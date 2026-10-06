@@ -85,6 +85,7 @@
     --color-chip-data: var(--chip-data);
     --color-chip-ask: var(--chip-ask);
     --color-chip-deny: var(--chip-deny);
+    --color-chip-chart-4: var(--chip-chart-4);
     --color-chip-design: var(--chip-design);
     --color-chip-integrations: var(--chip-integrations);
     --color-chip-reliability: var(--chip-reliability);
@@ -187,6 +188,7 @@
     --chip-data: #34d3992e;
     --chip-ask: #f59e0b2e;
     --chip-deny: #e11d482e;
+    --chip-chart-4: #9333ea2e;
     --chip-design: #fbbf242e;
     --chip-integrations: #38bdf82e;
     --chip-reliability: #f871712e;
@@ -271,6 +273,7 @@
     --chip-data: #6ee7b733;
     --chip-ask: #fcd34d33;
     --chip-deny: #fda4af33;
+    --chip-chart-4: #c084fc33;
     --chip-design: #fcd34d33;
     --chip-integrations: #7dd3fc33;
     --chip-reliability: #fca5a533;
