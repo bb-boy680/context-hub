@@ -1,13 +1,41 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
 
 @custom-variant dark (&:is(.dark *));
 @source "../../../apps/**/*.{ts,tsx}";
 @source "../../../components/**/*.{ts,tsx}";
 @source "../**/*.{ts,tsx}";
 
+/* Static scales from the design canvas. */
+@theme {
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-2xl: 16px;
+    --radius-3xl: 20px;
+    --radius-4xl: 24px;
+
+    --text-caption: 12px;
+    --text-body: 13px;
+    --text-title: 16px;
+    --text-heading: 22px;
+    --text-display: 29px;
+
+    --blur-glass: 18px;
+    --blur-header: 12px;
+    --blur-blob: 90px;
+
+    --shadow-glass: 0 8px 24px var(--glass-shadow);
+}
+
+/* Colour tokens are `var()` references so one class on <html> re-themes the app. */
 @theme inline {
     --font-heading: var(--font-sans);
     --color-sidebar-ring: var(--sidebar-ring);
@@ -41,90 +69,256 @@
     --color-card: var(--card);
     --color-foreground: var(--foreground);
     --color-background: var(--background);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
-    --font-sans: 'Geist Variable', sans-serif;
+    --color-tag-documents: var(--tag-documents);
+    --color-tag-engineering: var(--tag-engineering);
+    --color-tag-docs: var(--tag-docs);
+    --color-tag-data: var(--tag-data);
+    --color-tag-design: var(--tag-design);
+    --color-tag-integrations: var(--tag-integrations);
+    --color-tag-reliability: var(--tag-reliability);
+    --color-tag-marketing: var(--tag-marketing);
+    --color-tag-quality: var(--tag-quality);
+
+    --color-chip-documents: var(--chip-documents);
+    --color-chip-engineering: var(--chip-engineering);
+    --color-chip-docs: var(--chip-docs);
+    --color-chip-data: var(--chip-data);
+    --color-chip-design: var(--chip-design);
+    --color-chip-integrations: var(--chip-integrations);
+    --color-chip-reliability: var(--chip-reliability);
+    --color-chip-marketing: var(--chip-marketing);
+    --color-chip-quality: var(--chip-quality);
+    --color-chip-official: var(--chip-official);
+    --color-chip-internal: var(--chip-internal);
+    --color-chip-local: var(--chip-local);
+
+    --color-glass-border: var(--glass-border);
+    --color-glass-shadow: var(--glass-shadow);
+    --color-header: var(--header);
+    --color-accent-strong: var(--accent-strong);
+    --color-surface-raised: var(--surface-raised);
+    --color-surface-image-tile: var(--surface-image-tile);
+    --color-dialog: var(--dialog);
+    --color-notice-bg: var(--notice-bg);
+    --color-notice-border: var(--notice-border);
+    --color-dropzone: var(--dropzone);
+    --color-scrim: var(--scrim);
+    --color-success: var(--success);
+    --color-warning: var(--warning);
+    --color-marketplace-official: var(--marketplace-official);
+    --color-marketplace-internal: var(--marketplace-internal);
+    --color-marketplace-local: var(--marketplace-local);
+    --color-blob-blue: var(--blob-blue);
+    --color-blob-violet: var(--blob-violet);
+    --color-blob-pink: var(--blob-pink);
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
+    --radius: 8px;
+
+    --background: #edf1f8;
+    --foreground: #18181b;
+    --card: #ffffff99;
+    --card-foreground: #18181b;
+    --popover: #fffffff2;
+    --popover-foreground: #18181b;
+    --primary: #4f46e5;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #334155;
+    --muted: #e2e8f0;
+    --muted-foreground: #64748b;
+    --accent: #ffffffcc;
+    --accent-foreground: #18181b;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #e2e8f0;
+    --input: #cbd5e1;
+    --ring: #4f46e5;
+    --chart-1: #4f46e5;
+    --chart-2: #059669;
+    --chart-3: #ea580c;
+    --chart-4: #9333ea;
+    --chart-5: #e11d48;
+    --sidebar: #ffffff66;
+    --sidebar-foreground: #18181b;
+    --sidebar-primary: #4f46e5;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #ffffffcc;
+    --sidebar-accent-foreground: #18181b;
+    --sidebar-border: #ffffffb3;
+    --sidebar-ring: #4f46e5;
+
+    --glass-border: #ffffffb3;
+    --glass-shadow: #1e293b14;
+    --header: #ffffff73;
+    --accent-strong: #ffffff66;
+    --surface-raised: #ffffffcc;
+    --surface-image-tile: #ffffff99;
+    --dialog: #fffffff7;
+    --notice-bg: #4f46e51a;
+    --notice-border: #4f46e533;
+    --dropzone: #eef2ffb3;
+    --scrim: #0f172a73;
+    --success: #059669;
+    --warning: #ea580c;
+    --marketplace-official: #6366f1;
+    --marketplace-internal: #14b8a6;
+    --marketplace-local: #64748b;
+    --blob-blue: #93c5fd66;
+    --blob-violet: #c4b5fd66;
+    --blob-pink: #fbcfe866;
+
+    --tag-documents: #60a5fa;
+    --tag-engineering: #a78bfa;
+    --tag-docs: #f472b6;
+    --tag-data: #34d399;
+    --tag-design: #fbbf24;
+    --tag-integrations: #38bdf8;
+    --tag-reliability: #f87171;
+    --tag-marketing: #f0abfc;
+    --tag-quality: #a3e635;
+
+    --chip-documents: #60a5fa2e;
+    --chip-engineering: #a78bfa2e;
+    --chip-docs: #f472b62e;
+    --chip-data: #34d3992e;
+    --chip-design: #fbbf242e;
+    --chip-integrations: #38bdf82e;
+    --chip-reliability: #f871712e;
+    --chip-marketing: #f0abfc2e;
+    --chip-quality: #a3e6352e;
+    --chip-official: #6366f126;
+    --chip-internal: #14b8a626;
+    --chip-local: #64748b26;
+
+    --app-gradient-1: #e9f0fb;
+    --app-gradient-2: #f1edfb;
+    --app-gradient-3: #fbf0f2;
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: #0b0f1a;
+    --foreground: #f8fafc;
+    --card: #ffffff0f;
+    --card-foreground: #f8fafc;
+    --popover: #0e1422f2;
+    --popover-foreground: #f8fafc;
+    --primary: #6366f1;
+    --primary-foreground: #ffffff;
+    --secondary: #ffffff14;
+    --secondary-foreground: #e2e8f0;
+    --muted: #ffffff14;
+    --muted-foreground: #94a3b8;
+    --accent: #ffffff1f;
+    --accent-foreground: #f8fafc;
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+    --border: #ffffff1f;
+    --input: #ffffff29;
+    --ring: #818cf8;
+    --chart-1: #818cf8;
+    --chart-2: #34d399;
+    --chart-3: #fb923c;
+    --chart-4: #c084fc;
+    --chart-5: #fb7185;
+    --sidebar: #ffffff08;
+    --sidebar-foreground: #f8fafc;
+    --sidebar-primary: #6366f1;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #ffffff1f;
+    --sidebar-accent-foreground: #f8fafc;
+    --sidebar-border: #ffffff24;
+    --sidebar-ring: #818cf8;
+
+    --glass-border: #ffffff24;
+    --glass-shadow: #00000059;
+    --header: #ffffff0d;
+    --accent-strong: #ffffff0f;
+    --surface-raised: #ffffff1a;
+    --surface-image-tile: #ffffff14;
+    --dialog: #0e1422f7;
+    --notice-bg: #6366f11f;
+    --notice-border: #6366f133;
+    --dropzone: #312e81b3;
+    --scrim: #000000a6;
+    --success: #34d399;
+    --warning: #fb923c;
+    --marketplace-official: #818cf8;
+    --marketplace-internal: #2dd4bf;
+    --marketplace-local: #94a3b8;
+    --blob-blue: #1d4ed859;
+    --blob-violet: #6d28d959;
+    --blob-pink: #9d174d4d;
+
+    --tag-documents: #93c5fd;
+    --tag-engineering: #c4b5fd;
+    --tag-docs: #f9a8d4;
+    --tag-data: #6ee7b7;
+    --tag-design: #fcd34d;
+    --tag-integrations: #7dd3fc;
+    --tag-reliability: #fca5a5;
+    --tag-marketing: #f5d0fe;
+    --tag-quality: #bef264;
+
+    --chip-documents: #93c5fd33;
+    --chip-engineering: #c4b5fd33;
+    --chip-docs: #f9a8d433;
+    --chip-data: #6ee7b733;
+    --chip-design: #fcd34d33;
+    --chip-integrations: #7dd3fc33;
+    --chip-reliability: #fca5a533;
+    --chip-marketing: #f5d0fe33;
+    --chip-quality: #bef26433;
+    --chip-official: #818cf833;
+    --chip-internal: #2dd4bf33;
+    --chip-local: #94a3b833;
+
+    --app-gradient-1: #0b0f1a;
+    --app-gradient-2: #101426;
+    --app-gradient-3: #1a1226;
 }
 
 @layer base {
-  * {
-    @apply border-border outline-ring/50;
+    * {
+        @apply border-border outline-ring/50;
     }
-  body {
-    @apply bg-background text-foreground;
+
+    html {
+        background-color: var(--background);
     }
+
+    body {
+        @apply text-foreground;
+    }
+
+    /* Tailwind v4 dropped the preflight cursor for buttons; every enabled control opts in. */
+    button:not(:disabled, [aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="tab"]:not([aria-disabled="true"]),
+    [role="menuitem"]:not([aria-disabled="true"]),
+    [role="option"]:not([aria-disabled="true"]),
+    [role="switch"]:not([aria-disabled="true"]),
+    [role="checkbox"]:not([aria-disabled="true"]),
+    [role="radio"]:not([aria-disabled="true"]),
+    label,
+    summary,
+    select {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled="true"] {
+        cursor: not-allowed;
+    }
+}
+
+/* Page gradient behind the glass surfaces; the blobs sit on top of it. */
+@utility app-background {
+    background-image: linear-gradient(
+        225deg,
+        var(--app-gradient-1),
+        var(--app-gradient-2) 55%,
+        var(--app-gradient-3)
+    );
 }
