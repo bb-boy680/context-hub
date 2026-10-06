@@ -2,7 +2,6 @@ import {
   ActivityIcon,
   GitBranchIcon,
   LayoutDashboardIcon,
-  LibraryIcon,
   PlugIcon,
   ServerIcon,
   SettingsIcon,
@@ -30,7 +29,6 @@ export const navGroups: NavGroup[] = [
       { title: "Skills", path: "/skills", icon: SparklesIcon },
       { title: "MCP Servers", path: "/mcp-servers", icon: ServerIcon },
       { title: "Plugins", path: "/plugins", icon: PlugIcon },
-      { title: "Marketplace", path: "/marketplace", icon: LibraryIcon },
     ],
   },
   {
