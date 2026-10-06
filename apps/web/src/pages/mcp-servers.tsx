@@ -501,7 +501,10 @@ function PageTitleRow({ onAddServer }: { onAddServer: () => void }) {
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <Select defaultValue="All transports">
-          <SelectTrigger className={`h-9 w-[160px] ${outline}`} aria-label="Transport">
+          <SelectTrigger
+            className={`w-[160px] data-[size=default]:h-9 ${outline}`}
+            aria-label="Transport"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>

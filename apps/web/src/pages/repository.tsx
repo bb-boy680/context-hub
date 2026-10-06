@@ -127,12 +127,13 @@ function RepositoryCard() {
             />
           </div>
         </label>
-        <div className="flex items-start gap-4">
+        {/* The select is 2px shorter than the input, so the row aligns their boxes, not their labels. */}
+        <div className="flex items-end gap-4">
           <label className="flex w-[280px] shrink-0 flex-col gap-1.5">
             <FieldLabel>Branch</FieldLabel>
             <Select defaultValue={branch}>
               <SelectTrigger
-                className={`h-9 w-full ${fieldOutline}`}
+                className={`w-full data-[size=default]:h-9 ${fieldOutline}`}
                 aria-label="Branch"
               >
                 <SelectValue />

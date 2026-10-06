@@ -258,7 +258,8 @@ function ConfigurationPanel({
           label="Transport"
           hint="How the harness reaches this server"
         />
-        <div className="flex items-start gap-4">
+        {/* The select carries no label, so it lines up with the Command input, not with the label above it. */}
+        <div className="flex items-end gap-4">
           <SelectField value="stdio" className="w-[180px] shrink-0" />
           <label className="flex min-w-0 flex-1 flex-col gap-1.5">
             <span className="text-xs leading-[15px] text-muted-foreground">

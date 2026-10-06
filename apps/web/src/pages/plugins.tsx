@@ -328,7 +328,7 @@ function PageTitleRow({ onInstall }: { onInstall: () => void }) {
       <div className="flex shrink-0 items-center gap-2">
         <Select defaultValue="All sources">
           <SelectTrigger
-            className={`h-9 w-[150px] ${outline}`}
+            className={`w-[150px] data-[size=default]:h-9 ${outline}`}
             aria-label="Source"
           >
             <SelectValue />

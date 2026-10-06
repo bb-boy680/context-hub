@@ -151,7 +151,7 @@ function RegistryResults() {
           </div>
           <Select defaultValue={sortOptions[0]}>
             <SelectTrigger
-              className={`h-9 w-[138px] ${outline}`}
+              className={`w-[138px] data-[size=default]:h-9 ${outline}`}
               aria-label="Sort results"
             >
               <SelectValue />
