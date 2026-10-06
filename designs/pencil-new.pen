@@ -33409,7 +33409,8 @@
                               "width": "fill_container",
                               "content": "skill",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -33487,7 +33488,8 @@
                               "width": "fill_container",
                               "content": "README.md",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -33535,7 +33537,8 @@
                               "width": "fill_container",
                               "content": "scripts",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -33583,7 +33586,8 @@
                               "width": "fill_container",
                               "content": "templates",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -33631,7 +33635,8 @@
                               "width": "fill_container",
                               "content": "assets",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         }
@@ -102918,7 +102923,8 @@
                               "width": "fill_container",
                               "content": "engineering-kit",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -102966,7 +102972,8 @@
                               "width": "fill_container",
                               "content": ".claude-plugin",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103004,7 +103011,8 @@
                               "width": "fill_container",
                               "content": "plugin.json",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103052,7 +103060,8 @@
                               "width": "fill_container",
                               "content": "commands",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103090,7 +103099,8 @@
                               "width": "fill_container",
                               "content": "review.md",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103128,7 +103138,8 @@
                               "width": "fill_container",
                               "content": "test.md",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103176,7 +103187,8 @@
                               "width": "fill_container",
                               "content": "hooks",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103214,7 +103226,8 @@
                               "width": "fill_container",
                               "content": "hooks.json",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103252,7 +103265,8 @@
                               "width": "fill_container",
                               "content": "pre-tool-use.sh",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103300,7 +103314,8 @@
                               "width": "fill_container",
                               "content": "skills",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -103398,7 +103413,8 @@
                               "width": "fill_container",
                               "content": "code-review",
                               "fontFamily": "$font-sans",
-                              "fontSize": 13
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         }
@@ -105132,7 +105148,7 @@
                                           "fill": "$muted-foreground",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
-                                          "content": "Also sync skills and plugins that are currently turned off.",
+                                          "content": "Also link disabled skills and plugins into this workspace.",
                                           "fontFamily": "$font-sans",
                                           "fontSize": 12.5,
                                           "fontWeight": "normal"

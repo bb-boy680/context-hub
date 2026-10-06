@@ -1,5 +1,5 @@
 import { GitForkIcon, RefreshCwIcon, SearchIcon } from "lucide-react"
-import { useLocation } from "react-router"
+import { Link, useLocation } from "react-router"
 
 import {
   Breadcrumb,
@@ -49,6 +49,7 @@ export function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
       <Button
         size="lg"
         variant="outline"
+        render={<Link to="/repository" />}
         className="hidden border-input bg-transparent px-3.5 lg:inline-flex dark:bg-transparent"
       >
         <GitForkIcon />

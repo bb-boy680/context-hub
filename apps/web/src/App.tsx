@@ -6,9 +6,10 @@ import { McpServersPage } from "@/pages/mcp-servers"
 import { OverviewPage } from "@/pages/overview"
 import { PlaceholderPage } from "@/pages/placeholder"
 import { PluginsPage } from "@/pages/plugins"
+import { RepositoryPage } from "@/pages/repository"
 import { SkillsPage } from "@/pages/skills"
 
-const designedPaths = ["/", "/skills", "/mcp-servers", "/plugins"]
+const designedPaths = ["/", "/skills", "/mcp-servers", "/plugins", "/repository"]
 
 export function App() {
   return (
@@ -19,6 +20,7 @@ export function App() {
           <Route path="/skills" element={<SkillsPage />} />
           <Route path="/mcp-servers" element={<McpServersPage />} />
           <Route path="/plugins" element={<PluginsPage />} />
+          <Route path="/repository" element={<RepositoryPage />} />
           {navItems
             .filter((item) => !designedPaths.includes(item.path))
             .map((item) => (
