@@ -331,3 +331,20 @@
         var(--app-gradient-3)
     );
 }
+
+/* Photo covers soften downward. One masked backdrop blur replaces the design's four discrete
+   13px bands, whose radii compound into this same 0 -> 6px ramp, with no seam. */
+@utility cover-fade {
+    &::after {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        height: 52px;
+        pointer-events: none;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        mask-image: linear-gradient(to bottom, transparent, black);
+        -webkit-mask-image: linear-gradient(to bottom, transparent, black);
+    }
+}

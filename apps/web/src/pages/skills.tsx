@@ -7,10 +7,7 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import {
-  AddSkillDialog,
-  type AddSkillTab,
-} from "@/components/add-skill-dialog"
+import { AddSkillDialog, type AddSkillTab } from "@/components/add-skill-dialog"
 import { SkillDetailDialog } from "@/components/skill-detail-dialog"
 import { TablePagination } from "@/components/table-pagination"
 import { Badge } from "@workspace/ui/components/badge"
@@ -31,7 +28,12 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
 const cardSurface =
   "[--card-spacing:1.5rem] rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"
@@ -291,14 +293,6 @@ const columns = [
 
 const viewToggleSurface = "flex h-9 gap-1 rounded-lg bg-muted p-1"
 
-/* Each band blurs its backdrop, so the radii compound into the design's 1 / 2.5 / 4 / 6px ramp. */
-const blurBands = [
-  { top: 40, blur: 1 },
-  { top: 53, blur: 2.3 },
-  { top: 66, blur: 3.1 },
-  { top: 79, blur: 4.5 },
-]
-
 function titleCase(name: string) {
   return name
     .split("-")
@@ -326,22 +320,7 @@ function SourceBadge({ source }: { source: SkillSource }) {
 }
 
 function PhotoCover({ src }: { src: string }) {
-  return (
-    <>
-      <img src={src} alt="" className="size-full object-cover" />
-      {blurBands.map((band) => (
-        <div
-          key={band.top}
-          className="absolute inset-x-0 h-[13px]"
-          style={{
-            top: band.top,
-            backdropFilter: `blur(${band.blur}px)`,
-            WebkitBackdropFilter: `blur(${band.blur}px)`,
-          }}
-        />
-      ))}
-    </>
-  )
+  return <img src={src} alt="" className="size-full object-cover" />
 }
 
 function MarkdownCover({ skill }: { skill: Skill }) {
@@ -356,9 +335,10 @@ function MarkdownCover({ skill }: { skill: Skill }) {
       text: `category: ${skill.tags[0]}`,
       className: "text-secondary-foreground/68",
     },
+    { text: "---", className: "text-muted-foreground/42" },
     {
       text: `# ${titleCase(skill.name)}`,
-      className: "text-secondary-foreground/35",
+      className: "text-secondary-foreground/15",
     },
   ]
 
@@ -373,26 +353,22 @@ function MarkdownCover({ skill }: { skill: Skill }) {
   )
 }
 
-function SkillCard({
-  skill,
-  onOpen,
-}: {
-  skill: Skill
-  onOpen: () => void
-}) {
+function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: () => void }) {
   return (
     <div
       onDoubleClick={onOpen}
-      className="flex h-[224px] cursor-pointer flex-col overflow-hidden rounded-lg bg-card ring-1 ring-glass-border shadow-glass backdrop-blur-glass"
+      className="flex h-[246px] cursor-pointer flex-col overflow-hidden rounded-lg bg-card shadow-glass ring-1 ring-glass-border backdrop-blur-glass"
     >
-      <div className="relative h-[92px] shrink-0 overflow-hidden">
+      <div
+        className={`relative h-[124px] shrink-0 overflow-hidden ${skill.cover ? "cover-fade" : ""}`}
+      >
         {skill.cover ? (
           <PhotoCover src={skill.cover} />
         ) : (
           <MarkdownCover skill={skill} />
         )}
       </div>
-      <div className="flex flex-1 flex-col gap-2 p-3">
+      <div className="flex flex-1 flex-col gap-1.5 p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-sm font-semibold">{skill.name}</span>
           <SourceBadge source={skill.source} />
@@ -410,7 +386,10 @@ function SkillCard({
           <span className="truncate text-xs text-muted-foreground">
             {skill.tokens} · {skill.triggers} triggers
           </span>
-          <Switch defaultChecked={skill.enabled} aria-label={`Enable ${skill.name}`} />
+          <Switch
+            defaultChecked={skill.enabled}
+            aria-label={`Enable ${skill.name}`}
+          />
         </div>
       </div>
     </div>
@@ -420,7 +399,7 @@ function SkillCard({
 function SkillGrid({ onOpen }: { onOpen: (skill: Skill) => void }) {
   /* Five per row at most: past that the cards get too narrow to read. 96px = the four 24px gaps. */
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(max(266px,calc((100%-96px)/5)),1fr))] gap-6">
+    <div className="grid grid-cols-[repeat(auto-fill,minmax(max(266px,calc((100%-96px)/5)),1fr))] gap-x-6 gap-y-5">
       {skills.slice(0, 12).map((skill) => (
         <SkillCard
           key={skill.name}
@@ -486,9 +465,7 @@ function SkillTable({ onOpen }: { onOpen: (skill: Skill) => void }) {
                 onDoubleClick={() => onOpen(skill)}
                 className="h-11 cursor-pointer"
               >
-                <TableCell
-                  onDoubleClick={(event) => event.stopPropagation()}
-                >
+                <TableCell onDoubleClick={(event) => event.stopPropagation()}>
                   <Checkbox aria-label={`Select ${skill.name}`} />
                 </TableCell>
                 <TableCell>
@@ -523,9 +500,7 @@ function SkillTable({ onOpen }: { onOpen: (skill: Skill) => void }) {
                 <TableCell className="text-sm text-muted-foreground">
                   {skill.updated}
                 </TableCell>
-                <TableCell
-                  onDoubleClick={(event) => event.stopPropagation()}
-                >
+                <TableCell onDoubleClick={(event) => event.stopPropagation()}>
                   <Switch
                     defaultChecked={skill.enabled}
                     aria-label={`Enable ${skill.name}`}
@@ -537,9 +512,7 @@ function SkillTable({ onOpen }: { onOpen: (skill: Skill) => void }) {
         </Table>
       </div>
       <div className="flex items-center justify-between px-6">
-        <span className="text-xs text-muted-foreground">
-          1–14 of 42 skills
-        </span>
+        <span className="text-xs text-muted-foreground">1–14 of 42 skills</span>
         <TablePagination pageText="Page 1 of 4" />
       </div>
     </Card>

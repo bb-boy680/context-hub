@@ -49,12 +49,18 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 
 const cardSurface =
   "[--card-spacing:1.25rem] rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"
 
-const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
+const outline =
+  "border-border bg-transparent dark:border-input dark:bg-transparent"
 
 const tabs = [
   { value: "all", label: "All 15" },
@@ -73,14 +79,6 @@ const columns = [
 ]
 
 const viewToggleSurface = "flex h-9 gap-1 rounded-lg bg-muted p-1"
-
-/* Each band blurs its backdrop, so the radii compound into the design's 1 / 2.5 / 4 / 6px ramp. */
-const blurBands = [
-  { top: 40, blur: 1 },
-  { top: 53, blur: 2.3 },
-  { top: 66, blur: 3.1 },
-  { top: 79, blur: 4.5 },
-]
 
 function MarketplaceChip({
   marketplace,
@@ -104,22 +102,7 @@ function MarketplaceChip({
 }
 
 function PhotoCover({ src }: { src: string }) {
-  return (
-    <>
-      <img src={src} alt="" className="size-full object-cover" />
-      {blurBands.map((band) => (
-        <div
-          key={band.top}
-          className="absolute inset-x-0 h-[13px]"
-          style={{
-            top: band.top,
-            backdropFilter: `blur(${band.blur}px)`,
-            WebkitBackdropFilter: `blur(${band.blur}px)`,
-          }}
-        />
-      ))}
-    </>
-  )
+  return <img src={src} alt="" className="size-full object-cover" />
 }
 
 /** Plugins without an uploaded cover render their README instead, fading line by line. */
@@ -189,9 +172,11 @@ function PluginCard({
   return (
     <div
       onDoubleClick={onOpen}
-      className="flex h-[246px] cursor-pointer flex-col overflow-hidden rounded-lg bg-card ring-1 ring-glass-border shadow-glass backdrop-blur-glass"
+      className="flex h-[246px] cursor-pointer flex-col overflow-hidden rounded-lg bg-card shadow-glass ring-1 ring-glass-border backdrop-blur-glass"
     >
-      <div className="relative h-[92px] shrink-0 overflow-hidden">
+      <div
+        className={`relative h-[92px] shrink-0 overflow-hidden ${plugin.cover ? "cover-fade" : ""}`}
+      >
         {plugin.cover ? (
           <PhotoCover src={plugin.cover} />
         ) : (
@@ -281,9 +266,7 @@ function PluginTable({ onOpen }: { onOpen: (plugin: Plugin) => void }) {
                 onDoubleClick={() => onOpen(plugin)}
                 className="h-[42px] cursor-pointer"
               >
-                <TableCell
-                  onDoubleClick={(event) => event.stopPropagation()}
-                >
+                <TableCell onDoubleClick={(event) => event.stopPropagation()}>
                   <Checkbox aria-label={`Select ${plugin.name}`} />
                 </TableCell>
                 <TableCell>
@@ -308,9 +291,7 @@ function PluginTable({ onOpen }: { onOpen: (plugin: Plugin) => void }) {
                 <TableCell>
                   <MarketplaceChip marketplace={plugin.marketplace} />
                 </TableCell>
-                <TableCell
-                  onDoubleClick={(event) => event.stopPropagation()}
-                >
+                <TableCell onDoubleClick={(event) => event.stopPropagation()}>
                   <Switch
                     defaultChecked={plugin.enabled}
                     aria-label={`Enable ${plugin.name}`}

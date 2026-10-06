@@ -7023,15 +7023,16 @@
                       "id": "QDY2a",
                       "name": "Card Grid",
                       "width": "fill_container",
+                      "height": 778,
                       "layout": "vertical",
-                      "gap": 24,
+                      "gap": 20,
                       "children": [
                         {
                           "type": "frame",
                           "id": "nTfcL",
                           "name": "Grid Row 0",
                           "width": "fill_container",
-                          "height": 224,
+                          "height": 246,
                           "gap": 24,
                           "children": [
                             {
@@ -7040,7 +7041,7 @@
                               "name": "Skill pdf-extract",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -7075,7 +7076,7 @@
                                     "author": "Godz1"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -7092,7 +7093,7 @@
                                       "id": "Q7ybl",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -7103,7 +7104,7 @@
                                           "type": "rectangle",
                                           "id": "fIewN",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7112,7 +7113,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -7125,7 +7126,7 @@
                                       "id": "vXfIs",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -7136,7 +7137,7 @@
                                           "type": "rectangle",
                                           "id": "ehSrq",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7145,7 +7146,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -7158,7 +7159,7 @@
                                       "id": "S2rTx",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -7169,7 +7170,7 @@
                                           "type": "rectangle",
                                           "id": "tGoIP",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7178,7 +7179,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -7191,7 +7192,7 @@
                                       "id": "lTzns",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -7202,7 +7203,7 @@
                                           "type": "rectangle",
                                           "id": "m6w3k",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7211,7 +7212,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -7228,7 +7229,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -7366,7 +7367,7 @@
                               "name": "Skill code-review",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -7401,7 +7402,7 @@
                                     "author": "Michael Dziedzic"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -7418,7 +7419,7 @@
                                       "id": "Bd841",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -7429,7 +7430,7 @@
                                           "type": "rectangle",
                                           "id": "LKcRk",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7438,7 +7439,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -7451,7 +7452,7 @@
                                       "id": "J250s",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -7462,7 +7463,7 @@
                                           "type": "rectangle",
                                           "id": "JH1ka",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7471,7 +7472,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -7484,7 +7485,7 @@
                                       "id": "gprOz",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -7495,7 +7496,7 @@
                                           "type": "rectangle",
                                           "id": "h7JzZE",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7504,7 +7505,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -7517,7 +7518,7 @@
                                       "id": "O0yrhF",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -7528,7 +7529,7 @@
                                           "type": "rectangle",
                                           "id": "PFor8",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -7537,7 +7538,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -7554,7 +7555,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -7692,7 +7693,7 @@
                               "name": "Skill doc-audit",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -7728,7 +7729,7 @@
                                   },
                                   "clip": true,
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": "$surface-raised",
                                   "layout": "none",
                                   "children": [
@@ -7739,7 +7740,7 @@
                                       "y": 0,
                                       "name": "Markdown",
                                       "width": 266,
-                                      "height": 92,
+                                      "height": 124,
                                       "layout": "vertical",
                                       "gap": 2,
                                       "padding": [
@@ -7801,9 +7802,21 @@
                                         },
                                         {
                                           "type": "text",
+                                          "id": "fJfUi",
+                                          "name": "Line 5",
+                                          "fill": "#64748B6B",
+                                          "textGrowth": "fixed-width",
+                                          "width": "fill_container",
+                                          "content": "---",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        },
+                                        {
+                                          "type": "text",
                                           "id": "btVUY",
                                           "name": "Line 6",
-                                          "fill": "#33415559",
+                                          "fill": "#33415526",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
                                           "content": "# Doc Audit",
@@ -7823,7 +7836,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -7961,7 +7974,7 @@
                               "name": "Skill api-design",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -7996,7 +8009,7 @@
                                     "author": "Mohammad Rahmani"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -8013,7 +8026,7 @@
                                       "id": "mD7eo",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -8024,7 +8037,7 @@
                                           "type": "rectangle",
                                           "id": "zXQoC",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8033,7 +8046,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -8046,7 +8059,7 @@
                                       "id": "V7VkyP",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -8057,7 +8070,7 @@
                                           "type": "rectangle",
                                           "id": "n9UfNE",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8066,7 +8079,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -8079,7 +8092,7 @@
                                       "id": "nEyqw",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -8090,7 +8103,7 @@
                                           "type": "rectangle",
                                           "id": "lwjFm",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8099,7 +8112,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -8112,7 +8125,7 @@
                                       "id": "SpoZY",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -8123,7 +8136,7 @@
                                           "type": "rectangle",
                                           "id": "L1eS3",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8132,7 +8145,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -8149,7 +8162,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -8288,7 +8301,7 @@
                           "id": "BPNr4",
                           "name": "Grid Row 1",
                           "width": "fill_container",
-                          "height": 224,
+                          "height": 246,
                           "gap": 24,
                           "children": [
                             {
@@ -8297,7 +8310,7 @@
                               "name": "Skill test-reliability",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -8332,7 +8345,7 @@
                                     "author": "Testalize.me"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -8349,7 +8362,7 @@
                                       "id": "EQU7n",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -8360,7 +8373,7 @@
                                           "type": "rectangle",
                                           "id": "Txr91",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8369,7 +8382,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -8382,7 +8395,7 @@
                                       "id": "h2ZRoU",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -8393,7 +8406,7 @@
                                           "type": "rectangle",
                                           "id": "t7tM8X",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8402,7 +8415,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -8415,7 +8428,7 @@
                                       "id": "o2Ze2q",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -8426,7 +8439,7 @@
                                           "type": "rectangle",
                                           "id": "hFqqZ",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8435,7 +8448,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -8448,7 +8461,7 @@
                                       "id": "u6BrjU",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -8459,7 +8472,7 @@
                                           "type": "rectangle",
                                           "id": "XnRQS",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8468,7 +8481,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -8485,7 +8498,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -8623,7 +8636,7 @@
                               "name": "Skill release-notes",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -8658,7 +8671,7 @@
                                     "author": "SpaceX"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -8675,7 +8688,7 @@
                                       "id": "HvC85",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -8686,7 +8699,7 @@
                                           "type": "rectangle",
                                           "id": "xW6p8",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8695,7 +8708,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -8708,7 +8721,7 @@
                                       "id": "gv7wC",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -8719,7 +8732,7 @@
                                           "type": "rectangle",
                                           "id": "b67Zi",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8728,7 +8741,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -8741,7 +8754,7 @@
                                       "id": "y4s8Y",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -8752,7 +8765,7 @@
                                           "type": "rectangle",
                                           "id": "Ftgkf",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8761,7 +8774,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -8774,7 +8787,7 @@
                                       "id": "ywcsO",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -8785,7 +8798,7 @@
                                           "type": "rectangle",
                                           "id": "rqaFc",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -8794,7 +8807,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -8811,7 +8824,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -8949,7 +8962,7 @@
                               "name": "Skill legacy-jira-sync",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -8984,7 +8997,7 @@
                                     "author": "zubair khan"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -9001,7 +9014,7 @@
                                       "id": "YELlK",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -9012,7 +9025,7 @@
                                           "type": "rectangle",
                                           "id": "T2IHPH",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9021,7 +9034,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -9034,7 +9047,7 @@
                                       "id": "rfksa",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -9045,7 +9058,7 @@
                                           "type": "rectangle",
                                           "id": "GVl5M",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9054,7 +9067,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -9067,7 +9080,7 @@
                                       "id": "Ifdy9",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -9078,7 +9091,7 @@
                                           "type": "rectangle",
                                           "id": "hhOxQ",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9087,7 +9100,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -9100,7 +9113,7 @@
                                       "id": "AmM8v",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -9111,7 +9124,7 @@
                                           "type": "rectangle",
                                           "id": "WYiUY",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9120,7 +9133,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -9137,7 +9150,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -9274,7 +9287,7 @@
                               "name": "Skill data-migration",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -9310,7 +9323,7 @@
                                   },
                                   "clip": true,
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": "$surface-raised",
                                   "layout": "none",
                                   "children": [
@@ -9321,7 +9334,7 @@
                                       "y": 0,
                                       "name": "Markdown",
                                       "width": 266,
-                                      "height": 92,
+                                      "height": 124,
                                       "layout": "vertical",
                                       "gap": 2,
                                       "padding": [
@@ -9383,9 +9396,21 @@
                                         },
                                         {
                                           "type": "text",
+                                          "id": "J1F7QZ",
+                                          "name": "Line 5",
+                                          "fill": "#64748B6B",
+                                          "textGrowth": "fixed-width",
+                                          "width": "fill_container",
+                                          "content": "---",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        },
+                                        {
+                                          "type": "text",
                                           "id": "qAmTg",
                                           "name": "Line 6",
-                                          "fill": "#33415559",
+                                          "fill": "#33415526",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
                                           "content": "# Data Migration",
@@ -9405,7 +9430,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -9543,7 +9568,7 @@
                           "id": "C4mlQR",
                           "name": "Grid Row 2",
                           "width": "fill_container",
-                          "height": 224,
+                          "height": 246,
                           "gap": 24,
                           "children": [
                             {
@@ -9552,7 +9577,7 @@
                               "name": "Skill onboarding-guide",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -9587,7 +9612,7 @@
                                     "author": "ThisisEngineering"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -9604,7 +9629,7 @@
                                       "id": "webZb",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -9615,7 +9640,7 @@
                                           "type": "rectangle",
                                           "id": "vT6tb",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9624,7 +9649,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -9637,7 +9662,7 @@
                                       "id": "L7kZwq",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -9648,7 +9673,7 @@
                                           "type": "rectangle",
                                           "id": "UEJFO",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9657,7 +9682,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -9670,7 +9695,7 @@
                                       "id": "hDMDp",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -9681,7 +9706,7 @@
                                           "type": "rectangle",
                                           "id": "ZMQqQ",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9690,7 +9715,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -9703,7 +9728,7 @@
                                       "id": "DvvqV",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -9714,7 +9739,7 @@
                                           "type": "rectangle",
                                           "id": "Y7T9tj",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -9723,7 +9748,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -9740,7 +9765,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -9878,7 +9903,7 @@
                               "name": "Skill perf-profiling",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -9914,7 +9939,7 @@
                                   },
                                   "clip": true,
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": "$surface-raised",
                                   "layout": "none",
                                   "children": [
@@ -9925,7 +9950,7 @@
                                       "y": 0,
                                       "name": "Markdown",
                                       "width": 266,
-                                      "height": 92,
+                                      "height": 124,
                                       "layout": "vertical",
                                       "gap": 2,
                                       "padding": [
@@ -9987,9 +10012,21 @@
                                         },
                                         {
                                           "type": "text",
+                                          "id": "cm4z9",
+                                          "name": "Line 5",
+                                          "fill": "#64748B6B",
+                                          "textGrowth": "fixed-width",
+                                          "width": "fill_container",
+                                          "content": "---",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        },
+                                        {
+                                          "type": "text",
                                           "id": "odxCS",
                                           "name": "Line 6",
-                                          "fill": "#33415559",
+                                          "fill": "#33415526",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
                                           "content": "# Perf Profiling",
@@ -10009,7 +10046,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -10147,7 +10184,7 @@
                               "name": "Skill brand-voice",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -10182,7 +10219,7 @@
                                     "author": "Denys Striyeshyn"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -10199,7 +10236,7 @@
                                       "id": "O86sKj",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -10210,7 +10247,7 @@
                                           "type": "rectangle",
                                           "id": "N6ijB",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10219,7 +10256,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -10232,7 +10269,7 @@
                                       "id": "AOHA6",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -10243,7 +10280,7 @@
                                           "type": "rectangle",
                                           "id": "W6X0If",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10252,7 +10289,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -10265,7 +10302,7 @@
                                       "id": "w6puHQ",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -10276,7 +10313,7 @@
                                           "type": "rectangle",
                                           "id": "F9QwqT",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10285,7 +10322,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -10298,7 +10335,7 @@
                                       "id": "xjXlL",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -10309,7 +10346,7 @@
                                           "type": "rectangle",
                                           "id": "NLIXF",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10318,7 +10355,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -10335,7 +10372,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -10472,7 +10509,7 @@
                               "name": "Skill incident-postmortem",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "$card",
                               "cornerRadius": "$radius-lg",
                               "stroke": "$glass-border",
@@ -10507,7 +10544,7 @@
                                     "author": "Niclas Illg"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -10524,7 +10561,7 @@
                                       "id": "H6Uw1a",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -10535,7 +10572,7 @@
                                           "type": "rectangle",
                                           "id": "SAm40",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10544,7 +10581,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -10557,7 +10594,7 @@
                                       "id": "K57IyK",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -10568,7 +10605,7 @@
                                           "type": "rectangle",
                                           "id": "v0L7GB",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10577,7 +10614,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -10590,7 +10627,7 @@
                                       "id": "V7xiJP",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -10601,7 +10638,7 @@
                                           "type": "rectangle",
                                           "id": "pudHc",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10610,7 +10647,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -10623,7 +10660,7 @@
                                       "id": "HRH0n",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -10634,7 +10671,7 @@
                                           "type": "rectangle",
                                           "id": "YQCjn",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -10643,7 +10680,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -10660,7 +10697,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -128222,15 +128259,16 @@
                       "id": "Zsr0W",
                       "name": "Card Grid",
                       "width": "fill_container",
+                      "height": 778,
                       "layout": "vertical",
-                      "gap": 24,
+                      "gap": 20,
                       "children": [
                         {
                           "type": "frame",
                           "id": "FSCYx",
                           "name": "Grid Row 0",
                           "width": "fill_container",
-                          "height": 224,
+                          "height": 246,
                           "gap": 24,
                           "children": [
                             {
@@ -128239,7 +128277,7 @@
                               "name": "Skill pdf-extract",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -128274,7 +128312,7 @@
                                     "author": "Godz1"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -128291,7 +128329,7 @@
                                       "id": "I6ZgY",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -128302,7 +128340,7 @@
                                           "type": "rectangle",
                                           "id": "j78Xpl",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128311,7 +128349,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -128324,7 +128362,7 @@
                                       "id": "ZDacL",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -128335,7 +128373,7 @@
                                           "type": "rectangle",
                                           "id": "Q1Byr3",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128344,7 +128382,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -128357,7 +128395,7 @@
                                       "id": "b1T1A",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -128368,7 +128406,7 @@
                                           "type": "rectangle",
                                           "id": "VvKrK",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128377,7 +128415,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -128390,7 +128428,7 @@
                                       "id": "KzywN",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -128401,7 +128439,7 @@
                                           "type": "rectangle",
                                           "id": "ShzEJ",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128410,7 +128448,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -128427,7 +128465,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -128567,7 +128605,7 @@
                               "name": "Skill code-review",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -128602,7 +128640,7 @@
                                     "author": "Michael Dziedzic"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -128619,7 +128657,7 @@
                                       "id": "a6SRu",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -128630,7 +128668,7 @@
                                           "type": "rectangle",
                                           "id": "eDrRq",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128639,7 +128677,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -128652,7 +128690,7 @@
                                       "id": "J4xEAD",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -128663,7 +128701,7 @@
                                           "type": "rectangle",
                                           "id": "V62zEk",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128672,7 +128710,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -128685,7 +128723,7 @@
                                       "id": "NeIOn",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -128696,7 +128734,7 @@
                                           "type": "rectangle",
                                           "id": "QbmRe",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128705,7 +128743,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -128718,7 +128756,7 @@
                                       "id": "CnIKm",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -128729,7 +128767,7 @@
                                           "type": "rectangle",
                                           "id": "WhEdX",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -128738,7 +128776,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -128755,7 +128793,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -128895,7 +128933,7 @@
                               "name": "Skill doc-audit",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -128931,7 +128969,7 @@
                                   },
                                   "clip": true,
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": "#FFFFFF1A",
                                   "layout": "none",
                                   "children": [
@@ -128942,7 +128980,7 @@
                                       "y": 0,
                                       "name": "Markdown",
                                       "width": 266,
-                                      "height": 92,
+                                      "height": 124,
                                       "layout": "vertical",
                                       "gap": 2,
                                       "padding": [
@@ -129004,9 +129042,21 @@
                                         },
                                         {
                                           "type": "text",
+                                          "id": "mMDdY",
+                                          "name": "Line 5",
+                                          "fill": "#94A3B86B",
+                                          "textGrowth": "fixed-width",
+                                          "width": "fill_container",
+                                          "content": "---",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        },
+                                        {
+                                          "type": "text",
                                           "id": "M9bwH5",
                                           "name": "Line 6",
-                                          "fill": "#E2E8F059",
+                                          "fill": "#E2E8F026",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
                                           "content": "# Doc Audit",
@@ -129026,7 +129076,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -129166,7 +129216,7 @@
                               "name": "Skill api-design",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -129201,7 +129251,7 @@
                                     "author": "Mohammad Rahmani"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -129218,7 +129268,7 @@
                                       "id": "xYKOk",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -129229,7 +129279,7 @@
                                           "type": "rectangle",
                                           "id": "tNwbM",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129238,7 +129288,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -129251,7 +129301,7 @@
                                       "id": "GsVIF",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -129262,7 +129312,7 @@
                                           "type": "rectangle",
                                           "id": "a27KpN",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129271,7 +129321,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -129284,7 +129334,7 @@
                                       "id": "a853GV",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -129295,7 +129345,7 @@
                                           "type": "rectangle",
                                           "id": "kE3WS",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129304,7 +129354,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -129317,7 +129367,7 @@
                                       "id": "qEfo9",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -129328,7 +129378,7 @@
                                           "type": "rectangle",
                                           "id": "B353uc",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129337,7 +129387,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -129354,7 +129404,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -129495,7 +129545,7 @@
                           "id": "K6RgC",
                           "name": "Grid Row 1",
                           "width": "fill_container",
-                          "height": 224,
+                          "height": 246,
                           "gap": 24,
                           "children": [
                             {
@@ -129504,7 +129554,7 @@
                               "name": "Skill test-reliability",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -129539,7 +129589,7 @@
                                     "author": "Testalize.me"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -129556,7 +129606,7 @@
                                       "id": "GkQWw",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -129567,7 +129617,7 @@
                                           "type": "rectangle",
                                           "id": "r8Y5BZ",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129576,7 +129626,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -129589,7 +129639,7 @@
                                       "id": "RHFVd",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -129600,7 +129650,7 @@
                                           "type": "rectangle",
                                           "id": "s1OsL",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129609,7 +129659,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -129622,7 +129672,7 @@
                                       "id": "bBuJD",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -129633,7 +129683,7 @@
                                           "type": "rectangle",
                                           "id": "er4mM",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129642,7 +129692,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -129655,7 +129705,7 @@
                                       "id": "jOJfE",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -129666,7 +129716,7 @@
                                           "type": "rectangle",
                                           "id": "shZGH",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129675,7 +129725,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -129692,7 +129742,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -129832,7 +129882,7 @@
                               "name": "Skill release-notes",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -129867,7 +129917,7 @@
                                     "author": "SpaceX"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -129884,7 +129934,7 @@
                                       "id": "a0Z1q",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -129895,7 +129945,7 @@
                                           "type": "rectangle",
                                           "id": "j0WGZ",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129904,7 +129954,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -129917,7 +129967,7 @@
                                       "id": "QaUmm",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -129928,7 +129978,7 @@
                                           "type": "rectangle",
                                           "id": "p7BRj",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129937,7 +129987,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -129950,7 +130000,7 @@
                                       "id": "mWDvG",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -129961,7 +130011,7 @@
                                           "type": "rectangle",
                                           "id": "S7wVhG",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -129970,7 +130020,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -129983,7 +130033,7 @@
                                       "id": "K03hP4",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -129994,7 +130044,7 @@
                                           "type": "rectangle",
                                           "id": "I2QaI8",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130003,7 +130053,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -130020,7 +130070,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -130160,7 +130210,7 @@
                               "name": "Skill legacy-jira-sync",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -130195,7 +130245,7 @@
                                     "author": "zubair khan"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -130212,7 +130262,7 @@
                                       "id": "FHT5R",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -130223,7 +130273,7 @@
                                           "type": "rectangle",
                                           "id": "ORrO6",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130232,7 +130282,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -130245,7 +130295,7 @@
                                       "id": "lFQVk",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -130256,7 +130306,7 @@
                                           "type": "rectangle",
                                           "id": "RzHNw",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130265,7 +130315,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -130278,7 +130328,7 @@
                                       "id": "YZ2qV",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -130289,7 +130339,7 @@
                                           "type": "rectangle",
                                           "id": "XR8vo",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130298,7 +130348,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -130311,7 +130361,7 @@
                                       "id": "fBh5u",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -130322,7 +130372,7 @@
                                           "type": "rectangle",
                                           "id": "Fnrb1",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130331,7 +130381,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -130348,7 +130398,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -130488,7 +130538,7 @@
                               "name": "Skill data-migration",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -130524,7 +130574,7 @@
                                   },
                                   "clip": true,
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": "#FFFFFF1A",
                                   "layout": "none",
                                   "children": [
@@ -130535,7 +130585,7 @@
                                       "y": 0,
                                       "name": "Markdown",
                                       "width": 266,
-                                      "height": 92,
+                                      "height": 124,
                                       "layout": "vertical",
                                       "gap": 2,
                                       "padding": [
@@ -130597,9 +130647,21 @@
                                         },
                                         {
                                           "type": "text",
+                                          "id": "s6kDgl",
+                                          "name": "Line 5",
+                                          "fill": "#94A3B86B",
+                                          "textGrowth": "fixed-width",
+                                          "width": "fill_container",
+                                          "content": "---",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        },
+                                        {
+                                          "type": "text",
                                           "id": "PhZB9",
                                           "name": "Line 6",
-                                          "fill": "#E2E8F059",
+                                          "fill": "#E2E8F026",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
                                           "content": "# Data Migration",
@@ -130619,7 +130681,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -130760,7 +130822,7 @@
                           "id": "JQ8An",
                           "name": "Grid Row 2",
                           "width": "fill_container",
-                          "height": 224,
+                          "height": 246,
                           "gap": 24,
                           "children": [
                             {
@@ -130769,7 +130831,7 @@
                               "name": "Skill onboarding-guide",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -130804,7 +130866,7 @@
                                     "author": "ThisisEngineering"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -130821,7 +130883,7 @@
                                       "id": "mBNTA",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -130832,7 +130894,7 @@
                                           "type": "rectangle",
                                           "id": "z0VGiZ",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130841,7 +130903,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -130854,7 +130916,7 @@
                                       "id": "edeuB",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -130865,7 +130927,7 @@
                                           "type": "rectangle",
                                           "id": "P5hmrD",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130874,7 +130936,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -130887,7 +130949,7 @@
                                       "id": "DsINT",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -130898,7 +130960,7 @@
                                           "type": "rectangle",
                                           "id": "gbM9X",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130907,7 +130969,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -130920,7 +130982,7 @@
                                       "id": "HsXPG",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -130931,7 +130993,7 @@
                                           "type": "rectangle",
                                           "id": "iplhm",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -130940,7 +131002,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -130957,7 +131019,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -131097,7 +131159,7 @@
                               "name": "Skill perf-profiling",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -131133,7 +131195,7 @@
                                   },
                                   "clip": true,
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": "#FFFFFF1A",
                                   "layout": "none",
                                   "children": [
@@ -131144,7 +131206,7 @@
                                       "y": 0,
                                       "name": "Markdown",
                                       "width": 266,
-                                      "height": 92,
+                                      "height": 124,
                                       "layout": "vertical",
                                       "gap": 2,
                                       "padding": [
@@ -131206,9 +131268,21 @@
                                         },
                                         {
                                           "type": "text",
+                                          "id": "Q1yr8",
+                                          "name": "Line 5",
+                                          "fill": "#94A3B86B",
+                                          "textGrowth": "fixed-width",
+                                          "width": "fill_container",
+                                          "content": "---",
+                                          "fontFamily": "Inter",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        },
+                                        {
+                                          "type": "text",
                                           "id": "A6dap",
                                           "name": "Line 6",
-                                          "fill": "#E2E8F059",
+                                          "fill": "#E2E8F026",
                                           "textGrowth": "fixed-width",
                                           "width": "fill_container",
                                           "content": "# Perf Profiling",
@@ -131228,7 +131302,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -131368,7 +131442,7 @@
                               "name": "Skill brand-voice",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -131403,7 +131477,7 @@
                                     "author": "Denys Striyeshyn"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -131420,7 +131494,7 @@
                                       "id": "y2OOD",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -131431,7 +131505,7 @@
                                           "type": "rectangle",
                                           "id": "MKdpV",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131440,7 +131514,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -131453,7 +131527,7 @@
                                       "id": "O30eYO",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -131464,7 +131538,7 @@
                                           "type": "rectangle",
                                           "id": "MYeE4",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131473,7 +131547,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -131486,7 +131560,7 @@
                                       "id": "gs1tA",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -131497,7 +131571,7 @@
                                           "type": "rectangle",
                                           "id": "iDbLv",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131506,7 +131580,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -131519,7 +131593,7 @@
                                       "id": "UTtsD",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -131530,7 +131604,7 @@
                                           "type": "rectangle",
                                           "id": "J4y2G",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131539,7 +131613,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -131556,7 +131630,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
@@ -131696,7 +131770,7 @@
                               "name": "Skill incident-postmortem",
                               "clip": true,
                               "width": "fill_container",
-                              "height": 224,
+                              "height": 246,
                               "fill": "#FFFFFF0F",
                               "cornerRadius": "$radius-lg",
                               "stroke": "#FFFFFF24",
@@ -131731,7 +131805,7 @@
                                     "author": "Niclas Illg"
                                   },
                                   "width": "fill_container",
-                                  "height": 92,
+                                  "height": 124,
                                   "fill": {
                                     "type": "image",
                                     "enabled": true,
@@ -131748,7 +131822,7 @@
                                       "id": "xoz8y",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 40,
+                                      "y": 72,
                                       "name": "Blur 1",
                                       "clip": true,
                                       "width": 266,
@@ -131759,7 +131833,7 @@
                                           "type": "rectangle",
                                           "id": "a7FSv",
                                           "x": 0,
-                                          "y": -40,
+                                          "y": -72,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131768,7 +131842,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 1
@@ -131781,7 +131855,7 @@
                                       "id": "v2zHoC",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 53,
+                                      "y": 85,
                                       "name": "Blur 2.5",
                                       "clip": true,
                                       "width": 266,
@@ -131792,7 +131866,7 @@
                                           "type": "rectangle",
                                           "id": "CfcWs",
                                           "x": 0,
-                                          "y": -53,
+                                          "y": -85,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131801,7 +131875,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 2.5
@@ -131814,7 +131888,7 @@
                                       "id": "H6ps12",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 66,
+                                      "y": 98,
                                       "name": "Blur 4",
                                       "clip": true,
                                       "width": 266,
@@ -131825,7 +131899,7 @@
                                           "type": "rectangle",
                                           "id": "eCnnG",
                                           "x": 0,
-                                          "y": -66,
+                                          "y": -98,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131834,7 +131908,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 4
@@ -131847,7 +131921,7 @@
                                       "id": "r7VMHP",
                                       "layoutPosition": "absolute",
                                       "x": 0,
-                                      "y": 79,
+                                      "y": 111,
                                       "name": "Blur 6",
                                       "clip": true,
                                       "width": 266,
@@ -131858,7 +131932,7 @@
                                           "type": "rectangle",
                                           "id": "Tl0lj",
                                           "x": 0,
-                                          "y": -79,
+                                          "y": -111,
                                           "name": "Img",
                                           "fill": {
                                             "type": "image",
@@ -131867,7 +131941,7 @@
                                             "mode": "fill"
                                           },
                                           "width": 266,
-                                          "height": 92,
+                                          "height": 124,
                                           "effect": {
                                             "type": "blur",
                                             "radius": 6
@@ -131884,7 +131958,7 @@
                                   "width": "fill_container",
                                   "height": "fill_container",
                                   "layout": "vertical",
-                                  "gap": 8,
+                                  "gap": 6,
                                   "padding": 12,
                                   "children": [
                                     {
