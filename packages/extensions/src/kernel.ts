@@ -16,6 +16,12 @@ export interface KernelOptions {
   host: PlatformHost
   /** Packages this build ships; runtime-installed extensions join the catalog later. */
   extensions: ExtensionDefinition[]
+  /**
+   * Values the product provides as services before extensions activate, e.g. a
+   * form-owned implementation an extension reads with `ctx.get(name)`. Omitted
+   * when this form has nothing to offer, and the extension keeps its fallback.
+   */
+  services?: Record<string, unknown>
 }
 
 /** A composed kernel; call {@link HubKernel.start} once to activate enabled extensions. */
@@ -30,6 +36,9 @@ export interface HubKernel {
 export async function createHubKernel(options: KernelOptions): Promise<HubKernel> {
   const ctx = new Context()
   ctx.provide("host", options.host)
+  for (const [name, value] of Object.entries(options.services ?? {})) {
+    ctx.provide(name, value)
+  }
   const extensions = ctx.plugin(ExtensionService, { catalog: options.extensions })
   await extensions.await()
   const i18n = ctx.plugin(I18nService)

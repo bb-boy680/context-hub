@@ -28,6 +28,7 @@ import "swiper/css/thumbs"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
+import type { SkillDetail, SkillStore } from "./store.ts"
 
 import { useI18n } from "@workspace/extensions/react"
 import { Badge } from "@workspace/ui/components/badge"
@@ -45,20 +46,29 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
+import { Spinner } from "@workspace/ui/components/spinner"
+
+/** Frontmatter lines a preview shows: the fields the skill actually carries. */
+function frontmatterLines(skill: Skill): string[] {
+  const tags = skill.tags.length > 0 ? `tags: [${skill.tags.join(", ")}]` : null
+  return [
+    "---",
+    `name: ${skill.name}`,
+    `description: ${skill.summary}`,
+    ...(tags === null ? [] : [tags]),
+    "---",
+  ]
+}
 
 /** SKILL.md as the editor renders it: frontmatter, a heading, steps, then guardrails. */
 function skillFile(skill: Skill): { text: string; className: string }[] {
   const lowercase = skill.summary.charAt(0).toLowerCase() + skill.summary.slice(1)
 
   return [
-    { text: "---", className: "text-muted-foreground" },
-    { text: `name: ${skill.name}`, className: "text-secondary-foreground" },
-    {
-      text: `description: ${skill.summary}`,
-      className: "text-secondary-foreground",
-    },
-    { text: `category: ${skill.tags[0]}`, className: "text-secondary-foreground" },
-    { text: "---", className: "text-muted-foreground" },
+    ...frontmatterLines(skill).map((line) => ({
+      text: line,
+      className: line === "---" ? "text-muted-foreground" : "text-secondary-foreground",
+    })),
     { text: "", className: "text-muted-foreground" },
     { text: `# ${titleCase(skill.name)}`, className: "font-semibold text-foreground" },
     { text: "", className: "text-muted-foreground" },
@@ -95,13 +105,7 @@ function titleCase(value: string) {
 function MarkdownPreview({ skill }: { skill: Skill }) {
   return (
     <div className="flex size-full flex-col justify-center gap-0.5 bg-surface-raised px-4 font-mono text-[10.5px] leading-[14px]">
-      {[
-        "---",
-        `name: ${skill.name}`,
-        `description: ${skill.summary}`,
-        `category: ${skill.tags[0]}`,
-        "---",
-      ].map((line, index) => (
+      {frontmatterLines(skill).map((line, index) => (
         <span
           key={index}
           className={
@@ -277,8 +281,6 @@ function VideoThumb({ src, active }: { src: string; active: boolean }) {
   )
 }
 
-/** data: URLs carry their own mime type; anything else is guessed from the extension. */
-
 /** Slides the lightbox opens with: the gallery when the skill has one, else its cover. */
 function seedItems(skill: Skill): MediaItem[] {
   const sources = skill.gallery?.length
@@ -293,6 +295,106 @@ function seedItems(skill: Skill): MediaItem[] {
   }))
 }
 
+/** What the lightbox can do with its media, depending on where the skill lives. */
+interface MediaSource {
+  items: MediaItem[]
+  /** A URL or data: URL is offered only where the media is a preview, not a file. */
+  canAddUrl: boolean
+  /** A library write is in flight. */
+  busy: boolean
+  addFiles(files: FileList): Promise<void>
+  addUrl(src: string): void
+  remove(id: string): Promise<void>
+}
+
+/**
+ * Library assets when a store answers, the bundled gallery otherwise. Uploads
+ * and deletions go through the store, so what the user sees is what is on disk.
+ */
+function useMediaItems(
+  skill: Skill,
+  store: SkillStore | null,
+  detail: SkillDetail | null,
+  onChanged: () => void
+): MediaSource {
+  const [preview, setPreview] = React.useState<MediaItem[]>(() => seedItems(skill))
+  const [busy, setBusy] = React.useState(false)
+  const objectUrls = React.useRef<string[]>([])
+  const nextId = React.useRef(1)
+
+  React.useEffect(
+    () => () => {
+      objectUrls.current.forEach((url) => URL.revokeObjectURL(url))
+    },
+    []
+  )
+
+  const items = React.useMemo(() => {
+    if (store === null || detail === null) return preview
+    return detail.assetDetails.map((asset) => ({
+      id: asset.file,
+      kind: asset.kind,
+      src: store.assetUrl(detail.id, asset.file),
+    }))
+  }, [store, detail, preview])
+
+  const addFiles = React.useCallback(
+    async (files: FileList) => {
+      const list = Array.from(files)
+      if (store !== null && detail !== null) {
+        setBusy(true)
+        try {
+          for (const file of list) await store.putAsset(detail.id, file)
+          onChanged()
+        } finally {
+          setBusy(false)
+        }
+        return
+      }
+      const added: MediaItem[] = []
+      for (const file of list) {
+        const kind = file.type.startsWith("video/")
+          ? "video"
+          : file.type.startsWith("image/")
+            ? "image"
+            : null
+        if (!kind) continue
+        const url = URL.createObjectURL(file)
+        objectUrls.current.push(url)
+        added.push({ id: `media-${nextId.current++}`, kind, src: url })
+      }
+      setPreview((current) => [...current, ...added])
+    },
+    [store, detail, onChanged]
+  )
+
+  const addUrl = React.useCallback((src: string) => {
+    setPreview((current) => [
+      ...current,
+      { id: `media-${nextId.current++}`, kind: mediaKind(src), src },
+    ])
+  }, [])
+
+  const remove = React.useCallback(
+    async (id: string) => {
+      if (store !== null && detail !== null) {
+        setBusy(true)
+        try {
+          await store.deleteAsset(detail.id, id)
+          onChanged()
+        } finally {
+          setBusy(false)
+        }
+        return
+      }
+      setPreview((current) => current.filter((item) => item.id !== id))
+    },
+    [store, detail, onChanged]
+  )
+
+  return { items, canAddUrl: store === null, busy, addFiles, addUrl, remove }
+}
+
 /**
  * Swiper mutates its own copy of these params, so one shared template is safe;
  * shorthand booleans would replace the module defaults wholesale.
@@ -301,31 +403,22 @@ const navigationParams = { prevEl: null, nextEl: null }
 
 /**
  * Media column of the lightbox. Swiper owns paging, the thumbnails and the
- * keyboard shortcuts; this component only supplies slides and the add-media
- * popover (a local file, a URL, or a pasted data: URL).
+ * keyboard shortcuts; the slides and the actions behind them come from the caller.
  */
-function MediaPane({ skill }: { skill: Skill }) {
+function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
   const { t } = useI18n()
-  const [items, setItems] = React.useState<MediaItem[]>(() => seedItems(skill))
+  const { items, busy, canAddUrl } = source
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [thumbs, setThumbs] = React.useState<SwiperClass | null>(null)
   const [dragOver, setDragOver] = React.useState(false)
   const [addOpen, setAddOpen] = React.useState(false)
   const [link, setLink] = React.useState("")
   const mainRef = React.useRef<SwiperClass | null>(null)
-  const pendingSlide = React.useRef<number | null>(null)
-  const nextId = React.useRef(1)
   const fileRef = React.useRef<HTMLInputElement | null>(null)
   const prevRef = React.useRef<HTMLButtonElement | null>(null)
   const nextRef = React.useRef<HTMLButtonElement | null>(null)
-  const objectUrls = React.useRef<string[]>([])
-
-  React.useEffect(
-    () => () => {
-      objectUrls.current.forEach((url) => URL.revokeObjectURL(url))
-    },
-    []
-  )
+  const count = items.length
+  const lastCount = React.useRef(count)
 
   /* The nav buttons sit beside the Swiper, so bind them once both exist. */
   React.useEffect(() => {
@@ -342,12 +435,14 @@ function MediaPane({ skill }: { skill: Skill }) {
     instance.navigation.update()
   })
 
-  /* Runs after Swiper took the new slides in, so the target index exists. */
+  /* An upload appends a slide; show it, and after a removal keep a neighbour. */
   React.useEffect(() => {
-    if (pendingSlide.current === null) return
-    mainRef.current?.slideTo(pendingSlide.current)
-    pendingSlide.current = null
-  }, [items])
+    if (count > lastCount.current) mainRef.current?.slideTo(count - 1)
+    else if (count < lastCount.current) {
+      mainRef.current?.slideTo(Math.min(activeIndex, Math.max(0, count - 1)))
+    }
+    lastCount.current = count
+  }, [count, activeIndex])
 
   /*
    * Swiper's own keyboard module listens while events bubble, and the dialog
@@ -370,53 +465,18 @@ function MediaPane({ skill }: { skill: Skill }) {
     return () => document.removeEventListener("keydown", handle, true)
   }, [])
 
-  const add = (sources: { src: string; kind: "image" | "video" }[]) => {
-    if (sources.length === 0) return
-    const added = sources.map((source) => ({
-      id: `media-${nextId.current++}`,
-      ...source,
-    }))
-    setItems((previous) => {
-      pendingSlide.current = previous.length
-      return [...previous, ...added]
-    })
-  }
-
   const addFiles = (files: FileList) => {
-    const added: { src: string; kind: "image" | "video" }[] = []
-    for (const file of Array.from(files)) {
-      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue
-      const url = URL.createObjectURL(file)
-      objectUrls.current.push(url)
-      added.push({
-        src: url,
-        kind: file.type.startsWith("video/") ? "video" : "image",
-      })
-    }
-    add(added)
+    void source.addFiles(files)
     setAddOpen(false)
   }
 
   const addLink = () => {
     const value = link.trim()
     if (value === "") return
-    add([{ src: value, kind: mediaKind(value) }])
+    source.addUrl(value)
     setLink("")
     setAddOpen(false)
   }
-
-  /** Drops one asset and keeps a neighbour selected, so the stage never goes unset. */
-  const remove = (id: string) => {
-    setItems((previous) => {
-      const index = previous.findIndex((item) => item.id === id)
-      if (index < 0) return previous
-      const next = previous.filter((item) => item.id !== id)
-      if (index <= activeIndex) pendingSlide.current = Math.max(0, activeIndex - 1)
-      return next
-    })
-  }
-
-  const count = items.length
 
   return (
     <div
@@ -530,7 +590,7 @@ function MediaPane({ skill }: { skill: Skill }) {
                   <button
                     type="button"
                     aria-label={t("skills.media.remove")}
-                    onClick={() => remove(item.id)}
+                    onClick={() => void source.remove(item.id)}
                     className="absolute top-1 right-1 z-10 flex size-4 items-center justify-center rounded-full bg-[#0f172acc] text-white opacity-0 transition-opacity group-focus-within/thumb:opacity-100 group-hover/thumb:opacity-100 hover:bg-[#0f172a]"
                   >
                     <XIcon className="size-2.5" />
@@ -557,28 +617,31 @@ function MediaPane({ skill }: { skill: Skill }) {
             <span className="text-xs font-semibold text-muted-foreground">
               {t("skills.media.add.title")}
             </span>
-            <div className="flex items-center gap-2">
-              <Input
-                value={link}
-                onChange={(event) => setLink(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addLink()
-                }}
-                placeholder={t("skills.media.add.placeholder")}
-                aria-label={t("skills.media.add.placeholder")}
-                className="h-8 flex-1"
-              />
-              <Button size="sm" className="h-8 px-3" onClick={addLink}>
-                {t("skills.media.add.action")}
-              </Button>
-            </div>
+            {canAddUrl ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={link}
+                  onChange={(event) => setLink(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") addLink()
+                  }}
+                  placeholder={t("skills.media.add.placeholder")}
+                  aria-label={t("skills.media.add.placeholder")}
+                  className="h-8 flex-1"
+                />
+                <Button size="sm" className="h-8 px-3" onClick={addLink}>
+                  {t("skills.media.add.action")}
+                </Button>
+              </div>
+            ) : null}
             <Button
               variant="outline"
               size="sm"
               className="h-8 justify-start gap-2 border-input bg-transparent dark:bg-transparent"
+              disabled={busy}
               onClick={() => fileRef.current?.click()}
             >
-              <UploadIcon className="size-3.5" />
+              {busy ? <Spinner className="size-3.5" /> : <UploadIcon className="size-3.5" />}
               {t("skills.media.add.file")}
             </Button>
             <p className="text-[11px] leading-[15px] text-muted-foreground">
@@ -759,11 +822,14 @@ function InfoPanel({
       <div className="h-px shrink-0 bg-border" />
 
       <dl className="flex flex-col">
-        <MetaRow label={t("skills.detail.source")} value={skill.source} />
-        <MetaRow label={t("skills.detail.tokens")} value={skill.tokens} />
+        <MetaRow
+          label={t("skills.detail.source")}
+          value={ORIGIN_KEYS.includes(skill.source) ? t(`skills.source.${skill.source}`) : skill.source}
+        />
+        <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
         <MetaRow
           label={t("skills.detail.triggers")}
-          value={String(skill.triggers)}
+          value={skill.triggers === undefined ? "—" : String(skill.triggers)}
         />
         <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
       </dl>
@@ -793,15 +859,20 @@ function InfoPanel({
 /** Slides in from the right over the info panel, leaving the media strip dimmed behind it. */
 function FilesPanel({
   skill,
+  tree,
+  content,
   open,
   onBack,
 }: {
   skill: Skill
+  /** One row per entry: a folder, or a file with its own text when selected. */
+  tree: { path: string; name: string; depth: number; directory: boolean; active: boolean }[]
+  content: string
   open: boolean
   onBack: () => void
 }) {
-  const lines = skillFile(skill)
   const { t } = useI18n()
+  const lines = content.split("\n")
 
   return (
     <div
@@ -841,10 +912,10 @@ function FilesPanel({
       <div className="h-px shrink-0 bg-border" />
 
       <div className="flex min-h-0 flex-1 gap-5 p-5">
-        <div className="flex w-[224px] shrink-0 flex-col gap-0.5">
-          {fileTree.map((node) => (
+        <div className="flex w-[224px] shrink-0 flex-col gap-0.5 overflow-auto">
+          {tree.map((node) => (
             <span
-              key={node.name}
+              key={node.path}
               className={`flex h-7 items-center gap-2 rounded-md pr-2 text-[13px] ${
                 node.depth === 0
                   ? "pl-2"
@@ -852,12 +923,12 @@ function FilesPanel({
                     ? "pl-6"
                     : "pl-10"
               } ${
-                "active" in node && node.active
+                node.active
                   ? "bg-muted font-medium text-foreground"
                   : "text-secondary-foreground"
               }`}
             >
-              {node.kind === "folder" ? (
+              {node.directory ? (
                 node.depth === 0 ? (
                   <FolderOpenIcon className="size-3.5 shrink-0 text-muted-foreground" />
                 ) : (
@@ -868,9 +939,7 @@ function FilesPanel({
               ) : (
                 <FileTextIcon
                   className={`size-3.5 shrink-0 ${
-                    "active" in node && node.active
-                      ? "text-foreground"
-                      : "text-muted-foreground"
+                    node.active ? "text-foreground" : "text-muted-foreground"
                   }`}
                 />
               )}
@@ -891,10 +960,8 @@ function FilesPanel({
                 <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground">
                   {index + 1}
                 </span>
-                <span
-                  className={`pl-3 text-[11.5px] whitespace-pre ${line.className}`}
-                >
-                  {line.text}
+                <span className="pl-3 text-[11.5px] whitespace-pre text-secondary-foreground">
+                  {line}
                 </span>
               </div>
             ))}
@@ -905,18 +972,70 @@ function FilesPanel({
   )
 }
 
+/** Origins arrive as ids from the library; bundled rows carry a display label. */
+const ORIGIN_KEYS = ["local", "builtin", "registry"]
+
+/** One row of the files panel, from either the library's tree or the bundle's sample. */
+interface FileRow {
+  path: string
+  name: string
+  depth: number
+  directory: boolean
+  active: boolean
+}
+
+/** The files the panel lists: the library's own tree, or the bundled example. */
+function useFileRows(
+  skill: Skill,
+  detail: SkillDetail | null
+): { rows: FileRow[]; content: string } {
+  return React.useMemo(() => {
+    if (detail === null) {
+      return {
+        rows: fileTree.map((node) => ({
+          path: node.name,
+          name: node.name,
+          depth: node.depth,
+          directory: node.kind === "folder",
+          active: "active" in node && node.active,
+        })),
+        content: skillFile(skill)
+          .map((line) => line.text)
+          .join("\n"),
+      }
+    }
+    return {
+      rows: detail.files.map((file) => ({
+        path: file.path,
+        name: file.path.split("/").at(-1) ?? file.path,
+        depth: file.depth,
+        directory: file.directory,
+        active: file.path === "SKILL.md",
+      })),
+      content: `---\nname: ${detail.name}\ndescription: ${detail.description}\ntags: [${detail.tags.join(", ")}]\n---\n\n${detail.body}`,
+    }
+  }, [skill, detail])
+}
+
 function LightboxBody({
   skill,
-  installed,
+  detail,
+  store,
   onToggle,
   onTagsChange,
+  onChanged,
 }: {
   skill: Skill
-  installed: boolean
+  /** The stored record, present when a library answered. */
+  detail: SkillDetail | null
+  store: SkillStore | null
   onToggle: () => void
   onTagsChange: (tags: string[]) => void
+  onChanged: () => void
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
+  const media = useMediaItems(skill, store, detail, onChanged)
+  const files = useFileRows(skill, detail)
 
   /* The catalog stays mounted behind the dialog; stop its previews decoding. */
   React.useEffect(() => {
@@ -926,10 +1045,10 @@ function LightboxBody({
 
   return (
     <div className="relative flex h-full min-h-0">
-      <MediaPane skill={skill} />
+      <MediaPane skill={skill} source={media} />
       <InfoPanel
         skill={skill}
-        installed={installed}
+        installed={skill.enabled}
         onToggle={onToggle}
         onViewFiles={() => setFilesOpen(true)}
         onTagsChange={onTagsChange}
@@ -941,6 +1060,8 @@ function LightboxBody({
       />
       <FilesPanel
         skill={skill}
+        tree={files.rows}
+        content={files.content}
         open={filesOpen}
         onBack={() => setFilesOpen(false)}
       />
@@ -951,17 +1072,45 @@ function LightboxBody({
 /** Detail lightbox for one skill; opens on click from either view. */
 export function SkillDetailDialog({
   skill,
-  installed,
+  store,
   onToggle,
   onTagsChange,
+  onChanged,
   onOpenChange,
 }: {
   skill: Skill | null
-  installed: boolean
+  /** The library behind the catalog, or `null` while the bundle is on screen. */
+  store: SkillStore | null
   onToggle: () => void
   onTagsChange: (tags: string[]) => void
+  /** The stored record changed; the caller re-reads its page. */
+  onChanged: () => void
   onOpenChange: (open: boolean) => void
 }) {
+  const [loaded, setLoaded] = React.useState<{ id: string; detail: SkillDetail } | null>(null)
+  const id = skill?.id ?? null
+
+  /* Load the stored record whenever the lightbox opens on a library skill, and
+     again after a write moves its timestamp. */
+  React.useEffect(() => {
+    if (store === null || id === null) return
+    let live = true
+    void (async () => {
+      try {
+        const detail = await store.get(id)
+        if (live) setLoaded({ id, detail })
+      } catch {
+        /* A removed or unreadable skill leaves the dialog on the catalog row. */
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [store, id, skill?.stamp])
+
+  /* Only the record for the skill on screen counts; a stale one is ignored. */
+  const detail = loaded !== null && loaded.id === id ? loaded.detail : null
+
   return (
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>
       <DialogContent
@@ -970,11 +1119,13 @@ export function SkillDetailDialog({
       >
         {skill ? (
           <LightboxBody
-            key={skill.name}
+            key={skill.id}
             skill={skill}
-            installed={installed}
+            detail={detail}
+            store={store}
             onToggle={onToggle}
             onTagsChange={onTagsChange}
+            onChanged={onChanged}
           />
         ) : null}
       </DialogContent>

@@ -1,0 +1,249 @@
+/**
+ * Development bridge for the skill library. The disk-backed store lives in the
+ * process that owns the files; this Vite plugin puts it behind the dev server so
+ * the browser form can use it during development. Product forms mount the same
+ * store themselves — the desktop app in its main process, the executable in its
+ * host — so nothing here is a service the app depends on.
+ */
+import type { IncomingMessage, ServerResponse } from "node:http"
+
+import { createFsSkillStore } from "./src/host/skills-fs.ts"
+import type { SkillStore } from "./src/store.ts"
+
+/** Route prefix this bridge answers on. */
+const PREFIX = "/hub/skills"
+
+/** One `Content-Type` for a stored asset, from its extension. */
+const MIME_TYPES: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  webp: "image/webp",
+  gif: "image/gif",
+  mp4: "video/mp4",
+  webm: "video/webm",
+}
+
+function contentTypeOf(file: string): string {
+  const extension = file.slice(file.lastIndexOf(".") + 1).toLowerCase()
+  return MIME_TYPES[extension] ?? "application/octet-stream"
+}
+
+/** Read a whole request body into one buffer. */
+async function readBody(request: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  for await (const chunk of request) chunks.push(chunk as Buffer)
+  return Buffer.concat(chunks)
+}
+
+function sendJson(response: ServerResponse, status: number, value: unknown) {
+  const body = JSON.stringify(value)
+  response.writeHead(status, {
+    "Content-Type": "application/json",
+    "Content-Length": Buffer.byteLength(body),
+  })
+  response.end(body)
+}
+
+function sendError(response: ServerResponse, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error)
+  sendJson(response, 400, { error: message })
+}
+
+/** Serve one asset, honouring `Range` so media players can seek. */
+async function sendAsset(
+  store: SkillStore,
+  id: string,
+  file: string,
+  range: string | undefined,
+  response: ServerResponse
+) {
+  const { promises: fs, createReadStream } = await import("node:fs")
+  const path = await import("node:path")
+  const target = path.join(store.root, id, "assets", file)
+  const stat = await fs.stat(target).catch(() => null)
+  if (stat === null) {
+    response.writeHead(404).end()
+    return
+  }
+  const type = contentTypeOf(file)
+  const start =
+    range === undefined ? 0 : Number(/bytes=(\d+)-/.exec(range)?.[1] ?? 0)
+  if (start > 0) {
+    response.writeHead(206, {
+      "Content-Type": type,
+      "Content-Range": `bytes ${start}-${stat.size - 1}/${stat.size}`,
+      "Accept-Ranges": "bytes",
+      "Content-Length": stat.size - start,
+    })
+    createReadStream(target, { start }).pipe(response)
+    return
+  }
+  response.writeHead(200, {
+    "Content-Type": type,
+    "Accept-Ranges": "bytes",
+    "Content-Length": stat.size,
+    "Cache-Control": "no-cache",
+  })
+  createReadStream(target).pipe(response)
+}
+
+/** Vite plugin that exposes one skills root over the dev server. */
+export function skillLibrary(options: { root?: string } = {}) {
+  let store: SkillStore | null = null
+  let ready: Promise<SkillStore> | null = null
+
+  const getStore = async (): Promise<SkillStore> => {
+    ready ??= createFsSkillStore(options.root)
+    store = await ready
+    return store
+  }
+
+  return {
+    name: "context-hub-skill-library",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(PREFIX)) {
+            next()
+            return
+          }
+          const rest = url.pathname.slice(PREFIX.length).replace(/^\//, "")
+          const [id, section, ...tail] = rest.split("/").map(decodeURIComponent)
+          try {
+            const api = await getStore()
+            const method = request.method ?? "GET"
+
+            /* GET /hub/skills?action=tags — every category in use */
+            if (
+              rest === "" &&
+              method === "GET" &&
+              url.searchParams.get("action") === "tags"
+            ) {
+              sendJson(response, 200, await api.tags())
+              return
+            }
+
+            /* GET /hub/skills — the catalog page */
+            if (rest === "" && method === "GET") {
+              const enabled = url.searchParams.get("enabled")
+              const page = await api.list({
+                offset: Number(url.searchParams.get("offset") ?? 0),
+                limit:
+                  url.searchParams.get("limit") === null
+                    ? undefined
+                    : Number(url.searchParams.get("limit")),
+                q: url.searchParams.get("q") ?? undefined,
+                tag: url.searchParams.get("tag") ?? undefined,
+                enabled: enabled === null ? undefined : enabled === "true",
+                sort:
+                  url.searchParams.get("sort") === "name" ? "name" : "updated",
+              })
+              sendJson(response, 200, page)
+              return
+            }
+
+            /* POST /hub/skills?action=refresh — rebuild the catalog from disk */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "refresh"
+            ) {
+              await api.refresh()
+              sendJson(response, 200, { ok: true })
+              return
+            }
+
+            /* POST /hub/skills — create */
+            if (rest === "" && method === "POST") {
+              const body = JSON.parse(
+                (await readBody(request)).toString("utf8")
+              )
+              sendJson(response, 200, await api.create(body))
+              return
+            }
+
+            if (id === undefined || id === "") {
+              sendError(response, new Error("missing skill id"))
+              return
+            }
+
+            /* /hub/skills/<id> */
+            if (section === undefined) {
+              if (method === "GET") sendJson(response, 200, await api.get(id))
+              else if (method === "PATCH") {
+                const body = JSON.parse(
+                  (await readBody(request)).toString("utf8")
+                )
+                sendJson(response, 200, await api.update(id, body))
+              } else if (method === "DELETE") {
+                await api.remove(id)
+                sendJson(response, 200, { ok: true })
+              } else
+                sendError(response, new Error(`unsupported method ${method}`))
+              return
+            }
+
+            /* /hub/skills/<id>/assets/<file> */
+            if (section === "assets" && tail.length > 0) {
+              const file = tail.join("/")
+              if (method === "GET") {
+                await sendAsset(api, id, file, request.headers.range, response)
+              } else if (method === "DELETE") {
+                await api.deleteAsset(id, file)
+                sendJson(response, 200, { ok: true })
+              } else
+                sendError(response, new Error(`unsupported method ${method}`))
+              return
+            }
+
+            /* POST /hub/skills/<id>/assets?name=… — upload raw bytes */
+            if (section === "assets" && method === "POST") {
+              const name = url.searchParams.get("name")
+              if (name === null) {
+                sendError(response, new Error("missing asset name"))
+                return
+              }
+              const bytes = await readBody(request)
+              const part = new Uint8Array(bytes.byteLength)
+              part.set(bytes)
+              const file = new File([part], name, {
+                type: request.headers["content-type"] ?? "",
+              })
+              sendJson(response, 200, await api.putAsset(id, file))
+              return
+            }
+
+            /* /hub/skills/<id>/files/<path> */
+            if (section === "files" && tail.length > 0) {
+              const file = tail.join("/")
+              if (method === "GET") {
+                sendJson(response, 200, { text: await api.readFile(id, file) })
+              } else if (method === "PUT") {
+                await api.writeFile(
+                  id,
+                  file,
+                  (await readBody(request)).toString("utf8")
+                )
+                sendJson(response, 200, { ok: true })
+              } else
+                sendError(response, new Error(`unsupported method ${method}`))
+              return
+            }
+
+            sendError(response, new Error(`unknown route ${url.pathname}`))
+          } catch (error) {
+            sendError(response, error)
+          }
+        }
+      )
+    },
+  }
+}

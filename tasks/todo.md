@@ -195,6 +195,56 @@ Web / Web+Host / 桌面 / Exe 四种形态共用同一内核，形态差异收�
 - **依赖机制现状**：内核已支持 `provides` / `inject` / `waiting`，但目录里目前没有插件声明它们
   （没有消费者就不声明 `provides`）。claude-code / codex 插件要真实写盘时，skills 插件加 `provides: ["hub.skills"]`，
   目标插件加 `inject: ["hub.skills"]` 即可获得等待与级联卸载。
-- **遗留**：Add 弹窗的排序 Select 选项仍是英文（`SelectValue` 渲染 value 而非 children，
+- **遗留**：Add 弹窗的排序 Select 选项仍是英文（`SelectValue` 渲染 value 而非 children,
   翻译它需要把选中值提到 state）；`sync to target` 投递计划与 diff 预览仍未做。
+
+## 技能库落地本地磁盘 + UI 接线（2026-10-07）
+
+### 决策
+
+- **不做后端服务**：Context Hub 与 deepseek-harness 同源，直接读写本地磁盘即可；
+  盘上位置用 Context Hub 自己的家目录 `~/.context-hub`（`CONTEXT_HUB_HOME` 可覆盖，空串按未设处理）,
+  技能根为 `<home>/skills`，与 harness 的 `~/.deepseek` 无关。
+- **列表来自目录文件**：`<root>/index.json`（`{version, revision, skills}`）是该目录的目录索引,
+  只有 `refresh()` 走文件系统扫描，其余读操作都读这个文件；写操作先落地文件再原子更新索引。
+- **缝的两端**：`SkillStore`（`src/store.ts`）是唯一接口。宿主侧 `src/host/skills-fs.ts`（Node 实现）,
+  浏览器侧 `src/remote-store.ts`（走 `/hub/skills` 的 HTTP 实现）。`vite.ts` 提供的是**开发桥**,
+  不是产品后端：桌面形态直接用 `createFsSkillStore`，不需要它。
+- **写入原子**：同目录临时文件 + `rename`（Windows `EACCES/EBUSY/EPERM` 有限次重试）,
+  目录监视 `fs.watch({recursive})` 300ms 合并，跳过 `index.json` 与 `.tmp-*` 自身写入。
+- **分页在服务端**：`list({offset,limit,q,tag,enabled,sort})` 过滤+排序+切片后返回 `{items,total,revision,root}`,
+  排序以 id 兜底，翻页不会因同秒写入漂移。
+
+### 接线
+
+- `src/library.ts` 的 `useSkillLibrary(query)`：读页面、跟随 store 变更通知、代际号避免旧响应覆盖新响应；
+  无 store 时返回空结果，页面回落示例数据。
+- `src/page.tsx`：筛选标签页（全部/已启用/已停用）与分类 chip 进查询、底部范围文案 `from–to / total`、
+  分页器真正翻页；`table-pagination` 加可选接线属性（未接线时仍渲染原样，其他 4 个页面不受影响）。
+- `src/skill-detail-dialog.tsx`：媒体来自 `detail.assetDetails`（上传/删除走 store）,
+  文件树与 SKILL.md 预览来自 `detail.files` / 记录本身；分类增删写回 frontmatter。
+- 分类 chip 由 `store.tags()` 聚合提供（新方法 + 桥路由 `?action=tags`），空库不再显示编造的种子标签。
+
+### 接线中修掉的 5 个真实缺陷
+
+1. `enabled` 没进查询串 —— `remote-store.ts` 与 `vite.ts` 两端都漏，导致「已启用/已停用」筛选无效。
+2. 详情弹窗不重读记录：依赖项用的是格式化后的相对时间 `updated`，写入后仍是「现在」→ 永不变化；
+   改为携带原始时间戳 `stamp`（`updatedAt`）。
+3. `writeSkillFile` 按 patch 写：只改 `tags` 会把 `name` / `description` 行从 SKILL.md 里**删掉**；
+   改为未给出的字段沿用文件现有值。
+4. 无标签时封面预览渲染出 `category: undefined`。
+5. 空态显示 `host` 占位（浏览器读不到宿主路径）→ `SkillPage` 增加 `root` 字段。
+   另外前端不再伪造「+5」展开按钮（`options.length > visible.length` 才显示）。
+
+### 验证
+
+- `npx tsx packages/plugin-skills/scripts/check-store.ts`：**47 项断言全绿**（目录优先、外改刷新、
+  分页/搜索/标签/启停过滤、上传命名与 5MB 上限、删除、越界路径、监视与 dispose）。
+- `pnpm -r typecheck` 全绿；`pnpm --filter @workspace/plugin-skills lint` 绿。
+- 浏览器核对（真实 `~/.context-hub/skills`）：列表 2 条真实数据 + 本地徽章 + 相对时间；
+  启停 → 全部 2 行 / 已启用 1 行 / 已停用 1 行且按钮互换；14 条数据下翻页 1–12 → 13–14 → 1–12；
+  分类 chip 过滤 Documents → `1–1 / 1`；上传 12 字节 PNG → 缩略图 + 文件树 + 目录同步,
+  移除后三者同时回退且磁盘 `assets/` 清空；改分类 → SKILL.md 的 `tags:` 行被改写且其余行保留；
+  空目录启动的第二个实例显示空态与真实路径。
+
 

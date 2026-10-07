@@ -10,10 +10,13 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
+import { useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { seedTags, tagTone } from "./tags.ts"
-import type { Skill, SkillSource } from "./types.ts"
+import type { Skill } from "./types.ts"
+
+import { Spinner } from "@workspace/ui/components/spinner"
 
 import { useI18n } from "@workspace/extensions/react"
 import { Badge } from "@workspace/ui/components/badge"
@@ -58,7 +61,8 @@ const shot = (id: string) =>
 const demoVideo =
   "https://media.prompt-motion.com/stephanlivera-opus-5-5-on-max/video.86605038.mp4"
 
-const initialSkills: Skill[] = [
+/** Bundled rows the page renders when this form has no skill library. */
+const sampleSkills: Omit<Skill, "id">[] = [
   {
     name: "pdf-extract",
     summary: "Extract tables from PDFs",
@@ -243,11 +247,34 @@ const initialSkills: Skill[] = [
 
 const filterTags: SkillTag[] = [...seedTags]
 
-const tabs = [
+/* A sample row is keyed by its name, which is also its id in the catalog. */
+const sampleRows: Skill[] = sampleSkills.map((skill) => ({ ...skill, id: skill.name }))
+
+/** The size line under a card: only the parts this skill actually carries. */
+function skillMeta(skill: Skill, t: (key: string) => string): string {
+  const parts: string[] = []
+  if (skill.tokens !== undefined) {
+    parts.push(`${skill.tokens} ${t("skills.meta.tokens")}`)
+  }
+  if (skill.triggers !== undefined) {
+    parts.push(`${skill.triggers} ${t("skills.meta.triggers")}`)
+  }
+  if (parts.length === 0) parts.push(skill.updated)
+  return parts.join(" · ")
+}
+
+/* Tab sets differ by mode: the bundle demonstrates sources, a live library filters by state. */
+const sampleTabs = [
   { value: "all", labelKey: "skills.tab.all", count: 42 },
   { value: "built-in", labelKey: "skills.tab.builtin", count: 24 },
   { value: "workspace", labelKey: "skills.tab.workspace", count: 12 },
   { value: "skill.sh", labelKey: "skills.tab.registry", count: 6 },
+]
+
+const liveTabs = [
+  { value: "all", labelKey: "skills.filter.all" },
+  { value: "enabled", labelKey: "skills.filter.enabled" },
+  { value: "disabled", labelKey: "skills.filter.disabled" },
 ]
 
 /* Column widths include the 16px gutter the design leaves between columns. */
@@ -339,8 +366,13 @@ function InstallButton({
   )
 }
 
-function SourceBadge({ source }: { source: SkillSource }) {
-  return <Badge variant="secondary">{source}</Badge>
+const ORIGINS = ["local", "builtin", "registry"]
+
+/** Origins arrive as ids from the library; bundled rows carry a display label. */
+function SourceBadge({ source }: { source: string }) {
+  const { t } = useI18n()
+  const label = ORIGINS.includes(source) ? t(`skills.source.${source}`) : source
+  return <Badge variant="secondary">{label}</Badge>
 }
 
 /** Cover image that reports its own aspect ratio, for a card sized to the asset. */
@@ -406,15 +438,14 @@ const FALLBACK_RATIO = 16 / 9
 
 function SkillCard({
   skill,
-  installed,
   onToggle,
   onOpen,
 }: {
   skill: Skill
-  installed: boolean
   onToggle: () => void
   onOpen: () => void
 }) {
+  const { t } = useI18n()
   const shownTags = skill.tags.slice(0, 2)
   const extraTags = skill.tags.length - shownTags.length
   /* Stable identity keeps the ratio callback from re-running every render. */
@@ -474,10 +505,10 @@ function SkillCard({
         </p>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <span className="truncate text-[11px] text-muted-foreground">
-            {skill.tokens} tokens · {skill.triggers} triggers
+            {skillMeta(skill, t)}
           </span>
           <InstallButton
-            installed={installed}
+            installed={skill.enabled}
             onToggle={onToggle}
             label={skill.name}
           />
@@ -489,13 +520,11 @@ function SkillCard({
 
 function SkillGrid({
   skills,
-  installed,
   onToggle,
   onOpen,
 }: {
   skills: Skill[]
-  installed: Record<string, boolean>
-  onToggle: (name: string) => void
+  onToggle: (skill: Skill) => void
   onOpen: (skill: Skill) => void
 }) {
   /*
@@ -504,12 +533,11 @@ function SkillGrid({
    */
   return (
     <div className="columns-[266px] gap-x-6">
-      {skills.slice(0, 12).map((skill) => (
+      {skills.map((skill) => (
         <SkillCard
-          key={skill.name}
+          key={skill.id}
           skill={skill}
-          installed={installed[skill.name]}
-          onToggle={() => onToggle(skill.name)}
+          onToggle={() => onToggle(skill)}
           onOpen={() => onOpen(skill)}
         />
       ))}
@@ -550,13 +578,16 @@ function SkillThumb({ skill }: { skill: Skill }) {
 
 function SkillTable({
   skills,
-  installed,
+  rangeText,
+  pagination,
   onToggle,
   onOpen,
 }: {
   skills: Skill[]
-  installed: Record<string, boolean>
-  onToggle: (name: string) => void
+  /** Footer summary above the pager, e.g. "1–12 / 42". */
+  rangeText: string
+  pagination: React.ReactNode
+  onToggle: (skill: Skill) => void
   onOpen: (skill: Skill) => void
 }) {
   const { t } = useI18n()
@@ -589,7 +620,7 @@ function SkillTable({
           <TableBody>
             {skills.map((skill) => (
               <TableRow
-                key={skill.name}
+                key={skill.id}
                 onClick={() => onOpen(skill)}
                 className="h-11 cursor-pointer"
               >
@@ -620,18 +651,18 @@ function SkillTable({
                   <SourceBadge source={skill.source} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {skill.tokens}
+                  {skill.tokens ?? "—"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {skill.triggers}
+                  {skill.triggers ?? "—"}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {skill.updated}
                 </TableCell>
                 <TableCell>
                   <InstallButton
-                    installed={installed[skill.name]}
-                    onToggle={() => onToggle(skill.name)}
+                    installed={skill.enabled}
+                    onToggle={() => onToggle(skill)}
                     label={skill.name}
                   />
                 </TableCell>
@@ -641,20 +672,27 @@ function SkillTable({
         </Table>
       </div>
       <div className="flex items-center justify-between px-6">
-        <span className="text-xs text-muted-foreground">
-          {t("skills.range.long")}
-        </span>
-        <TablePagination pageText={t("skills.page")} />
+        <span className="text-xs text-muted-foreground">{rangeText}</span>
+        {pagination}
       </div>
     </Card>
   )
 }
 
-function PageTitleRow() {
+function PageTitleRow({
+  tag,
+  onTagChange,
+  options,
+}: {
+  /** Selected category filter, or "All tags". */
+  tag: string
+  onTagChange: (tag: string) => void
+  /** The categories on offer, from the library or the bundle. */
+  options: readonly string[]
+}) {
   const { t } = useI18n()
-  const [tag, setTag] = React.useState("All tags")
   const [expanded, setExpanded] = React.useState(false)
-  const visible = expanded ? filterTags : filterTags.slice(0, 4)
+  const visible = expanded ? options : options.slice(0, 4)
 
   return (
     <div className="flex items-start justify-between gap-6">
@@ -668,7 +706,7 @@ function PageTitleRow() {
         <button
           type="button"
           aria-pressed={tag === "All tags"}
-          onClick={() => setTag("All tags")}
+          onClick={() => onTagChange("All tags")}
           className={`flex h-[26px] shrink-0 items-center justify-center rounded-full px-2.5 text-[12.5px] transition-colors ${
             tag === "All tags"
               ? "bg-primary font-semibold text-primary-foreground"
@@ -682,7 +720,7 @@ function PageTitleRow() {
             key={item}
             type="button"
             aria-pressed={tag === item}
-            onClick={() => setTag(item)}
+            onClick={() => onTagChange(item)}
             className={`flex h-[26px] shrink-0 items-center justify-center rounded-full px-2.5 text-[12.5px] transition-colors ${
               tag === item
                 ? `bg-primary font-semibold text-primary-foreground`
@@ -692,15 +730,15 @@ function PageTitleRow() {
             {item}
           </button>
         ))}
-        {expanded ? null : (
+        {expanded ? null : options.length > visible.length ? (
           <button
             type="button"
             onClick={() => setExpanded(true)}
             className="flex h-[26px] shrink-0 items-center justify-center rounded-full bg-surface-raised px-2.5 text-[12.5px] font-medium text-muted-foreground transition-colors"
           >
-            +{filterTags.length - visible.length}
+            +{options.length - visible.length}
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   )
@@ -736,42 +774,105 @@ function ViewButton({
 
 export function SkillsPage() {
   const { t } = useI18n()
-  const [tab, setTab] = React.useState(tabs[0].value)
+  const [tab, setTab] = React.useState("all")
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
-  const [skills, setSkills] = React.useState<Skill[]>(initialSkills)
-  /* The open lightbox is a name, so edits to the catalog show through it. */
-  const [detailName, setDetailName] = React.useState<string | null>(null)
-  const [installed, setInstalled] = React.useState<Record<string, boolean>>(
-    () =>
-      Object.fromEntries(initialSkills.map((skill) => [skill.name, skill.enabled]))
-  )
+  const [tag, setTag] = React.useState("All tags")
+  const [page, setPage] = React.useState(0)
+  const [pageSize, setPageSize] = React.useState(12)
+  /* The open lightbox is an id, so edits to the catalog show through it. */
+  const [detailId, setDetailId] = React.useState<string | null>(null)
+  /* Bundled rows have no library behind them; edits stay in this map. */
+  const [samplePatch, setSamplePatch] = React.useState<
+    Record<string, Partial<Skill>>
+  >({})
 
-  const detail = skills.find((skill) => skill.name === detailName) ?? null
+  const library = useSkillLibrary({
+    offset: page * pageSize,
+    limit: pageSize,
+    sort: "updated",
+    enabled: tab === "enabled" ? true : tab === "disabled" ? false : undefined,
+    tag: tag === "All tags" ? undefined : tag,
+  })
+  const usingStore = library.store !== null
 
-  const toggleInstalled = (name: string) =>
-    setInstalled((current) => ({ ...current, [name]: !current[name] }))
+  const skills = React.useMemo(() => {
+    if (usingStore) return library.rows
+    return sampleRows.map((skill) => ({ ...skill, ...samplePatch[skill.id] }))
+  }, [usingStore, library.rows, samplePatch])
 
-  const setTags = (name: string, tags: string[]) =>
-    setSkills((current) =>
-      current.map((skill) => (skill.name === name ? { ...skill, tags } : skill))
+  const detail = skills.find((skill) => skill.id === detailId) ?? null
+
+  /** Apply a change, then re-read the page so the list shows what was stored. */
+  const applyTo = async (skill: Skill, patch: Partial<Skill>, persist: () => Promise<unknown>) => {
+    if (usingStore) {
+      await persist()
+      await library.reload()
+      return
+    }
+    setSamplePatch((current) => ({ ...current, [skill.id]: { ...current[skill.id], ...patch } }))
+  }
+
+  const toggleEnabled = (skill: Skill) =>
+    void applyTo(skill, { enabled: !skill.enabled }, () =>
+      library.store?.update(skill.id, { enabled: !skill.enabled }) ?? Promise.resolve()
     )
 
-  const openDetail = (skill: Skill) => setDetailName(skill.name)
+  const setTags = (skill: Skill, tags: string[]) =>
+    void applyTo(skill, { tags }, () =>
+      library.store?.update(skill.id, { tags }) ?? Promise.resolve()
+    )
+
+  const openDetail = (skill: Skill) => setDetailId(skill.id)
+
+  const total = usingStore ? library.total : skills.length
+  const from = total === 0 ? 0 : page * pageSize + 1
+  const to = Math.min(total, (page + 1) * pageSize)
+  const pageCount = Math.max(1, Math.ceil(total / pageSize))
+  const rangeText = `${from}–${to} / ${total}`
+
+  const pagination = (
+    <TablePagination
+      pageText={`${page + 1} / ${pageCount}`}
+      pageSize={pageSize}
+      canPrev={page > 0}
+      canNext={page + 1 < pageCount}
+      onPageSizeChange={(size) => {
+        setPageSize(size)
+        setPage(0)
+      }}
+      onFirst={() => setPage(0)}
+      onPrev={() => setPage((current) => Math.max(0, current - 1))}
+      onNext={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+      onLast={() => setPage(pageCount - 1)}
+    />
+  )
 
   return (
     <>
-      <PageTitleRow />
-      <Tabs value={tab} onValueChange={setTab} className="gap-6">
+      <PageTitleRow
+        tag={tag}
+        onTagChange={setTag}
+        options={usingStore ? library.tags : filterTags}
+      />
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          setTab(value)
+          setPage(0)
+        }}
+        className="gap-6"
+      >
         <div className="flex items-start justify-between gap-6">
           <TabsList className="h-9 gap-1 rounded-lg p-1">
-            {tabs.map((item) => (
+            {(usingStore ? liveTabs : sampleTabs).map((item) => (
               <TabsTrigger
                 key={item.value}
                 value={item.value}
                 className="h-7 flex-none rounded-md px-3 text-[13px] text-muted-foreground data-active:bg-accent data-active:text-foreground dark:data-active:bg-accent dark:data-active:text-foreground"
               >
-                {t(item.labelKey)} {item.count}
+                {t(item.labelKey)}
+                {"count" in item ? ` ${item.count}` : ""}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -808,26 +909,41 @@ export function SkillsPage() {
           </div>
         </div>
         <TabsContent value={tab} className="flex flex-col gap-6">
-          {view === "grid" ? (
+          {library.loading ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Spinner />
+              {t("skills.loading")}
+            </div>
+          ) : library.error !== null ? (
+            <div className="flex flex-col items-start gap-2 text-sm">
+              <span className="text-destructive">{library.error}</span>
+              <Button variant="outline" size="sm" onClick={() => void library.reload()}>
+                {t("skills.retry")}
+              </Button>
+            </div>
+          ) : skills.length === 0 ? (
+            <div className="flex flex-col items-start gap-2 py-12 text-sm text-muted-foreground">
+              <span>{t("skills.empty")}</span>
+              <span className="text-xs">{library.root}</span>
+            </div>
+          ) : view === "grid" ? (
             <>
               <SkillGrid
                 skills={skills}
-                installed={installed}
-                onToggle={toggleInstalled}
+                onToggle={toggleEnabled}
                 onOpen={openDetail}
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">
-                  {t("skills.range")}
-                </span>
-                <TablePagination pageText={t("skills.page")} />
+                <span className="text-xs text-muted-foreground">{rangeText}</span>
+                {pagination}
               </div>
             </>
           ) : (
             <SkillTable
               skills={skills}
-              installed={installed}
-              onToggle={toggleInstalled}
+              rangeText={rangeText}
+              pagination={pagination}
+              onToggle={toggleEnabled}
               onOpen={openDetail}
             />
           )}
@@ -843,15 +959,16 @@ export function SkillsPage() {
       />
       <SkillDetailDialog
         skill={detail}
-        installed={detail ? (installed[detail.name] ?? false) : false}
+        store={library.store}
         onToggle={() => {
-          if (detail) toggleInstalled(detail.name)
+          if (detail) toggleEnabled(detail)
         }}
         onTagsChange={(tags) => {
-          if (detail) setTags(detail.name, tags)
+          if (detail) setTags(detail, tags)
         }}
+        onChanged={() => void library.reload()}
         onOpenChange={(open) => {
-          if (!open) setDetailName(null)
+          if (!open) setDetailId(null)
         }}
       />
     </>

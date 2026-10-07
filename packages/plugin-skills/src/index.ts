@@ -11,8 +11,18 @@ import type { ExtensionDefinition } from "@workspace/extensions"
 
 import { skillsMessages } from "./messages.ts"
 import { SkillsPage } from "./page.tsx"
+import type { SkillStore } from "./store.ts"
 
 export { SkillsPage }
+export * from "./store.ts"
+export { createRemoteSkillStore } from "./remote-store.ts"
+
+declare module "@deepseek-ai/cordis" {
+  interface Context {
+    /** The form-owned skill library; absent when this form cannot reach one. */
+    "hub.skills"?: SkillStore
+  }
+}
 
 export const skillsExtension: ExtensionDefinition = {
   manifest: {
