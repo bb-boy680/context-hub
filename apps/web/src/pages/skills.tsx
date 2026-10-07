@@ -2,6 +2,7 @@ import {
   DownloadIcon,
   LayoutGridIcon,
   ListIcon,
+  Trash2Icon,
   UploadIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -19,7 +20,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { Switch } from "@workspace/ui/components/switch"
 import {
   Table,
   TableBody,
@@ -71,6 +71,18 @@ const tagLabel: Record<SkillTag, string> = {
   Quality: "text-tag-quality",
   Reliability: "text-tag-reliability",
   Marketing: "text-tag-marketing",
+}
+
+const tagDot: Record<SkillTag, string> = {
+  Documents: "bg-tag-documents",
+  Engineering: "bg-tag-engineering",
+  Docs: "bg-tag-docs",
+  Data: "bg-tag-data",
+  Design: "bg-tag-design",
+  Integrations: "bg-tag-integrations",
+  Quality: "bg-tag-quality",
+  Reliability: "bg-tag-reliability",
+  Marketing: "bg-tag-marketing",
 }
 
 type SkillSource = "Built-in" | "Workspace" | "skill.sh"
@@ -284,11 +296,11 @@ const columns = [
   { label: "", width: 32 },
   { label: "SKILL", width: 340 },
   { label: "TAGS", width: 166 },
-  { label: "SOURCE", width: 146 },
+  { label: "SOURCE", width: 136 },
   { label: "TOKENS", width: 96 },
   { label: "TRIGGERS", width: 96 },
-  { label: "UPDATED", width: 136 },
-  { label: "ENABLED", width: 76 },
+  { label: "UPDATED", width: 120 },
+  { label: "ACTION", width: 102 },
 ]
 
 const viewToggleSurface = "flex h-9 gap-1 rounded-lg bg-muted p-1"
@@ -315,6 +327,50 @@ function TagChip({ tag, size = "sm" }: { tag: SkillTag; size?: "sm" | "md" }) {
   )
 }
 
+function TagPill({ tag }: { tag: SkillTag }) {
+  return (
+    <span className="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[11px] font-semibold shadow-[0_2px_6px_#0F172A1A] ring-1 ring-[#0F172A1F] dark:bg-[#0E1422E6] dark:text-[#F8FAFC] dark:shadow-[0_2px_6px_#00000059] dark:ring-[#FFFFFF24]">
+      <span className={`size-1.5 shrink-0 rounded-full ${tagDot[tag]}`} />
+      {tag}
+    </span>
+  )
+}
+
+function InstallButton({
+  installed,
+  onToggle,
+  label,
+}: {
+  installed: boolean
+  onToggle: () => void
+  label: string
+}) {
+  return (
+    <Button
+      type="button"
+      size="xs"
+      variant={installed ? "outline" : "default"}
+      aria-label={`${installed ? "Uninstall" : "Install"} ${label}`}
+      onClick={(event) => {
+        event.stopPropagation()
+        onToggle()
+      }}
+      className={
+        installed
+          ? "gap-[5px] border-border bg-transparent px-2.5 text-xs font-medium text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent"
+          : "gap-[5px] px-2.5 text-xs font-medium"
+      }
+    >
+      {installed ? (
+        <Trash2Icon className="size-3.5" />
+      ) : (
+        <DownloadIcon className="size-3.5" />
+      )}
+      {installed ? "Uninstall" : "Install"}
+    </Button>
+  )
+}
+
 function SourceBadge({ source }: { source: SkillSource }) {
   return <Badge variant="secondary">{source}</Badge>
 }
@@ -331,10 +387,6 @@ function MarkdownCover({ skill }: { skill: Skill }) {
       text: `description: ${skill.summary}`,
       className: "text-secondary-foreground/85",
     },
-    {
-      text: `category: ${skill.tags[0]}`,
-      className: "text-secondary-foreground/68",
-    },
     { text: "---", className: "text-muted-foreground/42" },
     {
       text: `# ${titleCase(skill.name)}`,
@@ -343,7 +395,7 @@ function MarkdownCover({ skill }: { skill: Skill }) {
   ]
 
   return (
-    <div className="flex h-full flex-col gap-0.5 bg-surface-raised px-3 py-[7px] font-mono text-[10px] leading-[14px]">
+    <div className="flex h-full flex-col gap-0.5 bg-surface-raised px-3 pt-10 pb-2.5 font-mono text-[10px] leading-[14px]">
       {lines.map((line, index) => (
         <span key={index} className={`truncate ${line.className}`}>
           {line.text}
@@ -353,42 +405,58 @@ function MarkdownCover({ skill }: { skill: Skill }) {
   )
 }
 
-function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: () => void }) {
+function SkillCard({
+  skill,
+  installed,
+  onToggle,
+  onOpen,
+}: {
+  skill: Skill
+  installed: boolean
+  onToggle: () => void
+  onOpen: () => void
+}) {
+  const shownTags = skill.tags.slice(0, 2)
+  const extraTags = skill.tags.length - shownTags.length
+
   return (
     <div
-      onDoubleClick={onOpen}
+      onClick={onOpen}
       className="flex h-[246px] cursor-pointer flex-col overflow-hidden rounded-lg bg-card shadow-glass ring-1 ring-glass-border backdrop-blur-glass"
     >
-      <div
-        className={`relative h-[124px] shrink-0 overflow-hidden ${skill.cover ? "cover-fade" : ""}`}
-      >
+      <div className="relative h-[130px] shrink-0 overflow-hidden">
         {skill.cover ? (
           <PhotoCover src={skill.cover} />
         ) : (
           <MarkdownCover skill={skill} />
         )}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          {shownTags.map((tag) => (
+            <TagPill key={tag} tag={tag} />
+          ))}
+          {extraTags > 0 && (
+            <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-white/95 px-2.5 text-[11px] font-semibold text-muted-foreground shadow-[0_2px_6px_#0F172A1A] ring-1 ring-[#0F172A1F] dark:bg-[#0E1422E6] dark:text-[#94A3B8] dark:shadow-[0_2px_6px_#00000059] dark:ring-[#FFFFFF24]">
+              +{extraTags}
+            </span>
+          )}
+        </div>
       </div>
-      <div className="flex flex-1 flex-col gap-1.5 p-3">
-        <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-1 flex-col gap-1 px-3 py-2.5">
+        <div className="flex h-[18px] items-center justify-between gap-2">
           <span className="truncate text-sm font-semibold">{skill.name}</span>
           <SourceBadge source={skill.source} />
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <TagChip tag={skill.tags[0]} />
-        </div>
-        <p className="truncate text-xs text-muted-foreground">
-          {skill.summary}
+        <p className="line-clamp-2 text-xs text-muted-foreground">
+          {skill.description}
         </p>
-        <div
-          className="mt-auto flex items-center justify-between gap-2"
-          onDoubleClick={(event) => event.stopPropagation()}
-        >
-          <span className="truncate text-xs text-muted-foreground">
-            {skill.tokens} · {skill.triggers} triggers
+        <div className="mt-auto flex items-center justify-between gap-2">
+          <span className="truncate text-[11px] text-muted-foreground">
+            {skill.tokens} tokens · {skill.triggers} triggers
           </span>
-          <Switch
-            defaultChecked={skill.enabled}
-            aria-label={`Enable ${skill.name}`}
+          <InstallButton
+            installed={installed}
+            onToggle={onToggle}
+            label={skill.name}
           />
         </div>
       </div>
@@ -396,7 +464,15 @@ function SkillCard({ skill, onOpen }: { skill: Skill; onOpen: () => void }) {
   )
 }
 
-function SkillGrid({ onOpen }: { onOpen: (skill: Skill) => void }) {
+function SkillGrid({
+  installed,
+  onToggle,
+  onOpen,
+}: {
+  installed: Record<string, boolean>
+  onToggle: (name: string) => void
+  onOpen: (skill: Skill) => void
+}) {
   /* Five per row at most: past that the cards get too narrow to read. 96px = the four 24px gaps. */
   return (
     <div className="grid grid-cols-[repeat(auto-fill,minmax(max(266px,calc((100%-96px)/5)),1fr))] gap-x-6 gap-y-5">
@@ -404,6 +480,8 @@ function SkillGrid({ onOpen }: { onOpen: (skill: Skill) => void }) {
         <SkillCard
           key={skill.name}
           skill={skill}
+          installed={installed[skill.name]}
+          onToggle={() => onToggle(skill.name)}
           onOpen={() => onOpen(skill)}
         />
       ))}
@@ -431,7 +509,15 @@ function SkillThumb({ skill }: { skill: Skill }) {
   )
 }
 
-function SkillTable({ onOpen }: { onOpen: (skill: Skill) => void }) {
+function SkillTable({
+  installed,
+  onToggle,
+  onOpen,
+}: {
+  installed: Record<string, boolean>
+  onToggle: (name: string) => void
+  onOpen: (skill: Skill) => void
+}) {
   return (
     <Card className={`${cardSurface} gap-4`}>
       <CardHeader className="gap-1">
@@ -462,10 +548,10 @@ function SkillTable({ onOpen }: { onOpen: (skill: Skill) => void }) {
             {skills.map((skill) => (
               <TableRow
                 key={skill.name}
-                onDoubleClick={() => onOpen(skill)}
+                onClick={() => onOpen(skill)}
                 className="h-11 cursor-pointer"
               >
-                <TableCell onDoubleClick={(event) => event.stopPropagation()}>
+                <TableCell onClick={(event) => event.stopPropagation()}>
                   <Checkbox aria-label={`Select ${skill.name}`} />
                 </TableCell>
                 <TableCell>
@@ -495,15 +581,16 @@ function SkillTable({ onOpen }: { onOpen: (skill: Skill) => void }) {
                   {skill.tokens}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
-                  {skill.triggers} phrases
+                  {skill.triggers}
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {skill.updated}
                 </TableCell>
-                <TableCell onDoubleClick={(event) => event.stopPropagation()}>
-                  <Switch
-                    defaultChecked={skill.enabled}
-                    aria-label={`Enable ${skill.name}`}
+                <TableCell>
+                  <InstallButton
+                    installed={installed[skill.name]}
+                    onToggle={() => onToggle(skill.name)}
+                    label={skill.name}
                   />
                 </TableCell>
               </TableRow>
@@ -608,6 +695,13 @@ export function SkillsPage() {
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [detail, setDetail] = React.useState<Skill | null>(null)
   const [detailOpen, setDetailOpen] = React.useState(false)
+  const [installed, setInstalled] = React.useState<Record<string, boolean>>(
+    () =>
+      Object.fromEntries(skills.map((skill) => [skill.name, skill.enabled]))
+  )
+
+  const toggleInstalled = (name: string) =>
+    setInstalled((current) => ({ ...current, [name]: !current[name] }))
 
   const openDetail = (skill: Skill) => {
     setDetail(skill)
@@ -665,7 +759,11 @@ export function SkillsPage() {
         <TabsContent value={tab} className="flex flex-col gap-6">
           {view === "grid" ? (
             <>
-              <SkillGrid onOpen={openDetail} />
+              <SkillGrid
+                installed={installed}
+                onToggle={toggleInstalled}
+                onOpen={openDetail}
+              />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
                   1–12 of 42 skills
@@ -674,7 +772,11 @@ export function SkillsPage() {
               </div>
             </>
           ) : (
-            <SkillTable onOpen={openDetail} />
+            <SkillTable
+              installed={installed}
+              onToggle={toggleInstalled}
+              onOpen={openDetail}
+            />
           )}
         </TabsContent>
       </Tabs>
@@ -688,6 +790,10 @@ export function SkillsPage() {
       />
       <SkillDetailDialog
         skill={detailOpen ? detail : null}
+        installed={detail ? (installed[detail.name] ?? false) : false}
+        onToggle={() => {
+          if (detail) toggleInstalled(detail.name)
+        }}
         onOpenChange={(open) => {
           if (!open) setDetailOpen(false)
         }}
