@@ -1,13 +1,13 @@
 import { useLocation } from "react-router"
 
-import { findNavItem } from "@/lib/navigation"
+import { useNavItem } from "@/lib/navigation"
 import { useI18n } from "@workspace/extensions/react"
 
 /** Route target for sections that are not designed yet. */
 export function PlaceholderPage() {
   const { pathname } = useLocation()
   const { t } = useI18n()
-  const labelKey = findNavItem(pathname)?.labelKey ?? "nav.overview"
+  const labelKey = useNavItem(pathname)?.labelKey ?? "nav.overview"
 
   return (
     <div className="flex items-start justify-between gap-6">

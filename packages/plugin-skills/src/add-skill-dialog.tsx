@@ -31,16 +31,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
+import { useI18n } from "@workspace/extensions/react"
 
 export type AddSkillTab = "skill.sh" | "local"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
 
-const segments: { value: AddSkillTab; label: string }[] = [
-  { value: "skill.sh", label: "skill.sh" },
-  { value: "local", label: "local" },
+const segments: { value: AddSkillTab; labelKey: string }[] = [
+  { value: "skill.sh", labelKey: "skills.add.segment.registry" },
+  { value: "local", labelKey: "skills.add.segment.local" },
 ]
 
+/* Sort option labels double as the Select value, which SelectValue renders verbatim. */
 const sortOptions = ["Most installs", "Recently updated", "Trending"]
 
 type RegistrySkill = {
@@ -112,6 +114,8 @@ function SegmentRow({
   tab: AddSkillTab
   onTabChange: (tab: AddSkillTab) => void
 }) {
+  const { t } = useI18n()
+
   return (
     <div className="px-6 pb-4">
       <div className="flex h-9 gap-1 rounded-lg bg-muted p-1">
@@ -128,7 +132,7 @@ function SegmentRow({
                 : "font-medium text-muted-foreground hover:text-foreground"
             }`}
           >
-            {segment.label}
+            {t(segment.labelKey)}
           </button>
         ))}
       </div>
@@ -137,6 +141,8 @@ function SegmentRow({
 }
 
 function RegistryResults() {
+  const { t } = useI18n()
+
   return (
     <>
       <div className="px-6 pb-4">
@@ -145,14 +151,14 @@ function RegistryResults() {
             <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary" />
             <Input
               className="h-10 pl-9"
-              placeholder="Search skill.sh registry"
-              aria-label="Search skill.sh registry"
+              placeholder={t("skills.add.searchPlaceholder")}
+              aria-label={t("skills.add.searchPlaceholder")}
             />
           </div>
           <Select defaultValue={sortOptions[0]}>
             <SelectTrigger
               className={`w-[138px] data-[size=default]:h-9 ${outline}`}
-              aria-label="Sort results"
+              aria-label={t("skills.add.sort")}
             >
               <SelectValue />
             </SelectTrigger>
@@ -169,10 +175,10 @@ function RegistryResults() {
       <div className="h-px shrink-0 bg-border" />
       <div className="flex items-center justify-between px-6 pt-3 pb-2">
         <span className="text-xs leading-[15px] text-muted-foreground">
-          Popular this week
+          {t("skills.add.popular")}
         </span>
         <span className="text-xs leading-[15px] text-muted-foreground">
-          Community skills, verified manifests
+          {t("skills.add.verified")}
         </span>
       </div>
       <ul>
@@ -204,10 +210,10 @@ function RegistryResults() {
             {skill.installed ? (
               <Badge variant="ghost">
                 <CheckIcon className="text-chart-2" />
-                Installed
+                {t("skills.add.installed")}
               </Badge>
             ) : (
-              <Button className="w-24">Install</Button>
+              <Button className="w-24">{t("skills.action.install")}</Button>
             )}
           </li>
         ))}
@@ -217,6 +223,8 @@ function RegistryResults() {
 }
 
 function LocalImport() {
+  const { t } = useI18n()
+
   return (
     <div className="px-6 pb-6">
       <div className="flex h-[228px] flex-col items-center justify-center gap-3 rounded-lg bg-dropzone p-7 ring-2 ring-primary">
@@ -224,15 +232,14 @@ function LocalImport() {
           <UploadIcon className="size-[26px] text-primary" />
         </span>
         <span className="text-[15px] font-semibold">
-          Drag and drop your skill folder here
+          {t("skills.add.dropTitle")}
         </span>
         <span className="w-[420px] text-center text-xs text-muted-foreground">
-          The folder must contain a SKILL.md manifest. You can also drop a .zip
-          archive.
+          {t("skills.add.dropHint")}
         </span>
         <Button variant="outline" className={`px-4 ${outline}`}>
           <UploadIcon />
-          Browse files
+          {t("skills.add.browseFiles")}
         </Button>
       </div>
     </div>
@@ -240,6 +247,8 @@ function LocalImport() {
 }
 
 function CompactPager({ pageText }: { pageText: string }) {
+  const { t } = useI18n()
+
   return (
     <div className="flex h-8 items-center gap-4">
       <span className="text-xs text-muted-foreground">{pageText}</span>
@@ -249,7 +258,7 @@ function CompactPager({ pageText }: { pageText: string }) {
           size="icon"
           disabled
           className={outline}
-          aria-label="Previous page"
+          aria-label={t("skills.add.previousPage")}
         >
           <ChevronLeftIcon />
         </Button>
@@ -257,7 +266,7 @@ function CompactPager({ pageText }: { pageText: string }) {
           variant="outline"
           size="icon"
           className={outline}
-          aria-label="Next page"
+          aria-label={t("skills.add.nextPage")}
         >
           <ChevronRightIcon />
         </Button>
@@ -278,6 +287,8 @@ export function AddSkillDialog({
   onTabChange: (tab: AddSkillTab) => void
   onOpenChange: (open: boolean) => void
 }) {
+  const { t } = useI18n()
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -287,11 +298,10 @@ export function AddSkillDialog({
         <div className="flex items-start gap-4 px-6 pt-[22px] pb-4">
           <div className="flex flex-col gap-[5px]">
             <DialogTitle className="text-base leading-[19px] font-semibold">
-              Add skill
+              {t("skills.add.title")}
             </DialogTitle>
             <DialogDescription className="text-sm leading-[17px]">
-              Install from the skill.sh registry or import a folder from this
-              machine.
+              {t("skills.add.description")}
             </DialogDescription>
           </div>
           <DialogClose
@@ -300,7 +310,7 @@ export function AddSkillDialog({
                 variant="ghost"
                 size="icon-sm"
                 className="ml-auto shrink-0"
-                aria-label="Close"
+                aria-label={t("skills.action.close")}
               />
             }
           >
@@ -313,27 +323,27 @@ export function AddSkillDialog({
           {tab === "skill.sh" ? (
             <>
               <span className="text-xs text-muted-foreground">
-                1–6 of 1,284 skills
+                {t("skills.add.registryRange")}
               </span>
               <div className="flex items-center gap-2">
-                <CompactPager pageText="Page 1 of 8" />
+                <CompactPager pageText={t("skills.add.page")} />
                 <DialogClose
                   render={<Button variant="outline" className={outline} />}
                 >
-                  Close
+                  {t("skills.action.close")}
                 </DialogClose>
               </div>
             </>
           ) : (
             <>
               <span className="text-xs text-muted-foreground">
-                Copied into .dsh/skills and enabled right away.
+                {t("skills.add.copiedHint")}
               </span>
               <div className="flex items-center gap-2">
                 <DialogClose render={<Button variant="ghost" />}>
-                  Cancel
+                  {t("skills.action.cancel")}
                 </DialogClose>
-                <Button>Import</Button>
+                <Button>{t("skills.action.import")}</Button>
               </div>
             </>
           )}

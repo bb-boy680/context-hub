@@ -29,6 +29,9 @@ importers:
       '@workspace/locale-zh-cn':
         specifier: workspace:*
         version: link:../../packages/locale-zh-cn
+      '@workspace/plugin-skills':
+        specifier: workspace:*
+        version: link:../../packages/plugin-skills
       '@workspace/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -152,6 +155,49 @@ importers:
       eslint:
         specifier: ^10
         version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/plugin-skills:
+    dependencies:
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../extensions
+      '@workspace/ui':
+        specifier: workspace:*
+        version: link:../ui
+      lucide-react:
+        specifier: ^1.48.0
+        version: 1.48.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      swiper:
+        specifier: ^14.3.0
+        version: 14.3.0
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.10.0(jiti@2.7.0))
       globals:
         specifier: ^17
         version: 17.12.0
@@ -3079,6 +3125,10 @@ packages:
     resolution: {integrity: sha512-aulFJcD6YK8V1G7iRB5tigAP4TsHBZZrOV8pjV++zdUwmeV8uzbY7yn6h9MswN62adStNZFuCIx4haBnRuMDaw==}
     engines: {node: '>=18'}
 
+  swiper@14.3.0:
+    resolution: {integrity: sha512-qw0Xv1+sylM8KCQxWxV2iYAK2G6XjFGPZ/8F1baEsY8DK4A3sTnLx6jUJ0G71rDbVQ05JHMWkcWmJ5NvlxZO0w==}
+    engines: {node: '>= 4.7.0'}
+
   systeminformation@5.33.13:
     resolution: {integrity: sha512-GtyakkchTQKymM1WeAB652zi3rM1q00RKdc+jZe9KGstuc/mWUwAnQGN/RE5gVYvHIR8xYOUIUD9irVKDtA0wA==}
     engines: {node: '>=10.0.0'}
@@ -5882,6 +5932,8 @@ snapshots:
   strip-final-newline@2.0.0: {}
 
   strip-final-newline@4.0.0: {}
+
+  swiper@14.3.0: {}
 
   systeminformation@5.33.13: {}
 

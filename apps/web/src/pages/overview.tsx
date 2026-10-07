@@ -10,7 +10,6 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import { TablePagination } from "@/components/table-pagination"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -36,6 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { TablePagination } from "@workspace/ui/components/table-pagination"
 
 const cardSurface =
   "[--card-spacing:1.5rem] rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"

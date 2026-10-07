@@ -24,7 +24,6 @@ import {
   McpServerDialog,
   type DetailServer,
 } from "@/components/mcp-server-dialog"
-import { TablePagination } from "@/components/table-pagination"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -49,6 +48,7 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { TablePagination } from "@workspace/ui/components/table-pagination"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 
 const cardSurface =

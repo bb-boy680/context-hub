@@ -14,7 +14,7 @@ import { Kbd } from "@workspace/ui/components/kbd"
 import { SidebarTrigger } from "@workspace/ui/components/sidebar"
 
 import { ThemeToggle } from "@/components/theme-toggle"
-import { findNavItem } from "@/lib/navigation"
+import { useNavItem } from "@/lib/navigation"
 import { useI18n } from "@workspace/extensions/react"
 
 /** Changes waiting to leave the workspace; mirrored on the Repository page. */
@@ -23,7 +23,7 @@ const pendingChanges = 3
 export function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
   const { pathname } = useLocation()
   const { t } = useI18n()
-  const page = findNavItem(pathname)?.labelKey
+  const page = useNavItem(pathname)?.labelKey
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b border-glass-border bg-header px-6 backdrop-blur-header">

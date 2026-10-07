@@ -11,6 +11,7 @@ import {
   type PlatformHost,
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
+import { skillsExtension } from "@workspace/plugin-skills"
 
 const webHost: PlatformHost = {
   form: "Web",
@@ -28,7 +29,7 @@ const webHost: PlatformHost = {
 export async function startHub(): Promise<HubKernel> {
   const kernel = await createHubKernel({
     host: webHost,
-    extensions: [...builtinExtensions, simplifiedChineseLocale],
+    extensions: [...builtinExtensions, skillsExtension, simplifiedChineseLocale],
   })
   await kernel.start()
   return kernel

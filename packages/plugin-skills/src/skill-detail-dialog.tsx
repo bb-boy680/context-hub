@@ -1,0 +1,983 @@
+import {
+  ArrowLeftIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CodeIcon,
+  DownloadIcon,
+  FileTextIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  ImageIcon,
+  MoreHorizontalIcon,
+  PauseIcon,
+  PlayIcon,
+  PlusIcon,
+  Trash2Icon,
+  UploadIcon,
+  Volume2Icon,
+  VolumeXIcon,
+  XIcon,
+} from "lucide-react"
+import * as React from "react"
+import { Navigation, Thumbs } from "swiper/modules"
+import { Swiper, SwiperSlide } from "swiper/react"
+import type { SwiperClass } from "swiper/react"
+import "swiper/css"
+import "swiper/css/thumbs"
+
+import { mediaKind, setPreviewsSuspended } from "./media.ts"
+import { seedTags, tagTone } from "./tags.ts"
+import type { MediaItem, Skill } from "./types.ts"
+
+import { useI18n } from "@workspace/extensions/react"
+import { Badge } from "@workspace/ui/components/badge"
+import { Button } from "@workspace/ui/components/button"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import { Input } from "@workspace/ui/components/input"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@workspace/ui/components/popover"
+
+/** SKILL.md as the editor renders it: frontmatter, a heading, steps, then guardrails. */
+function skillFile(skill: Skill): { text: string; className: string }[] {
+  const lowercase = skill.summary.charAt(0).toLowerCase() + skill.summary.slice(1)
+
+  return [
+    { text: "---", className: "text-muted-foreground" },
+    { text: `name: ${skill.name}`, className: "text-secondary-foreground" },
+    {
+      text: `description: ${skill.summary}`,
+      className: "text-secondary-foreground",
+    },
+    { text: `category: ${skill.tags[0]}`, className: "text-secondary-foreground" },
+    { text: "---", className: "text-muted-foreground" },
+    { text: "", className: "text-muted-foreground" },
+    { text: `# ${titleCase(skill.name)}`, className: "font-semibold text-foreground" },
+    { text: "", className: "text-muted-foreground" },
+    { text: `Apply this skill to ${lowercase}.`, className: "text-secondary-foreground" },
+    { text: "", className: "text-muted-foreground" },
+    { text: "## Steps", className: "font-semibold text-foreground" },
+    { text: "1. Read the request and the target files", className: "text-secondary-foreground" },
+    { text: "2. Apply the rules this skill defines", className: "text-secondary-foreground" },
+    { text: "3. Report what changed and why", className: "text-secondary-foreground" },
+    { text: "", className: "text-muted-foreground" },
+    { text: "## Guardrails", className: "font-semibold text-foreground" },
+    { text: "- Never invent facts that are not in the source", className: "text-secondary-foreground" },
+  ]
+}
+
+/** The skill folder; the active row is the file shown in the editor. */
+const fileTree = [
+  { name: "skill", kind: "folder", depth: 0 },
+  { name: "SKILL.md", kind: "file", depth: 1, active: true },
+  { name: "reference.md", kind: "file", depth: 1 },
+  { name: "examples", kind: "folder", depth: 1 },
+  { name: "basic.md", kind: "file", depth: 2 },
+  { name: "scripts", kind: "folder", depth: 1 },
+  { name: "extract.py", kind: "file", depth: 2 },
+] as const
+
+function titleCase(value: string) {
+  return value
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ")
+}
+
+function MarkdownPreview({ skill }: { skill: Skill }) {
+  return (
+    <div className="flex size-full flex-col justify-center gap-0.5 bg-surface-raised px-4 font-mono text-[10.5px] leading-[14px]">
+      {[
+        "---",
+        `name: ${skill.name}`,
+        `description: ${skill.summary}`,
+        `category: ${skill.tags[0]}`,
+        "---",
+      ].map((line, index) => (
+        <span
+          key={index}
+          className={
+            line === "---"
+              ? "truncate text-muted-foreground/70"
+              : "truncate text-secondary-foreground/80"
+          }
+        >
+          {line}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/** Start one video, falling back to muted when the browser blocks audible autoplay. */
+async function startPlayback(video: HTMLVideoElement) {
+  try {
+    await video.play()
+  } catch {
+    video.muted = true
+    try {
+      await video.play()
+    } catch {
+      /* Still blocked: the slide keeps its own play button. */
+    }
+  }
+}
+
+/** One slide: the image itself, or a video carrying its own play control. */
+function MediaSlide({
+  item,
+  skill,
+  active,
+}: {
+  item?: MediaItem
+  skill: Skill
+  /** The slide Swiper currently shows; drives the video's own play state. */
+  active: boolean
+}) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null)
+  const [playing, setPlaying] = React.useState(false)
+  const [muted, setMuted] = React.useState(false)
+  const [progress, setProgress] = React.useState(0)
+  const { t } = useI18n()
+
+  /* Play the active slide and pause the rest; `playing` follows the video's own events. */
+  React.useEffect(() => {
+    const video = videoRef.current
+    if (!video || item?.kind !== "video") return
+    if (active) void startPlayback(video)
+    else video.pause()
+  }, [active, item?.id, item?.kind])
+
+  const togglePlay = () => {
+    const video = videoRef.current
+    if (!video) return
+    if (video.paused) void startPlayback(video)
+    else video.pause()
+  }
+
+  const seek = (ratio: number) => {
+    const video = videoRef.current
+    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return
+    video.currentTime = ratio * video.duration
+    setProgress(ratio)
+  }
+
+  const toggleMute = () => {
+    const video = videoRef.current
+    if (!video) return
+    video.muted = !video.muted
+    setMuted(video.muted)
+  }
+
+  return (
+    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#0f172a]">
+      {!item ? (
+        <MarkdownPreview skill={skill} />
+      ) : item.kind === "video" ? (
+        <video
+          ref={videoRef}
+          src={item.src}
+          playsInline
+          onClick={togglePlay}
+          onPlay={() => setPlaying(true)}
+          onPause={() => setPlaying(false)}
+          onEnded={() => setPlaying(false)}
+          onVolumeChange={() => setMuted(videoRef.current?.muted ?? false)}
+          onTimeUpdate={(event) =>
+            setProgress(
+              event.currentTarget.currentTime / (event.currentTarget.duration || 1)
+            )
+          }
+          className="size-full object-cover"
+        />
+      ) : (
+        <img src={item.src} alt="" className="size-full object-cover" />
+      )}
+      {item?.kind === "video" ? (
+        /* Control bar sits over a scrim so the video itself stays unobstructed. */
+        <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-[#0f172ad9] to-transparent px-4 pt-8 pb-3">
+          <button
+            type="button"
+            aria-label={playing ? t("skills.media.pause") : t("skills.media.play")}
+            onClick={togglePlay}
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/20"
+          >
+            {playing ? (
+              <PauseIcon className="size-4 fill-white text-white" />
+            ) : (
+              <PlayIcon className="size-4 fill-white text-white" />
+            )}
+          </button>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={0.1}
+            value={Math.round(progress * 1000) / 10}
+            aria-label={t("skills.media.seek")}
+            onChange={(event) => seek(Number(event.target.value) / 100)}
+            className="h-4 min-w-0 flex-1 cursor-pointer accent-white"
+          />
+          <button
+            type="button"
+            aria-label={t(muted ? "skills.media.unmute" : "skills.media.mute")}
+            onClick={toggleMute}
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/20"
+          >
+            {muted ? (
+              <VolumeXIcon className="size-4" />
+            ) : (
+              <Volume2Icon className="size-4" />
+            )}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Thumbnail for a video. The active one keeps playing muted; the rest hold a
+ * frame near the start, so the strip neither goes black nor decodes every
+ * video in the gallery.
+ */
+function VideoThumb({ src, active }: { src: string; active: boolean }) {
+  const ref = React.useRef<HTMLVideoElement | null>(null)
+
+  React.useEffect(() => {
+    const video = ref.current
+    if (!video) return
+    if (active) void video.play().catch(() => undefined)
+    else video.pause()
+  }, [active])
+
+  return (
+    <video
+      ref={ref}
+      src={src}
+      muted
+      loop
+      playsInline
+      preload="metadata"
+      onLoadedMetadata={(event) => {
+        const video = event.currentTarget
+        if (active || !Number.isFinite(video.duration)) return
+        video.currentTime = Math.min(0.5, video.duration / 2)
+      }}
+      className="size-full object-cover"
+    />
+  )
+}
+
+/** data: URLs carry their own mime type; anything else is guessed from the extension. */
+
+/** Slides the lightbox opens with: the gallery when the skill has one, else its cover. */
+function seedItems(skill: Skill): MediaItem[] {
+  const sources = skill.gallery?.length
+    ? skill.gallery
+    : skill.cover
+      ? [skill.cover]
+      : []
+  return sources.map((src, index) => ({
+    id: `seed-${index}`,
+    kind: mediaKind(src),
+    src,
+  }))
+}
+
+/**
+ * Swiper mutates its own copy of these params, so one shared template is safe;
+ * shorthand booleans would replace the module defaults wholesale.
+ */
+const navigationParams = { prevEl: null, nextEl: null }
+
+/**
+ * Media column of the lightbox. Swiper owns paging, the thumbnails and the
+ * keyboard shortcuts; this component only supplies slides and the add-media
+ * popover (a local file, a URL, or a pasted data: URL).
+ */
+function MediaPane({ skill }: { skill: Skill }) {
+  const { t } = useI18n()
+  const [items, setItems] = React.useState<MediaItem[]>(() => seedItems(skill))
+  const [activeIndex, setActiveIndex] = React.useState(0)
+  const [thumbs, setThumbs] = React.useState<SwiperClass | null>(null)
+  const [dragOver, setDragOver] = React.useState(false)
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [link, setLink] = React.useState("")
+  const mainRef = React.useRef<SwiperClass | null>(null)
+  const pendingSlide = React.useRef<number | null>(null)
+  const nextId = React.useRef(1)
+  const fileRef = React.useRef<HTMLInputElement | null>(null)
+  const prevRef = React.useRef<HTMLButtonElement | null>(null)
+  const nextRef = React.useRef<HTMLButtonElement | null>(null)
+  const objectUrls = React.useRef<string[]>([])
+
+  React.useEffect(
+    () => () => {
+      objectUrls.current.forEach((url) => URL.revokeObjectURL(url))
+    },
+    []
+  )
+
+  /* The nav buttons sit beside the Swiper, so bind them once both exist. */
+  React.useEffect(() => {
+    const instance = mainRef.current
+    const prev = prevRef.current
+    const next = nextRef.current
+    if (!instance || instance.destroyed || !prev || !next) return
+    const { navigation } = instance.params
+    if (typeof navigation !== "object") return
+    if (navigation.prevEl === prev && navigation.nextEl === next) return
+    navigation.prevEl = prev
+    navigation.nextEl = next
+    instance.navigation.init()
+    instance.navigation.update()
+  })
+
+  /* Runs after Swiper took the new slides in, so the target index exists. */
+  React.useEffect(() => {
+    if (pendingSlide.current === null) return
+    mainRef.current?.slideTo(pendingSlide.current)
+    pendingSlide.current = null
+  }, [items])
+
+  /*
+   * Swiper's own keyboard module listens while events bubble, and the dialog
+   * stops them on the way up, so take the arrow keys during capture instead.
+   */
+  React.useEffect(() => {
+    const handle = (event: KeyboardEvent) => {
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return
+      const target = event.target as HTMLElement | null
+      const tag = target?.tagName.toLowerCase()
+      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return
+      const instance = mainRef.current
+      if (!instance || instance.destroyed) return
+      event.preventDefault()
+      if (event.key === "ArrowLeft") instance.slidePrev()
+      else instance.slideNext()
+    }
+    document.addEventListener("keydown", handle, true)
+    return () => document.removeEventListener("keydown", handle, true)
+  }, [])
+
+  const add = (sources: { src: string; kind: "image" | "video" }[]) => {
+    if (sources.length === 0) return
+    const added = sources.map((source) => ({
+      id: `media-${nextId.current++}`,
+      ...source,
+    }))
+    setItems((previous) => {
+      pendingSlide.current = previous.length
+      return [...previous, ...added]
+    })
+  }
+
+  const addFiles = (files: FileList) => {
+    const added: { src: string; kind: "image" | "video" }[] = []
+    for (const file of Array.from(files)) {
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue
+      const url = URL.createObjectURL(file)
+      objectUrls.current.push(url)
+      added.push({
+        src: url,
+        kind: file.type.startsWith("video/") ? "video" : "image",
+      })
+    }
+    add(added)
+    setAddOpen(false)
+  }
+
+  const addLink = () => {
+    const value = link.trim()
+    if (value === "") return
+    add([{ src: value, kind: mediaKind(value) }])
+    setLink("")
+    setAddOpen(false)
+  }
+
+  /** Drops one asset and keeps a neighbour selected, so the stage never goes unset. */
+  const remove = (id: string) => {
+    setItems((previous) => {
+      const index = previous.findIndex((item) => item.id === id)
+      if (index < 0) return previous
+      const next = previous.filter((item) => item.id !== id)
+      if (index <= activeIndex) pendingSlide.current = Math.max(0, activeIndex - 1)
+      return next
+    })
+  }
+
+  const count = items.length
+
+  return (
+    <div
+      onDragOver={(event) => {
+        event.preventDefault()
+        setDragOver(true)
+      }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(event) => {
+        event.preventDefault()
+        setDragOver(false)
+        addFiles(event.dataTransfer.files)
+      }}
+      className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-secondary px-4 py-6 ${
+        dragOver ? "ring-2 ring-primary ring-inset" : ""
+      }`}
+    >
+      <div className="relative w-full max-w-[720px]">
+        <Swiper
+          modules={[Navigation, Thumbs]}
+          onSwiper={(instance) => {
+            mainRef.current = instance
+          }}
+          onBeforeInit={(instance) => {
+            /* Object form keeps Swiper's own navigation defaults. */
+            const { navigation } = instance.params
+            if (typeof navigation === "object") {
+              navigation.prevEl = prevRef.current
+              navigation.nextEl = nextRef.current
+            }
+          }}
+          navigation={navigationParams}
+          thumbs={{ swiper: thumbs !== null && !thumbs.destroyed ? thumbs : null }}
+          slidesPerView={1}
+          onSlideChange={(instance) => setActiveIndex(instance.activeIndex)}
+          className="w-full outline-none"
+        >
+          {(count > 0 ? items : [undefined]).map((item, index) => (
+            <SwiperSlide key={item?.id ?? "empty"}>
+              <MediaSlide item={item} skill={skill} active={index === activeIndex} />
+            </SwiperSlide>
+          ))}
+        </Swiper>
+
+        {count > 1 ? (
+          <>
+            <span className="absolute top-4 left-4 z-10 flex h-[26px] items-center gap-1.5 rounded-full bg-[#0f172acc] px-2.5 text-[11px] font-semibold text-white">
+              <ImageIcon className="size-3.5" />
+              {`${activeIndex + 1} / ${count}`}
+            </span>
+            <button
+              ref={prevRef}
+              type="button"
+              aria-label={t("skills.media.previous")}
+              className="absolute top-1/2 left-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-foreground shadow-[0_2px_8px_#0F172A33] transition-opacity [&.swiper-button-disabled]:opacity-40"
+            >
+              <ChevronLeftIcon className="size-4" />
+            </button>
+            <button
+              ref={nextRef}
+              type="button"
+              aria-label={t("skills.media.next")}
+              className="absolute top-1/2 right-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-foreground shadow-[0_2px_8px_#0F172A33] transition-opacity [&.swiper-button-disabled]:opacity-40"
+            >
+              <ChevronRightIcon className="size-4" />
+            </button>
+          </>
+        ) : null}
+      </div>
+
+      <div className="flex max-w-full items-center gap-2.5">
+        {count > 0 ? (
+          <Swiper
+            modules={[Thumbs]}
+            onSwiper={setThumbs}
+            watchSlidesProgress
+            slidesPerView="auto"
+            spaceBetween={10}
+            className="max-w-full"
+          >
+            {items.map((item, index) => (
+              <SwiperSlide key={item.id} className="!w-[72px]">
+                <div className="group/thumb relative h-11 w-full">
+                  <button
+                    type="button"
+                    aria-label={`${
+                      item.kind === "video"
+                        ? t("skills.media.video")
+                        : t("skills.media.image")
+                    } ${index + 1}`}
+                    aria-current={index === activeIndex}
+                    /* Swiper's Thumbs module answers pointer taps; this keeps the keyboard working. */
+                    onClick={() => mainRef.current?.slideTo(index)}
+                    className={`relative block size-full overflow-hidden rounded-md ring-inset ${
+                      index === activeIndex
+                        ? "ring-2 ring-primary"
+                        : "ring-1 ring-glass-border"
+                    }`}
+                  >
+                    {item.kind === "video" ? (
+                      <span className="relative block size-full bg-[#0f172a]">
+                        <VideoThumb src={item.src} active={index === activeIndex} />
+                        <span className="absolute right-1 bottom-1 flex size-4 items-center justify-center rounded-full bg-[#0f172ab3]">
+                          <PlayIcon className="size-2.5 fill-white text-white" />
+                        </span>
+                      </span>
+                    ) : (
+                      <img src={item.src} alt="" className="size-full object-cover" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    aria-label={t("skills.media.remove")}
+                    onClick={() => remove(item.id)}
+                    className="absolute top-1 right-1 z-10 flex size-4 items-center justify-center rounded-full bg-[#0f172acc] text-white opacity-0 transition-opacity group-focus-within/thumb:opacity-100 group-hover/thumb:opacity-100 hover:bg-[#0f172a]"
+                  >
+                    <XIcon className="size-2.5" />
+                  </button>
+                </div>
+              </SwiperSlide>
+            ))}
+          </Swiper>
+        ) : null}
+
+        <Popover open={addOpen} onOpenChange={setAddOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                aria-label={t("skills.media.upload")}
+                className="flex h-11 w-[72px] shrink-0 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground"
+              />
+            }
+          >
+            <PlusIcon className="size-[18px]" />
+          </PopoverTrigger>
+          <PopoverContent align="start" side="top" className="w-80 gap-2.5 p-3">
+            <span className="text-xs font-semibold text-muted-foreground">
+              {t("skills.media.add.title")}
+            </span>
+            <div className="flex items-center gap-2">
+              <Input
+                value={link}
+                onChange={(event) => setLink(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addLink()
+                }}
+                placeholder={t("skills.media.add.placeholder")}
+                aria-label={t("skills.media.add.placeholder")}
+                className="h-8 flex-1"
+              />
+              <Button size="sm" className="h-8 px-3" onClick={addLink}>
+                {t("skills.media.add.action")}
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 justify-start gap-2 border-input bg-transparent dark:bg-transparent"
+              onClick={() => fileRef.current?.click()}
+            >
+              <UploadIcon className="size-3.5" />
+              {t("skills.media.add.file")}
+            </Button>
+            <p className="text-[11px] leading-[15px] text-muted-foreground">
+              {t("skills.media.add.hint")}
+            </p>
+          </PopoverContent>
+        </Popover>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,video/*"
+          multiple
+          hidden
+          onChange={(event) => {
+            if (event.target.files) addFiles(event.target.files)
+            event.target.value = ""
+          }}
+        />
+      </div>
+
+      <p className="text-xs leading-[15px] text-muted-foreground">
+        {t("skills.media.hint")}
+      </p>
+    </div>
+  )
+}
+
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex h-[30px] items-center justify-between border-b border-border last:border-b-0">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="text-xs font-medium">{value}</dd>
+    </div>
+  )
+}
+
+/** Category chips with inline add and remove; new names join the tint set by hash. */
+function CategoryEditor({
+  tags,
+  onChange,
+}: {
+  tags: string[]
+  onChange: (tags: string[]) => void
+}) {
+  const { t } = useI18n()
+  const [open, setOpen] = React.useState(false)
+  const [value, setValue] = React.useState("")
+  const available = seedTags.filter((tag) => !tags.includes(tag))
+
+  const add = (tag: string) => {
+    const next = tag.trim()
+    if (next === "" || tags.includes(next)) return
+    onChange([...tags, next])
+    setValue("")
+  }
+
+  return (
+    <section className="flex flex-col gap-2">
+      <span className="text-xs font-semibold text-muted-foreground">
+        {t("skills.detail.category")}
+      </span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {tags.map((tag) => (
+          <span
+            key={tag}
+            className={`group/tag flex h-5 shrink-0 items-center gap-0.5 rounded-full pr-1.5 pl-2 text-xs font-medium ${tagTone(tag).chip} ${tagTone(tag).label}`}
+          >
+            {tag}
+            <button
+              type="button"
+              aria-label={`${t("skills.detail.category.remove")} ${tag}`}
+              onClick={() => onChange(tags.filter((item) => item !== tag))}
+              className="flex size-3.5 items-center justify-center rounded-full opacity-50 transition-opacity hover:opacity-100"
+            >
+              <XIcon className="size-2.5" />
+            </button>
+          </span>
+        ))}
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger
+            render={
+              <button
+                type="button"
+                aria-label={t("skills.detail.category.add")}
+                className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed border-input text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
+              />
+            }
+          >
+            <PlusIcon className="size-3" />
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-60 gap-2 p-2">
+            <Input
+              value={value}
+              onChange={(event) => setValue(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") add(value)
+              }}
+              placeholder={t("skills.detail.category.placeholder")}
+              aria-label={t("skills.detail.category.placeholder")}
+              className="h-8"
+            />
+            {available.length > 0 ? (
+              <div className="flex flex-wrap gap-1.5">
+                {available.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => add(tag)}
+                    className={`flex h-5 shrink-0 items-center rounded-full px-2 text-xs font-medium transition-opacity hover:opacity-80 ${tagTone(tag).chip} ${tagTone(tag).label}`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </PopoverContent>
+        </Popover>
+      </div>
+    </section>
+  )
+}
+
+function InfoPanel({
+  skill,
+  installed,
+  onToggle,
+  onViewFiles,
+  onTagsChange,
+}: {
+  skill: Skill
+  installed: boolean
+  onToggle: () => void
+  onViewFiles: () => void
+  onTagsChange: (tags: string[]) => void
+}) {
+  const { t } = useI18n()
+
+  return (
+    <div className="flex w-[360px] shrink-0 flex-col gap-4 border-l border-border p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1.5">
+          <DialogTitle className="truncate text-base leading-[19px] font-semibold">
+            {skill.name}
+          </DialogTitle>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="h-[18px] px-1.5 text-[11px]">
+              {skill.source}
+            </Badge>
+            <DialogDescription className="truncate text-xs text-muted-foreground">
+              {`${t("skills.detail.updated")} ${skill.updated}`}
+            </DialogDescription>
+          </div>
+        </div>
+        <DialogClose
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={t("skills.action.close")}
+            />
+          }
+        >
+          <XIcon className="text-muted-foreground" />
+        </DialogClose>
+      </div>
+
+      <div className="h-px shrink-0 bg-border" />
+
+      <CategoryEditor tags={skill.tags} onChange={onTagsChange} />
+
+      <section className="flex flex-col gap-2">
+        <span className="text-xs font-semibold text-muted-foreground">
+          {t("skills.detail.description")}
+        </span>
+        <p className="text-[13px] leading-[1.5]">{skill.description}</p>
+      </section>
+
+      <div className="h-px shrink-0 bg-border" />
+
+      <dl className="flex flex-col">
+        <MetaRow label={t("skills.detail.source")} value={skill.source} />
+        <MetaRow label={t("skills.detail.tokens")} value={skill.tokens} />
+        <MetaRow
+          label={t("skills.detail.triggers")}
+          value={String(skill.triggers)}
+        />
+        <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
+      </dl>
+
+      <div className="mt-auto flex items-center gap-2">
+        <Button className="h-9 w-[156px] gap-[7px]" onClick={onViewFiles}>
+          <FileTextIcon />
+          {t("skills.detail.files.action")}
+        </Button>
+        <Button
+          variant={installed ? "outline" : "default"}
+          className={
+            installed
+              ? "h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
+              : "h-9 flex-1 gap-[7px] px-2.5"
+          }
+          onClick={onToggle}
+        >
+          {installed ? <Trash2Icon /> : <DownloadIcon />}
+          {t(installed ? "skills.action.uninstall" : "skills.action.install")}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+/** Slides in from the right over the info panel, leaving the media strip dimmed behind it. */
+function FilesPanel({
+  skill,
+  open,
+  onBack,
+}: {
+  skill: Skill
+  open: boolean
+  onBack: () => void
+}) {
+  const lines = skillFile(skill)
+  const { t } = useI18n()
+
+  return (
+    <div
+      aria-hidden={!open}
+      className={`absolute inset-y-0 right-0 z-20 flex w-[880px] max-w-full flex-col bg-dialog shadow-[-20px_0_48px_#0F172A47] transition-transform duration-300 ease-out ${
+        open ? "translate-x-0" : "translate-x-full"
+      }`}
+    >
+      <div className="flex h-14 shrink-0 items-center gap-3 px-5">
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t("skills.detail.files.back")}
+          onClick={onBack}
+        >
+          <ArrowLeftIcon />
+        </Button>
+        <span className="text-sm leading-[17px] font-semibold">
+          {skill.name}
+        </span>
+        <span className="text-sm leading-[17px] text-muted-foreground">
+          {`/ ${t("skills.detail.files")}`}
+        </span>
+        <DialogClose
+          render={
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto shrink-0"
+              aria-label={t("skills.action.close")}
+            />
+          }
+        >
+          <XIcon className="text-muted-foreground" />
+        </DialogClose>
+      </div>
+      <div className="h-px shrink-0 bg-border" />
+
+      <div className="flex min-h-0 flex-1 gap-5 p-5">
+        <div className="flex w-[224px] shrink-0 flex-col gap-0.5">
+          {fileTree.map((node) => (
+            <span
+              key={node.name}
+              className={`flex h-7 items-center gap-2 rounded-md pr-2 text-[13px] ${
+                node.depth === 0
+                  ? "pl-2"
+                  : node.depth === 1
+                    ? "pl-6"
+                    : "pl-10"
+              } ${
+                "active" in node && node.active
+                  ? "bg-muted font-medium text-foreground"
+                  : "text-secondary-foreground"
+              }`}
+            >
+              {node.kind === "folder" ? (
+                node.depth === 0 ? (
+                  <FolderOpenIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                ) : (
+                  <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
+                )
+              ) : node.name.endsWith(".py") ? (
+                <CodeIcon className="size-3.5 shrink-0 text-muted-foreground" />
+              ) : (
+                <FileTextIcon
+                  className={`size-3.5 shrink-0 ${
+                    "active" in node && node.active
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                  }`}
+                />
+              )}
+              <span className="truncate">{node.name}</span>
+            </span>
+          ))}
+        </div>
+
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface-raised">
+          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3.5">
+            <FileTextIcon className="size-3.5 text-muted-foreground" />
+            <span className="text-[13px] font-medium">SKILL.md</span>
+            <MoreHorizontalIcon className="ml-auto size-4 text-muted-foreground" />
+          </div>
+          <div className="flex-1 overflow-auto py-3 font-mono">
+            {lines.map((line, index) => (
+              <div key={index} className="flex h-5 items-center px-3.5">
+                <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground">
+                  {index + 1}
+                </span>
+                <span
+                  className={`pl-3 text-[11.5px] whitespace-pre ${line.className}`}
+                >
+                  {line.text}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function LightboxBody({
+  skill,
+  installed,
+  onToggle,
+  onTagsChange,
+}: {
+  skill: Skill
+  installed: boolean
+  onToggle: () => void
+  onTagsChange: (tags: string[]) => void
+}) {
+  const [filesOpen, setFilesOpen] = React.useState(false)
+
+  /* The catalog stays mounted behind the dialog; stop its previews decoding. */
+  React.useEffect(() => {
+    setPreviewsSuspended(true)
+    return () => setPreviewsSuspended(false)
+  }, [])
+
+  return (
+    <div className="relative flex h-full min-h-0">
+      <MediaPane skill={skill} />
+      <InfoPanel
+        skill={skill}
+        installed={installed}
+        onToggle={onToggle}
+        onViewFiles={() => setFilesOpen(true)}
+        onTagsChange={onTagsChange}
+      />
+      <div
+        className={`pointer-events-none absolute inset-0 z-10 bg-scrim transition-opacity duration-300 ${
+          filesOpen ? "opacity-100" : "opacity-0"
+        }`}
+      />
+      <FilesPanel
+        skill={skill}
+        open={filesOpen}
+        onBack={() => setFilesOpen(false)}
+      />
+    </div>
+  )
+}
+
+/** Detail lightbox for one skill; opens on click from either view. */
+export function SkillDetailDialog({
+  skill,
+  installed,
+  onToggle,
+  onTagsChange,
+  onOpenChange,
+}: {
+  skill: Skill | null
+  installed: boolean
+  onToggle: () => void
+  onTagsChange: (tags: string[]) => void
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={skill !== null} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        className="flex h-[min(740px,calc(100vh-48px))] w-[min(1136px,calc(100vw-48px))] flex-col gap-0 overflow-hidden rounded-xl bg-dialog p-0 shadow-[0_24px_56px_#0F172A3D] ring-glass-border backdrop-blur-xl sm:max-w-none"
+      >
+        {skill ? (
+          <LightboxBody
+            key={skill.name}
+            skill={skill}
+            installed={installed}
+            onToggle={onToggle}
+            onTagsChange={onTagsChange}
+          />
+        ) : null}
+      </DialogContent>
+    </Dialog>
+  )
+}

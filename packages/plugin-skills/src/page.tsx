@@ -8,9 +8,14 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import { AddSkillDialog, type AddSkillTab } from "@/components/add-skill-dialog"
-import { SkillDetailDialog } from "@/components/skill-detail-dialog"
-import { TablePagination } from "@/components/table-pagination"
+import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
+import { AutoplayVideo } from "./autoplay-video.tsx"
+import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
+import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
+import { seedTags, tagTone } from "./tags.ts"
+import type { Skill, SkillSource } from "./types.ts"
+
+import { useI18n } from "@workspace/extensions/react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -28,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { TablePagination } from "@workspace/ui/components/table-pagination"
 import {
   Tabs,
   TabsContent,
@@ -38,73 +44,21 @@ import {
 const cardSurface =
   "[--card-spacing:1.5rem] rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"
 
-type SkillTag =
-  | "Documents"
-  | "Engineering"
-  | "Docs"
-  | "Data"
-  | "Design"
-  | "Integrations"
-  | "Quality"
-  | "Reliability"
-  | "Marketing"
+type SkillTag = (typeof seedTags)[number]
 
-const tagChip: Record<SkillTag, string> = {
-  Documents: "bg-chip-documents",
-  Engineering: "bg-chip-engineering",
-  Docs: "bg-chip-docs",
-  Data: "bg-chip-data",
-  Design: "bg-chip-design",
-  Integrations: "bg-chip-integrations",
-  Quality: "bg-chip-quality",
-  Reliability: "bg-chip-reliability",
-  Marketing: "bg-chip-marketing",
-}
+/* Card covers keep their own ratio, so the masonry derives its rhythm from real sizes. 390 = 4:3, 292 = 16:9, 347 = 3:2, 520 = 1:1, 693 = 3:4. */
+const cover = (id: string, height: number) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=520&h=${height}&q=70`
 
-const tagLabel: Record<SkillTag, string> = {
-  Documents: "text-tag-documents",
-  Engineering: "text-tag-engineering",
-  Docs: "text-tag-docs",
-  Data: "text-tag-data",
-  Design: "text-tag-design",
-  Integrations: "text-tag-integrations",
-  Quality: "text-tag-quality",
-  Reliability: "text-tag-reliability",
-  Marketing: "text-tag-marketing",
-}
+/* 16:9 for the lightbox stage, which is larger than the card cover. */
+const shot = (id: string) =>
+  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&h=608&q=80`
 
-const tagDot: Record<SkillTag, string> = {
-  Documents: "bg-tag-documents",
-  Engineering: "bg-tag-engineering",
-  Docs: "bg-tag-docs",
-  Data: "bg-tag-data",
-  Design: "bg-tag-design",
-  Integrations: "bg-tag-integrations",
-  Quality: "bg-tag-quality",
-  Reliability: "bg-tag-reliability",
-  Marketing: "bg-tag-marketing",
-}
+/* Sample clip so the video paths (cover preview, lightbox playback) are exercised. */
+const demoVideo =
+  "https://media.prompt-motion.com/stephanlivera-opus-5-5-on-max/video.86605038.mp4"
 
-type SkillSource = "Built-in" | "Workspace" | "skill.sh"
-
-type Skill = {
-  name: string
-  /* The design gives the grid card a shortened summary and the list row the full description. */
-  summary: string
-  description: string
-  tags: SkillTag[]
-  source: SkillSource
-  tokens: string
-  triggers: number
-  updated: string
-  enabled: boolean
-  cover?: string
-}
-
-const cover = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=520&h=184&q=70`
-
-const skills: Skill[] = [
+const initialSkills: Skill[] = [
   {
     name: "pdf-extract",
     summary: "Extract tables from PDFs",
@@ -115,7 +69,12 @@ const skills: Skill[] = [
     triggers: 4,
     updated: "2 hours ago",
     enabled: true,
-    cover: cover("photo-1761671614144-e8c003fff544"),
+    cover: cover("photo-1761671614144-e8c003fff544", 390),
+    gallery: [
+      shot("photo-1761671614144-e8c003fff544"),
+      shot("photo-1580584126903-c17d41830450"),
+      shot("photo-1599727277643-b0c9cfb7705d"),
+    ],
   },
   {
     name: "code-review",
@@ -127,7 +86,11 @@ const skills: Skill[] = [
     triggers: 9,
     updated: "yesterday",
     enabled: true,
-    cover: cover("photo-1580584126903-c17d41830450"),
+    cover: cover("photo-1580584126903-c17d41830450", 292),
+    gallery: [
+      shot("photo-1580584126903-c17d41830450"),
+      shot("photo-1516849841032-87cbac4d88f7"),
+    ],
   },
   {
     name: "doc-audit",
@@ -150,7 +113,11 @@ const skills: Skill[] = [
     triggers: 6,
     updated: "2 days ago",
     enabled: true,
-    cover: cover("photo-1618388810903-840bb0d15ea5"),
+    cover: cover("photo-1618388810903-840bb0d15ea5", 390),
+    gallery: [
+      shot("photo-1618388810903-840bb0d15ea5"),
+      shot("photo-1544383835-bda2bc66a55d"),
+    ],
   },
   {
     name: "test-reliability",
@@ -162,7 +129,7 @@ const skills: Skill[] = [
     triggers: 5,
     updated: "3 days ago",
     enabled: true,
-    cover: cover("photo-1599727277643-b0c9cfb7705d"),
+    cover: cover("photo-1599727277643-b0c9cfb7705d", 292),
   },
   {
     name: "release-notes",
@@ -174,7 +141,7 @@ const skills: Skill[] = [
     triggers: 2,
     updated: "3 days ago",
     enabled: true,
-    cover: cover("photo-1516849841032-87cbac4d88f7"),
+    cover: cover("photo-1516849841032-87cbac4d88f7", 347),
   },
   {
     name: "legacy-jira-sync",
@@ -186,7 +153,7 @@ const skills: Skill[] = [
     triggers: 4,
     updated: "5 days ago",
     enabled: false,
-    cover: cover("photo-1549164330-86c63b6d4195"),
+    cover: cover("photo-1549164330-86c63b6d4195", 390),
   },
   {
     name: "data-migration",
@@ -209,7 +176,7 @@ const skills: Skill[] = [
     triggers: 3,
     updated: "8 days ago",
     enabled: true,
-    cover: cover("photo-1580894908361-967195033215"),
+    cover: cover("photo-1580894908361-967195033215", 693),
   },
   {
     name: "perf-profiling",
@@ -221,6 +188,8 @@ const skills: Skill[] = [
     triggers: 7,
     updated: "9 days ago",
     enabled: true,
+    /* A video as the first asset: the card and the list row preview it muted. */
+    gallery: [demoVideo],
   },
   {
     name: "brand-voice",
@@ -232,7 +201,7 @@ const skills: Skill[] = [
     triggers: 2,
     updated: "12 days ago",
     enabled: false,
-    cover: cover("photo-1611269154421-4e27233ac5c7"),
+    cover: cover("photo-1611269154421-4e27233ac5c7", 520),
   },
   {
     name: "incident-postmortem",
@@ -244,7 +213,7 @@ const skills: Skill[] = [
     triggers: 4,
     updated: "14 days ago",
     enabled: true,
-    cover: cover("flagged/photo-1551954810-43cd6aef5b1f"),
+    cover: cover("flagged/photo-1551954810-43cd6aef5b1f", 292),
   },
   {
     name: "schema-explorer",
@@ -256,7 +225,7 @@ const skills: Skill[] = [
     triggers: 3,
     updated: "18 days ago",
     enabled: true,
-    cover: cover("photo-1544383835-bda2bc66a55d"),
+    cover: cover("photo-1544383835-bda2bc66a55d", 390),
   },
   {
     name: "accessibility-audit",
@@ -268,27 +237,17 @@ const skills: Skill[] = [
     triggers: 5,
     updated: "21 days ago",
     enabled: false,
-    cover: cover("photo-1523289333742-be1143f6b766"),
+    cover: cover("photo-1523289333742-be1143f6b766", 347),
   },
 ]
 
-const filterTags: SkillTag[] = [
-  "Documents",
-  "Engineering",
-  "Docs",
-  "Data",
-  "Design",
-  "Integrations",
-  "Quality",
-  "Reliability",
-  "Marketing",
-]
+const filterTags: SkillTag[] = [...seedTags]
 
 const tabs = [
-  { value: "all", label: "All 42" },
-  { value: "built-in", label: "Built-in 24" },
-  { value: "workspace", label: "Workspace 12" },
-  { value: "skill.sh", label: "skill.sh 6" },
+  { value: "all", labelKey: "skills.tab.all", count: 42 },
+  { value: "built-in", labelKey: "skills.tab.builtin", count: 24 },
+  { value: "workspace", labelKey: "skills.tab.workspace", count: 12 },
+  { value: "skill.sh", labelKey: "skills.tab.registry", count: 6 },
 ]
 
 /* Column widths include the 16px gutter the design leaves between columns. */
@@ -312,7 +271,13 @@ function titleCase(name: string) {
     .join(" ")
 }
 
-function TagChip({ tag, size = "sm" }: { tag: SkillTag; size?: "sm" | "md" }) {
+function TagChip({
+  tag,
+  size = "sm",
+}: {
+  tag: string
+  size?: "sm" | "md"
+}) {
   const box =
     size === "sm"
       ? "h-[18px] px-1.5 text-[11px] leading-[13px]"
@@ -320,17 +285,17 @@ function TagChip({ tag, size = "sm" }: { tag: SkillTag; size?: "sm" | "md" }) {
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full font-medium ${box} ${tagChip[tag]} ${tagLabel[tag]}`}
+      className={`inline-flex shrink-0 items-center rounded-full font-medium ${box} ${tagTone(tag).chip} ${tagTone(tag).label}`}
     >
       {tag}
     </span>
   )
 }
 
-function TagPill({ tag }: { tag: SkillTag }) {
+function TagPill({ tag }: { tag: string }) {
   return (
     <span className="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[11px] font-semibold shadow-[0_2px_6px_#0F172A1A] ring-1 ring-[#0F172A1F] dark:bg-[#0E1422E6] dark:text-[#F8FAFC] dark:shadow-[0_2px_6px_#00000059] dark:ring-[#FFFFFF24]">
-      <span className={`size-1.5 shrink-0 rounded-full ${tagDot[tag]}`} />
+      <span className={`size-1.5 shrink-0 rounded-full ${tagTone(tag).dot}`} />
       {tag}
     </span>
   )
@@ -345,12 +310,15 @@ function InstallButton({
   onToggle: () => void
   label: string
 }) {
+  const { t } = useI18n()
+  const action = t(installed ? "skills.action.uninstall" : "skills.action.install")
+
   return (
     <Button
       type="button"
       size="xs"
       variant={installed ? "outline" : "default"}
-      aria-label={`${installed ? "Uninstall" : "Install"} ${label}`}
+      aria-label={`${action} ${label}`}
       onClick={(event) => {
         event.stopPropagation()
         onToggle()
@@ -366,7 +334,7 @@ function InstallButton({
       ) : (
         <DownloadIcon className="size-3.5" />
       )}
-      {installed ? "Uninstall" : "Install"}
+      {action}
     </Button>
   )
 }
@@ -375,8 +343,36 @@ function SourceBadge({ source }: { source: SkillSource }) {
   return <Badge variant="secondary">{source}</Badge>
 }
 
-function PhotoCover({ src }: { src: string }) {
-  return <img src={src} alt="" className="size-full object-cover" />
+/** Cover image that reports its own aspect ratio, for a card sized to the asset. */
+function PhotoCover({
+  src,
+  onRatio,
+}: {
+  src: string
+  onRatio: (ratio: number) => void
+}) {
+  const ref = React.useRef<HTMLImageElement | null>(null)
+
+  /* A cached image can finish before the load listener attaches. */
+  React.useEffect(() => {
+    const image = ref.current
+    if (image?.complete && image.naturalWidth > 0) {
+      onRatio(image.naturalWidth / image.naturalHeight)
+    }
+  }, [src, onRatio])
+
+  return (
+    <img
+      ref={ref}
+      src={src}
+      alt=""
+      onLoad={(event) => {
+        const image = event.currentTarget
+        onRatio(image.naturalWidth / image.naturalHeight)
+      }}
+      className="size-full object-cover"
+    />
+  )
 }
 
 function MarkdownCover({ skill }: { skill: Skill }) {
@@ -405,6 +401,9 @@ function MarkdownCover({ skill }: { skill: Skill }) {
   )
 }
 
+/** Ratio a card falls back to before its asset reports one. */
+const FALLBACK_RATIO = 16 / 9
+
 function SkillCard({
   skill,
   installed,
@@ -418,17 +417,41 @@ function SkillCard({
 }) {
   const shownTags = skill.tags.slice(0, 2)
   const extraTags = skill.tags.length - shownTags.length
+  /* Stable identity keeps the ratio callback from re-running every render. */
+  const media = React.useMemo(() => cardMedia(skill), [skill])
+  /* The media box takes the asset's own ratio, so covers are never cropped. */
+  const [ratio, setRatio] = React.useState<number | undefined>(() =>
+    media === undefined ? undefined : knownAspect(media.src)
+  )
+
+  const measure = React.useCallback(
+    (next: number) => {
+      if (media === undefined) return
+      rememberAspect(media.src, next)
+      setRatio(next)
+    },
+    [media]
+  )
 
   return (
     <div
       onClick={onOpen}
-      className="flex h-[246px] cursor-pointer flex-col overflow-hidden rounded-lg bg-card shadow-glass ring-1 ring-glass-border backdrop-blur-glass"
+      className="mb-5 cursor-pointer overflow-hidden rounded-lg bg-card shadow-glass ring-1 ring-glass-border backdrop-blur-glass break-inside-avoid"
     >
-      <div className="relative h-[130px] shrink-0 overflow-hidden">
-        {skill.cover ? (
-          <PhotoCover src={skill.cover} />
-        ) : (
+      <div
+        className="relative w-full overflow-hidden bg-surface-raised"
+        style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
+      >
+        {media === undefined ? (
           <MarkdownCover skill={skill} />
+        ) : media.kind === "video" ? (
+          <AutoplayVideo
+            src={media.src}
+            onAspect={measure}
+            className="size-full object-cover"
+          />
+        ) : (
+          <PhotoCover src={media.src} onRatio={measure} />
         )}
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           {shownTags.map((tag) => (
@@ -441,7 +464,7 @@ function SkillCard({
           )}
         </div>
       </div>
-      <div className="flex flex-1 flex-col gap-1 px-3 py-2.5">
+      <div className="flex flex-col gap-1 px-3 py-2.5">
         <div className="flex h-[18px] items-center justify-between gap-2">
           <span className="truncate text-sm font-semibold">{skill.name}</span>
           <SourceBadge source={skill.source} />
@@ -449,7 +472,7 @@ function SkillCard({
         <p className="line-clamp-2 text-xs text-muted-foreground">
           {skill.description}
         </p>
-        <div className="mt-auto flex items-center justify-between gap-2">
+        <div className="mt-0.5 flex items-center justify-between gap-2">
           <span className="truncate text-[11px] text-muted-foreground">
             {skill.tokens} tokens · {skill.triggers} triggers
           </span>
@@ -465,17 +488,22 @@ function SkillCard({
 }
 
 function SkillGrid({
+  skills,
   installed,
   onToggle,
   onOpen,
 }: {
+  skills: Skill[]
   installed: Record<string, boolean>
   onToggle: (name: string) => void
   onOpen: (skill: Skill) => void
 }) {
-  /* Five per row at most: past that the cards get too narrow to read. 96px = the four 24px gaps. */
+  /*
+   * Masonry: column-width lets the browser pick how many 266px columns fit
+   * (four at the design's 1136), and each card keeps its own height.
+   */
   return (
-    <div className="grid grid-cols-[repeat(auto-fill,minmax(max(266px,calc((100%-96px)/5)),1fr))] gap-x-6 gap-y-5">
+    <div className="columns-[266px] gap-x-6">
       {skills.slice(0, 12).map((skill) => (
         <SkillCard
           key={skill.name}
@@ -490,10 +518,21 @@ function SkillGrid({
 }
 
 function SkillThumb({ skill }: { skill: Skill }) {
-  if (skill.cover) {
+  const media = cardMedia(skill)
+
+  if (media?.kind === "video") {
+    return (
+      <AutoplayVideo
+        src={media.src}
+        className="size-9 shrink-0 rounded-md object-cover"
+      />
+    )
+  }
+
+  if (media !== undefined) {
     return (
       <img
-        src={skill.cover}
+        src={media.src}
         alt=""
         className="size-9 shrink-0 rounded-md object-cover"
       />
@@ -510,23 +549,26 @@ function SkillThumb({ skill }: { skill: Skill }) {
 }
 
 function SkillTable({
+  skills,
   installed,
   onToggle,
   onOpen,
 }: {
+  skills: Skill[]
   installed: Record<string, boolean>
   onToggle: (name: string) => void
   onOpen: (skill: Skill) => void
 }) {
+  const { t } = useI18n()
+
   return (
     <Card className={`${cardSurface} gap-4`}>
       <CardHeader className="gap-1">
         <CardTitle className="text-base leading-tight font-semibold">
-          Installed skills
+          {t("skills.installed.title")}
         </CardTitle>
         <CardDescription className="text-sm leading-snug">
-          Install skills from skill.sh, or manage the ones already in this
-          workspace.
+          {t("skills.installed.description")}
         </CardDescription>
       </CardHeader>
       <div className="px-6">
@@ -599,14 +641,17 @@ function SkillTable({
         </Table>
       </div>
       <div className="flex items-center justify-between px-6">
-        <span className="text-xs text-muted-foreground">1–14 of 42 skills</span>
-        <TablePagination pageText="Page 1 of 4" />
+        <span className="text-xs text-muted-foreground">
+          {t("skills.range.long")}
+        </span>
+        <TablePagination pageText={t("skills.page")} />
       </div>
     </Card>
   )
 }
 
 function PageTitleRow() {
+  const { t } = useI18n()
   const [tag, setTag] = React.useState("All tags")
   const [expanded, setExpanded] = React.useState(false)
   const visible = expanded ? filterTags : filterTags.slice(0, 4)
@@ -614,9 +659,9 @@ function PageTitleRow() {
   return (
     <div className="flex items-start justify-between gap-6">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">Skills</h1>
+        <h1 className="text-2xl font-semibold">{t("skills.title")}</h1>
         <p className="text-sm text-muted-foreground">
-          Install skills from skill.sh or manage the ones in this workspace.
+          {t("skills.description")}
         </p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
@@ -630,7 +675,7 @@ function PageTitleRow() {
               : "bg-surface-raised text-muted-foreground"
           }`}
         >
-          All tags
+          {t("skills.allTags")}
         </button>
         {visible.map((item) => (
           <button
@@ -641,7 +686,7 @@ function PageTitleRow() {
             className={`flex h-[26px] shrink-0 items-center justify-center rounded-full px-2.5 text-[12.5px] transition-colors ${
               tag === item
                 ? `bg-primary font-semibold text-primary-foreground`
-                : `bg-surface-raised font-medium ${tagLabel[item]}`
+                : `bg-surface-raised font-medium ${tagTone(item).label}`
             }`}
           >
             {item}
@@ -690,23 +735,29 @@ function ViewButton({
 }
 
 export function SkillsPage() {
+  const { t } = useI18n()
   const [tab, setTab] = React.useState(tabs[0].value)
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
-  const [detail, setDetail] = React.useState<Skill | null>(null)
-  const [detailOpen, setDetailOpen] = React.useState(false)
+  const [skills, setSkills] = React.useState<Skill[]>(initialSkills)
+  /* The open lightbox is a name, so edits to the catalog show through it. */
+  const [detailName, setDetailName] = React.useState<string | null>(null)
   const [installed, setInstalled] = React.useState<Record<string, boolean>>(
     () =>
-      Object.fromEntries(skills.map((skill) => [skill.name, skill.enabled]))
+      Object.fromEntries(initialSkills.map((skill) => [skill.name, skill.enabled]))
   )
+
+  const detail = skills.find((skill) => skill.name === detailName) ?? null
 
   const toggleInstalled = (name: string) =>
     setInstalled((current) => ({ ...current, [name]: !current[name] }))
 
-  const openDetail = (skill: Skill) => {
-    setDetail(skill)
-    setDetailOpen(true)
-  }
+  const setTags = (name: string, tags: string[]) =>
+    setSkills((current) =>
+      current.map((skill) => (skill.name === name ? { ...skill, tags } : skill))
+    )
+
+  const openDetail = (skill: Skill) => setDetailName(skill.name)
 
   return (
     <>
@@ -720,7 +771,7 @@ export function SkillsPage() {
                 value={item.value}
                 className="h-7 flex-none rounded-md px-3 text-[13px] text-muted-foreground data-active:bg-accent data-active:text-foreground dark:data-active:bg-accent dark:data-active:text-foreground"
               >
-                {item.label}
+                {t(item.labelKey)} {item.count}
               </TabsTrigger>
             ))}
           </TabsList>
@@ -728,13 +779,13 @@ export function SkillsPage() {
             <div className={viewToggleSurface}>
               <ViewButton
                 icon={LayoutGridIcon}
-                label="Grid view"
+                label={t("skills.view.grid")}
                 active={view === "grid"}
                 onClick={() => setView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
-                label="List view"
+                label={t("skills.view.list")}
                 active={view === "list"}
                 onClick={() => setView("list")}
               />
@@ -745,14 +796,14 @@ export function SkillsPage() {
               onClick={() => setAddTab("local")}
             >
               <UploadIcon />
-              Import
+              {t("skills.action.import")}
             </Button>
             <Button
               className="h-9 gap-2 px-4"
               onClick={() => setAddTab("skill.sh")}
             >
               <DownloadIcon />
-              Browse skill.sh
+              {t("skills.action.browse")}
             </Button>
           </div>
         </div>
@@ -760,19 +811,21 @@ export function SkillsPage() {
           {view === "grid" ? (
             <>
               <SkillGrid
+                skills={skills}
                 installed={installed}
                 onToggle={toggleInstalled}
                 onOpen={openDetail}
               />
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted-foreground">
-                  1–12 of 42 skills
+                  {t("skills.range")}
                 </span>
-                <TablePagination pageText="Page 1 of 4" />
+                <TablePagination pageText={t("skills.page")} />
               </div>
             </>
           ) : (
             <SkillTable
+              skills={skills}
               installed={installed}
               onToggle={toggleInstalled}
               onOpen={openDetail}
@@ -789,13 +842,16 @@ export function SkillsPage() {
         }}
       />
       <SkillDetailDialog
-        skill={detailOpen ? detail : null}
+        skill={detail}
         installed={detail ? (installed[detail.name] ?? false) : false}
         onToggle={() => {
           if (detail) toggleInstalled(detail.name)
         }}
+        onTagsChange={(tags) => {
+          if (detail) setTags(detail.name, tags)
+        }}
         onOpenChange={(open) => {
-          if (!open) setDetailOpen(false)
+          if (!open) setDetailName(null)
         }}
       />
     </>

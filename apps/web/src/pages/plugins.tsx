@@ -16,7 +16,6 @@ import {
   PluginDetailDialog,
   type PluginDetail,
 } from "@/components/plugin-detail-dialog"
-import { TablePagination } from "@/components/table-pagination"
 import {
   marketplaceChip,
   marketplaceLabel,
@@ -49,6 +48,7 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import { TablePagination } from "@workspace/ui/components/table-pagination"
 import {
   Tabs,
   TabsContent,
