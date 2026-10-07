@@ -1,0 +1,120 @@
+/**
+ * `ctx.i18n` (I18nService): active locale and message lookup. Language packs
+ * arrive through the extension point, so installing one is the whole feature;
+ * the kernel keeps `en` as the locked fallback table.
+ */
+import { Service } from "./cordis.ts"
+import type { Context } from "./cordis.ts"
+
+import type { PlatformHost } from "./host.ts"
+import type { ExtensionService } from "./service.ts"
+import type { LocaleContribution } from "./types.ts"
+
+/** Persisted active locale id. */
+const LOCALE_KEY = "hub/locale"
+
+/** Fallback locale id; the kernel locks this pack so the lookup chain always terminates. */
+const FALLBACK_LOCALE = "en"
+
+/** One selectable language as the UI reads it. */
+export interface LocaleDefinition {
+  id: string
+  label: string
+}
+
+/** Immutable locale state published on every change. */
+export interface I18nState {
+  active: string
+  locales: LocaleDefinition[]
+  revision: number
+}
+
+declare module "@deepseek-ai/cordis" {
+  interface Context {
+    i18n: I18nService
+  }
+  interface Events {
+    /** The active locale or the selectable set changed. */
+    "i18n/change"(state: I18nState): void
+  }
+}
+
+export class I18nService extends Service {
+  static inject = ["extensions", "host"]
+
+  private readonly host: PlatformHost
+  private readonly extensions: ExtensionService
+  private active: string
+  private table = new Map<string, string>()
+  private revision = 0
+  private cached!: I18nState
+
+  constructor(ctx: Context) {
+    super(ctx, "i18n")
+    const host = ctx.get("host")
+    const extensions = ctx.get("extensions")
+    if (host === undefined) throw new Error("i18n: host service unavailable")
+    if (extensions === undefined) throw new Error("i18n: extension service unavailable")
+    this.host = host
+    this.extensions = extensions
+    this.active = host.storage.read(LOCALE_KEY) ?? FALLBACK_LOCALE
+    ctx.on("extensions/changed", () => this.refresh())
+    this.refresh()
+  }
+
+  /** Current locale state; stable between changes. */
+  get state(): I18nState {
+    return this.cached
+  }
+
+  /** Translate one key through the active table, falling back to `en`, then to the key. */
+  t(key: string): string {
+    return this.table.get(key) ?? key
+  }
+
+  /** Switch the active locale; unknown or disabled ids are ignored. */
+  setLocale(id: string): void {
+    if (id === this.active) return
+    if (!this.cached.locales.some((locale) => locale.id === id)) return
+    this.active = id
+    this.host.storage.write(LOCALE_KEY, id)
+    this.refresh()
+  }
+
+  private refresh(): void {
+    const packs = this.packs()
+    const locales: LocaleDefinition[] = []
+    for (const pack of packs) {
+      if (locales.some((locale) => locale.id === pack.id)) continue
+      locales.push({ id: pack.id, label: pack.label })
+    }
+    if (!locales.some((locale) => locale.id === this.active)) {
+      this.active = FALLBACK_LOCALE
+      this.host.storage.write(LOCALE_KEY, this.active)
+    }
+    this.table = this.buildTable(packs)
+    this.revision += 1
+    this.cached = { active: this.active, locales, revision: this.revision }
+    this.ctx.emit("i18n/change", this.cached)
+  }
+
+  private packs(): LocaleContribution[] {
+    return this.extensions.contributions("locale")
+  }
+
+  /** Fallback first, other packs next, the active pack last, so missing keys keep the fallback text. */
+  private buildTable(packs: LocaleContribution[]): Map<string, string> {
+    const table = new Map<string, string>()
+    const merge = (pack: LocaleContribution) => {
+      for (const [key, value] of Object.entries(pack.messages)) table.set(key, value)
+    }
+    const fallback = packs.find((pack) => pack.id === FALLBACK_LOCALE)
+    if (fallback !== undefined) merge(fallback)
+    for (const pack of packs) {
+      if (pack.id !== FALLBACK_LOCALE && pack.id !== this.active) merge(pack)
+    }
+    const active = packs.find((pack) => pack.id === this.active)
+    if (active !== undefined) merge(active)
+    return table
+  }
+}

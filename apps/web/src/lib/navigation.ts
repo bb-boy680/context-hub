@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  BlocksIcon,
   GitBranchIcon,
   LayoutDashboardIcon,
   PlugIcon,
@@ -11,33 +12,35 @@ import {
 } from "lucide-react"
 
 export type NavItem = {
-  title: string
+  /** Message key resolved through `ctx.i18n` where the item renders. */
+  labelKey: string
   path: string
   icon: LucideIcon
 }
 
 export type NavGroup = {
-  label: string
+  labelKey: string
   items: NavItem[]
 }
 
 export const navGroups: NavGroup[] = [
   {
-    label: "Manage",
+    labelKey: "nav.group.manage",
     items: [
-      { title: "Overview", path: "/", icon: LayoutDashboardIcon },
-      { title: "Skills", path: "/skills", icon: SparklesIcon },
-      { title: "MCP Servers", path: "/mcp-servers", icon: ServerIcon },
-      { title: "Plugins", path: "/plugins", icon: PlugIcon },
+      { labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon },
+      { labelKey: "nav.skills", path: "/skills", icon: SparklesIcon },
+      { labelKey: "nav.mcpServers", path: "/mcp-servers", icon: ServerIcon },
+      { labelKey: "nav.plugins", path: "/plugins", icon: PlugIcon },
     ],
   },
   {
-    label: "Operate",
+    labelKey: "nav.group.operate",
     items: [
-      { title: "Activity", path: "/activity", icon: ActivityIcon },
-      { title: "Policies", path: "/policies", icon: ShieldIcon },
-      { title: "Repository", path: "/repository", icon: GitBranchIcon },
-      { title: "Settings", path: "/settings", icon: SettingsIcon },
+      { labelKey: "nav.activity", path: "/activity", icon: ActivityIcon },
+      { labelKey: "nav.policies", path: "/policies", icon: ShieldIcon },
+      { labelKey: "nav.repository", path: "/repository", icon: GitBranchIcon },
+      { labelKey: "nav.settings", path: "/settings", icon: SettingsIcon },
+      { labelKey: "nav.extensions", path: "/extensions", icon: BlocksIcon },
     ],
   },
 ]

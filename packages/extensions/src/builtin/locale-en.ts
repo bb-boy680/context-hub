@@ -1,0 +1,86 @@
+/**
+ * The locked English base pack. The kernel ships it because every lookup
+ * falls back to it; other languages arrive as their own extension packages.
+ */
+import { LanguagesIcon } from "lucide-react"
+
+import type { ExtensionDefinition } from "../types.ts"
+
+/** Keys every pack resolves; the UI reads them through `ctx.i18n.t`. */
+const en: Record<string, string> = {
+  "nav.group.manage": "Manage",
+  "nav.group.operate": "Operate",
+  "nav.overview": "Overview",
+  "nav.skills": "Skills",
+  "nav.mcpServers": "MCP Servers",
+  "nav.plugins": "Plugins",
+  "nav.extensions": "Extensions",
+  "nav.activity": "Activity",
+  "nav.policies": "Policies",
+  "nav.repository": "Repository",
+  "nav.settings": "Settings",
+  "header.workspace": "Workspace",
+  "header.search": "Search context",
+  "header.connectRepo": "Connect repo",
+  "header.syncRepo": "Sync repo",
+  "extensions.title": "Extensions",
+  "extensions.description": "Extend Context Hub with agent integrations and language packs.",
+  "extensions.searchPlaceholder": "Search extensions",
+  "extensions.language": "Language",
+  "extensions.category.integration": "Integrations",
+  "extensions.category.language": "Languages",
+  "extensions.category.appearance": "Appearance",
+  "extensions.category.source": "Sources",
+  "extensions.category.storage": "Storage",
+  "extensions.category.integration.description": "Each agent reads its assets from a different place. An integration tells Context Hub how to deliver yours to that agent.",
+  "extensions.category.language.description": "A language pack translates the whole interface. Install one, pick it from the language menu, uninstall it to fall back to English.",
+  "extensions.category.appearance.description": "Themes and visual options for the interface.",
+  "extensions.category.source.description": "Extra places Context Hub can pull assets from.",
+  "extensions.category.storage.description": "Where Context Hub keeps its state on this machine.",
+  "extensions.action.install": "Install",
+  "extensions.action.uninstall": "Uninstall",
+  "extensions.action.close": "Close",
+  "extensions.status.error": "Failed",
+  "extensions.status.incompatible": "Incompatible",
+  "extensions.status.builtin": "Built-in",
+  "extensions.kind.builtin": "Built-in",
+  "extensions.kind.declarative": "Declarative",
+  "extensions.kind.code": "Code",
+  "extensions.requiresRuntime": "Needs the desktop app or a local runtime",
+  "extensions.empty": "No extensions match your search.",
+  "extensions.detail.about": "About",
+  "extensions.detail.contributes": "Contributes",
+  "extensions.detail.locations": "Reads from",
+  "extensions.detail.format": "Format",
+  "extensions.detail.supports": "Accepts",
+  "extensions.detail.permissions": "Permissions",
+  "extensions.detail.noPermissions": "No extra permissions",
+  "extensions.detail.form": "Form",
+  "extensions.asset.skill": "Skills",
+  "extensions.asset.mcp": "MCP servers",
+  "extensions.asset.memory": "Memory",
+  "extensions.asset.hook": "Hooks",
+  "extensions.permission.storage.self": "Its own stored state",
+  "extensions.permission.assets.read": "Read your assets",
+  "extensions.permission.assets.write": "Write your assets",
+  "extensions.permission.filesystem": "Local filesystem",
+  "extensions.permission.network": "Network access",
+}
+
+/** Fallback pack: locked, always enabled, and the table every other pack falls back to. */
+export const englishLocale: ExtensionDefinition = {
+  manifest: {
+    id: "hub.locale.en",
+    name: "English",
+    version: "0.1.0",
+    apiVersion: "^0.1",
+    kind: "builtin",
+    category: "language",
+    description: "Base interface language every other pack falls back to.",
+    icon: LanguagesIcon,
+    defaultEnabled: true,
+    locked: true,
+    permissions: [],
+  },
+  declarative: { locale: [{ id: "en", label: "English", messages: en }] },
+}

@@ -14,9 +14,11 @@ import {
 } from "@workspace/ui/components/sidebar"
 
 import { navGroups } from "@/lib/navigation"
+import { useI18n } from "@workspace/extensions/react"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { pathname } = useLocation()
+  const { t } = useI18n()
 
   return (
     <Sidebar className="border-sidebar-border backdrop-blur-glass" {...props}>
@@ -40,9 +42,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent className="gap-4 p-2">
         {navGroups.map((group) => (
-          <SidebarGroup key={group.label} className="gap-0.5 p-0">
+          <SidebarGroup key={group.labelKey} className="gap-0.5 p-0">
             <SidebarGroupLabel className="text-[length:var(--text-body)] font-semibold text-foreground">
-              {group.label}
+              {t(group.labelKey)}
             </SidebarGroupLabel>
             <SidebarMenu className="ml-4 w-auto gap-0.5 border-l border-border pl-2.5">
               {group.items.map((item) => (
@@ -52,7 +54,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                     render={<Link to={item.path} />}
                   >
                     <item.icon />
-                    <span>{item.title}</span>
+                    <span>{t(item.labelKey)}</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
