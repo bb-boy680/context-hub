@@ -42,6 +42,7 @@ const en: Record<string, string> = {
   "extensions.action.close": "Close",
   "extensions.status.error": "Failed",
   "extensions.status.incompatible": "Incompatible",
+  "extensions.status.waiting": "Waiting",
   "extensions.status.builtin": "Built-in",
   "extensions.kind.builtin": "Built-in",
   "extensions.kind.declarative": "Declarative",

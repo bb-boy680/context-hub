@@ -102,19 +102,22 @@ export class I18nService extends Service {
     return this.extensions.contributions("locale")
   }
 
-  /** Fallback first, other packs next, the active pack last, so missing keys keep the fallback text. */
+  /**
+   * Merge the fallback locale first and the active locale over it, so a key
+   * the active pack omits keeps its English text. Every pack of a locale is
+   * merged in catalog order, because the kernel and each extension ship their
+   * own namespace defaults under the same locale id.
+   */
   private buildTable(packs: LocaleContribution[]): Map<string, string> {
     const table = new Map<string, string>()
-    const merge = (pack: LocaleContribution) => {
-      for (const [key, value] of Object.entries(pack.messages)) table.set(key, value)
+    const merge = (locale: string) => {
+      for (const pack of packs) {
+        if (pack.id !== locale) continue
+        for (const [key, value] of Object.entries(pack.messages)) table.set(key, value)
+      }
     }
-    const fallback = packs.find((pack) => pack.id === FALLBACK_LOCALE)
-    if (fallback !== undefined) merge(fallback)
-    for (const pack of packs) {
-      if (pack.id !== FALLBACK_LOCALE && pack.id !== this.active) merge(pack)
-    }
-    const active = packs.find((pack) => pack.id === this.active)
-    if (active !== undefined) merge(active)
+    merge(FALLBACK_LOCALE)
+    if (this.active !== FALLBACK_LOCALE) merge(this.active)
     return table
   }
 }

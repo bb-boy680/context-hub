@@ -76,6 +76,11 @@ function ExtensionRow({
                 {t("extensions.status.incompatible")}
               </Badge>
             ) : null}
+            {status === "waiting" ? (
+              <Badge variant="secondary">
+                {t("extensions.status.waiting")}
+              </Badge>
+            ) : null}
           </span>
           <span className="truncate text-[13px] leading-[18px] text-muted-foreground">
             {manifest.description}

@@ -4,7 +4,7 @@
  * a value, so every module here imports the framework through this file.
  */
 import { Context, Service } from "@deepseek-ai/cordis"
-import type { Fiber } from "@deepseek-ai/cordis"
+import type { Fiber, Plugin } from "@deepseek-ai/cordis"
 
 export { Context, Service }
-export type { Fiber }
+export type { Fiber, Plugin }

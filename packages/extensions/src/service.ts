@@ -6,7 +6,7 @@
  * extension made unwinds through the same mechanism.
  */
 import { Service } from "./cordis.ts"
-import type { Context, Fiber } from "./cordis.ts"
+import type { Context, Fiber, Plugin } from "./cordis.ts"
 
 import type { PlatformHost } from "./host.ts"
 import {
@@ -28,6 +28,8 @@ type Disposer = () => void
 export type ExtensionStatus =
   | "inactive"
   | "activating"
+  /** Enabled, but holding until every service in `manifest.inject` is provided. */
+  | "waiting"
   | "active"
   | "error"
   | "incompatible"
@@ -79,6 +81,8 @@ export class ExtensionService extends Service {
   private readonly host: PlatformHost
   private readonly entries = new Map<string, Entry>()
   private readonly fibers = new Map<string, Fiber>()
+  /** Reverse lookup for `internal/status`, which reports every fiber by identity. */
+  private readonly owners = new Map<Fiber, string>()
   private readonly points = new Map<ExtensionPointId, Map<string, unknown[]>>()
   private tail: Promise<void> = Promise.resolve()
   private revision = 0
@@ -108,6 +112,11 @@ export class ExtensionService extends Service {
       entry.enabled = locked === true || (stored[id] ?? defaultEnabled ?? false)
       if (entry.enabled) this.registerDeclarative(entry)
     }
+    // A required service appearing or disappearing re-loads its dependents;
+    // this listener keeps each entry's status in step with its fiber.
+    ctx.on("internal/status", (fiber) => {
+      void this.observe(fiber)
+    })
     this.cached = this.buildSnapshot()
   }
 
@@ -202,7 +211,7 @@ export class ExtensionService extends Service {
   }
 
   private async activate(entry: Entry): Promise<void> {
-    const { id } = entry.definition.manifest
+    const { id, inject } = entry.definition.manifest
     const activate = entry.definition.activate
     if (activate === undefined) {
       entry.status = "active"
@@ -211,7 +220,7 @@ export class ExtensionService extends Service {
 
     entry.status = "activating"
     this.publish()
-    const fiber = this.ctx.plugin((pluginCtx: Context) => {
+    const plugin: Plugin.Function = (pluginCtx: Context) => {
       const scope: ExtensionScope = {
         ctx: pluginCtx,
         host: this.host,
@@ -220,18 +229,16 @@ export class ExtensionService extends Service {
         },
       }
       activate(scope)
-    })
-    this.fibers.set(id, fiber)
+    }
+    Object.defineProperty(plugin, "name", { value: id, configurable: true })
+    if (inject !== undefined) plugin.inject = inject
 
-    try {
-      await fiber.await()
-      entry.status = "active"
-      entry.error = undefined
-    } catch (error) {
-      entry.status = "error"
-      entry.error = error instanceof Error ? error.message : String(error)
-      this.host.log("error", `extensions: "${id}" failed to activate: ${entry.error}`)
+    const fiber = this.ctx.plugin(plugin)
+    this.fibers.set(id, fiber)
+    this.owners.set(fiber, id)
+    if ((await this.sync(entry, fiber)) !== undefined) {
       this.fibers.delete(id)
+      this.owners.delete(fiber)
       await fiber.dispose()
     }
   }
@@ -241,9 +248,50 @@ export class ExtensionService extends Service {
     const { id } = entry.definition.manifest
     const fiber = this.fibers.get(id)
     this.fibers.delete(id)
-    await fiber?.dispose()
+    if (fiber !== undefined) {
+      this.owners.delete(fiber)
+      await fiber.dispose()
+    }
     entry.status = "inactive"
     entry.error = undefined
+  }
+
+  /**
+   * Read one fiber's dependency state into its entry. Returns the failure
+   * message when the plugin threw, `undefined` once the fiber settled.
+   */
+  private async sync(entry: Entry, fiber: Fiber): Promise<string | undefined> {
+    try {
+      // Settles the in-flight transition; the fiber stays pending while any
+      // service in `manifest.inject` is missing, and this resolves at once.
+      await fiber.await()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      entry.status = "error"
+      entry.error = message
+      this.host.log(
+        "error",
+        `extensions: "${entry.definition.manifest.id}" failed to activate: ${message}`
+      )
+      return message
+    }
+    if (fiber.store !== undefined) {
+      entry.status = "active"
+      entry.error = undefined
+      return undefined
+    }
+    entry.status = "waiting"
+    return undefined
+  }
+
+  /** Follow one of our fibers after a dependency appeared or disappeared. */
+  private async observe(fiber: Fiber): Promise<void> {
+    const id = this.owners.get(fiber)
+    if (id === undefined) return
+    const entry = this.entries.get(id)
+    if (entry === undefined || !entry.enabled) return
+    await this.sync(entry, fiber)
+    this.publish()
   }
 
   private contribute(

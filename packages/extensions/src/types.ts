@@ -5,6 +5,7 @@
  */
 import type { Context } from "@deepseek-ai/cordis"
 import type { LucideIcon } from "lucide-react"
+import type { ComponentType } from "react"
 
 import type { PlatformHost } from "./host.ts"
 
@@ -64,12 +65,41 @@ export interface AgentTargetDescriptor {
   format: string
 }
 
+/** Sidebar groups the shell renders, in order. */
+export type NavGroupId = "manage" | "operate"
+
+/** One sidebar entry contributed by an extension. */
+export interface NavContribution {
+  /** Route path, e.g. "/skills". */
+  path: string
+  /** Message key resolved through `ctx.i18n` where the entry renders. */
+  labelKey: string
+  icon: LucideIcon
+  group: NavGroupId
+  /**
+   * Sort rank inside the group; the shell leaves gaps between its own entries
+   * (10, 20, 30 …) so a contributed entry can be inserted between them.
+   */
+  order: number
+}
+
+/** One page contributed by an extension; a UI shell mounts it at its path. */
+export interface RouteContribution {
+  path: string
+  /** Rendered without props; the page reads its own data through the kernel. */
+  Component: ComponentType
+}
+
 /** One contribution type per point id; a point indexes every value contributed to it. */
 export interface ContributionMap {
   /** A selectable UI language. */
   locale: LocaleContribution
   /** One coding agent's consumption contract. */
   target: AgentTargetDescriptor
+  /** A sidebar entry. */
+  nav: NavContribution
+  /** A page. */
+  route: RouteContribution
 }
 
 /** Contribution point ids the kernel indexes. */
@@ -108,6 +138,13 @@ export interface ExtensionManifest {
   /** The kernel never disables this extension, so the UI offers no switch. */
   locked?: boolean
   permissions?: ExtensionPermission[]
+  /** Cordis service names this extension provides; other extensions may require them. */
+  provides?: string[]
+  /**
+   * Cordis service names this extension requires. It stays `waiting` until
+   * every one is provided, and unloads again when one is disabled.
+   */
+  inject?: string[]
 }
 
 /** One package in the catalog. */
