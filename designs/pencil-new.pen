@@ -461,6 +461,7 @@
               "id": "oA9a1",
               "name": "Group Manage",
               "width": "fill_container",
+              "height": 168,
               "layout": "vertical",
               "gap": 2,
               "children": [
@@ -596,6 +597,7 @@
               "id": "i4xn4",
               "name": "Group Operate",
               "width": "fill_container",
+              "height": 202,
               "layout": "vertical",
               "gap": 2,
               "children": [
@@ -629,7 +631,7 @@
                   "id": "donVh",
                   "name": "Menu Sub",
                   "width": "fill_container",
-                  "height": 134,
+                  "height": 168,
                   "padding": [
                     0,
                     0,
@@ -717,6 +719,21 @@
                             },
                             "Z6DcUn": {
                               "content": "Settings"
+                            }
+                          }
+                        },
+                        {
+                          "id": "omuqu",
+                          "type": "ref",
+                          "ref": "qHkMd",
+                          "name": "Nav Extensions",
+                          "width": "fill_container",
+                          "descendants": {
+                            "w3gRL": {
+                              "icon": "extension"
+                            },
+                            "Z6DcUn": {
+                              "content": "Extensions"
                             }
                           }
                         }
@@ -149429,6 +149446,3347 @@
                               "fill": "#94A3B8"
                             }
                           }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "fiE2W",
+      "x": 0,
+      "y": 8876,
+      "name": "Module / Extensions",
+      "width": 4560,
+      "height": 1128,
+      "layout": "none",
+      "children": [
+        {
+          "type": "frame",
+          "id": "rTxkS",
+          "x": 0,
+          "y": 0,
+          "name": "Module Label",
+          "width": 560,
+          "layout": "vertical",
+          "gap": 5,
+          "children": [
+            {
+              "type": "text",
+              "id": "eCZWV",
+              "name": "Module Title",
+              "fill": "$foreground",
+              "content": "Extensions",
+              "fontFamily": "$font-sans",
+              "fontSize": 22,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "F4IHSu",
+              "name": "Module Description",
+              "fill": "$muted-foreground",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Extend Context Hub itself: agent integrations and interface languages.",
+              "fontFamily": "$font-sans",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "xoH9e",
+          "x": 0,
+          "y": 48,
+          "name": "Context Hub — Extensions",
+          "clip": true,
+          "width": 1440,
+          "height": 1080,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 225,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#E9F0FB",
+                "position": 0
+              },
+              {
+                "color": "#F1EDFB",
+                "position": 0.55
+              },
+              {
+                "color": "#FBF0F2",
+                "position": 1
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "NVmlD",
+              "layoutPosition": "absolute",
+              "x": 120,
+              "y": 720,
+              "name": "Blob",
+              "fill": "$blob-pink",
+              "width": 380,
+              "height": 380,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "type": "ellipse",
+              "id": "PbTB2",
+              "layoutPosition": "absolute",
+              "x": 920,
+              "y": 160,
+              "name": "Blob",
+              "fill": "$blob-violet",
+              "width": 420,
+              "height": 420,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "type": "ellipse",
+              "id": "oQYqP",
+              "layoutPosition": "absolute",
+              "x": 280,
+              "y": -140,
+              "name": "Blob",
+              "fill": "$blob-blue",
+              "width": 460,
+              "height": 460,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "id": "j4BaG1",
+              "type": "ref",
+              "ref": "Yv9pw",
+              "name": "Sidebar",
+              "height": 1080
+            },
+            {
+              "type": "frame",
+              "id": "WRw5i",
+              "name": "Main",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$background",
+              "layout": "vertical",
+              "children": [
+                {
+                  "id": "NrBzc",
+                  "type": "ref",
+                  "ref": "YazIs",
+                  "name": "App Header",
+                  "width": "fill_container",
+                  "descendants": {
+                    "J7G23": {
+                      "content": "Extensions"
+                    }
+                  }
+                },
+                {
+                  "type": "frame",
+                  "id": "ceg1J",
+                  "name": "Content",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 24,
+                  "padding": 24,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "LAKiM",
+                      "name": "Page Title",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "OEoog",
+                          "name": "Title Block",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "yV5ha",
+                              "name": "Title",
+                              "fill": "$foreground",
+                              "content": "Extensions",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 24,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "i2TxvD",
+                              "name": "Description",
+                              "fill": "$muted-foreground",
+                              "content": "Extend Context Hub with agent integrations and language packs. Everything here is a package you can install, enable or disable at any time.",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 14,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "PKbgi",
+                          "name": "Actions",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "U4OJn",
+                              "type": "ref",
+                              "ref": "Wr5iQ",
+                              "name": "Language Select",
+                              "width": 150,
+                              "descendants": {
+                                "DEzpy": {
+                                  "content": "English"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "h6JlM",
+                      "name": "Search Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "jvZB0",
+                          "type": "ref",
+                          "ref": "NOh42",
+                          "name": "Search Extensions",
+                          "width": 320,
+                          "descendants": {
+                            "Rx6IP": {
+                              "enabled": true
+                            },
+                            "VNMMJ": {
+                              "content": "Search extensions"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Wg9CF",
+                      "name": "Sections",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 24,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "d7Eko",
+                          "name": "Integrations Card",
+                          "width": 1136,
+                          "fill": "$card",
+                          "cornerRadius": "$radius-lg",
+                          "stroke": "$glass-border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "effect": [
+                            {
+                              "type": "background_blur",
+                              "radius": 18
+                            },
+                            {
+                              "type": "shadow",
+                              "shadowType": "outer",
+                              "color": "$glass-shadow",
+                              "offset": {
+                                "x": 0,
+                                "y": 8
+                              },
+                              "blur": 24
+                            }
+                          ],
+                          "layout": "vertical",
+                          "gap": 16,
+                          "padding": 20,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "F91HD",
+                              "name": "Card Header",
+                              "width": "fill_container",
+                              "height": 40,
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "aUnqm",
+                                  "name": "Card Title",
+                                  "fill": "$foreground",
+                                  "content": "Integrations",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ObWKY",
+                                  "name": "Card Description",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Each agent reads its assets from a different place. An integration tells Context Hub how to deliver yours to that agent.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "pHXUq",
+                              "name": "Rows",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "bYPHS",
+                                  "name": "Row A",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "hn6cm",
+                                      "name": "Claude Code",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "FwYsn",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "B7hBZ",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "terminal",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "D8Hq2p",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "x2l75V",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "Claude Code",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "X33j1A",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Deliver skills, memory and MCP servers to Claude Code.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "kqtC8",
+                                          "name": "Button Uninstall",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "SQyDa",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "Uninstall",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "DbhyI",
+                                      "name": "Codex",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "paRzs",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "isfrb",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "deployed_code",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "Z1iE0K",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "e2N7h1",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "Codex",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "qG2Bi",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Deliver skills, memory and MCP servers to Codex.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "PeRvq",
+                                          "name": "Button Uninstall",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "Iv7Yb",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "Uninstall",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Qfs3t",
+                                  "name": "Row B",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "nUPkR",
+                                      "name": "GitHub Copilot",
+                                      "width": 528,
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "jKqi9",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "q8FD99",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "github",
+                                              "library": "lucide",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "ab7sQ",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "WKApr",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "GitHub Copilot",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "Xmdpn",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Deliver instructions and prompt files to Copilot workspaces.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "qhgeF",
+                                          "name": "Button Uninstall",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "zmFeJ",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "Uninstall",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ILWY9",
+                          "name": "Languages Card",
+                          "width": 1136,
+                          "fill": "$card",
+                          "cornerRadius": "$radius-lg",
+                          "stroke": "$glass-border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "effect": [
+                            {
+                              "type": "background_blur",
+                              "radius": 18
+                            },
+                            {
+                              "type": "shadow",
+                              "shadowType": "outer",
+                              "color": "$glass-shadow",
+                              "offset": {
+                                "x": 0,
+                                "y": 8
+                              },
+                              "blur": 24
+                            }
+                          ],
+                          "layout": "vertical",
+                          "gap": 16,
+                          "padding": 20,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "H2MO94",
+                              "name": "Card Header",
+                              "width": "fill_container",
+                              "height": 40,
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "x5n8BT",
+                                  "name": "Card Title",
+                                  "fill": "$foreground",
+                                  "content": "Languages",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "mWPBt",
+                                  "name": "Card Description",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "A language pack translates the whole interface. Install one, pick it from the language menu, uninstall it to fall back to English.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "gwaHb",
+                              "name": "Rows",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "kc5dL",
+                                  "name": "Row A",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "zPKrO",
+                                      "name": "English",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "t7hmA",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-documents",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "OV1Sy",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "language",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-documents"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "h7YF9l",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "MjADk",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "English",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "D8Tku",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Base interface language every other pack falls back to.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "YUPTc",
+                                          "type": "ref",
+                                          "ref": "Mml1j",
+                                          "name": "Badge Built-in",
+                                          "descendants": {
+                                            "L07t2Q": {
+                                              "enabled": false
+                                            },
+                                            "oB8F6": {
+                                              "content": "Built-in"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "QC5nP",
+                                      "name": "简体中文",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "Ia7VQ",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-documents",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "VlBTw",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "translate",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-documents"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "xnRSJ",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "WRT6P",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "简体中文",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "M9qUT",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Chinese (Simplified) interface language.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "tegp2",
+                                          "name": "Button Install",
+                                          "height": 32,
+                                          "fill": "$primary",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "#00000000",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "uICYV",
+                                              "name": "Label",
+                                              "fill": "$primary-foreground",
+                                              "content": "Install",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "f994Qy",
+          "x": 1560,
+          "y": 48,
+          "name": "Context Hub — Extensions — Detail",
+          "clip": true,
+          "width": 1440,
+          "height": 1080,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 225,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#E9F0FB",
+                "position": 0
+              },
+              {
+                "color": "#F1EDFB",
+                "position": 0.55
+              },
+              {
+                "color": "#FBF0F2",
+                "position": 1
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "ZQZms",
+              "layoutPosition": "absolute",
+              "x": 120,
+              "y": 720,
+              "name": "Blob",
+              "fill": "$blob-pink",
+              "width": 380,
+              "height": 380,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "type": "ellipse",
+              "id": "pdxaH",
+              "layoutPosition": "absolute",
+              "x": 920,
+              "y": 160,
+              "name": "Blob",
+              "fill": "$blob-violet",
+              "width": 420,
+              "height": 420,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "type": "ellipse",
+              "id": "DSRzz",
+              "layoutPosition": "absolute",
+              "x": 280,
+              "y": -140,
+              "name": "Blob",
+              "fill": "$blob-blue",
+              "width": 460,
+              "height": 460,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "id": "cIXWu",
+              "type": "ref",
+              "ref": "Yv9pw",
+              "name": "Sidebar",
+              "height": 1080
+            },
+            {
+              "type": "frame",
+              "id": "dHy5y",
+              "name": "Main",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$background",
+              "layout": "vertical",
+              "children": [
+                {
+                  "id": "aJNp2",
+                  "type": "ref",
+                  "ref": "YazIs",
+                  "name": "App Header",
+                  "width": "fill_container",
+                  "descendants": {
+                    "J7G23": {
+                      "content": "Extensions"
+                    }
+                  }
+                },
+                {
+                  "type": "frame",
+                  "id": "B0QKO",
+                  "name": "Content",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 24,
+                  "padding": 24,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "FDU0O",
+                      "name": "Page Title",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "orldW",
+                          "name": "Title Block",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "JLR2a",
+                              "name": "Title",
+                              "fill": "$foreground",
+                              "content": "Extensions",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 24,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "xlbVR",
+                              "name": "Description",
+                              "fill": "$muted-foreground",
+                              "content": "Extend Context Hub with agent integrations and language packs. Everything here is a package you can install, enable or disable at any time.",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 14,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "o9LMip",
+                          "name": "Actions",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "O4IPH",
+                              "type": "ref",
+                              "ref": "Wr5iQ",
+                              "name": "Language Select",
+                              "width": 150,
+                              "descendants": {
+                                "DEzpy": {
+                                  "content": "English"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "i7Suz9",
+                      "name": "Search Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "Noo4T",
+                          "type": "ref",
+                          "ref": "NOh42",
+                          "name": "Search Extensions",
+                          "width": 320,
+                          "descendants": {
+                            "Rx6IP": {
+                              "enabled": true
+                            },
+                            "VNMMJ": {
+                              "content": "Search extensions"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "f2qiK",
+                      "name": "Sections",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 24,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "P2Dqcf",
+                          "name": "Integrations Card",
+                          "width": 1136,
+                          "fill": "$card",
+                          "cornerRadius": "$radius-lg",
+                          "stroke": "$glass-border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "effect": [
+                            {
+                              "type": "background_blur",
+                              "radius": 18
+                            },
+                            {
+                              "type": "shadow",
+                              "shadowType": "outer",
+                              "color": "$glass-shadow",
+                              "offset": {
+                                "x": 0,
+                                "y": 8
+                              },
+                              "blur": 24
+                            }
+                          ],
+                          "layout": "vertical",
+                          "gap": 16,
+                          "padding": 20,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "f2L9pC",
+                              "name": "Card Header",
+                              "width": "fill_container",
+                              "height": 40,
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Gxygn",
+                                  "name": "Card Title",
+                                  "fill": "$foreground",
+                                  "content": "Integrations",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "f3VCe",
+                                  "name": "Card Description",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Each agent reads its assets from a different place. An integration tells Context Hub how to deliver yours to that agent.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Ftnmf",
+                              "name": "Rows",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "kAdxt",
+                                  "name": "Row A",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "m56aH",
+                                      "name": "Claude Code",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "R1OxJZ",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "UiAXy",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "terminal",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "l2T4e",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "U1gxk",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "Claude Code",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "rEYii",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Deliver skills, memory and MCP servers to Claude Code.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "crdDE",
+                                          "type": "ref",
+                                          "ref": "eOFaD",
+                                          "name": "Switch",
+                                          "fill": "$primary",
+                                          "descendants": {
+                                            "skl3k": {
+                                              "x": 18
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "M4lO4",
+                                      "name": "Codex",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "VIBaq",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "pe2zr",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "deployed_code",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "yNL8z",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "ymqko",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "Codex",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "U4if8",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Deliver skills, memory and MCP servers to Codex.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "M2hNgD",
+                                          "type": "ref",
+                                          "ref": "eOFaD",
+                                          "name": "Switch",
+                                          "fill": "$primary",
+                                          "descendants": {
+                                            "skl3k": {
+                                              "x": 18
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "ZB308",
+                                  "name": "Row B",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "K8kUE",
+                                      "name": "GitHub Copilot",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "Ah3vw",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "yavtQ",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "github",
+                                              "library": "lucide",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "bPhEd",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "WodoX",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "GitHub Copilot",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "uVAsw",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Deliver instructions and prompt files to Copilot workspaces.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "zeGI9",
+                                          "type": "ref",
+                                          "ref": "eOFaD",
+                                          "name": "Switch",
+                                          "fill": "$primary",
+                                          "descendants": {
+                                            "skl3k": {
+                                              "x": 18
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "P6qWm",
+                          "name": "Languages Card",
+                          "width": 1136,
+                          "fill": "$card",
+                          "cornerRadius": "$radius-lg",
+                          "stroke": "$glass-border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "effect": [
+                            {
+                              "type": "background_blur",
+                              "radius": 18
+                            },
+                            {
+                              "type": "shadow",
+                              "shadowType": "outer",
+                              "color": "$glass-shadow",
+                              "offset": {
+                                "x": 0,
+                                "y": 8
+                              },
+                              "blur": 24
+                            }
+                          ],
+                          "layout": "vertical",
+                          "gap": 16,
+                          "padding": 20,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "fyHF9",
+                              "name": "Card Header",
+                              "width": "fill_container",
+                              "height": 40,
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "HyYle",
+                                  "name": "Card Title",
+                                  "fill": "$foreground",
+                                  "content": "Languages",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "c4st0",
+                                  "name": "Card Description",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "A language pack translates the whole interface. Install one, pick it from the language menu, disable it to fall back to English.",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "W6zsfV",
+                              "name": "Rows",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "GSuBR",
+                                  "name": "Row A",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "PeWnY",
+                                      "name": "English",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "eSuRI",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-documents",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "FbZG1",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "language",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-documents"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "LN8Sl",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "ouw9h",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "English",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "HeTLo",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Base interface language every other pack falls back to.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "Jh4eB",
+                                          "type": "ref",
+                                          "ref": "Mml1j",
+                                          "name": "Badge Built-in",
+                                          "descendants": {
+                                            "L07t2Q": {
+                                              "enabled": false
+                                            },
+                                            "oB8F6": {
+                                              "content": "Built-in"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "LqeXq",
+                                      "name": "简体中文",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "XgsmJ",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-documents",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "V3EOyo",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "translate",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-documents"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "eXqDg",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "M9Fv9Y",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "简体中文",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "lhFAw",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "Chinese (Simplified) interface language.",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "CgsSk",
+                                          "type": "ref",
+                                          "ref": "x3lnSj",
+                                          "name": "Button Install",
+                                          "width": 32,
+                                          "height": 32,
+                                          "padding": 0,
+                                          "gap": 0,
+                                          "fill": "#00000000",
+                                          "stroke": "$border",
+                                          "descendants": {
+                                            "PXvdy": {
+                                              "enabled": true,
+                                              "icon": "add",
+                                              "fill": "$muted-foreground"
+                                            },
+                                            "xFfMZ": {
+                                              "enabled": false
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "rectangle",
+              "id": "V4tOr",
+              "layoutPosition": "absolute",
+              "x": 0,
+              "y": 0,
+              "name": "Scrim",
+              "fill": "$scrim",
+              "width": 1440,
+              "height": 1080
+            },
+            {
+              "type": "frame",
+              "id": "SU7yo",
+              "layoutPosition": "absolute",
+              "x": 400,
+              "y": 222,
+              "name": "Dialog",
+              "clip": true,
+              "width": 640,
+              "fill": "$dialog",
+              "cornerRadius": "$radius-lg",
+              "stroke": "$glass-border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner",
+              "effect": [
+                {
+                  "type": "background_blur",
+                  "radius": 24
+                },
+                {
+                  "type": "shadow",
+                  "shadowType": "outer",
+                  "color": "#0F172A3D",
+                  "offset": {
+                    "x": 0,
+                    "y": 24
+                  },
+                  "blur": 56
+                }
+              ],
+              "layout": "vertical",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "s8IIKu",
+                  "name": "Dialog Header",
+                  "width": "fill_container",
+                  "height": 84,
+                  "gap": 14,
+                  "padding": [
+                    22,
+                    24,
+                    18,
+                    24
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "RhnDt",
+                      "name": "Icon Tile",
+                      "width": 44,
+                      "height": 44,
+                      "fill": "$chip-integrations",
+                      "cornerRadius": 10,
+                      "layout": "vertical",
+                      "justifyContent": "center",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "mWZfA",
+                          "name": "Icon",
+                          "width": 22,
+                          "height": 22,
+                          "icon": "terminal",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$tag-integrations"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "i745h",
+                      "name": "Title Text",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 4,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "MyNzV",
+                          "name": "Name Row",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "IeLUq",
+                              "name": "Name",
+                              "fill": "$foreground",
+                              "content": "Claude Code",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 16,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "id": "KXLcd",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Badge Kind",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "Code"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "WDb49",
+                          "name": "Meta",
+                          "fill": "$muted-foreground",
+                          "content": "v0.1.0  ·  Form Web",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "id": "UJhv9",
+                      "type": "ref",
+                      "ref": "x3lnSj",
+                      "name": "Button Close",
+                      "width": 32,
+                      "height": 32,
+                      "padding": 0,
+                      "gap": 0,
+                      "fill": "#00000000",
+                      "stroke": "#00000000",
+                      "descendants": {
+                        "PXvdy": {
+                          "enabled": true,
+                          "icon": "close",
+                          "fill": "$muted-foreground"
+                        },
+                        "xFfMZ": {
+                          "enabled": false
+                        }
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ODYK7",
+                  "name": "Dialog Body",
+                  "width": "fill_container",
+                  "stroke": "$border",
+                  "strokeWidth": {
+                    "top": 1
+                  },
+                  "layout": "vertical",
+                  "gap": 20,
+                  "padding": 24,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "b8Tfx",
+                      "name": "Section About",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "xG89v",
+                          "name": "Section Label",
+                          "fill": "$foreground",
+                          "content": "About",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "text",
+                          "id": "SSkJj",
+                          "name": "Section Text",
+                          "fill": "$muted-foreground",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Deliver skills, memory and MCP servers to Claude Code.",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Aev4r",
+                      "name": "Section Contributes",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XPkrY",
+                          "name": "Section Label",
+                          "fill": "$foreground",
+                          "content": "Contributes",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "e8v6e",
+                          "name": "Chips",
+                          "width": "fill_container",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "id": "uIZ2a",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Chip Skills",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "Skills"
+                                }
+                              }
+                            },
+                            {
+                              "id": "Z9CzHl",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Chip MCP servers",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "MCP servers"
+                                }
+                              }
+                            },
+                            {
+                              "id": "N11owa",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Chip Memory",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "Memory"
+                                }
+                              }
+                            },
+                            {
+                              "id": "ehIVR",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Chip Hooks",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "Hooks"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "d6RFSc",
+                          "name": "Panel Label",
+                          "fill": "$muted-foreground",
+                          "content": "Reads from",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "RBd7K",
+                          "name": "Paths Panel",
+                          "width": "fill_container",
+                          "fill": "$muted",
+                          "cornerRadius": "$radius-md",
+                          "layout": "vertical",
+                          "padding": [
+                            0,
+                            12
+                          ],
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "GK1pq",
+                              "name": "Path Skills",
+                              "width": "fill_container",
+                              "height": 30,
+                              "stroke": "$border",
+                              "strokeWidth": {
+                                "bottom": 1
+                              },
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "r8O6hk",
+                                  "name": "Label",
+                                  "fill": "$foreground",
+                                  "content": "Skills",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "bPP75",
+                                  "name": "Path",
+                                  "fill": "$muted-foreground",
+                                  "content": "~/.claude/skills/<name>/SKILL.md",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "fJq8y",
+                              "name": "Path Memory",
+                              "width": "fill_container",
+                              "height": 30,
+                              "stroke": "$border",
+                              "strokeWidth": {
+                                "bottom": 1
+                              },
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "RChAx",
+                                  "name": "Label",
+                                  "fill": "$foreground",
+                                  "content": "Memory",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "kU9EZ",
+                                  "name": "Path",
+                                  "fill": "$muted-foreground",
+                                  "content": "~/.claude/CLAUDE.md",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "CZvMq",
+                              "name": "Path MCP servers",
+                              "width": "fill_container",
+                              "height": 30,
+                              "stroke": "$border",
+                              "strokeWidth": {
+                                "bottom": 1
+                              },
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "JpL9g",
+                                  "name": "Label",
+                                  "fill": "$foreground",
+                                  "content": "MCP servers",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "tldUP",
+                                  "name": "Path",
+                                  "fill": "$muted-foreground",
+                                  "content": "~/.claude.json",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "wZGzX",
+                              "name": "Path Hooks",
+                              "width": "fill_container",
+                              "height": 30,
+                              "stroke": "$border",
+                              "justifyContent": "space_between",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "f4HsZ8",
+                                  "name": "Label",
+                                  "fill": "$foreground",
+                                  "content": "Hooks",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "D6iFDR",
+                                  "name": "Path",
+                                  "fill": "$muted-foreground",
+                                  "content": "~/.claude/settings.json",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "wUmcb",
+                          "name": "Format",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "X2vDu",
+                              "name": "Label",
+                              "fill": "$muted-foreground",
+                              "content": "Format",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "text",
+                              "id": "l8RpW1",
+                              "name": "Value",
+                              "fill": "$foreground",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Markdown with YAML frontmatter; JSON for MCP servers and hooks.",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 13,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Gvpv1",
+                      "name": "Notice",
+                      "width": "fill_container",
+                      "fill": "$notice-bg",
+                      "cornerRadius": "$radius-md",
+                      "gap": 8,
+                      "padding": [
+                        10,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "icon",
+                          "id": "lIMjZ",
+                          "name": "Icon",
+                          "width": 16,
+                          "height": 16,
+                          "icon": "info",
+                          "library": "Material Symbols Rounded",
+                          "fill": "$muted-foreground"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Z2XwE4",
+                          "name": "Notice Text",
+                          "fill": "$muted-foreground",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Writing these files needs the desktop app or a local runtime — the web build only previews the plan.",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12.5,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "e1IbwX",
+                      "name": "Section Permissions",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "bpZPY",
+                          "name": "Section Label",
+                          "fill": "$foreground",
+                          "content": "Permissions",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "600"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "kEaA3",
+                          "name": "Chips",
+                          "width": "fill_container",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "id": "NewXX",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Chip Read your assets",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "Read your assets"
+                                }
+                              }
+                            },
+                            {
+                              "id": "LhoHM",
+                              "type": "ref",
+                              "ref": "Mml1j",
+                              "name": "Chip Local filesystem",
+                              "descendants": {
+                                "L07t2Q": {
+                                  "enabled": false
+                                },
+                                "oB8F6": {
+                                  "content": "Local filesystem"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "V02QK",
+                  "name": "Dialog Footer",
+                  "width": "fill_container",
+                  "height": 64,
+                  "stroke": "$border",
+                  "strokeWidth": {
+                    "top": 1
+                  },
+                  "gap": 12,
+                  "padding": [
+                    16,
+                    24
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ubyYi",
+                      "name": "Footer Hint",
+                      "fill": "$muted-foreground",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Applied the next time an agent reads these paths.",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "id": "rqTRl",
+                      "type": "ref",
+                      "ref": "x3lnSj",
+                      "name": "Button Cancel",
+                      "fill": "#00000000",
+                      "stroke": "#00000000",
+                      "descendants": {
+                        "PXvdy": {
+                          "enabled": false
+                        },
+                        "xFfMZ": {
+                          "content": "Close",
+                          "fill": "$foreground"
+                        }
+                      }
+                    },
+                    {
+                      "id": "OT6Rp",
+                      "type": "ref",
+                      "ref": "x3lnSj",
+                      "name": "Button Uninstall",
+                      "fill": "#00000000",
+                      "stroke": "$border",
+                      "descendants": {
+                        "PXvdy": {
+                          "enabled": true,
+                          "icon": "delete",
+                          "fill": "$secondary-foreground"
+                        },
+                        "xFfMZ": {
+                          "content": "Uninstall",
+                          "fill": "$secondary-foreground"
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "p4Gt9",
+          "x": 3120,
+          "y": 48,
+          "name": "Context Hub — Extensions — 中文",
+          "clip": true,
+          "width": 1440,
+          "height": 1080,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "enabled": true,
+            "rotation": 225,
+            "size": {
+              "height": 1
+            },
+            "colors": [
+              {
+                "color": "#E9F0FB",
+                "position": 0
+              },
+              {
+                "color": "#F1EDFB",
+                "position": 0.55
+              },
+              {
+                "color": "#FBF0F2",
+                "position": 1
+              }
+            ]
+          },
+          "children": [
+            {
+              "type": "ellipse",
+              "id": "NPCaQ",
+              "layoutPosition": "absolute",
+              "x": 120,
+              "y": 720,
+              "name": "Blob",
+              "fill": "$blob-pink",
+              "width": 380,
+              "height": 380,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "type": "ellipse",
+              "id": "O5JEg",
+              "layoutPosition": "absolute",
+              "x": 920,
+              "y": 160,
+              "name": "Blob",
+              "fill": "$blob-violet",
+              "width": 420,
+              "height": 420,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "type": "ellipse",
+              "id": "b6Cm3h",
+              "layoutPosition": "absolute",
+              "x": 280,
+              "y": -140,
+              "name": "Blob",
+              "fill": "$blob-blue",
+              "width": 460,
+              "height": 460,
+              "effect": {
+                "type": "blur",
+                "radius": 90
+              }
+            },
+            {
+              "id": "EhpJL",
+              "type": "ref",
+              "ref": "Yv9pw",
+              "name": "Sidebar",
+              "height": 1080,
+              "descendants": {
+                "c2McOX": {
+                  "content": "管理"
+                },
+                "jssd2/Z6DcUn": {
+                  "content": "概览"
+                },
+                "YRsVn/Z6DcUn": {
+                  "content": "技能"
+                },
+                "r89mgc/Z6DcUn": {
+                  "content": "MCP 服务器"
+                },
+                "Ji99R/Z6DcUn": {
+                  "content": "插件"
+                },
+                "E1mS4": {
+                  "content": "运维"
+                },
+                "tTVPZ/Z6DcUn": {
+                  "content": "活动"
+                },
+                "GEafE/Z6DcUn": {
+                  "content": "策略"
+                },
+                "wLweX/Z6DcUn": {
+                  "content": "仓库"
+                },
+                "DRhnK/Z6DcUn": {
+                  "content": "设置"
+                }
+              }
+            },
+            {
+              "type": "frame",
+              "id": "ejKrc",
+              "name": "Main",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "$background",
+              "layout": "vertical",
+              "children": [
+                {
+                  "id": "o8UiB",
+                  "type": "ref",
+                  "ref": "YazIs",
+                  "name": "App Header",
+                  "width": "fill_container",
+                  "descendants": {
+                    "qo3K5": {
+                      "content": "工作区"
+                    },
+                    "J7G23": {
+                      "content": "扩展"
+                    },
+                    "kcflH": {
+                      "content": "搜索上下文"
+                    },
+                    "rNs9e/xFfMZ": {
+                      "content": "连接仓库"
+                    },
+                    "PwHQT": {
+                      "content": "同步仓库"
+                    }
+                  }
+                },
+                {
+                  "type": "frame",
+                  "id": "yDnFs",
+                  "name": "Content",
+                  "width": "fill_container",
+                  "height": "fill_container",
+                  "layout": "vertical",
+                  "gap": 24,
+                  "padding": 24,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "I0QQo",
+                      "name": "Page Title",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "b29t0",
+                          "name": "Title Block",
+                          "layout": "vertical",
+                          "gap": 4,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "M7zovK",
+                              "name": "Title",
+                              "fill": "$foreground",
+                              "content": "扩展",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 24,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "y0OqGG",
+                              "name": "Description",
+                              "fill": "$muted-foreground",
+                              "content": "通过代理集成与语言包扩展 Context Hub。这里的一切都是可以随时安装、启用或禁用的包。",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 14,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "EYW26",
+                          "name": "Actions",
+                          "gap": 8,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "le7qC",
+                              "type": "ref",
+                              "ref": "Wr5iQ",
+                              "name": "Language Select",
+                              "width": 150,
+                              "descendants": {
+                                "DEzpy": {
+                                  "content": "简体中文"
+                                }
+                              }
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "tegW7",
+                      "name": "Search Row",
+                      "width": "fill_container",
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "id": "K3DWy",
+                          "type": "ref",
+                          "ref": "NOh42",
+                          "name": "Search Extensions",
+                          "width": 320,
+                          "descendants": {
+                            "Rx6IP": {
+                              "enabled": true
+                            },
+                            "VNMMJ": {
+                              "content": "搜索扩展"
+                            }
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "wAhOi",
+                      "name": "Sections",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 24,
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "m64sHa",
+                          "name": "Integrations Card",
+                          "width": 1136,
+                          "fill": "$card",
+                          "cornerRadius": "$radius-lg",
+                          "stroke": "$glass-border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "effect": [
+                            {
+                              "type": "background_blur",
+                              "radius": 18
+                            },
+                            {
+                              "type": "shadow",
+                              "shadowType": "outer",
+                              "color": "$glass-shadow",
+                              "offset": {
+                                "x": 0,
+                                "y": 8
+                              },
+                              "blur": 24
+                            }
+                          ],
+                          "layout": "vertical",
+                          "gap": 16,
+                          "padding": 20,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "k8kvG",
+                              "name": "Card Header",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "IqmCU",
+                                  "name": "Card Title",
+                                  "fill": "$foreground",
+                                  "content": "集成",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "SZYpq",
+                                  "name": "Card Description",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "每个代理从不同的位置读取资产。集成告诉 Context Hub 如何把你的资产交付给该代理。",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "taDnb",
+                              "name": "Rows",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "SEna2",
+                                  "name": "Row A",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "RBmer",
+                                      "name": "Claude Code",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "FTwjG",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "LXJOc",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "terminal",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "T37DgA",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "TAHpt",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "Claude Code",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "nHAJN",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "向 Claude Code 交付技能、记忆与 MCP 服务器。",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "qFKNd",
+                                          "name": "Button 卸载",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "u1zbt",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "卸载",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "Hw30y",
+                                      "name": "Codex",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "Db0th",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "jIlX5",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "deployed_code",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "jHD5Z",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "Scunn",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "Codex",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "ePhTG",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "向 Codex 交付技能、记忆与 MCP 服务器。",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "nG80S",
+                                          "name": "Button 卸载",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "CvqU8",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "卸载",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "yqtth",
+                                  "name": "Row B",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "zUMJz",
+                                      "name": "GitHub Copilot",
+                                      "width": 528,
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "GVRv6",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-integrations",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "VQhfa",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "github",
+                                              "library": "lucide",
+                                              "fill": "$tag-integrations"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "HLLNt",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "vlmSA",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "GitHub Copilot",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "WL6mQ",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "向 Copilot 工作区交付指令与提示文件。",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "LgyB0",
+                                          "name": "Button 卸载",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "Iyp4P",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "卸载",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "t2Lz7t",
+                          "name": "Languages Card",
+                          "width": 1136,
+                          "fill": "$card",
+                          "cornerRadius": "$radius-lg",
+                          "stroke": "$glass-border",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
+                          "effect": [
+                            {
+                              "type": "background_blur",
+                              "radius": 18
+                            },
+                            {
+                              "type": "shadow",
+                              "shadowType": "outer",
+                              "color": "$glass-shadow",
+                              "offset": {
+                                "x": 0,
+                                "y": 8
+                              },
+                              "blur": 24
+                            }
+                          ],
+                          "layout": "vertical",
+                          "gap": 16,
+                          "padding": 20,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "njRPG",
+                              "name": "Card Header",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 4,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "fdJSI",
+                                  "name": "Card Title",
+                                  "fill": "$foreground",
+                                  "content": "语言",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 16,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ecFTa",
+                                  "name": "Card Description",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "语言包会翻译整个界面。安装后在语言菜单中选择，卸载后自动回退到英文。",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 14,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "xBQGA",
+                              "name": "Rows",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 8,
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "fF8Qz",
+                                  "name": "Row A",
+                                  "width": "fill_container",
+                                  "gap": 40,
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "obP8y",
+                                      "name": "English",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "aUpUl",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-documents",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "uioWz",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "language",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-documents"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "aHljY",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "yI13x",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "English",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "GJ5Sh",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "所有其他语言包回退的基础界面语言。",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "id": "NNBPq",
+                                          "type": "ref",
+                                          "ref": "Mml1j",
+                                          "name": "Badge Built-in",
+                                          "descendants": {
+                                            "L07t2Q": {
+                                              "enabled": false
+                                            },
+                                            "oB8F6": {
+                                              "content": "内置"
+                                            }
+                                          }
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "XOa7A",
+                                      "name": "简体中文",
+                                      "width": "fill_container",
+                                      "height": 64,
+                                      "cornerRadius": "$radius-md",
+                                      "gap": 12,
+                                      "padding": [
+                                        0,
+                                        12
+                                      ],
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "ij4er",
+                                          "name": "Icon Tile",
+                                          "width": 40,
+                                          "height": 40,
+                                          "fill": "$chip-documents",
+                                          "cornerRadius": 10,
+                                          "layout": "vertical",
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "icon",
+                                              "id": "lQvzZ",
+                                              "name": "Icon",
+                                              "width": 20,
+                                              "height": 20,
+                                              "icon": "translate",
+                                              "library": "Material Symbols Rounded",
+                                              "fill": "$tag-documents"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "OPuN0",
+                                          "name": "Text",
+                                          "width": "fill_container",
+                                          "layout": "vertical",
+                                          "gap": 3,
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "dcKEc",
+                                              "name": "Name",
+                                              "fill": "$foreground",
+                                              "content": "简体中文",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 14,
+                                              "fontWeight": "500"
+                                            },
+                                            {
+                                              "type": "text",
+                                              "id": "eAyli",
+                                              "name": "Desc",
+                                              "fill": "$muted-foreground",
+                                              "textGrowth": "fixed-width",
+                                              "width": "fill_container",
+                                              "content": "简体中文界面语言。",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "normal"
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "type": "frame",
+                                          "id": "gkdeY",
+                                          "name": "Button 卸载",
+                                          "height": 32,
+                                          "fill": "#00000000",
+                                          "cornerRadius": "$radius-md",
+                                          "stroke": "$border",
+                                          "strokeWidth": 1,
+                                          "strokeAlignment": "inner",
+                                          "gap": 6,
+                                          "padding": [
+                                            0,
+                                            12
+                                          ],
+                                          "justifyContent": "center",
+                                          "alignItems": "center",
+                                          "children": [
+                                            {
+                                              "type": "text",
+                                              "id": "aHMyR",
+                                              "name": "Label",
+                                              "fill": "$secondary-foreground",
+                                              "content": "卸载",
+                                              "fontFamily": "$font-sans",
+                                              "fontSize": 13,
+                                              "fontWeight": "500"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
                         }
                       ]
                     }
