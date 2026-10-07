@@ -288,8 +288,8 @@ function ConfigurationPanel({
           }
         />
         <div className="flex flex-col gap-2">
-          {variables.map((variable) => (
-            <div key={variable.key} className="flex items-center gap-3">
+          {variables.map((variable, index) => (
+            <div key={index} className="flex items-center gap-3">
               <ValueField className="w-[240px] shrink-0">
                 <span className="truncate font-mono text-xs">
                   {variable.key}

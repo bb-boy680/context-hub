@@ -344,8 +344,8 @@ function MarkdownCover({ skill }: { skill: Skill }) {
 
   return (
     <div className="flex h-full flex-col gap-0.5 bg-surface-raised px-3 py-[7px] font-mono text-[10px] leading-[14px]">
-      {lines.map((line) => (
-        <span key={line.text} className={`truncate ${line.className}`}>
+      {lines.map((line, index) => (
+        <span key={index} className={`truncate ${line.className}`}>
           {line.text}
         </span>
       ))}

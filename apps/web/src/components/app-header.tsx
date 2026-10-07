@@ -49,6 +49,7 @@ export function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
       <Button
         size="lg"
         variant="outline"
+        nativeButton={false}
         render={<Link to="/repository" />}
         className="hidden border-input bg-transparent px-3.5 lg:inline-flex dark:bg-transparent"
       >
