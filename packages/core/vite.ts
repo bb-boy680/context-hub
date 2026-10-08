@@ -20,12 +20,13 @@ import { PLUGIN_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
-import { listDirectory } from "./src/host/fs-browse.ts"
+import { hostFolder, listDirectory } from "./src/host/fs-browse.ts"
 import { resolveHubHome } from "./src/host/home.ts"
 import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
 import { createFsWorkspaceStore } from "./src/host/workspaces-fs.ts"
 import type { StateStore } from "./src/state.ts"
+import type { WorkspaceStore } from "./src/workspace.ts"
 
 /** One `Content-Type` for a stored file, from its extension. */
 const MIME_TYPES: Record<string, string> = {
@@ -288,8 +289,17 @@ export function pluginFiles(options: { home?: string } = {}) {
  * reports the folder the person walked to and this keeps it; a product form
  * mounts the same store itself.
  */
-export function workspaceList(options: { home?: string } = {}) {
-  const store = createFsWorkspaceStore(resolveHubHome(options.home))
+export function workspaceList(options: { home?: string; folder?: string } = {}) {
+  let ready: Promise<WorkspaceStore> | null = null
+
+  const getStore = async (): Promise<WorkspaceStore> => {
+    ready ??= (async () => {
+      /* This host's own folder is a workspace by default, with no picking. */
+      const folder = options.folder ?? (await hostFolder())
+      return createFsWorkspaceStore(resolveHubHome(options.home), { folder })
+    })()
+    return ready
+  }
 
   return {
     name: "context-hub-workspace-list",
@@ -310,6 +320,7 @@ export function workspaceList(options: { home?: string } = {}) {
           const action = url.pathname.slice(WORKSPACE_ROUTE.length).replace(/^\//, "")
           const method = request.method ?? "GET"
           try {
+            const store = await getStore()
             if (action === "" && method === "GET") {
               sendJson(response, 200, await store.page())
               return

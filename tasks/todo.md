@@ -1311,3 +1311,35 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
   `installSkillIntoWorkspace` 的 `LINK_UNSUPPORTED` 分支）
 - 6. 其他模块对齐（另开）：Overview/MCP/Plugins/Repository 接真实 store、顶栏两个按钮、Ctrl+K 过滤
 
+### 修正：宿主自己就是工作区，不需要选（2026-10-08，用户反馈）
+
+**用户的问题**：切到 `dsh-context-hub` 工作区时，装不了、也看不到这个工作区的 skills。
+**表面原因**：那条工作区是**旧版**留下的，只有名字没有路径 —— 旧版用浏览器 `showDirectoryPicker`，
+浏览器只肯给文件夹名，所以库里存不下路径；没有路径就读不到 `<ws>/.agents/skills`。
+**用户的要求**：「不需要选，默认就是扫描当前工作区的 .agents」。
+
+**做法**：不再让用户为这件事挑文件夹（先写的"点这条行 → 选文件夹重新绑定"那套已全部撤掉），
+改成**宿主自己所在的文件夹就是一个工作区**：
+
+- `packages/core/src/host/fs-browse.ts` 新增 `projectRoot(folder)`（向上找到最近的 `.git`，找不到就用自己）
+  与 `hostFolder()`（= `projectRoot(process.cwd())`）。dev server 起在 `apps/web`，向上就是仓库根。
+- `createFsWorkspaceStore(home, { folder })`：读列表时把**宿主的文件夹**并进工作区列表 ——
+  已经有指向它的行就什么都不做；有**同名但无路径**的行就让它**原地**取到路径（旧数据自动治好，
+  位置不变、current 跟着改成新 id）；都没有就追加进来；列表本来没选工作区时它成为当前。只做一次，写入后即固化。
+- `workspaceList()` / `skillLibrary()` 两个桥都传 `folder: options.folder ?? await hostFolder()`；
+  `createFsSkillStore` 增加 `folder` 并透传给它的工作区 store，两处读到的是同一个文件夹。
+- 菜单里那条 `workspace.noPath` 提示与点击重新绑定一并删除（回退），创建流程仍是"创建 → 打开选择器"。
+
+**验证**（浏览器 + 磁盘，真实桥）：
+- `GET /hub/workspaces` → `dsh-context-hub` 自动带上 `path: D:\work-space\dsh-context-hub` 且为当前；
+  `deepseek-harness`（宿主不叫这个名）保持无路径不动。
+- `GET /hub/skills?action=workspace` → 读到仓库 `.agents/skills` 的 3 个技能（grill-me / grilling / shadcn-ui）。
+- 页面：页签 `全部 5 / 工作区 3`；`install-me` 点安装 → 磁盘出现
+  `.agents\skills\install-me → ~\.context-hub\skills\install-me` 的 Junction、页签变 4、按钮变"移除"；
+  点移除 → 链接消失、仓库自带技能与库都未受影响。
+- 顺带修掉一个合并缺陷：工作区**自带**的 `grill-me` 与库里同名时，原先被当成"已安装"而**从工作区页签消失**；
+  现在按"位置"分，工作区自带的同名技能单独成行，库里的那条安装按钮置灰并提示「工作区里已经有同名技能。」
+  （`Skill.taken`）；行 key 与灯箱都用 `skillKey()`（location + id），同名两张卡不再撞 key。
+- `check-workspaces.ts` 增至 45 项（含 projectRoot / 收养 / 旧行原地治愈 / 宿主不匹配不动）；
+  `check-workspace-skills.ts`、`check-store.ts`、`check-state.ts` 无回归；五个包 typecheck + lint 全绿。
+

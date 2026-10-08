@@ -19,6 +19,11 @@ export type Skill = {
   location: SkillLocation
   /** The workspace holds this library skill, installed by the hub as a link. */
   installed: boolean
+  /**
+   * The workspace holds a skill of its own under this id, so the name is taken:
+   * installing the library's copy under it is not possible.
+   */
+  taken?: boolean
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
   stale?: boolean
   /** Token estimate, present once the body has been read. */

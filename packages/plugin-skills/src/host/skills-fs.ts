@@ -152,6 +152,11 @@ async function readdirOrEmpty(dir: string) {
 export interface SkillStoreOptions {
   /** Hub home; skills live in `<home>/skills` and their files in `<home>/assets`. */
   home?: string
+  /**
+   * The folder this host works in: it is a workspace without anyone picking it,
+   * and its `.agents/skills` is what the workspace half of the page reads.
+   */
+  folder?: string
   /** An already-built library, for a form that shares one across features. */
   library?: AssetLibrary
 }
@@ -169,7 +174,7 @@ export async function createFsSkillStore(
   /** In-memory copy of the catalog; a page render never re-reads the file. */
   let catalog: CatalogFile | null = null
   /** The workspace list holds the folder a skill installs into. */
-  const workspaces = createFsWorkspaceStore(home)
+  const workspaces = createFsWorkspaceStore(home, { folder: options.folder })
 
   /** The current workspace folder, or `null` when none is picked or it has no path. */
   const currentWorkspace = async (): Promise<string | null> => {

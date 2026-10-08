@@ -10,6 +10,8 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http"
 
+import { hostFolder } from "@workspace/core/host/fs-browse"
+
 import { createFsSkillStore } from "./src/host/skills-fs.ts"
 import type { SkillOrigin, SkillStore } from "./src/store.ts"
 
@@ -41,11 +43,15 @@ function sendError(response: ServerResponse, error: unknown) {
 }
 
 /** Vite plugin that exposes the skill library over the dev server. */
-export function skillLibrary(options: { home?: string } = {}) {
+export function skillLibrary(options: { home?: string; folder?: string } = {}) {
   let ready: Promise<SkillStore> | null = null
 
   const getStore = async (): Promise<SkillStore> => {
-    ready ??= createFsSkillStore({ home: options.home })
+    ready ??= (async () => {
+      /* This host's own folder is a workspace by default, with no picking. */
+      const folder = options.folder ?? (await hostFolder())
+      return createFsSkillStore({ home: options.home, folder })
+    })()
     return ready
   }
 

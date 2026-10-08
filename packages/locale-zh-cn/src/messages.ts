@@ -107,6 +107,7 @@ export const messages: Record<string, string> = {
   "skills.installed.description": "这个 hub 已知的全部技能，以及当前工作区里已有的技能。",
   "skills.workspace.none": "先选择工作区，才能装进去。",
   "skills.workspace.noPath": "这个工作区没有可读取的文件夹路径。",
+  "skills.workspace.taken": "工作区里已经有同名技能。",
   "skills.workspace.empty": "这个工作区还没有技能。",
   "skills.notice.copied": "已改为复制：这个文件系统不支持链接，副本归工作区所有。",
   "skills.range": "1–12，共 42 个技能",

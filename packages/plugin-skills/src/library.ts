@@ -54,6 +54,15 @@ export function locationLabel(
   return t(location === "library" ? "skills.location.library" : "skills.location.workspace")
 }
 
+/**
+ * A row's identity for React and for the open lightbox. The same id can be on
+ * screen twice — a library skill and a same-named skill the workspace wrote are
+ * two rows — so the location is part of it.
+ */
+export function skillKey(skill: Skill): string {
+  return `${skill.location}:${skill.id}`
+}
+
 /** Token count as a compact label, the way the cards show it. */
 export function tokenLabel(body: string): string {
   const count = Math.round(body.length / 4)
@@ -203,16 +212,23 @@ export function useSkillLibrary(): SkillLibrary {
     if (store === null) return []
     const held = new Map((workspace?.skills ?? []).map((skill) => [skill.id, skill]))
     const library: Skill[] = (page?.items ?? []).map((item) => {
-      const installed = held.get(item.id)?.origin === "hub"
+      const own = held.get(item.id)
+      const installed = own?.origin === "hub"
       return {
         ...toSkill(item, store, locale),
         location: installed ? "both" : "library",
         installed,
+        /* A same-named skill the project wrote is not this one, and it holds the name. */
+        taken: own !== undefined && !installed,
       }
     })
-    const known = new Set(library.map((row) => row.id))
+    /*
+     * A link the hub made is the library's skill, already on screen; anything
+     * else the workspace holds is its own — including a directory that happens
+     * to share a name with a library skill, which is a different skill.
+     */
     const own = (workspace?.skills ?? [])
-      .filter((skill) => !known.has(skill.id))
+      .filter((skill) => skill.origin !== "hub")
       .map(workspaceRow)
     return [...library, ...own]
   }, [store, page, workspace, locale])

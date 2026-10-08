@@ -11,7 +11,7 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
-import { locationLabel, useSkillLibrary } from "./library.ts"
+import { locationLabel, skillKey, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { seedTags, tagTone } from "./tags.ts"
@@ -323,8 +323,8 @@ function WorkspaceButton({
   onRemove,
 }: {
   skill: Skill
-  /** No workspace to install into; the action is offered but not available. */
-  blocked: boolean
+  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  blocked: string | null
   onInstall: () => void
   onRemove: () => void
 }) {
@@ -354,13 +354,15 @@ function WorkspaceButton({
 
   if (skill.location !== "library") return null
 
+  /* A skill the workspace wrote itself already holds the name. */
+  const reason = blocked ?? (skill.taken === true ? t("skills.workspace.taken") : null)
   return (
     <Button
       type="button"
       size="xs"
       aria-label={`${t("skills.action.install")} ${skill.name}`}
-      disabled={blocked}
-      title={blocked ? t("skills.workspace.none") : undefined}
+      disabled={reason !== null}
+      title={reason ?? undefined}
       onClick={(event) => {
         event.stopPropagation()
         onInstall()
@@ -442,7 +444,8 @@ function SkillCard({
   onOpen,
 }: {
   skill: Skill
-  blocked: boolean
+  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  blocked: string | null
   onInstall: () => void
   onRemove: () => void
   onOpen: () => void
@@ -529,7 +532,8 @@ function SkillGrid({
   onOpen,
 }: {
   skills: Skill[]
-  blocked: boolean
+  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  blocked: string | null
   onInstall: (skill: Skill) => void
   onRemove: (skill: Skill) => void
   onOpen: (skill: Skill) => void
@@ -542,7 +546,7 @@ function SkillGrid({
     <div className="columns-[266px] gap-x-6">
       {skills.map((skill) => (
         <SkillCard
-          key={skill.id}
+          key={skillKey(skill)}
           skill={skill}
           blocked={blocked}
           onInstall={() => onInstall(skill)}
@@ -598,7 +602,8 @@ function SkillTable({
   /** Footer summary above the pager, e.g. "1–12 / 42". */
   rangeText: string
   pagination: React.ReactNode
-  blocked: boolean
+  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  blocked: string | null
   onInstall: (skill: Skill) => void
   onRemove: (skill: Skill) => void
   onOpen: (skill: Skill) => void
@@ -633,7 +638,7 @@ function SkillTable({
           <TableBody>
             {skills.map((skill) => (
               <TableRow
-                key={skill.id}
+                key={skillKey(skill)}
                 onClick={() => onOpen(skill)}
                 className="h-11 cursor-pointer"
               >
@@ -798,8 +803,8 @@ export function SkillsPage() {
   const [pageSize, setPageSize] = React.useState(12)
   /* One line above the list: how an install landed, or why it did not. */
   const [notice, setNotice] = React.useState<{ tone: "info" | "error"; text: string } | null>(null)
-  /* The open lightbox is an id, so edits to the catalog show through it. */
-  const [detailId, setDetailId] = React.useState<string | null>(null)
+  /* The open lightbox is a row key, because the same id can be two rows. */
+  const [detailKey, setDetailKey] = React.useState<string | null>(null)
   /* Bundled rows have no library behind them; edits stay in this map. */
   const [samplePatch, setSamplePatch] = React.useState<
     Record<string, Partial<Skill>>
@@ -808,8 +813,13 @@ export function SkillsPage() {
   const library = useSkillLibrary()
   const usingStore = library.store !== null
   const counts = usingStore ? library.counts : SAMPLE_COUNTS
-  /* With no folder to install into the action is offered but not available. */
-  const blocked = library.workspaceRoot === null
+  /* With no folder to install into, the action says why it is unavailable. */
+  const blocked =
+    library.workspaceId === null
+      ? t("skills.workspace.none")
+      : library.workspaceRoot === null
+        ? t("skills.workspace.noPath")
+        : null
 
   /* The page filters and pages what the hook hands it: rows come from the
      library and the workspace both, and only one of the two has a server page. */
@@ -826,7 +836,7 @@ export function SkillsPage() {
     [matching, page, pageSize]
   )
 
-  const detail = matching.find((skill) => skill.id === detailId) ?? null
+  const detail = matching.find((skill) => skillKey(skill) === detailKey) ?? null
 
   /** Apply a change, then re-read the page so the list shows what was stored. */
   const applyTo = async (skill: Skill, patch: Partial<Skill>, persist: () => Promise<unknown>) => {
@@ -872,10 +882,10 @@ export function SkillsPage() {
   const removeSkill = async (skill: Skill) => {
     await (library.store?.remove(skill.id) ?? Promise.resolve())
     await library.reload()
-    setDetailId(null)
+    setDetailKey(null)
   }
 
-  const openDetail = (skill: Skill) => setDetailId(skill.id)
+  const openDetail = (skill: Skill) => setDetailKey(skillKey(skill))
 
   const total = matching.length
   const from = total === 0 ? 0 : page * pageSize + 1
@@ -1032,7 +1042,7 @@ export function SkillsPage() {
         skill={detail}
         store={library.store}
         root={library.root}
-        disabled={blocked}
+        reason={blocked ?? (detail?.taken === true ? t("skills.workspace.taken") : null)}
         onToggle={() => {
           if (detail === null) return
           if (detail.installed || detail.stale) void uninstall(detail)
@@ -1044,7 +1054,7 @@ export function SkillsPage() {
         }}
         onChanged={() => void library.reload()}
         onOpenChange={(open) => {
-          if (!open) setDetailId(null)
+          if (!open) setDetailKey(null)
         }}
       />
     </>

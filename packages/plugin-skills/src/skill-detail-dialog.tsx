@@ -26,7 +26,7 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
-import { locationLabel } from "./library.ts"
+import { locationLabel, skillKey } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
@@ -886,7 +886,7 @@ function DeleteBubble({
 
 function InfoPanel({
   skill,
-  disabled,
+  reason,
   path,
   onDelete,
   onToggle,
@@ -894,8 +894,8 @@ function InfoPanel({
   onTagsChange,
 }: {
   skill: Skill
-  /** No workspace to install into; the lightbox offers the action without it. */
-  disabled: boolean
+  /** Why this skill cannot be installed here, ready to show; `null` when it can. */
+  reason: string | null
   /** The skill's directory, spelled as a person would write it. */
   path: string | null
   /** `null` when this form has no library to delete from. */
@@ -977,7 +977,10 @@ function InfoPanel({
                 ? "h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
                 : "h-9 flex-1 gap-[7px] px-2.5"
             }
-            disabled={!skill.installed && !skill.stale && disabled}
+            /* Installing is unavailable when there is no folder, or when the
+               workspace already wrote a skill of its own under this name. */
+            disabled={!skill.installed && !skill.stale && reason !== null}
+            title={!skill.installed && !skill.stale ? (reason ?? undefined) : undefined}
             onClick={onToggle}
           >
             {skill.stale ? <Trash2Icon /> : skill.installed ? <PowerIcon /> : <DownloadIcon />}
@@ -1170,7 +1173,7 @@ function LightboxBody({
   detail,
   store,
   root,
-  disabled,
+  reason,
   onToggle,
   onDelete,
   onTagsChange,
@@ -1182,8 +1185,8 @@ function LightboxBody({
   store: SkillStore | null
   /** The skills root as the library spells it, for the delete question. */
   root: string | null
-  /** No workspace to install into; the action is offered without it. */
-  disabled: boolean
+  /** Why this skill cannot be installed here, ready to show; `null` when it can. */
+  reason: string | null
   onToggle: () => void
   onDelete: (() => Promise<void>) | null
   onTagsChange: (tags: string[]) => void
@@ -1207,7 +1210,7 @@ function LightboxBody({
       <MediaPane skill={skill} source={media} />
       <InfoPanel
         skill={skill}
-        disabled={disabled}
+        reason={reason}
         path={path}
         onDelete={onDelete}
         onToggle={onToggle}
@@ -1235,7 +1238,7 @@ export function SkillDetailDialog({
   skill,
   store,
   root,
-  disabled,
+  reason,
   onToggle,
   onDelete,
   onTagsChange,
@@ -1247,8 +1250,8 @@ export function SkillDetailDialog({
   store: SkillStore | null
   /** Where the library keeps its skills, as it spells the path. */
   root: string | null
-  /** No workspace to install into; the action is offered without it. */
-  disabled: boolean
+  /** Why this skill cannot be installed here, ready to show; `null` when it can. */
+  reason: string | null
   onToggle: () => void
   /** Delete the skill and everything the hub stores for it. */
   onDelete: (skill: Skill) => Promise<void>
@@ -1289,12 +1292,12 @@ export function SkillDetailDialog({
       >
         {skill ? (
           <LightboxBody
-            key={skill.id}
+            key={skillKey(skill)}
             skill={skill}
             detail={detail}
             store={store}
             root={root}
-            disabled={disabled}
+            reason={reason}
             onToggle={onToggle}
             onDelete={store === null ? null : () => onDelete(skill)}
             onTagsChange={onTagsChange}

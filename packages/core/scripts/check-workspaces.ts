@@ -17,7 +17,7 @@ import path from "node:path"
 
 import { folderId, readWorkspaceState, workspaceName } from "../src/workspace.ts"
 import { createFsWorkspaceStore } from "../src/host/workspaces-fs.ts"
-import { listDirectory } from "../src/host/fs-browse.ts"
+import { listDirectory, projectRoot } from "../src/host/fs-browse.ts"
 
 let failures = 0
 
@@ -157,6 +157,56 @@ check("a name comes from the last segment", workspaceName(project) === "marketin
 check("a Windows path names the same way", workspaceName("D:\\work\\hub") === "hub", workspaceName("D:\\work\\hub"))
 check("a trailing separator is not a segment", workspaceName("D:\\work\\hub\\") === "hub", workspaceName("D:\\work\\hub\\"))
 
+/* The host's own folder is a workspace without anyone picking it. */
+const hostHome = await fs.mkdtemp(path.join(tmpdir(), "context-hub-host-"))
+const repo = path.join(hostHome, "my-project")
+await fs.mkdir(path.join(repo, "sub"), { recursive: true })
+check("a folder with no repository above it stands on its own", (await projectRoot(path.join(repo, "sub"))) === path.join(repo, "sub"))
+await fs.mkdir(path.join(repo, ".git"), { recursive: true })
+check(
+  "a folder inside a repository belongs to the repository",
+  (await projectRoot(path.join(repo, "sub"))) === repo,
+  await projectRoot(path.join(repo, "sub"))
+)
+
+const hostStore = createFsWorkspaceStore(path.join(hostHome, "hub"), { folder: repo })
+const adopted = await hostStore.page()
+check("the host's folder is a workspace by itself", adopted.folders.length === 1, adopted.folders)
+check("it carries the folder's name", adopted.folders[0]?.name === "my-project", adopted.folders[0])
+check("it carries the folder's path", adopted.folders[0]?.path === repo, adopted.folders[0])
+check("it is current when nothing else was", adopted.current === repo, adopted.current)
+check(
+  "adopting it is written down, not repeated",
+  JSON.stringify((await createFsWorkspaceStore(path.join(hostHome, "hub"), { folder: repo }).page()).folders) ===
+    JSON.stringify(adopted.folders)
+)
+
+/* A row from before the hub kept paths names the host's folder: it takes the path. */
+const legacyHome = path.join(hostHome, "legacy")
+await fs.mkdir(path.join(legacyHome, "state"), { recursive: true })
+await fs.writeFile(
+  path.join(legacyHome, "state", "workspaces.json"),
+  JSON.stringify({ folders: [{ name: "my-project" }, { name: "elsewhere" }], current: "my-project" })
+)
+const healed = await createFsWorkspaceStore(legacyHome, { folder: repo }).page()
+check("the name-only row is replaced, not duplicated", healed.folders.length === 2, healed.folders)
+check(
+  "it keeps its place and now points at the host's folder",
+  healed.folders[0]?.name === "my-project" && healed.folders[0]?.path === repo,
+  healed.folders[0]
+)
+check("and it stays the current workspace", healed.current === repo, healed.current)
+check(
+  "a row the host does not name is left alone",
+  healed.folders[1]?.name === "elsewhere" && healed.folders[1]?.path === null,
+  healed.folders[1]
+)
+
+/* A host with no folder of its own adopts nothing. */
+const plain = await createFsWorkspaceStore(path.join(hostHome, "plain")).page()
+check("a store with no host folder stays empty", plain.folders.length === 0, plain.folders)
+
 await fs.rm(home, { recursive: true, force: true })
+await fs.rm(hostHome, { recursive: true, force: true })
 console.log(failures === 0 ? "all checks passed" : `${failures} check(s) failed`)
 process.exit(failures === 0 ? 0 : 1)

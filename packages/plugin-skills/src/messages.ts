@@ -39,6 +39,7 @@ export const skillsMessages: Record<string, string> = {
     "Every skill this hub knows, and the ones the current workspace holds.",
   "skills.workspace.none": "Choose a workspace to install into.",
   "skills.workspace.noPath": "This workspace has no folder path to read.",
+  "skills.workspace.taken": "This workspace has its own skill with that name.",
   "skills.workspace.empty": "This workspace has no skills yet.",
   "skills.notice.copied":
     "Copied instead of linked: this filesystem has no links, so the workspace owns its own copy.",
