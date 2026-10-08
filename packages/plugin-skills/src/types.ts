@@ -8,10 +8,10 @@ export type SkillLocation = "library" | "workspace" | "both"
 /** How a skill reached this machine; the first half of a row's provenance line. */
 export type { SkillOrigin as SkillSource } from "./store.ts"
 /** Where a skill's files were installed from, when anything recorded it. */
-export type { SkillUpstream } from "./store.ts"
+export type { SkillUpstream, SkillCheck } from "./store.ts"
 
 import type { SkillOrigin as SkillSource } from "./store.ts"
-import type { SkillUpstream } from "./store.ts"
+import type { SkillUpstream, SkillCheck } from "./store.ts"
 
 /** One skill row, shared by the catalog page and the detail lightbox. */
 export type Skill = {
@@ -47,6 +47,8 @@ export type Skill = {
    * written here or copied in by hand, and then no update can be checked.
    */
   upstream?: SkillUpstream
+  /** The last check of that source: what it held, and the files here then. */
+  checked?: SkillCheck
   /**
    * A skill the workspace holds that the library also holds under this id; the
    * library's copy is the one to manage, so this row offers nothing to do.

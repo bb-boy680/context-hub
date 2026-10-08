@@ -13,6 +13,7 @@ import type {
   SkillStore,
   SkillSummary,
   SkillUpdateCheck,
+  SkillUpdateSummary,
   WorkspaceInstall,
   WorkspaceSkill,
   WorkspaceSkillsView,
@@ -25,8 +26,8 @@ export interface SkillLibrary {
   store: SkillStore | null
   /** Every skill the hub knows here: the library's own, then the workspace's. */
   rows: Skill[]
-  /** Rows under each tab: everything, and what the current workspace holds. */
-  counts: { all: number; workspace: number }
+  /** Rows each location tab shows: everything, the library's, the workspace's. */
+  counts: { all: number; library: number; workspace: number }
   /** The current workspace's skills; `null` when no folder is selected. */
   workspace: WorkspaceSkillsView | null
   /** The workspace in use, or `null` when this form has none selected. */
@@ -52,6 +53,8 @@ export interface SkillLibrary {
   remove(id: string): Promise<void>
   /** Measure one library skill against the upstream its files came from. */
   checkUpdate(id: string): Promise<SkillUpdateCheck>
+  /** Measure every skill that records a source; the rows carry the answers. */
+  checkAll(): Promise<SkillUpdateSummary>
   /** Install that upstream's current revision over this copy. */
   update(id: string): Promise<void>
 }
@@ -190,6 +193,7 @@ export function toSkill(
     cover: gallery[0],
     gallery: gallery.length > 0 ? gallery : undefined,
     ...(row.upstream === undefined ? {} : { upstream: row.upstream }),
+    ...(row.checked === undefined ? {} : { checked: row.checked }),
   }
 }
 
@@ -379,9 +383,22 @@ export function useSkillLibrary(): SkillLibrary {
   const checkUpdate = React.useCallback(
     async (id: string) => {
       if (store === null) throw new Error("this form has no skill library")
-      return store.checkUpdate(id)
+      const result = await store.checkUpdate(id)
+      /* The row now carries the answer, so the list's badge agrees with the dialog. */
+      await reload()
+      return result
     },
-    [store]
+    [store, reload]
+  )
+
+  const checkAll = React.useCallback(
+    async () => {
+      if (store === null) throw new Error("this form has no skill library")
+      const summary = await store.checkUpdates()
+      await reload()
+      return summary
+    },
+    [store, reload]
   )
 
   const update = React.useCallback(
@@ -397,7 +414,7 @@ export function useSkillLibrary(): SkillLibrary {
     return {
       store: null,
       rows: [],
-      counts: { all: 0, workspace: 0 },
+      counts: { all: 0, library: 0, workspace: 0 },
       workspace: null,
       workspaceId,
       workspaceRoot: null,
@@ -413,6 +430,9 @@ export function useSkillLibrary(): SkillLibrary {
       checkUpdate: async () => {
         throw new Error("this form has no skill library")
       },
+      checkAll: async () => {
+        throw new Error("this form has no skill library")
+      },
       update: async () => undefined,
     }
   }
@@ -421,6 +441,9 @@ export function useSkillLibrary(): SkillLibrary {
     rows,
     counts: {
       all: rows.length,
+      /* A skill in both places counts under each tab; only its absence from one
+         side excludes it there. */
+      library: rows.filter((row) => row.location !== "workspace").length,
       workspace: rows.filter((row) => row.location !== "library").length,
     },
     workspace,
@@ -436,6 +459,7 @@ export function useSkillLibrary(): SkillLibrary {
     deleteWorkspaceSkill,
     remove,
     checkUpdate,
+    checkAll,
     update,
   }
 }

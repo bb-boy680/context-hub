@@ -20,6 +20,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.action.close": "Close",
   "skills.action.cancel": "Cancel",
   "skills.tab.all": "All",
+  "skills.tab.library": "Library",
   "skills.tab.workspace": "Workspace",
   "skills.location.library": "Library",
   "skills.location.both": "Library + Workspace",
@@ -55,7 +56,10 @@ export const skillsMessages: Record<string, string> = {
   "skills.update.applying": "Updating…",
   "skills.update.modified":
     "The files here were changed after the install; updating replaces them.",
-  "skills.update.unreadable": "The source records no revision for this skill",
+  "skills.update.checkAll": "Check updates",
+  "skills.update.checkingAll": "Checking sources…",
+  "skills.update.badge": "Update available",
+  "skills.update.lastChecked": "Last checked {age}",
   "skills.range": "1–12 of 42 skills",
   "skills.range.long": "1–14 of 42 skills",
   "skills.page": "Page 1 of 4",
@@ -102,6 +106,8 @@ export const skillsMessages: Record<string, string> = {
   "skills.detail.files": "Files",
   "skills.detail.files.action": "View files",
   "skills.detail.files.back": "Back to details",
+  "skills.detail.files.tree": "Skill files",
+  "skills.detail.files.loading": "Reading the file…",
   "skills.detail.delete": "Delete skill",
   "skills.delete.title": "Delete {name}?",
   "skills.delete.text":

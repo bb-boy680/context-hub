@@ -2,11 +2,8 @@ import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  CodeIcon,
   DownloadIcon,
   FileTextIcon,
-  FolderIcon,
-  FolderOpenIcon,
   ImageIcon,
   LibraryIcon,
   MoreHorizontalIcon,
@@ -28,14 +25,17 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
+import { CodeView } from "./code-view.tsx"
+import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { skillKey } from "./library.ts"
+import { formatAge, skillKey } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill, SkillLocation } from "./types.ts"
 import type {
   SkillDetail,
+  SkillFileEntry,
   SkillStore,
   SkillUpdateCheck,
   WorkspaceSkillDetail,
@@ -72,40 +72,39 @@ function frontmatterLines(skill: Skill): string[] {
   ]
 }
 
-/** SKILL.md as the editor renders it: frontmatter, a heading, steps, then guardrails. */
-function skillFile(skill: Skill): { text: string; className: string }[] {
+/** The bundled example's document: frontmatter, a heading, steps, then guardrails. */
+function skillFile(skill: Skill): string {
   const lowercase = skill.summary.charAt(0).toLowerCase() + skill.summary.slice(1)
-
   return [
-    ...frontmatterLines(skill).map((line) => ({
-      text: line,
-      className: line === "---" ? "text-muted-foreground" : "text-secondary-foreground",
-    })),
-    { text: "", className: "text-muted-foreground" },
-    { text: `# ${titleCase(skill.name)}`, className: "font-semibold text-foreground" },
-    { text: "", className: "text-muted-foreground" },
-    { text: `Apply this skill to ${lowercase}.`, className: "text-secondary-foreground" },
-    { text: "", className: "text-muted-foreground" },
-    { text: "## Steps", className: "font-semibold text-foreground" },
-    { text: "1. Read the request and the target files", className: "text-secondary-foreground" },
-    { text: "2. Apply the rules this skill defines", className: "text-secondary-foreground" },
-    { text: "3. Report what changed and why", className: "text-secondary-foreground" },
-    { text: "", className: "text-muted-foreground" },
-    { text: "## Guardrails", className: "font-semibold text-foreground" },
-    { text: "- Never invent facts that are not in the source", className: "text-secondary-foreground" },
-  ]
+    ...frontmatterLines(skill),
+    "",
+    `# ${titleCase(skill.name)}`,
+    "",
+    `Apply this skill to ${lowercase}.`,
+    "",
+    "## Steps",
+    "1. Read the request and the target files",
+    "2. Apply the rules this skill defines",
+    "3. Report what changed and why",
+    "",
+    "## Guardrails",
+    "- Never invent facts that are not in the source",
+  ].join("\n")
 }
 
-/** The skill folder; the active row is the file shown in the editor. */
-const fileTree = [
-  { name: "skill", kind: "folder", depth: 0 },
-  { name: "SKILL.md", kind: "file", depth: 1, active: true },
-  { name: "reference.md", kind: "file", depth: 1 },
-  { name: "examples", kind: "folder", depth: 1 },
-  { name: "basic.md", kind: "file", depth: 2 },
-  { name: "scripts", kind: "folder", depth: 1 },
-  { name: "extract.py", kind: "file", depth: 2 },
-] as const
+/**
+ * The bundled example's directory, for the one form that has no library to
+ * read: the demo shows a skill's shape, and nothing here is read from disk.
+ */
+const sampleFiles: SkillFileEntry[] = [
+  { path: "skill", depth: 0, directory: true, bytes: 0 },
+  { path: "skill/SKILL.md", depth: 1, directory: false, bytes: 0 },
+  { path: "skill/reference.md", depth: 1, directory: false, bytes: 0 },
+  { path: "skill/examples", depth: 1, directory: true, bytes: 0 },
+  { path: "skill/examples/basic.md", depth: 2, directory: false, bytes: 0 },
+  { path: "skill/scripts", depth: 1, directory: true, bytes: 0 },
+  { path: "skill/scripts/extract.py", depth: 2, directory: false, bytes: 0 },
+]
 
 function titleCase(value: string) {
   return value
@@ -907,7 +906,9 @@ function DeleteBubble({
 /**
  * The update line for a library skill: the source its files were installed
  * from, and the one action that follows from it. Reading the source means a
- * clone of the whole package, so nothing here runs on its own — a person asks.
+ * clone of the whole package, so nothing runs on its own — a person asks, and
+ * the last answer a check left on the row seeds what this row shows until the
+ * next one.
  */
 function UpdateRow({
   skill,
@@ -918,15 +919,27 @@ function UpdateRow({
   onCheck: () => Promise<SkillUpdateCheck>
   onUpdate: () => Promise<void>
 }) {
-  const { t } = useI18n()
+  const { t, state: locale } = useI18n()
+  const upstream = skill.upstream
+  /* The last recorded answer, as the check that took it left it. */
+  const known = React.useMemo((): SkillUpdateCheck | null => {
+    const checked = skill.checked
+    if (checked === undefined || upstream === undefined) return null
+    return {
+      recordedHash: upstream.hash,
+      currentHash: checked.currentHash,
+      latestHash: checked.latest,
+      outdated: checked.latest !== upstream.hash,
+      modified: checked.currentHash !== upstream.hash,
+    }
+  }, [skill.checked, upstream])
   const [state, setState] = React.useState<
     | { kind: "idle" }
     | { kind: "checking" }
     | { kind: "applying" }
     | { kind: "checked"; result: SkillUpdateCheck }
     | { kind: "failed"; reason: string }
-  >({ kind: "idle" })
-  const upstream = skill.upstream
+  >(() => (known !== null && known.outdated ? { kind: "checked", result: known } : { kind: "idle" }))
 
   const check = async () => {
     setState({ kind: "checking" })
@@ -968,13 +981,12 @@ function UpdateRow({
         : state.kind === "failed"
           ? state.reason
           : state.kind === "checked"
-            ? state.result.latestHash === null
-              ? t("skills.update.unreadable")
-              : state.result.outdated
-                ? t("skills.update.available")
-                : t("skills.update.current")
+            ? state.result.outdated
+              ? t("skills.update.available")
+              : t("skills.update.current")
             : upstream.source
   const label = outdated ? t("skills.update.apply") : t("skills.update.check")
+  const checkedAt = skill.checked?.at ?? null
 
   return (
     <>
@@ -1008,6 +1020,13 @@ function UpdateRow({
         {state.kind === "checked" && state.result.outdated && state.result.modified ? (
           <span className="text-[11px] text-amber-600 dark:text-amber-400">
             {t("skills.update.modified")}
+          </span>
+        ) : null}
+        {/* With no newer answer at hand, the age of the last one is the fact
+            worth showing; a fresh check replaces this line with its result. */}
+        {state.kind === "idle" && checkedAt !== null ? (
+          <span className="text-[11px] text-muted-foreground">
+            {t("skills.update.lastChecked").replace("{age}", formatAge(checkedAt, locale.active))}
           </span>
         ) : null}
       </div>
@@ -1172,20 +1191,53 @@ function InfoPanel({
 /** Slides in from the right over the info panel, leaving the media strip dimmed behind it. */
 function FilesPanel({
   skill,
-  tree,
-  content,
+  files,
+  read,
   open,
   onBack,
 }: {
   skill: Skill
-  /** One row per entry: a folder, or a file with its own text when selected. */
-  tree: { path: string; name: string; depth: number; directory: boolean; active: boolean }[]
-  content: string
+  /** One entry per file and folder the skill directory holds. */
+  files: SkillFileEntry[]
+  /** Read one of those files, wherever this skill's files live. */
+  read: (path: string) => Promise<string>
   open: boolean
   onBack: () => void
 }) {
   const { t } = useI18n()
-  const lines = content.split("\n")
+  /* SKILL.md is what a skill is for, so it is what opens first. */
+  const fallback =
+    files.find((file) => file.path === "SKILL.md")?.path ??
+    files.find((file) => !file.directory)?.path ??
+    null
+  const [picked, setPicked] = React.useState<string | null>(null)
+  /* Another skill's files make a remembered path meaningless; the fallback wins. */
+  const current = picked !== null && files.some((file) => file.path === picked) ? picked : fallback
+  /* What was read is kept with the file it came from, so a row that just
+     changed shows its own state rather than the previous file's text. */
+  const [content, setContent] = React.useState<
+    { path: string; kind: "text"; text: string } | { path: string; kind: "failure"; reason: string }
+  >()
+
+  React.useEffect(() => {
+    if (current === null) return
+    let live = true
+    read(current).then(
+      (text) => {
+        if (live) setContent({ path: current, kind: "text", text })
+      },
+      (reason: unknown) => {
+        const message = reason instanceof Error ? reason.message : String(reason)
+        if (live) setContent({ path: current, kind: "failure", reason: message })
+      }
+    )
+    return () => {
+      live = false
+    }
+  }, [current, read])
+
+  const loaded = content !== undefined && content.path === current ? content : null
+  const name = current === null ? "" : (current.split("/").at(-1) ?? current)
 
   return (
     <div
@@ -1225,59 +1277,32 @@ function FilesPanel({
       <div className="h-px shrink-0 bg-border" />
 
       <div className="flex min-h-0 flex-1 gap-5 p-5">
-        <div className="flex w-[224px] shrink-0 flex-col gap-0.5 overflow-auto">
-          {tree.map((node) => (
-            <span
-              key={node.path}
-              className={`flex h-7 items-center gap-2 rounded-md pr-2 text-[13px] ${
-                node.depth === 0
-                  ? "pl-2"
-                  : node.depth === 1
-                    ? "pl-6"
-                    : "pl-10"
-              } ${
-                node.active
-                  ? "bg-muted font-medium text-foreground"
-                  : "text-secondary-foreground"
-              }`}
-            >
-              {node.directory ? (
-                node.depth === 0 ? (
-                  <FolderOpenIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                ) : (
-                  <FolderIcon className="size-3.5 shrink-0 text-muted-foreground" />
-                )
-              ) : node.name.endsWith(".py") ? (
-                <CodeIcon className="size-3.5 shrink-0 text-muted-foreground" />
-              ) : (
-                <FileTextIcon
-                  className={`size-3.5 shrink-0 ${
-                    node.active ? "text-foreground" : "text-muted-foreground"
-                  }`}
-                />
-              )}
-              <span className="truncate">{node.name}</span>
-            </span>
-          ))}
+        <div className="flex w-[224px] shrink-0 flex-col overflow-auto">
+          <SkillFileTree
+            key={fileTreeKey(files)}
+            files={files}
+            selected={current ?? ""}
+            onSelect={setPicked}
+          />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface-raised">
           <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3.5">
-            <FileTextIcon className="size-3.5 text-muted-foreground" />
-            <span className="text-[13px] font-medium">SKILL.md</span>
-            <MoreHorizontalIcon className="ml-auto size-4 text-muted-foreground" />
+            <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
+            <span className="truncate text-[13px] font-medium">{name}</span>
+            <MoreHorizontalIcon className="ml-auto size-4 shrink-0 text-muted-foreground" />
           </div>
-          <div className="flex-1 overflow-auto py-3 font-mono">
-            {lines.map((line, index) => (
-              <div key={index} className="flex h-5 items-center px-3.5">
-                <span className="w-6 shrink-0 text-right text-[11px] text-muted-foreground">
-                  {index + 1}
-                </span>
-                <span className="pl-3 text-[11.5px] whitespace-pre text-secondary-foreground">
-                  {line}
-                </span>
+          <div className="min-h-0 flex-1 overflow-auto">
+            {loaded === null ? (
+              <div className="flex items-center gap-2 p-3.5 text-xs text-muted-foreground">
+                <Spinner />
+                {t("skills.detail.files.loading")}
               </div>
-            ))}
+            ) : loaded.kind === "failure" ? (
+              <p className="p-3.5 text-xs text-destructive">{loaded.reason}</p>
+            ) : (
+              <CodeView text={loaded.text} path={current ?? ""} />
+            )}
           </div>
         </div>
       </div>
@@ -1286,62 +1311,47 @@ function FilesPanel({
 }
 
 /** One row of the files panel, from either the library's tree or the bundle's sample. */
-interface FileRow {
-  path: string
-  name: string
-  depth: number
-  directory: boolean
-  active: boolean
+/** The files a skill holds, and the way to read any one of them. */
+interface SkillFiles {
+  files: SkillFileEntry[]
+  read: (path: string) => Promise<string>
+}
+
+/** Nothing to show on a form with no library at all, and nothing to read. */
+const NO_FILES: SkillFiles = {
+  files: [],
+  read: () => Promise.reject(new Error("this form has no skill library")),
 }
 
 /** The files the panel lists: the library's own tree, the workspace's, or the bundled example. */
-function useFileRows(
+function useSkillFiles(
   skill: Skill,
+  store: SkillStore | null,
   detail: SkillDetail | null,
-  held: WorkspaceSkillDetail | null,
-  sample: boolean
-): { rows: FileRow[]; content: string } {
+  held: WorkspaceSkillDetail | null
+): SkillFiles {
+  const attached = store !== null && (detail !== null || held !== null)
+  const read = React.useCallback(
+    (path: string): Promise<string> => {
+      if (store === null) return Promise.reject(new Error("this form has no skill library"))
+      /* A workspace skill is read where it lives; the library holds its own
+         files, which is also where a linked skill's files end up. */
+      return skill.location === "workspace"
+        ? store.workspaceFile(skill.id, path)
+        : store.readFile(skill.id, path)
+    },
+    [store, skill.id, skill.location]
+  )
   return React.useMemo(() => {
-    if (detail !== null) {
-      return {
-        rows: detail.files.map((file) => ({
-          path: file.path,
-          name: file.path.split("/").at(-1) ?? file.path,
-          depth: file.depth,
-          directory: file.directory,
-          active: file.path === "SKILL.md",
-        })),
-        content: `---\nname: ${detail.name}\ndescription: ${detail.description}\ntags: [${detail.tags.join(", ")}]\n---\n\n${detail.body}`,
-      }
-    }
-    /* A workspace skill is read where it lives, so its manifest is shown as written. */
-    if (held !== null) {
-      return {
-        rows: held.files.map((file) => ({
-          path: file.path,
-          name: file.path.split("/").at(-1) ?? file.path,
-          depth: file.depth,
-          directory: file.directory,
-          active: file.path === "SKILL.md",
-        })),
-        content: held.text,
-      }
-    }
-    /* Nothing to read: only a form with no library at all falls back to the example. */
-    if (!sample) return { rows: [], content: "" }
+    if (!attached) return NO_FILES
+    if (detail !== null) return { files: detail.files, read }
+    if (held !== null) return { files: held.files, read }
+    /* Only a form with no library carries the bundled example's own files. */
     return {
-      rows: fileTree.map((node) => ({
-        path: node.name,
-        name: node.name,
-        depth: node.depth,
-        directory: node.kind === "folder",
-        active: "active" in node && node.active,
-      })),
-      content: skillFile(skill)
-        .map((line) => line.text)
-        .join("\n"),
+      files: sampleFiles,
+      read: () => Promise.resolve(skillFile(skill)),
     }
-  }, [skill, detail, held, sample])
+  }, [attached, detail, held, skill, read])
 }
 
 function LightboxBody({
@@ -1387,7 +1397,7 @@ function LightboxBody({
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
   const media = useMediaItems(skill, store, detail, onChanged)
-  const files = useFileRows(skill, detail, held, store === null)
+  const files = useSkillFiles(skill, store, detail, held)
   /* The stage's fallback is the document itself: the stored body, the workspace's
      own file without its frontmatter, or the row's heading and description. */
   const doc = React.useMemo(() => {
@@ -1434,8 +1444,8 @@ function LightboxBody({
       />
       <FilesPanel
         skill={skill}
-        tree={files.rows}
-        content={files.content}
+        files={files.files}
+        read={files.read}
         open={filesOpen}
         onBack={() => setFilesOpen(false)}
       />

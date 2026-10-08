@@ -18,6 +18,7 @@ import {
   installSkillIntoWorkspace,
   linkSkillIntoLibrary,
   readWorkspaceSkill,
+  readWorkspaceSkillFile,
   readWorkspaceSkills,
   removeSkillFromWorkspace,
   workspaceSkillRoot,
@@ -164,6 +165,34 @@ check("a skill that is not there reads as nothing", (await readWorkspaceSkill(wo
 check(
   "a name that would read outside the root is refused",
   await readWorkspaceSkill(workspace, "../escape").then(
+    () => false,
+    (error: unknown) => (error as Error).message.includes("unusable skill name")
+  )
+)
+
+/* One file of a workspace skill is read through the same directory guard. */
+check(
+  "a file beside the manifest reads",
+  (await readWorkspaceSkillFile(workspace, "own-one", "notes.md")) === "note"
+)
+check(
+  "the manifest reads as written",
+  (await readWorkspaceSkillFile(workspace, "own-one", "SKILL.md"))?.startsWith("---\n") === true
+)
+check(
+  "a file that is not there reads as nothing",
+  (await readWorkspaceSkillFile(workspace, "own-one", "missing.md")) === null
+)
+check(
+  "a path that would read outside the skill is refused",
+  await readWorkspaceSkillFile(workspace, "own-one", "../../../outside.txt").then(
+    () => false,
+    (error: unknown) => (error as Error).message.includes("escapes the skill directory")
+  )
+)
+check(
+  "and a name that would read outside the root is refused too",
+  await readWorkspaceSkillFile(workspace, "../escape", "SKILL.md").then(
     () => false,
     (error: unknown) => (error as Error).message.includes("unusable skill name")
   )

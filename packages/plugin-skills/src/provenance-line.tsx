@@ -23,7 +23,10 @@ export function ProvenanceLine({ skill }: { skill: Skill }) {
   const Icon = SOURCE_ICONS[skill.source] ?? HardDriveIcon
 
   return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 text-[12.5px] leading-[15px]">
+    /* max-w-full clamps the line to its container: without it a fixed-width
+       cell's nowrap text sets the box's minimum to the full line, so nothing
+       ever shrinks and the text paints over the neighbouring column. */
+    <span className="inline-flex max-w-full min-w-0 items-center gap-1.5 text-[12.5px] leading-[15px]">
       <Icon className="size-3.5 shrink-0 text-muted-foreground/70" aria-hidden />
       <span className="truncate font-medium text-muted-foreground">
         {sourceLabel(skill.source, t)}
@@ -31,7 +34,9 @@ export function ProvenanceLine({ skill }: { skill: Skill }) {
       <span aria-hidden className="shrink-0 text-muted-foreground/45">
         ·
       </span>
-      <span className="shrink-0 font-semibold text-amber-600 dark:text-amber-400">
+      {/* Shrinks with an ellipsis rather than painting over the next column:
+          a longer label, or another language, must not overlap its neighbour. */}
+      <span className="truncate font-semibold text-amber-600 dark:text-amber-400">
         {locationLabel(skill.location, t)}
       </span>
     </span>

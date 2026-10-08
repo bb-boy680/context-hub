@@ -25,7 +25,19 @@ export interface SkillUpstream {
   /** Directory hash of the installed revision; what updates are measured against. */
   hash: string
 }
-
+/**
+ * One check's answer, kept on the row: what the source held when it was asked,
+ * and what the files here held at that same moment. Both are a record of that
+ * check, not a claim about now, which is why the `at` time travels with them.
+ */
+export interface SkillCheck {
+  /** When the source was asked. */
+  at: string
+  /** The source's revision hash as of then. */
+  latest: string
+  /** The directory hash of the local files as of then. */
+  currentHash: string
+}
 /** One row of the catalog: the metadata the list renders, without file bodies. */
 export interface SkillSummary {
   /** Directory name under the skills root; the skill's identity. */
@@ -51,6 +63,8 @@ export interface SkillSummary {
   /** Where the files came from, when anything recorded it; absent on a skill
       written here or copied in by hand, which is why it cannot be checked. */
   upstream?: SkillUpstream
+  /** The last time a source was asked about this skill, and what it held. */
+  checked?: SkillCheck
   /**
    * ISO timestamp of the last recorded change to the hub's own copy, empty for
    * a linked skill: the hub has changed nothing about files it does not hold,
@@ -158,12 +172,23 @@ export interface SkillUpdateCheck {
   recordedHash: string
   /** The directory hash of the files on disk now. */
   currentHash: string
-  /** The upstream revision's directory hash, or `null` when it could not be read. */
-  latestHash: string | null
+  /** The upstream revision's directory hash. */
+  latestHash: string
   /** The upstream holds a revision this copy does not have. */
   outdated: boolean
   /** The files on disk differ from the recorded revision. */
   modified: boolean
+}
+
+/** What one batch check found across the library. */
+export interface SkillUpdateSummary {
+  /** Skills whose source answered and whose answer was recorded. */
+  checked: number
+  /** Of those, how many the source has moved past. */
+  outdated: number
+  /** Skills whose source could not be read, each with the reason; the rest
+      still ran, so one unreachable package does not silence the others. */
+  failed: { name: string; reason: string }[]
 }
 
 /** One file of a folder read, relative to the skill directory it belongs to. */
@@ -286,6 +311,12 @@ export interface SkillStore {
    * is the only way to show its own manifest and files.
    */
   workspaceSkill(id: string): Promise<WorkspaceSkillDetail | null>
+  /**
+   * One text file of a skill the current workspace holds, read where it lives.
+   * A linked skill's files belong to the library, but they are read through
+   * this too: the path is the one the workspace sees.
+   */
+  workspaceFile(id: string, path: string): Promise<string>
   /** Put one library skill into the current workspace; answers how it landed. */
   installToWorkspace(id: string): Promise<WorkspaceInstall>
   /**
@@ -303,9 +334,17 @@ export interface SkillStore {
   removeFromWorkspace(id: string): Promise<void>
   /**
    * Measure one skill against the upstream it was installed from. Reads the
-   * source over the network, so it is asked for, never automatic.
+   * source over the network, so it is asked for, never automatic. The answer
+   * is recorded on the row, where a badge and the detail dialog read it back.
    */
   checkUpdate(id: string): Promise<SkillUpdateCheck>
+  /**
+   * Measure every skill that records a source against it — one CLI run per
+   * source, so a package holding several skills is cloned once, not once per
+   * skill. Reads over the network, so it is asked for, never automatic; a
+   * source that fails is reported without stopping the rest.
+   */
+  checkUpdates(): Promise<SkillUpdateSummary>
   /**
    * Install the upstream's current revision over the skill's files, wherever
    * they live, and record the new hash. Refuses when nothing recorded a source.

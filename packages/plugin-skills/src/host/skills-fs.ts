@@ -36,13 +36,14 @@ import {
 } from "../frontmatter.ts"
 import { importFolder } from "./folder-import.ts"
 import { walkSkillDir } from "./file-tree.ts"
-import { downloadPackageSkills, fetchUpstreamRecord, listPackageSkills } from "./skills-cli.ts"
+import { downloadPackageSkills, fetchUpstreamRecords, listPackageSkills } from "./skills-cli.ts"
 import { readLockedUpstream, skillFolderHash } from "./upstream.ts"
 import {
   deleteSkillFromWorkspace,
   installSkillIntoWorkspace,
   linkSkillIntoLibrary,
   readWorkspaceSkill,
+  readWorkspaceSkillFile,
   readWorkspaceSkills,
   removeSkillFromWorkspace,
 } from "./workspace-skills.ts"
@@ -56,6 +57,7 @@ import type {
   PackageSkill,
   SkillAsset,
   SkillCounts,
+  SkillCheck,
   SkillDetail,
   SkillDraft,
   SkillImport,
@@ -66,12 +68,15 @@ import type {
   SkillStore,
   SkillSummary,
   SkillUpdateCheck,
+  SkillUpdateSummary,
   SkillUpstream,
 } from "../store.ts"
 
 const CATALOG_FILE = "index.json"
 const MANIFEST = "SKILL.md"
 const CATALOG_VERSION = 1
+/** Sources asked in parallel by one batch check; each run clones a package. */
+const CHECK_CONCURRENCY = 3
 
 /** One skill as the catalog records it. */
 interface CatalogEntry {
@@ -88,6 +93,8 @@ interface CatalogEntry {
   link?: string
   /** What the skills CLI recorded it was installed from; absent when nothing did. */
   upstream?: SkillUpstream
+  /** The last check's answer for this skill; carried by a scan like `upstream`. */
+  checked?: SkillCheck
   /** Media references, in the order the UI shows them. */
   assets: string[]
   /** Manifest mtime when this row was last read; drives refreshes. */
@@ -236,6 +243,9 @@ export async function createFsSkillStore(
       /* Where the files came from is not in the manifest, so a scan carries
          the recorded answer forward; only an install writes a new one. */
       ...(previous?.upstream === undefined ? {} : { upstream: previous.upstream }),
+      /* The last check's answer is the same kind of record: the manifest does
+         not carry it, and a scan must not throw it away. */
+      ...(previous?.checked === undefined ? {} : { checked: previous.checked }),
       /* A skill's manifest carries no media; the references it had stay as they are. */
       assets: previous?.assets ?? [],
       mtimeMs: stat.mtimeMs,
@@ -313,6 +323,70 @@ export async function createFsSkillStore(
     const skills = { ...current.skills }
     change(skills)
     await saveCatalog({ ...current, skills })
+  }
+
+  /**
+   * Ask each source what it holds now, one CLI run per group: a package that
+   * holds several skills is cloned once, and the run reports the hash the CLI
+   * itself would record for an install now, so nothing compares by a second
+   * implementation. A source that fails is reported, not thrown: the others
+   * still answer.
+   */
+  const askSources = async (
+    groups: Map<string, string[]>
+  ): Promise<{ latest: Map<string, string>; failed: { name: string; reason: string }[] }> => {
+    const latest = new Map<string, string>()
+    const failed: { name: string; reason: string }[] = []
+    const queue = [...groups]
+    let next = 0
+    const worker = async (): Promise<void> => {
+      while (next < queue.length) {
+        const [source, ids] = queue[next++]
+        try {
+          const answer = await fetchUpstreamRecords(source, ids)
+          for (const [name, record] of answer.records) latest.set(name, record.hash)
+          for (const [name, reason] of answer.failed) failed.push({ name, reason })
+        } catch (failure) {
+          const reason = failure instanceof Error ? failure.message : String(failure)
+          for (const id of ids) failed.push({ name: id, reason })
+        }
+      }
+    }
+    await Promise.all(
+      Array.from({ length: Math.min(CHECK_CONCURRENCY, queue.length) }, worker)
+    )
+    return { latest, failed }
+  }
+
+  /**
+   * Write one check's answers onto their rows, together with the local hash
+   * read at the same moment, so a badge and the detail dialog read a whole
+   * answer back without asking the network again.
+   *
+   * @returns the local hashes that were recorded, by skill id.
+   */
+  const recordChecks = async (
+    latest: Map<string, string>
+  ): Promise<Map<string, string>> => {
+    const hashes = new Map<string, string>()
+    for (const id of latest.keys()) {
+      /* The files are read where they are, link or not: the question is what
+         this copy holds, not which directory holds it. The CLI never hashes
+         what is on disk, so this is the one number it cannot supply. */
+      const hash = await skillFolderHash(skillDir(id)).catch(() => null)
+      if (hash !== null) hashes.set(id, hash)
+    }
+    if (hashes.size === 0) return hashes
+    const at = new Date().toISOString()
+    await mutate((skills) => {
+      for (const [id, currentHash] of hashes) {
+        const row = skills[id]
+        const found = latest.get(id)
+        if (row === undefined || found === undefined) continue
+        skills[id] = { ...row, checked: { at, latest: found, currentHash } }
+      }
+    })
+    return hashes
   }
 
   /** Record one reference last in the display order. */
@@ -406,6 +480,7 @@ export async function createFsSkillStore(
           enabled: row.enabled,
           ...(row.link === undefined ? {} : { link: row.link }),
           ...(row.upstream === undefined ? {} : { upstream: row.upstream }),
+          ...(row.checked === undefined ? {} : { checked: row.checked }),
           assets: row.assets,
           updatedAt: row.updatedAt,
         })
@@ -640,6 +715,15 @@ export async function createFsSkillStore(
       return workspace === null ? null : readWorkspaceSkill(workspace, id)
     },
 
+    async workspaceFile(id: string, file: string): Promise<string> {
+      const workspace = await requiredWorkspace()
+      const text = await readWorkspaceSkillFile(workspace, id, file)
+      if (text === null) {
+        throw new Error(`the workspace holds no such file: ${id}/${file}`)
+      }
+      return text
+    },
+
     async installToWorkspace(id: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
       return installSkillIntoWorkspace(workspace, root, id)
@@ -671,22 +755,42 @@ export async function createFsSkillStore(
       if (upstream === undefined) {
         throw new Error(`no recorded source for this skill, so nothing can be compared: ${id}`)
       }
-      /* The source's current revision, installed into a throwaway directory by
-         the CLI itself: the hash it reports there is the one it would record
-         for an install now, so the comparison needs no second implementation. */
-      const latest = await fetchUpstreamRecord(upstream.source, id)
-      /* The files are read where they are, link or not: the question is what
-         this copy holds, not which directory holds it. The CLI never hashes
-         what is on disk, so this is the one number it cannot supply. */
-      const currentHash = await skillFolderHash(skillDir(id))
-      const latestHash = latest?.hash ?? null
+      const { latest, failed } = await askSources(new Map([[upstream.source, [id]]]))
+      const found = latest.get(id)
+      if (found === undefined) {
+        /* The CLI's own reason is worth more to a person than a generic one. */
+        const reason = failed.find((entry) => entry.name === id)?.reason
+        throw new Error(reason ?? `the source answered nothing about this skill: ${id}`)
+      }
+      const recorded = await recordChecks(latest)
+      const currentHash = recorded.get(id) ?? found
       return {
         recordedHash: upstream.hash,
         currentHash,
-        latestHash,
-        outdated: latestHash !== null && latestHash !== upstream.hash,
+        latestHash: found,
+        outdated: found !== upstream.hash,
         modified: currentHash !== upstream.hash,
       }
+    },
+
+    async checkUpdates(): Promise<SkillUpdateSummary> {
+      const current = await loadCatalog()
+      /* One group per source: the CLI answers a whole package in one run. */
+      const groups = new Map<string, string[]>()
+      for (const [id, row] of Object.entries(current.skills)) {
+        const source = row.upstream?.source
+        if (source === undefined) continue
+        const ids = groups.get(source)
+        if (ids === undefined) groups.set(source, [id])
+        else ids.push(id)
+      }
+      const { latest, failed } = await askSources(groups)
+      const recorded = await recordChecks(latest)
+      let outdated = 0
+      for (const id of recorded.keys()) {
+        if (current.skills[id]?.upstream?.hash !== latest.get(id)) outdated += 1
+      }
+      return { checked: recorded.size, outdated, failed }
     },
 
     async updateFromUpstream(id: string): Promise<void> {
@@ -717,7 +821,19 @@ export async function createFsSkillStore(
         const fresh = result.records?.[landed]?.hash ?? (await skillFolderHash(target))
         await mutate((skills) => {
           const next = skills[id]
-          if (next !== undefined) skills[id] = { ...next, upstream: { ...upstream, hash: fresh } }
+          if (next !== undefined) {
+            skills[id] = {
+              ...next,
+              upstream: { ...upstream, hash: fresh },
+              /* What the CLI just installed is, by construction, both the
+                 source's revision and what the files hold now. */
+              checked: {
+                at: new Date().toISOString(),
+                latest: fresh,
+                currentHash: fresh,
+              },
+            }
+          }
         })
       } finally {
         await fs.rm(work, { recursive: true, force: true })

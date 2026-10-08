@@ -174,37 +174,72 @@ export async function listPackageSkills(source: string): Promise<PackageSkill[]>
   }
 }
 
+/** What one source said about a group of skills, without touching the library. */
+export interface UpstreamRecords {
+  /** The CLI's own record for each skill it installed, keyed by name. */
+  records: Map<string, SkillUpstream>
+  /** Skills the CLI did not install, each with the reason it gave. */
+  failed: Map<string, string>
+}
+
 /**
- * Read what the CLI records for the source's current revision of one skill,
- * without touching the library: the install runs in a throwaway directory and
- * everything it writes is dropped. The hash in that record is the CLI's own,
- * so a check never has to reproduce the algorithm.
+ * Read what the CLI records for the source's current revision of several
+ * skills at once: the install runs in a throwaway directory and everything it
+ * writes is dropped. One run per package is what keeps a batch check at one
+ * clone per source rather than one per skill. A skill the CLI refuses lands in
+ * `failed` with the CLI's own reason; the rest still arrive.
  *
  * @param source — the package the lock named, in the form the CLI accepts.
- * @param skill — the skill's directory name in the package.
- * @returns the CLI's record for this revision.
- * @throws when the CLI could not install it, carrying the CLI's own reason:
- *   no network, a private package, or a skill the source no longer holds.
+ * @param skills — the skills' directory names in the package.
+ * @returns the CLI's records, and its own reasons for whatever it refused.
+ * @throws when the CLI answered with no report at all — no network, or a
+ *   source it could not read — which speaks for every skill in the group.
  */
-export async function fetchUpstreamRecord(
+export async function fetchUpstreamRecords(
   source: string,
-  skill: string
-): Promise<SkillUpstream | null> {
+  skills: string[]
+): Promise<UpstreamRecords> {
+  /* Without `--skill` the CLI takes the whole package; there is nothing to
+     ask about, and asking would install everything the source holds. */
+  if (skills.length === 0) return { records: new Map(), failed: new Map() }
   const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-skills-"))
   try {
-    const args = ["skills", "add", source, "--skill", skill, "-a", AGENT, "--copy", "-y", "--json"]
+    const args = ["skills", "add", source]
+    for (const skill of skills) args.push("--skill", skill)
+    args.push("-a", AGENT, "--copy", "-y", "--json")
     const { stdout, stderr, code } = await runCli(args, work)
     const report = parseReport(stdout)
     if (report.length === 0) throw new Error(failureText(code, stderr, stdout))
-    const outcome = report[0]
-    if (outcome.status !== "installed") {
-      throw new Error(
-        outcome.error ??
-          outcome.reason ??
-          `the source no longer holds this skill (${outcome.status ?? "unknown"})`
-      )
+    const records = new Map<string, SkillUpstream>()
+    const failed = new Map<string, string>()
+    /* A failure the CLI reports with no skill attached is the package's own —
+       a failed clone, say — and it speaks for every skill it never named. */
+    let packageFailure: string | null = null
+    for (const entry of report) {
+      const name = entry.name ?? ""
+      const reason =
+        entry.error ?? entry.reason ?? `the CLI reported it as ${entry.status}`
+      if (name === "") {
+        if (entry.status !== "installed") packageFailure ??= reason
+        continue
+      }
+      if (entry.status !== "installed") {
+        failed.set(name, reason)
+        continue
+      }
+      const record = await readLockedUpstream(work, name)
+      if (record === null) failed.set(name, "the CLI wrote no lock entry for it")
+      else records.set(name, record)
     }
-    return await readLockedUpstream(work, skill)
+    for (const skill of skills) {
+      if (records.has(skill) || failed.has(skill)) continue
+      /* The lock is the CLI's own record, so a skill it installed but did not
+         name in the report is still answered by it. */
+      const record = await readLockedUpstream(work, skill)
+      if (record !== null) records.set(skill, record)
+      else failed.set(skill, packageFailure ?? "the CLI reported nothing for it")
+    }
+    return { records, failed }
   } finally {
     await fs.rm(work, { recursive: true, force: true })
   }

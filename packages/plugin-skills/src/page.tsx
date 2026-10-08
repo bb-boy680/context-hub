@@ -4,6 +4,7 @@ import {
   LibraryIcon,
   ListIcon,
   PowerIcon,
+  RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
   type LucideIcon,
@@ -248,22 +249,26 @@ const sampleRows: Skill[] = sampleSkills.map((skill) => ({
 /* The tab row carries one dimension: where a skill is, not where it came from. */
 const TABS: { value: SkillTab; labelKey: string }[] = [
   { value: "all", labelKey: "skills.tab.all" },
+  { value: "library", labelKey: "skills.tab.library" },
   { value: "workspace", labelKey: "skills.tab.workspace" },
 ]
 
 /** Which rows a tab shows. */
-type SkillTab = "all" | "workspace"
+type SkillTab = "all" | "library" | "workspace"
 
 /* Counts for the bundled demo rows, which have no store behind them. */
-const SAMPLE_COUNTS = { all: 42, workspace: 12 }
+const SAMPLE_COUNTS = { all: 42, library: 30, workspace: 12 }
 
-/* Column widths include the 16px gutter the design leaves between columns. */
+/* Column widths include the 16px gutter the design leaves between columns.
+   位置 is 154 rather than the design's 136: "本地 · 技能库 + 工作区" measures
+   150 and the location axis introduced that longer label, so it takes 18 from
+   Token 数, whose header is 58 wide and whose values are always short. */
 const columns = [
   { labelKey: "", width: 32 },
   { labelKey: "skills.column.skill", width: 340 },
   { labelKey: "skills.column.tags", width: 166 },
-  { labelKey: "skills.column.location", width: 136 },
-  { labelKey: "skills.column.tokens", width: 96 },
+  { labelKey: "skills.column.location", width: 154 },
+  { labelKey: "skills.column.tokens", width: 78 },
   { labelKey: "skills.column.triggers", width: 96 },
   { labelKey: "skills.column.updated", width: 120 },
   { labelKey: "skills.column.action", width: 102 },
@@ -467,6 +472,23 @@ function MarkdownCover({
 /** Ratio a card falls back to before its asset reports one. */
 const FALLBACK_RATIO = 16 / 9
 
+/**
+ * The marker a row carries when the last check found its source ahead of the
+ * files here. Nothing is rendered until a check recorded an answer.
+ */
+function UpdateBadge({ skill }: { skill: Skill }) {
+  const { t } = useI18n()
+  const latest = skill.checked?.latest
+  if (latest === undefined || skill.upstream === undefined || latest === skill.upstream.hash) {
+    return null
+  }
+  return (
+    <span className="shrink-0 text-[11px] leading-[14px] font-semibold text-amber-600 dark:text-amber-400">
+      {t("skills.update.badge")}
+    </span>
+  )
+}
+
 function SkillCard({
   skill,
   store,
@@ -537,7 +559,10 @@ function SkillCard({
       </div>
       <div className="flex flex-col gap-1 px-3 py-2.5">
         <div className="flex h-[18px] items-center justify-between gap-2">
-          <span className="truncate text-sm font-semibold">{skill.name}</span>
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate text-sm font-semibold">{skill.name}</span>
+            <UpdateBadge skill={skill} />
+          </span>
           {/* A skill the hub does not hold has no recorded age; nothing goes here. */}
           {skill.updated === "" ? null : (
             <span className="shrink-0 text-[11px] leading-[14px] text-muted-foreground">
@@ -700,8 +725,11 @@ function SkillTable({
                   <div className="flex items-center gap-2.5">
                     <SkillThumb skill={skill} />
                     <div className="flex min-w-0 flex-col">
-                      <span className="truncate text-sm leading-[17px] font-medium">
-                        {skill.name}
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate text-sm leading-[17px] font-medium">
+                          {skill.name}
+                        </span>
+                        <UpdateBadge skill={skill} />
                       </span>
                       <span className="truncate text-xs leading-[15px] text-muted-foreground">
                         {skill.description}
@@ -853,6 +881,8 @@ export function SkillsPage() {
   /* Why the last action did not go through. A success says nothing: the row it
      changed already shows the result. */
   const [refusal, setRefusal] = React.useState<string | null>(null)
+  /* A batch check clones every recorded source; the toolbar says it is busy. */
+  const [checking, setChecking] = React.useState(false)
   /* The open lightbox is a row key, because the same id can be two rows. */
   const [detailKey, setDetailKey] = React.useState<string | null>(null)
   /* Bundled rows have no library behind them; edits stay in this map. */
@@ -877,7 +907,14 @@ export function SkillsPage() {
     const rows = usingStore
       ? library.rows
       : sampleRows.map((skill) => ({ ...skill, ...samplePatch[skill.id] }))
-    const onTab = tab === "workspace" ? rows.filter((row) => row.location !== "library") : rows
+    /* A skill in both places answers to both tabs; only a tab's own absence
+       from a row excludes it. */
+    const onTab =
+      tab === "library"
+        ? rows.filter((row) => row.location !== "workspace")
+        : tab === "workspace"
+          ? rows.filter((row) => row.location !== "library")
+          : rows
     return tag === "All tags" ? onTab : onTab.filter((row) => row.tags.includes(tag))
   }, [usingStore, library.rows, tab, tag, samplePatch])
 
@@ -907,6 +944,26 @@ export function SkillsPage() {
       setRefusal(null)
     } catch (failure) {
       setRefusal(reasonOf(failure))
+    }
+  }
+
+  /** Ask every recorded source; the badges that change are the report. A
+      source that could not be read is named, since nothing else would say so. */
+  const checkAll = async () => {
+    setChecking(true)
+    try {
+      const summary = await library.checkAll()
+      setRefusal(
+        summary.failed.length === 0
+          ? null
+          : summary.failed
+              .map((entry) => `${entry.name}: ${entry.reason}`)
+              .join(" · ")
+      )
+    } catch (failure) {
+      setRefusal(reasonOf(failure))
+    } finally {
+      setChecking(false)
     }
   }
 
@@ -1020,6 +1077,16 @@ export function SkillsPage() {
                 onClick={() => setView("list")}
               />
             </div>
+            <Button
+              variant="outline"
+              disabled={checking}
+              /* The same amber the "有更新" badge uses, so the feature reads as one thing. */
+              className="h-9 gap-2 border-amber-600/40 bg-transparent px-4 text-amber-600 hover:bg-amber-600/10 hover:text-amber-700 dark:border-amber-400/40 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
+              onClick={() => void checkAll()}
+            >
+              <RefreshCwIcon className={checking ? "animate-spin" : undefined} />
+              {checking ? t("skills.update.checkingAll") : t("skills.update.checkAll")}
+            </Button>
             <Button
               variant="outline"
               className="h-9 gap-2 border-border bg-transparent px-4 dark:border-input dark:bg-transparent"

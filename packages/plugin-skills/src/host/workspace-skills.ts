@@ -133,6 +133,29 @@ export async function readWorkspaceSkill(
 }
 
 /**
+ * Read one text file of a skill a workspace holds.
+ *
+ * @param workspace — the workspace folder, absolute.
+ * @param id — the skill's directory name under the workspace's skills root.
+ * @param file — the file's path inside that directory, `/`-separated.
+ * @returns the file's text, or `null` when it is not there or not readable.
+ * @throws when the path climbs out of the skill's own directory.
+ */
+export async function readWorkspaceSkillFile(
+  workspace: string,
+  id: string,
+  file: string
+): Promise<string | null> {
+  const dir = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
+  const target = path.resolve(dir, file)
+  const prefix = dir.endsWith(path.sep) ? dir : dir + path.sep
+  if (!target.startsWith(prefix)) {
+    throw new Error(`path escapes the skill directory: ${file}`)
+  }
+  return fs.readFile(target, "utf8").catch(() => null)
+}
+
+/**
  * Put one library skill into a workspace, as a link into the library.
  *
  * @param workspace — the workspace folder, absolute.

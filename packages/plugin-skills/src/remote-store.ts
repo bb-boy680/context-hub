@@ -18,6 +18,7 @@ import type {
   SkillQuery,
   SkillStore,
   SkillUpdateCheck,
+  SkillUpdateSummary,
   WorkspaceInstall,
   WorkspaceSkillDetail as WorkspaceSkillRecord,
   WorkspaceSkillsView as WorkspaceSkills,
@@ -181,6 +182,14 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       )
     },
 
+    async workspaceFile(id: string, file: string): Promise<string> {
+      const body = await call<{ text: string }>(
+        base,
+        `/hub/skills?action=workspace-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}`
+      )
+      return body.text
+    },
+
     async installToWorkspace(id: string): Promise<WorkspaceInstall> {
       const body = await call<{ mode: WorkspaceInstall }>(
         base,
@@ -228,6 +237,12 @@ export function createRemoteSkillStore(base = ""): SkillStore {
         base,
         `/hub/skills/${encodeURIComponent(id)}/update`
       )
+    },
+
+    checkUpdates(): Promise<SkillUpdateSummary> {
+      return call<SkillUpdateSummary>(base, "/hub/skills?action=check-updates", {
+        method: "POST",
+      })
     },
 
     async updateFromUpstream(id: string): Promise<void> {

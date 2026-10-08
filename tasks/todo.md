@@ -1675,6 +1675,44 @@ UI 上点 `创建工作区` → `showDirectoryPicker` 被调用（桩计数 1）
 实测：舞台 720x405，`scroll == client`（无滚动条），`pre` 内容宽 640 == 容器宽 640 且 `white-space: pre-wrap`；
 两个工作区（4 张 / 12 张卡）全部封面 **零横向溢出元素**；灯箱与卡片截图复核过；typecheck + lint 全绿。
 
+# 文件面板改用库：可交互文件树 + shiki 语法高亮（2026-10-09，用户："文件树是默认折叠的、并且还不能点击其他的文件；我们尽量不要手写这些东西"）
+
+**问题（都是手写的）**：树是一个平铺列表，**只能渲染、不能交互**（不能折叠、不能点开别的文件，选中项硬编码 `SKILL.md`）；
+内容是手写的逐行 `<div>`（行号 + `whitespace-pre`），长行横向溢出。
+
+**改法**：
+- **树 = `@headless-tree/react` + `@headless-tree/core`**（headless：展开/折叠、焦点、方向键、ARIA 全由库给）。
+  `src/file-tree.tsx` 把后端平铺清单（`SkillFileEntry[]{path,depth,directory}`）编成 `{items, children}` 索引喂给
+  `useTree({ rootItemId: "", dataLoader, features: [syncDataLoaderFeature, hotkeysCoreFeature] })`；
+  `initialState.expandedItems` = 根（**默认折叠**：顶层条目可见，文件夹要点开才展开——2026-10-09 按用户
+  「文件树没有默认折叠」修正，之前是全展开）；行是 `<button {...item.getProps()}>`，
+  `onPrimaryAction` 里只有 `!item.isFolder()` 才 `onSelect(path)`；`aria-selected` 用面板自己的选中态覆盖。
+- **内容 = `shiki`**（`shiki/core` + `createJavaScriptRegexEngine()`，**不引 wasm**）：`src/code-view.tsx` 只装
+  markdown/yaml/json/python/ts/js/bash/html/css/toml 十种语法，`codeToHtml(text, { lang, themes:{light,dark}, defaultColor:false })`
+  出 HTML；行号是 CSS 计数器（`globals.css` 新增 `@utility file-code`），主题跟着 `.dark` 切（`var(--shiki-light/dark)`）。
+  高亮是异步的：先渲染纯文本 `<pre>`，色彩到了再换（不空白、不阻塞）。
+- **任意文件可读**：库技能本来就有 `store.readFile(id, path)`；**工作区技能新开一条缝**——
+  `readWorkspaceSkillFile(workspace, id, file)`（`path.resolve` + 前缀校验，越界抛 "path escapes the skill directory"）、
+  `SkillStore.workspaceFile(id, path)`、`remote-store` 走 `GET /hub/skills?action=workspace-file&id=&path=`、`vite.ts` 加路由。
+  面板按 `skill.location` 分派：`workspace` → `store.workspaceFile`，其余 → `store.readFile`。
+- **结果与路径一起存**：读到的内容存在 `{path, kind:"text"|"failure"}` 里，路径不匹配就显示读取中——
+  **不在 effect 里同步 setState**（`react-hooks/set-state-in-effect` 会拦，也会级联渲染）。
+
+**踩的坑（重要）**：headless-tree **只在挂载时构建一次条目清单**（`getItems()` 返回缓存的 `itemInstances`，
+只有 `rebuildTree()` / `scheduleRebuildTree()` 才重建），而我们的文件清单是**异步到达**的（先空后有）——
+于是树永远空着、DOM 里一行都没有。修法：`key={fileTreeKey(files)}`（全部 path 拼接），清单变了就重挂载。
+排错方法值得复用：先在页面里用同一个库做**最小复现**（证明库没问题），再回头看"数据什么时候到手"。
+
+**验证**：
+- `check-workspace-skills.ts` 增至 **63 项**（新 5 项：读同级文件 / 读 SKILL.md 原文 / 不存在返回 null /
+  `../../../outside.txt` 被拒 / 越界技能名被拒）全过；`check-store` / `check-upstream` / `check-updates` 无回归；
+  plugin-skills + ui 的 tsc、plugin-skills eslint 全绿。
+- 真机（zh-CN，浏览器）：库技能 `grilling` 与工作区技能 `grill-me` 两个灯箱都验证——
+  树 `agents(1) → openai.yaml(2) / SKILL.md(1)` **默认折叠**（`agents` 收起、点开出现 `openai.yaml`）；
+  点 `openai.yaml` → 头部标题跟着变、选中态移动、正文换成该文件且带语法色（YAML 键着色、行号 1..n）；
+  多层技能 `dsh-doc`（references/ + templates/ 共 13 个文件）默认只见两个文件夹 + SKILL.md，
+  展开 references 点开 `style.md`（50 行）正常；浅色 token `rgb(34,134,58)`、深色 `rgb(133,232,157)`。
+
 # 技能更新的批量检查与徽标（2026-10-09，用户："那如果是远程仓库的 skills 更新了怎么办？"）
 
 ## 问题
@@ -1715,5 +1753,66 @@ UI 上点 `创建工作区` → `showDirectoryPicker` 被调用（桩计数 1）
   检查同路径、更新目标改为工作区目录（`updateFromUpstream` 按 location 分派）。
 - 要不要给批量检查加 TTL 自动跑（打开技能页且上次检查超过 N 小时）—— 成本是每次多个 clone，默认不做。
 
-## 结果
-（待实施）
+## 结果（2026-10-09，已实现；用户指定按钮位置："这个地方在加一个按钮"）
+
+**入口**：技能页工具栏（视图切换与 `导入` 之间）新增 outline 按钮 `检查更新`，
+检查中变 `正在检查…` + 图标 `animate-spin`、按钮禁用；失败源在 refusal 行按 `名字: 原因 · …` 汇总，
+成功不说话（徽标本身就是结果）。
+
+**批量检查（按源去重）**：`SkillStore.checkUpdates()` —— 按 `upstream.source` 分组（原来 N 个技能 = N 次 clone），
+`askSources()` 每组一次 CLI 调用（`--skill a --skill b …`），并发上限 3；单技能 `checkUpdate` 走同一条路。
+结果落盘：catalog 行新增 `checked: {at, latest, currentHash}`（`readEntry`/`list` 像 `upstream` 一样携带，
+跨重启保留）；`outdated` 是派生值 `checked.latest !== upstream.hash`。
+
+**CLI 细节**：`fetchUpstreamRecord`（单）→ `fetchUpstreamRecords`（多，返回 `{records, failed}`）。
+实测发现 CLI 对**整包失败**会给出**无名**条目（clone 失败），实现把它当作"对这个包所有技能的回答"
+（`packageFailure`），不再产生名字为空的失败项；未命名但 lock 里存在的技能仍从 lock 补读。
+
+**UI**：卡片名旁与列表名旁 amber `有更新` 徽标（`UpdateBadge`，无 `checked` 不渲染）；
+灯箱 `UpdateRow` 用 `skill.checked` 播种 —— 已过期直接显示 `上游有更新` + `更新` 按钮（不必再点一次检查），
+idle 且有过检查时显示 `上次检查：<age>`。更新成功后 checked 变成新哈希（徽标立即消失）；
+`SkillUpdateCheck.latestHash` 改为非空，删除 `skills.update.unreadable` 分支与键（CLI 的失败原因更有用）。
+
+**验证**：
+- 新脚本 `scripts/check-updates.ts`（**29 项，全绿**）：fixture 是本机 `file://` git 仓库
+  （实测 CLI 认它为 `sourceType: "git"`，**无需网络**）→ 安装两个技能 → 批量检查 up to date →
+  推进一版 → `outdated: 1` 且另一行仍是 2/2 被测量 → 单检查 current → 手改文件 `modified: true` →
+  `updateFromUpstream` 后文件与记录一致、再查 outdated 0 → 新 store 仍读到 `checked`（落盘携带）→
+  指向坏源的 row 单独失败且其他源照常（`checked: 2, failed: [ghost-test]`）→ 无源/未知技能被拒 →
+  空技能列表不触 CLI。
+- 回归：`check-store.ts` / `check-upstream.ts` / `check-workspace-skills.ts` 全过；
+  plugin-skills + locale-zh-cn 的 tsc/eslint 全绿。
+- 真机（浏览器，zh-CN；dev server 重启以加载桥）：工具栏按钮出现 → 点 `检查更新`（控制台观测到
+  `检查更新`→`正在检查…`）→ 本地 fixture 演示技能出现 amber `有更新` 徽标 → 灯箱**播种**显示
+  `上游有更新`/`更新` → 点更新 **1.6s** 完成：徽标消失、封面正文变第二版、灯箱回 idle 显示
+  `上次检查：现在` → 演示技能与 fixture 已删除（库恢复 3 个技能）。
+- 真实上游：`mattpocock/skills` 的 grill-me 检查 4.1s 返回 `{checked:1,outdated:0,failed:[]}`（上游未动）。
+
+**按钮配色（2026-10-09，用户："按你颜色改一下呀"）**：把工具栏「检查更新」按钮改成更新功能的琥珀色 —— 与「有更新」徽标同色：
+文字/图标/描边用 `amber-600`（深色下 `amber-400`）、hover 琥珀底 10%、背景保持透明。实测浅色
+`oklch(0.666 0.179 58.318)`、深色 `oklch(0.828 0.189 84.429)`（与徽标、来源行同色值）；tsc + eslint 全绿。
+
+**位置列重叠修复（2026-10-09，用户："这个地方样式重叠了，宽度不是自适应的吗？"）**：
+列表是 `table-fixed` + 设计稿固定列宽（合计 1088），**不按内容自适应**；`本地 · 技能库 + 工作区` 实测 150px
+而「位置」列只有 136px，多出的 14px 直接压到下一列（TRIGGERS）上。
+- 列宽：位置 136 → **154**，从 **Token 数 96 → 78** 借 18（其表头实测 58、值恒为短数/「—」）；
+  **更新时间不能减**——英文 "22 seconds ago" 实测 106px，原 120 才是对的（一度减到 102，量过后回滚）。
+  合计仍 1088，设计稿占位不变。
+- `ProvenanceLine` 加 `max-w-full`（根）+ 末段 `truncate`：**单元格的 `white-space: nowrap` 会让行的最小宽度
+  等于整行文本**，所以只加 shrink 不够，必须 `max-w-full` 把盒子夹到容器宽度内才会走到省略号。
+  实测：154 下完整显示（150/154，无溢出）；把列强压到 110 时自动省略号且 **溢出 0**（修前是溢出 40）；
+  网格卡片（344 宽）与灯箱 InfoPanel 两处同组件，均无溢出、按钮不被压。
+- tsc + eslint 全绿。
+
+**技能库页签（2026-10-09，用户："这里还得新增一个筛选条件，就是筛选技能库"）**：位置轴从两档变三档
+—— `全部 / 技能库 / 工作区`（`SkillTab = "all" | "library" | "workspace"`，`TABS` 与 `SAMPLE_COUNTS` 同步）。
+- 筛选规则：**"两处都有"的行同时在两档里出现**，只有"缺少这一侧"才被排除 ——
+  `library: location !== "workspace"`、`workspace: location !== "library"`。
+- 计数在 `library.ts` 的 `useSkillLibrary().counts` 里按同一规则算（新增 `library` 键，空 store 兜底同步）。
+- 文案 `skills.tab.library`（en "Library" / zh "技能库"）。空库时沿用 `skills.empty` + 库根路径。
+- 实测（本机库 2 个纯库技能 + 13 个工作区行）：页签 `全部 15 / 技能库 2 / 工作区 13`；
+  切到技能库只剩 ui-ux-pro-max、grill-me（都是 location=library），工作区档 12 行/第 2 页，
+  逐档点击与行内容核对一致；tsc + eslint 全绿。
+
+**已知边界**：工作区里直接 `npx skills add` 的技能仍不可检查（没有 upstream，按用户决定放到下一期）；
+不做自动轮询（每次检查是真实 clone）；更新仍逐技能（覆盖本地改动的提示要保留）。

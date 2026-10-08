@@ -102,6 +102,22 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
               return
             }
 
+            /* GET /hub/skills?action=workspace-file&id=…&path=… — one file, read in place */
+            if (
+              rest === "" &&
+              method === "GET" &&
+              url.searchParams.get("action") === "workspace-file"
+            ) {
+              const id = url.searchParams.get("id")
+              const file = url.searchParams.get("path")
+              if (id === null || id === "" || file === null || file === "") {
+                sendError(response, new Error("missing workspace file"))
+                return
+              }
+              sendJson(response, 200, { text: await api.workspaceFile(id, file) })
+              return
+            }
+
             /* POST /hub/skills?action=install-workspace — link one skill into it */
             if (
               rest === "" &&
@@ -226,6 +242,16 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
             ) {
               await api.refresh()
               sendJson(response, 200, { ok: true })
+              return
+            }
+
+            /* POST /hub/skills?action=check-updates — ask every recorded source */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "check-updates"
+            ) {
+              sendJson(response, 200, await api.checkUpdates())
               return
             }
 
