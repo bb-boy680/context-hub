@@ -180,7 +180,7 @@ const repository = await scanFolder([
   { path: "repo/skills/engineering/code-review/reference.md", file: new File(["ref"], "reference.md") },
   { path: "repo/skills/writing/tdd/SKILL.md", file: doc("tdd", "Test first.") },
   { path: "repo/node_modules/pkg/SKILL.md", file: doc("pkg", "Dependency.") },
-  { path: "repo/.github/SKILL.md", file: doc("hidden", "Hidden.") },
+  { path: "repo/.git/SKILL.md", file: doc("git", "Git internals.") },
 ])
 same(
   "every skill under the picked folder is found, at any depth",
@@ -191,6 +191,35 @@ check(
   "a skill's own subfolders come with it",
   repository[0]?.files.length === 2,
   repository[0]?.files.map((entry) => entry.path)
+)
+
+/* A picked project keeps its skills where the agents put them. */
+const project = await scanFolder([
+  { path: "app/src/index.ts", file: new File(["code"], "index.ts") },
+  { path: "app/.agents/skills/grill-me/SKILL.md", file: doc("grill-me", "Grill a plan.") },
+  { path: "app/.agents/skills/grill-me/references/notes.md", file: new File(["notes"], "notes.md") },
+  { path: "app/.claude/skills/retro/SKILL.md", file: doc("retro", "Run a retro.") },
+])
+same(
+  "a hidden agent directory is searched, not skipped",
+  project.map((skill) => `${skill.name}@${skill.dir}`),
+  ["grill-me@app/.agents/skills/grill-me", "retro@app/.claude/skills/retro"]
+)
+
+/* Picking the agent directory itself: its own name must not hide what is under it. */
+const agentRoot = await scanFolder([
+  { path: ".agents/skills/grill-me/SKILL.md", file: doc("grill-me", "Grill a plan.") },
+  { path: ".agents/skills/grill-me/references/notes.md", file: new File(["notes"], "notes.md") },
+])
+same(
+  "the folder a person picked is searched whatever it is called",
+  agentRoot.map((skill) => `${skill.name}@${skill.dir}`),
+  ["grill-me@.agents/skills/grill-me"]
+)
+check(
+  "its nested files come along",
+  agentRoot[0]?.files.length === 2,
+  agentRoot[0]?.files.map((entry) => entry.path)
 )
 
 /* A skill that carries another manifest is still one skill. */

@@ -27,7 +27,7 @@ export interface FolderSkill {
 const MANIFEST = "SKILL.md"
 
 /** Directories whose contents are never a skill worth importing. */
-const NOISE = new Set(["node_modules"])
+const NOISE = new Set(["node_modules", ".git"])
 
 /** Split a path into its segments, dropping the empty ones a leading slash leaves. */
 function segments(path: string): string[] {
@@ -37,9 +37,14 @@ function segments(path: string): string[] {
     .filter((part) => part !== "" && part !== ".")
 }
 
-/** Whether a path sits under a hidden or generated directory. */
+/**
+ * Whether a path sits under a generated directory.
+ *
+ * Hidden directories are searched on purpose: the layouts in use put skills
+ * under `<project>/.agents/skills/<name>` and `<project>/.claude/skills/<name>`.
+ */
 function ignored(parts: string[]): boolean {
-  return parts.some((part) => part.startsWith(".") || NOISE.has(part))
+  return parts.some((part) => NOISE.has(part))
 }
 
 /** Encode a file as base64, the form a JSON body carries bytes in. */
@@ -101,6 +106,8 @@ async function readEntry(entry: FileSystemEntry, parent: string): Promise<Droppe
     return files.map((file) => ({ path, file }))
   }
   if (!entry.isDirectory) return []
+  /* Skipping these while walking keeps a dropped project from being read whole. */
+  if (NOISE.has(entry.name)) return []
   const children = await readDirectoryEntry(entry as FileSystemDirectoryEntry)
   const nested = await Promise.all(children.map((child) => readEntry(child, path)))
   return nested.flat()
