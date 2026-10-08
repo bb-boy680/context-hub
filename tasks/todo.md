@@ -273,4 +273,37 @@ URL 应当只记录引用，只有真正"上传"的资源才落盘，落盘位�
   卡片徽标与详情弹窗的"来源"都显示 `工作区`（不再出现裸 `local`）。
 - 注意：改动服务端桥代码后需**重启 dev server**（Vite 不会热更已加载的插件模块），否则前端会拿到没有 `counts` 的响应。
 
+## 画布：删掉多余画板、卡片改瀑布流（2026-10-08）
+
+### 删除
+
+Skills 行原有 10 块画板，删掉 4 块已被取代的：
+
+| 画板 | 为什么多余 |
+| --- | --- |
+| `X2w2Te` Grid（初版） | 被 Grid v3 取代 |
+| `qk8lW` Grid v2 | 同上 |
+| `u0xRV` Detail — Configuration | 详情已改为 lightbox，tab 弹窗不再实现 |
+| `jFcNl` Detail — Files | 同上 |
+
+剩下的 6 块按实现顺序重排（x = 128 + i×1560）：Grid v3 `libo0`、List `qBAVy`、skill.sh `Y2fjK1`、
+Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 14176 → **9496**。
+
+### 同步
+
+- **卡片 = 瀑布流**：Grid v3 的 `Card Grid` 由"3 行 × 4 张等高卡（266×246）"改为 4 个 `Column` 竖排容器，
+  卡片封面高度按真实媒体比例变化（16:9→150、3:2→177、4:3→200、1:1→266），卡片高度 = 封面 + 116。
+  列高 938 / 981 / 915 / 981，`Card Grid` 保持 778 并 `clip`，折线落在每列第 3 张的封面内——
+  与实现里 `columns-[266px]` 的实际视口一致（页面滚动，见下一屏）。
+- **两块 lightbox 屏的背景同步**：`E8hbJ` / `n8FFba` 的旧等高行换成同一组瀑布流列（Copy 过来），
+  否则弹窗后面的目录与 Grid v3 对不上。
+- **页签**：List / skill.sh / Import 三屏残留的第 5 个页签 `Disabled 4` 已删，六屏统一为
+  `All 42 / Built-in 24 / Workspace 12 / skill.sh 6`（375 宽）。
+- Module Label 描述里的 "detail dialog" 改为 "detail lightbox"。
+
+### 验证
+
+- 全行扫描：除装饰 Blob（刻意的出血）外无布局问题；`Card Grid` 内的裁切是视口折线，不是缺陷。
+- 核对图：`designs/check-skills-masonry/libo0.png`（瀑布流网格）、`L9tdZp.png`（lightbox + 新背景）。
+
 
