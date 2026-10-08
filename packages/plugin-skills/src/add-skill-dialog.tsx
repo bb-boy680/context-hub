@@ -178,6 +178,38 @@ function ListState({ text, busy }: { text: string; busy: boolean }) {
   )
 }
 
+/** What the current tab has picked, each one removable where it is named. */
+function PickedChips({
+  picked,
+  onRemove,
+}: {
+  picked: string[]
+  onRemove: (name: string) => void
+}) {
+  const { t } = useI18n()
+  if (picked.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {picked.map((skill) => (
+        <span
+          key={skill}
+          className="flex h-[21px] items-center gap-1.5 rounded-full bg-muted px-2 font-mono text-[11.5px]"
+        >
+          {skill}
+          <button
+            type="button"
+            aria-label={`${t("skills.media.remove")} ${skill}`}
+            onClick={() => onRemove(skill)}
+          >
+            <XIcon className="size-3 text-muted-foreground" />
+          </button>
+        </span>
+      ))}
+    </div>
+  )
+}
+
 /**
  * The discard question, anchored to the Cancel button it belongs to. Cancel
  * only asks when the dialog holds something a close would drop: with an empty
@@ -588,6 +620,11 @@ export function AddSkillDialog({
                 )}
               </p>
             )}
+            {picked.length > 0 && (
+              <div className="pt-2">
+                <PickedChips picked={picked} onRemove={toggle} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-2 px-6 pb-6">
@@ -611,25 +648,7 @@ export function AddSkillDialog({
             <span className="text-[11px] leading-[14px] text-muted-foreground">
               {t("skills.add.packageNote")}
             </span>
-            {picked.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5">
-                {picked.map((skill) => (
-                  <span
-                    key={skill}
-                    className="flex h-[21px] items-center gap-1.5 rounded-full bg-muted px-2 font-mono text-[11.5px]"
-                  >
-                    {skill}
-                    <button
-                      type="button"
-                      aria-label={`${t("skills.media.remove")} ${skill}`}
-                      onClick={() => toggle(skill)}
-                    >
-                      <XIcon className="size-3 text-muted-foreground" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+            <PickedChips picked={picked} onRemove={toggle} />
           </div>
         )}
 
