@@ -4,6 +4,9 @@
  * the browser form can use it during development. Product forms mount the same
  * store themselves — the desktop app in its main process, the executable in its
  * host — so nothing here is a service the app depends on.
+ *
+ * Media files are served by the asset bridge, which owns that directory; this
+ * one only records and drops the references a skill holds.
  */
 import type { IncomingMessage, ServerResponse } from "node:http"
 
@@ -12,22 +15,6 @@ import type { SkillStore } from "./src/store.ts"
 
 /** Route prefix this bridge answers on. */
 const PREFIX = "/hub/skills"
-
-/** One `Content-Type` for a stored asset, from its extension. */
-const MIME_TYPES: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  gif: "image/gif",
-  mp4: "video/mp4",
-  webm: "video/webm",
-}
-
-function contentTypeOf(file: string): string {
-  const extension = file.slice(file.lastIndexOf(".") + 1).toLowerCase()
-  return MIME_TYPES[extension] ?? "application/octet-stream"
-}
 
 /** Read a whole request body into one buffer. */
 async function readBody(request: NodeJS.ReadableStream): Promise<Buffer> {
@@ -50,53 +37,13 @@ function sendError(response: ServerResponse, error: unknown) {
   sendJson(response, 400, { error: message })
 }
 
-/** Serve one asset, honouring `Range` so media players can seek. */
-async function sendAsset(
-  store: SkillStore,
-  id: string,
-  file: string,
-  range: string | undefined,
-  response: ServerResponse
-) {
-  const { promises: fs, createReadStream } = await import("node:fs")
-  const path = await import("node:path")
-  const target = path.join(store.root, id, "assets", file)
-  const stat = await fs.stat(target).catch(() => null)
-  if (stat === null) {
-    response.writeHead(404).end()
-    return
-  }
-  const type = contentTypeOf(file)
-  const start =
-    range === undefined ? 0 : Number(/bytes=(\d+)-/.exec(range)?.[1] ?? 0)
-  if (start > 0) {
-    response.writeHead(206, {
-      "Content-Type": type,
-      "Content-Range": `bytes ${start}-${stat.size - 1}/${stat.size}`,
-      "Accept-Ranges": "bytes",
-      "Content-Length": stat.size - start,
-    })
-    createReadStream(target, { start }).pipe(response)
-    return
-  }
-  response.writeHead(200, {
-    "Content-Type": type,
-    "Accept-Ranges": "bytes",
-    "Content-Length": stat.size,
-    "Cache-Control": "no-cache",
-  })
-  createReadStream(target).pipe(response)
-}
-
-/** Vite plugin that exposes one skills root over the dev server. */
-export function skillLibrary(options: { root?: string } = {}) {
-  let store: SkillStore | null = null
+/** Vite plugin that exposes the skill library over the dev server. */
+export function skillLibrary(options: { home?: string } = {}) {
   let ready: Promise<SkillStore> | null = null
 
   const getStore = async (): Promise<SkillStore> => {
-    ready ??= createFsSkillStore(options.root)
-    store = await ready
-    return store
+    ready ??= createFsSkillStore({ home: options.home })
+    return ready
   }
 
   return {
@@ -191,33 +138,32 @@ export function skillLibrary(options: { root?: string } = {}) {
               return
             }
 
-            /* POST /hub/skills/<id>/from-url — fetch a source and store it */
-            if (section === "from-url" && method === "POST") {
+            /* POST /hub/skills/<id>/source — record a pasted source */
+            if (section === "source" && method === "POST") {
               const body = JSON.parse(
                 (await readBody(request)).toString("utf8")
-              ) as { url?: string }
-              if (typeof body.url !== "string") {
-                sendError(response, new Error("missing url"))
+              ) as { source?: string }
+              if (typeof body.source !== "string") {
+                sendError(response, new Error("missing source"))
                 return
               }
-              sendJson(response, 200, await api.putAssetFromUrl(id, body.url))
+              sendJson(response, 200, await api.addAssetSource(id, body.source))
               return
             }
 
-            /* /hub/skills/<id>/assets/<file> */
-            if (section === "assets" && tail.length > 0) {
-              const file = tail.join("/")
-              if (method === "GET") {
-                await sendAsset(api, id, file, request.headers.range, response)
-              } else if (method === "DELETE") {
-                await api.deleteAsset(id, file)
-                sendJson(response, 200, { ok: true })
-              } else
-                sendError(response, new Error(`unsupported method ${method}`))
+            /* /hub/skills/<id>/assets?ref=… — drop a reference */
+            if (section === "assets" && method === "DELETE") {
+              const ref = url.searchParams.get("ref")
+              if (ref === null) {
+                sendError(response, new Error("missing asset reference"))
+                return
+              }
+              await api.deleteAsset(id, ref)
+              sendJson(response, 200, { ok: true })
               return
             }
 
-            /* POST /hub/skills/<id>/assets?name=… — upload raw bytes */
+            /* POST /hub/skills/<id>/assets?name=… — take over uploaded bytes */
             if (section === "assets" && method === "POST") {
               const name = url.searchParams.get("name")
               if (name === null) {

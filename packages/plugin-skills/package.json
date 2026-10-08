@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
+    "@workspace/core": "workspace:*",
     "@workspace/extensions": "workspace:*",
     "@workspace/ui": "workspace:*",
     "lucide-react": "^1.48.0",

@@ -136,7 +136,7 @@ export const messages: Record<string, string> = {
   "skills.media.add.placeholder": "图片 URL 或 data: URL",
   "skills.media.add.action": "添加",
   "skills.media.add.file": "选择本地文件",
-  "skills.media.add.hint": "该地址的文件会被下载并存入该技能的目录。",
+  "skills.media.add.hint": "URL 只记录为引用；本地文件与 base64 会存入 Context Hub。",
   "skills.media.add.hintPreview": "这里不会写入磁盘，仅本次预览可见。",
   "skills.media.add.failed": "无法读取该 URL。",
   "skills.detail.category.add": "添加分类",

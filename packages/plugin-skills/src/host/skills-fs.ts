@@ -8,6 +8,11 @@
  *   so browsing never walks directories; `refresh()` is the only scan, and it
  *   reconciles the catalog with the manifests after external edits.
  *
+ * A skill's media is a reference, not a file in its directory: a remote URL the
+ * hub leaves alone, or a path into the hub's asset library, which this store
+ * deletes together with the reference. Uploaded bytes never enter the skill
+ * directory, so copying a skill around carries the links and nothing else.
+ *
  * Writes replace files atomically (a sibling temp file renamed into place, with
  * a bounded retry for Windows sharing errors), so a reader never observes a
  * partial manifest or catalog. This module runs in the process that owns the
@@ -15,15 +20,18 @@
  */
 import { randomUUID } from "node:crypto"
 import { promises as fs, watch } from "node:fs"
-import { homedir } from "node:os"
 import path from "node:path"
+
+import { assetKind, assetUrl, isLink, readSource } from "@workspace/core"
+import { createFsAssetLibrary } from "@workspace/core/host"
+import { displayPath, resolveHubHome } from "@workspace/core/host/home"
+import type { AssetLibrary } from "@workspace/core"
 
 import {
   parseSkillFile,
   starterSkillFile,
   writeSkillFile,
 } from "../frontmatter.ts"
-import { assetKind } from "../store.ts"
 import type {
   SkillAsset,
   SkillDetail,
@@ -42,18 +50,6 @@ const MANIFEST = "SKILL.md"
 const CATALOG_VERSION = 1
 /** Prefix for in-flight replacements; watchers skip it. */
 const TEMP_PREFIX = ".tmp-"
-/** Upload limits, in bytes. */
-const MAX_IMAGE = 5 * 1024 * 1024
-const MAX_VIDEO = 25 * 1024 * 1024
-const MIME_TYPES: Record<string, string> = {
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  webp: "image/webp",
-  gif: "image/gif",
-  mp4: "video/mp4",
-  webm: "video/webm",
-}
 
 /** One skill as the catalog records it. */
 interface CatalogEntry {
@@ -62,7 +58,7 @@ interface CatalogEntry {
   tags: string[]
   enabled: boolean
   source: SkillOrigin
-  /** Asset file names, in the order the UI shows them. */
+  /** Media references, in the order the UI shows them. */
   assets: string[]
   /** Manifest mtime when this row was last read; drives refreshes. */
   mtimeMs: number
@@ -75,23 +71,9 @@ interface CatalogFile {
   skills: Record<string, CatalogEntry>
 }
 
-/** Resolve the Context Hub home: explicit path, then `$CONTEXT_HUB_HOME`, then `~/.context-hub`. */
-export function resolveHubHome(explicit?: string): string {
-  if (explicit !== undefined && explicit.trim() !== "") return explicit
-  const fromEnv = process.env.CONTEXT_HUB_HOME
-  if (fromEnv !== undefined && fromEnv.trim() !== "") return fromEnv
-  return path.join(homedir(), ".context-hub")
-}
-
-/** Where the skill library lives by default. */
-export function defaultSkillsRoot(explicitHome?: string): string {
-  return path.join(resolveHubHome(explicitHome), "skills")
-}
-
-/** How an absolute root is shown to a person, without leaking machine paths. */
-export function displayPath(root: string): string {
-  const home = homedir()
-  return root.startsWith(home) ? `~${root.slice(home.length)}` : root
+/** Where the skill library lives under one hub home. */
+export function skillsRoot(home: string): string {
+  return path.join(home, "skills")
 }
 
 /** Reject anything that could escape the skill directory. */
@@ -107,20 +89,6 @@ function assertSafeSegment(value: string, what: string): string {
   return value
 }
 
-/** Characters no file name may carry: path separators plus the Windows reserved set. */
-const RESERVED_IN_NAME = /[\\/:*?"<>|]/
-
-/** Reject an asset name that would escape, hide, or fail to write. */
-function assertSafeFileName(value: string): string {
-  if (value === "" || value === "." || value === ".." || value.startsWith(".")) {
-    throw new Error(`asset name is not allowed: ${value}`)
-  }
-  if (RESERVED_IN_NAME.test(value)) {
-    throw new Error(`asset name is not allowed: ${value}`)
-  }
-  return value
-}
-
 /** Reject a relative path that climbs out of the skill directory. */
 function assertSafePath(base: string, relative: string): string {
   const resolved = path.resolve(base, relative)
@@ -128,47 +96,6 @@ function assertSafePath(base: string, relative: string): string {
   if (!resolved.startsWith(prefix))
     throw new Error(`path escapes the skill directory: ${relative}`)
   return resolved
-}
-
-/** Extension a fetched asset is stored with, from its content type. */
-const EXTENSIONS: Record<string, string> = {
-  "image/png": "png",
-  "image/jpeg": "jpg",
-  "image/webp": "webp",
-  "image/gif": "gif",
-  "image/avif": "avif",
-  "image/svg+xml": "svg",
-  "video/mp4": "mp4",
-  "video/webm": "webm",
-  "video/quicktime": "mov",
-}
-
-/** The protocol of a URL, or the reason it is not one. */
-function schemeOf(url: string): string {
-  try {
-    return new URL(url).protocol
-  } catch {
-    throw new Error(`not a URL: ${url}`)
-  }
-}
-
-/** The name a fetched source is stored under: its own file name, else one from the type. */
-function nameForUrl(url: string, contentType: string): string {
-  const extension =
-    EXTENSIONS[contentType.split(";")[0].trim().toLowerCase()] ?? "bin"
-  if (url.startsWith("data:")) return `asset.${extension}`
-  let segment = ""
-  try {
-    segment = decodeURIComponent(new URL(url).pathname)
-      .split("/")
-      .filter(Boolean)
-      .at(-1) ?? ""
-  } catch {
-    /* An undecodable path keeps the generated name. */
-  }
-  const cleaned = segment.replace(/[^A-Za-z0-9._-]/g, "")
-  if (cleaned === "") return `asset.${extension}`
-  return /\.[A-Za-z0-9]{2,5}$/.test(cleaned) ? cleaned : `${cleaned}.${extension}`
 }
 
 /** Make a display name safe to use as a directory name. */
@@ -233,10 +160,21 @@ async function readdirOrEmpty(dir: string) {
   }
 }
 
-/** Create the disk-backed store for one skills root. */
+/** What a disk-backed store needs to know about where it writes. */
+export interface SkillStoreOptions {
+  /** Hub home; skills live in `<home>/skills` and their files in `<home>/assets`. */
+  home?: string
+  /** An already-built library, for a form that shares one across features. */
+  library?: AssetLibrary
+}
+
+/** Create the disk-backed store for one hub home. */
 export async function createFsSkillStore(
-  root = defaultSkillsRoot()
+  options: SkillStoreOptions = {}
 ): Promise<SkillStore> {
+  const home = resolveHubHome(options.home)
+  const root = skillsRoot(home)
+  const library = options.library ?? createFsAssetLibrary(home)
   await fs.mkdir(root, { recursive: true })
   const catalogPath = path.join(root, CATALOG_FILE)
   const listeners = new Set<() => void>()
@@ -246,20 +184,6 @@ export async function createFsSkillStore(
   const skillDir = (id: string) =>
     path.join(root, assertSafeSegment(id, "skill id"))
 
-  const listAssets = async (id: string): Promise<string[]> => {
-    const entries = await readdirOrEmpty(path.join(skillDir(id), "assets"))
-    return entries
-      .filter((entry) => entry.isFile() && !entry.name.startsWith("."))
-      .map((entry) => entry.name)
-      .sort()
-  }
-
-  /** Assets in recorded order first, then anything dropped in by hand. */
-  const orderedAssets = (recorded: string[], present: string[]): string[] => {
-    const kept = recorded.filter((file) => present.includes(file))
-    return [...kept, ...present.filter((file) => !kept.includes(file))]
-  }
-
   /** Read one manifest into a catalog row. */
   const readEntry = async (
     id: string,
@@ -268,10 +192,9 @@ export async function createFsSkillStore(
     const manifest = path.join(skillDir(id), MANIFEST)
     const stat = await statOrNull(manifest)
     if (stat === null) return null
-    const assets = orderedAssets(previous?.assets ?? [], await listAssets(id))
     /* An untouched manifest keeps its recorded row without re-parsing. */
     if (previous !== undefined && previous.mtimeMs === stat.mtimeMs) {
-      return { ...previous, assets }
+      return previous
     }
     const { frontmatter } = parseSkillFile(await fs.readFile(manifest, "utf8"))
     return {
@@ -280,7 +203,8 @@ export async function createFsSkillStore(
       tags: frontmatter.tags ?? [],
       enabled: previous?.enabled ?? true,
       source: previous?.source ?? "local",
-      assets,
+      /* A skill's manifest carries no media; the references it had stay as they are. */
+      assets: previous?.assets ?? [],
       mtimeMs: stat.mtimeMs,
       updatedAt: stat.mtime.toISOString(),
     }
@@ -337,50 +261,26 @@ export async function createFsSkillStore(
     await saveCatalog({ ...current, skills })
   }
 
-  /**
-   * Write one asset beside the skill and record it last in the display order.
-   * The name is made unique, and the size limit for its kind is enforced before
-   * anything reaches the disk.
-   */
-  const storeAsset = async (
-    id: string,
-    name: string,
-    bytes: Uint8Array,
-    contentType: string
-  ): Promise<SkillAsset> => {
-    const current = await loadCatalog()
-    if (current.skills[id] === undefined) throw new Error(`unknown skill: ${id}`)
-    const assets = path.join(skillDir(id), "assets")
-    await fs.mkdir(assets, { recursive: true })
-    const original = assertSafeFileName(path.basename(name))
-    const extension = path.extname(original).slice(1).toLowerCase()
-    const type = contentType.split(";")[0].trim() || MIME_TYPES[extension] || ""
-    const kind = assetKind(original, type)
-    const limit = kind === "video" ? MAX_VIDEO : MAX_IMAGE
-    if (bytes.byteLength > limit) {
-      throw new Error(
-        `${kind} exceeds the ${Math.round(limit / 1024 / 1024)} MB limit`
-      )
-    }
-    let file = original
-    let suffix = 1
-    while ((await statOrNull(path.join(assets, file))) !== null) {
-      file = `${path.basename(original, path.extname(original))}-${suffix++}${path.extname(original)}`
-    }
-    /* Write beside the target and rename, so a failed upload leaves no half file. */
-    const temporary = path.join(assets, `${TEMP_PREFIX}${randomUUID()}`)
-    await fs.writeFile(temporary, bytes)
-    await fs.rename(temporary, path.join(assets, file))
+  /** Record one reference last in the display order. */
+  const recordAsset = async (id: string, ref: string): Promise<SkillAsset> => {
+    const kind = assetKind(ref)
     await mutate((skills) => {
       const row = skills[id]
       if (row === undefined) return
       skills[id] = {
         ...row,
-        assets: [...row.assets.filter((item) => item !== file), file],
+        assets: [...row.assets.filter((item) => item !== ref), ref],
         updatedAt: new Date().toISOString(),
       }
     })
-    return { file, kind, bytes: bytes.byteLength }
+    return { ref, kind }
+  }
+
+  /** Drop references the hub does not own from a row that is going away. */
+  const dropStored = async (refs: string[]): Promise<void> => {
+    for (const ref of refs) {
+      if (!isLink(ref)) await library.remove(ref)
+    }
   }
 
   const detailOf = async (id: string): Promise<SkillDetail> => {
@@ -393,18 +293,10 @@ export async function createFsSkillStore(
       .catch(() => null)
     if (manifest === null) throw new Error(`skill has no ${MANIFEST}: ${id}`)
     const files = await walk(dir, dir, 0)
-    const assetDetails: SkillAsset[] = []
-    for (const file of row.assets) {
-      const stat = await statOrNull(path.join(dir, "assets", file))
-      assetDetails.push({
-        file,
-        kind: assetKind(
-          file,
-          MIME_TYPES[path.extname(file).slice(1).toLowerCase()]
-        ),
-        bytes: stat?.size ?? 0,
-      })
-    }
+    const assetDetails: SkillAsset[] = row.assets.map((ref) => ({
+      ref,
+      kind: assetKind(ref),
+    }))
     return {
       id,
       name: row.name,
@@ -547,6 +439,11 @@ export async function createFsSkillStore(
     },
 
     async remove(id: string): Promise<void> {
+      const current = await loadCatalog()
+      const row = current.skills[id]
+      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      /* Files first: a failure leaves the row intact rather than orphaning them. */
+      await dropStored(row.assets)
       await fs.rm(skillDir(id), { recursive: true, force: true })
       await mutate((skills) => {
         delete skills[id]
@@ -567,62 +464,55 @@ export async function createFsSkillStore(
     },
 
     async putAsset(id: string, file: File): Promise<SkillAsset> {
-      return storeAsset(
-        id,
+      const current = await loadCatalog()
+      if (current.skills[id] === undefined)
+        throw new Error(`unknown skill: ${id}`)
+      const ref = await library.put(
         file.name,
         new Uint8Array(await file.arrayBuffer()),
         file.type
       )
+      return recordAsset(id, ref)
     },
 
-    async putAssetFromUrl(id: string, url: string): Promise<SkillAsset> {
-      const scheme = schemeOf(url)
-      if (scheme !== "http:" && scheme !== "https:" && scheme !== "data:") {
-        throw new Error(`only http, https, and data sources are read: ${scheme}`)
-      }
-      const response = await fetch(url)
-      if (!response.ok) {
-        throw new Error(`${response.status} ${response.statusText}`.trim())
-      }
-      const declared = Number(response.headers.get("content-length") ?? "0")
-      if (declared > MAX_VIDEO) {
-        throw new Error(
-          `source exceeds the ${Math.round(MAX_VIDEO / 1024 / 1024)} MB limit`
-        )
-      }
-      const contentType = response.headers.get("content-type") ?? ""
-      return storeAsset(
-        id,
-        nameForUrl(url, contentType),
-        new Uint8Array(await response.arrayBuffer()),
-        contentType
-      )
-    },
-
-    async deleteAsset(id: string, file: string): Promise<void> {
-      await fs.rm(
-        path.join(
-          skillDir(id),
-          "assets",
-          assertSafeFileName(file)
-        ),
-        {
-          force: true,
+    async addAssetSource(id: string, source: string): Promise<SkillAsset> {
+      const current = await loadCatalog()
+      const row = current.skills[id]
+      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const parsed = readSource(source)
+      if (parsed.kind === "link") {
+        /* Re-adding a link keeps one entry; the hub does not own it. */
+        if (row.assets.includes(parsed.ref)) {
+          return { ref: parsed.ref, kind: assetKind(parsed.ref) }
         }
+        return recordAsset(id, parsed.ref)
+      }
+      const ref = await library.put(
+        parsed.name,
+        parsed.bytes,
+        parsed.contentType
       )
+      return recordAsset(id, ref)
+    },
+
+    async deleteAsset(id: string, ref: string): Promise<void> {
+      const current = await loadCatalog()
+      const row = current.skills[id]
+      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      if (!isLink(ref)) await library.remove(ref)
       await mutate((skills) => {
-        const row = skills[id]
-        if (row === undefined) return
+        const next = skills[id]
+        if (next === undefined) return
         skills[id] = {
-          ...row,
-          assets: row.assets.filter((item) => item !== file),
+          ...next,
+          assets: next.assets.filter((item) => item !== ref),
           updatedAt: new Date().toISOString(),
         }
       })
     },
 
-    assetUrl(id: string, file: string): string {
-      return `/hub/skills/${encodeURIComponent(id)}/assets/${encodeURIComponent(file)}`
+    assetUrl(ref: string): string {
+      return isLink(ref) ? ref : assetUrl(ref)
     },
 
     subscribe(listener: () => void): () => void {

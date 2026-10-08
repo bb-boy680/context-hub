@@ -1,13 +1,14 @@
 /**
  * Behaviour check for the disk-backed skill library. It runs the store against
- * a temporary root and asserts the catalog contract: the list is served from
- * `index.json`, writes keep it in step with the manifests, and an external
- * manifest edit reaches the list through a refresh.
+ * a temporary hub home and asserts the catalog contract: the list is served
+ * from `index.json`, writes keep it in step with the manifests, an external
+ * manifest edit reaches the list through a refresh, and a media reference is
+ * either a link the hub leaves alone or a file it stores and deletes with the
+ * reference.
  *
  * Run from the package: `node scripts/check-store.ts`
  */
 import { promises as fs } from "node:fs"
-import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -24,10 +25,12 @@ function check(what: string, ok: boolean, detail?: unknown) {
   console.log(`  FAIL ${what}${detail === undefined ? "" : ` — ${JSON.stringify(detail)}`}`)
 }
 
-const root = await fs.mkdtemp(path.join(tmpdir(), "context-hub-skills-"))
-console.log(`root: ${root}`)
+const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-"))
+const root = path.join(home, "skills")
+const files = path.join(home, "assets")
+console.log(`home: ${home}`)
 
-const store = await createFsSkillStore(root)
+const store = await createFsSkillStore({ home })
 
 /* An empty root reads as an empty catalog, and the catalog file is written. */
 const empty = await store.list()
@@ -134,16 +137,18 @@ check("a tags-only write replaces the tags line", /^tags: \[Docs, Safety\]$/m.te
 check("a tags-only write keeps the body", patched.includes("# Hand Made"), patched.slice(-40))
 check("the write changes the file", patched !== before)
 
-/* Uploads land in assets/, are recorded in order, and are served by URL. */
+/* Uploaded bytes land in the hub's asset directory and the record holds the path. */
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 const first = await store.putAsset("pdf-extract", new File([png], "cover.png", { type: "image/png" }))
 const second = await store.putAsset("pdf-extract", new File([png], "cover.png", { type: "image/png" }))
-check("first upload keeps its name", first.file === "cover.png", first.file)
-check("a taken name gains a suffix", second.file === "cover-1.png", second.file)
+check("first upload keeps its name", first.ref === "assets/cover.png", first.ref)
+check("a taken name gains a suffix", second.ref === "assets/cover-1.png", second.ref)
 check("upload reports the kind", first.kind === "image")
 const withAssets = await store.get("pdf-extract")
-check("assets keep upload order", withAssets.assets.join(",") === "cover.png,cover-1.png", withAssets.assets)
-check("asset url encodes the skill and file", store.assetUrl("pdf-extract", "cover.png").includes("/pdf-extract/assets/cover.png"))
+check("assets keep upload order", withAssets.assets.join(",") === "assets/cover.png,assets/cover-1.png", withAssets.assets)
+check("the bytes are stored with the hub", (await fs.stat(path.join(files, "cover.png"))).size === png.byteLength)
+check("the skill directory keeps no copy", (await fs.readdir(path.join(root, "pdf-extract", "assets"))).length === 0)
+check("a stored path is served from the hub route", store.assetUrl("assets/cover.png") === "/hub/files/assets/cover.png", store.assetUrl("assets/cover.png"))
 
 /* Oversize uploads are refused before anything is written. */
 let refused = ""
@@ -154,55 +159,64 @@ try {
 }
 check("oversize upload is refused with a reason", refused.includes("5 MB"), refused)
 
-/* A fetched source lands like an upload, named after the URL's own file. */
-const source = createServer((_, response) => {
-  response.writeHead(200, { "Content-Type": "video/mp4" })
-  response.end(Buffer.from([0, 0, 0, 24]))
-})
-await new Promise<void>((resolve) => source.listen(0, "127.0.0.1", resolve))
-const address = source.address()
-const port = typeof address === "object" && address !== null ? address.port : 0
-const fetched = await store.putAssetFromUrl(
+/* A remote source stays a link: the hub never reads or copies it. */
+const link = await store.addAssetSource(
   "pdf-extract",
-  `http://127.0.0.1:${port}/clips/take one.mp4`
+  "https://media.example.com/clips/take one.mp4"
 )
-await new Promise<void>((resolve) => source.close(() => resolve()))
-check("a fetched source is stored under its URL name", fetched.file === "takeone.mp4", fetched.file)
-check("a fetched source reports the kind its type names", fetched.kind === "video", fetched.kind)
-check("a fetched source reaches the record", (await store.get("pdf-extract")).assets.includes("takeone.mp4"))
+check("a remote source is recorded as given", link.ref === "https://media.example.com/clips/take one.mp4", link.ref)
+check("a remote source reports the kind from its name", link.kind === "video", link.kind)
+check("a remote source passes through as its own URL", store.assetUrl(link.ref) === link.ref)
+check("a remote source is listed", (await store.get("pdf-extract")).assets.includes(link.ref))
+const again = await store.addAssetSource("pdf-extract", link.ref)
+check("re-adding a link keeps one entry", again.ref === link.ref, again.ref)
+const linked = await store.get("pdf-extract")
+check("re-adding a link does not duplicate it", linked.assets.filter((ref) => ref === link.ref).length === 1)
+check("no file is written for a link", (await fs.readdir(files)).sort().join(",") === "cover-1.png,cover.png", await fs.readdir(files))
 
+/* A data: source carries its own bytes, so the hub takes it over. */
+const inline = await store.addAssetSource(
+  "pdf-extract",
+  `data:image/png;base64,${Buffer.from(png).toString("base64")}`
+)
+check("a data: source is stored as a file", inline.ref === "assets/asset.png", inline.ref)
+check("a data: source reports the kind its type names", inline.kind === "image", inline.kind)
+check("a data: source writes the decoded bytes", (await fs.stat(path.join(files, "asset.png"))).size === png.byteLength)
+
+/* Anything the hub cannot keep is refused with a reason. */
 let scheme = ""
 try {
-  await store.putAssetFromUrl("pdf-extract", "file:///etc/passwd")
+  await store.addAssetSource("pdf-extract", "file:///etc/passwd")
 } catch (error) {
   scheme = error instanceof Error ? error.message : String(error)
 }
 check("a non-http source is refused", scheme.includes("http"), scheme)
 
-/* A data: URL carries its own bytes, so it needs no server. */
-const inline = await store.putAssetFromUrl(
-  "pdf-extract",
-  `data:image/png;base64,${Buffer.from(png).toString("base64")}`
-)
-check("a data: URL is stored from its own bytes", inline.file === "asset.png", inline.file)
-check("a data: URL reports the kind its type names", inline.kind === "image", inline.kind)
-check("a data: URL writes the decoded bytes", (await fs.stat(path.join(root, "pdf-extract", "assets", "asset.png"))).size === png.byteLength)
-await store.deleteAsset("pdf-extract", inline.file)
+/* Deleting a reference deletes the file the hub stores for it. */
+await store.deleteAsset("pdf-extract", inline.ref)
+check("the file is gone from the disk", (await fs.stat(path.join(files, "asset.png")).catch(() => null)) === null)
+check("the reference is gone from the record", !(await store.get("pdf-extract")).assets.includes(inline.ref))
 
-let dead = ""
-try {
-  await store.putAssetFromUrl("pdf-extract", `http://127.0.0.1:${port}/gone.png`)
-} catch (error) {
-  dead = error instanceof Error ? error.message : String(error)
-}
-check("an unreachable source is refused", dead.includes("1") || dead.includes("fetch"), dead)
-await store.deleteAsset("pdf-extract", fetched.file)
-
-/* Deleting an asset drops it from the record. */
-await store.deleteAsset("pdf-extract", "cover.png")
+await store.deleteAsset("pdf-extract", link.ref)
 check(
-  "deleted asset leaves the record",
-  (await store.get("pdf-extract")).assets.join(",") === "cover-1.png"
+  "the record keeps the other references",
+  (await store.get("pdf-extract")).assets.join(",") === "assets/cover.png,assets/cover-1.png",
+  (await store.get("pdf-extract")).assets
+)
+
+/* An upload always lands under the hub's asset directory, whatever name it carries. */
+const traversing = await store.putAsset(
+  "pdf-extract",
+  new File([png], "../cover.png", { type: "image/png" })
+)
+check(
+  "upload name keeps only its base name",
+  /^assets\/cover(-\d+)?\.png$/.test(traversing.ref),
+  traversing.ref
+)
+check(
+  "upload lands inside the asset directory",
+  (await fs.stat(path.join(files, "cover.png")).catch(() => null)) !== null
 )
 
 /* Path escapes are refused. */
@@ -220,30 +234,25 @@ try {
 } catch (error) {
   unsafe = error instanceof Error ? error.message : String(error)
 }
-check("unsafe asset name is refused", unsafe.includes("not allowed"), unsafe)
+check("a reference outside the hub is refused", unsafe.includes("escapes"), unsafe)
 
-/* An upload always lands under assets/, whatever the client sends as its name. */
-const traversing = await store.putAsset(
-  "pdf-extract",
-  new File([png], "../cover.png", { type: "image/png" })
-)
-check("upload name is reduced to its base name", traversing.file === "cover.png", traversing.file)
-check(
-  "upload lands inside assets/",
-  (await fs.stat(path.join(root, "pdf-extract", "assets", "cover.png")).catch(() => null)) !== null
-)
+/* Removing a skill takes the files it references with it. */
+await store.remove("pdf-extract")
+check("removing a skill deletes the files it referenced", (await fs.readdir(files)).length === 0, await fs.readdir(files))
+check("removing a skill deletes its directory", (await fs.stat(path.join(root, "pdf-extract")).catch(() => null)) === null)
+check("removing a skill drops the row", (await store.list()).items.every((item) => item.id !== "pdf-extract"))
 
 /* File bodies are read from disk, not from the catalog. */
-await store.writeFile("pdf-extract", "references/notes.md", "# Notes\n")
-check("written file reads back", (await store.readFile("pdf-extract", "references/notes.md")) === "# Notes\n")
+await store.writeFile("hand-made", "references/notes.md", "# Notes\n")
+check("written file reads back", (await store.readFile("hand-made", "references/notes.md")) === "# Notes\n")
 check(
   "file tree lists the written file",
-  (await store.get("pdf-extract")).files.some((file) => file.path === "references/notes.md")
+  (await store.get("hand-made")).files.some((file) => file.path === "references/notes.md")
 )
 
 /* Remove deletes the directory and its catalog row. */
 await store.remove("hand-made")
-check("remove drops the row", (await store.list()).total === 1)
+check("remove drops the row", (await store.list()).total === 0)
 check(
   "remove deletes the directory",
   (await fs.stat(path.join(root, "hand-made")).catch(() => null)) === null
@@ -265,7 +274,7 @@ await fs.writeFile(
   "utf8"
 )
 check("directory watching notifies the caller", await notified)
-check("watched skill reaches the list", (await store.list()).total === 2)
+check("watched skill reaches the list", (await store.list()).total === 1)
 
 store.dispose()
 await fs.rm(root, { recursive: true, force: true })

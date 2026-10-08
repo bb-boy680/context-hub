@@ -12,6 +12,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@workspace/core": "workspace:*",
     "@workspace/extensions": "workspace:*",
     "@workspace/locale-zh-cn": "workspace:*",
     "@workspace/plugin-skills": "workspace:*",

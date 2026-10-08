@@ -85,7 +85,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.media.add.action": "Add",
   "skills.media.add.file": "Choose a local file",
   "skills.media.add.hint":
-    "The file at that URL is downloaded and stored with the skill.",
+    "A URL stays a link to the source; a file is stored in the hub.",
   "skills.media.add.hintPreview": "Nothing is stored here; these live only in this preview.",
   "skills.media.add.failed": "That URL could not be read.",
   "skills.detail.category.add": "Add category",

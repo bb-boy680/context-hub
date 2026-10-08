@@ -18,17 +18,21 @@ export interface SkillSummary {
   source: SkillOrigin
   /** Whether the skill is active in this hub. */
   enabled: boolean
-  /** Asset file names, in display order. */
+  /**
+   * Where this skill's media comes from, in display order: either a remote URL
+   * the hub only references, or a path relative to the hub home that the hub
+   * owns and deletes with the skill.
+   */
   assets: string[]
   /** ISO timestamp of the last recorded change. */
   updatedAt: string
 }
 
-/** One asset of a skill. */
+/** One piece of media a skill references. */
 export interface SkillAsset {
-  file: string
+  /** The recorded reference: a remote URL, or a path relative to the hub home. */
+  ref: string
   kind: "image" | "video"
-  bytes: number
 }
 
 /** One entry of a skill's file tree. */
@@ -111,35 +115,25 @@ export interface SkillStore {
   create(draft: SkillDraft): Promise<SkillDetail>
   /** Change the mutable fields; omitted fields stay as they are. */
   update(id: string, patch: SkillPatch): Promise<SkillDetail>
-  /** Delete the skill and everything under it. */
+  /** Delete the skill: its directory, and every file the hub stores for it. */
   remove(id: string): Promise<void>
   /** Read one text file inside the skill directory. */
   readFile(id: string, path: string): Promise<string>
   /** Replace one text file inside the skill directory. */
   writeFile(id: string, path: string, text: string): Promise<void>
-  /** Store one uploaded asset; the name is made unique when taken. */
+  /** Take over one uploaded file, record it last, and answer with its reference. */
   putAsset(id: string, file: File): Promise<SkillAsset>
   /**
-   * Fetch one asset from an `http:` or `https:` URL and store it beside the
-   * skill. The implementation performs the fetch, so a source that refuses a
-   * browser read still lands: only the machine's own network rules apply.
+   * Add one pasted source. A remote address is recorded as it is; a `data:`
+   * source is stored as a file the hub owns.
    */
-  putAssetFromUrl(id: string, url: string): Promise<SkillAsset>
-  /** Delete one asset and drop it from the recorded order. */
-  deleteAsset(id: string, file: string): Promise<void>
-  /** A URL that serves one asset; each form resolves it in its own way. */
-  assetUrl(id: string, file: string): string
+  addAssetSource(id: string, source: string): Promise<SkillAsset>
+  /** Drop one reference, deleting the stored file when the hub owns it. */
+  deleteAsset(id: string, ref: string): Promise<void>
+  /** The URL that shows one reference; a remote URL passes through unchanged. */
+  assetUrl(ref: string): string
   /** Change notifications from directory watching; returns an unsubscribe. */
   subscribe(listener: () => void): () => void
   /** Release the directory watcher. The store is unusable afterwards. */
   dispose(): void
-}
-
-/** Whether a source is a video, by mime type first and extension second. */
-export function assetKind(
-  file: string,
-  contentType?: string
-): "image" | "video" {
-  if (contentType?.startsWith("video/")) return "video"
-  return /\.(mp4|webm|mov|m4v|ogv)$/i.test(file) ? "video" : "image"
 }

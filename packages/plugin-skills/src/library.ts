@@ -59,7 +59,7 @@ export function toSkill(
   locale: string,
   tokens?: string
 ): Skill {
-  const gallery = row.assets.map((file) => store.assetUrl(row.id, file))
+  const gallery = row.assets.map((ref) => store.assetUrl(ref))
   return {
     id: row.id,
     name: row.name,

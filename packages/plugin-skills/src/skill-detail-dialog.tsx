@@ -333,9 +333,9 @@ function useMediaItems(
   const items = React.useMemo(() => {
     if (store === null || detail === null) return preview
     return detail.assetDetails.map((asset) => ({
-      id: asset.file,
+      id: asset.ref,
       kind: asset.kind,
-      src: store.assetUrl(detail.id, asset.file),
+      src: store.assetUrl(asset.ref),
     }))
   }, [store, detail, preview])
 
@@ -380,7 +380,7 @@ function useMediaItems(
       }
       setBusy(true)
       try {
-        await store.putAssetFromUrl(detail.id, src)
+        await store.addAssetSource(detail.id, src)
         onChanged()
       } finally {
         setBusy(false)

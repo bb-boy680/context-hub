@@ -4,6 +4,8 @@
  * playing video decodes frames continuously, so the cap keeps a scrolling grid
  * from stacking decoders.
  */
+import { assetKind } from "@workspace/core"
+
 import type { Skill } from "./types.ts"
 
 /** Cover previews allowed to decode at once; later requests queue for a slot. */
@@ -44,9 +46,7 @@ export function setPreviewsSuspended(next: boolean): void {
 
 /** data: URLs carry their own mime type; anything else is guessed from the extension. */
 export function mediaKind(src: string): "image" | "video" {
-  const mime = /^data:([^;,]+)/i.exec(src)?.[1] ?? ""
-  if (mime.startsWith("video/")) return "video"
-  return /\.(mp4|webm|mov|m4v|ogv|avi)(\?|#|$)/i.test(src) ? "video" : "image"
+  return assetKind(src, /^data:([^;,]+)/i.exec(src)?.[1] ?? "")
 }
 
 /**

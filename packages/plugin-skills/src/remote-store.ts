@@ -4,6 +4,8 @@
  * this for one that calls its main process. Nothing else in the plugin knows
  * the difference.
  */
+import { assetUrl, isLink } from "@workspace/core"
+
 import type {
   SkillAsset,
   SkillDetail,
@@ -113,28 +115,28 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       )
     },
 
-    putAssetFromUrl(id: string, url: string): Promise<SkillAsset> {
+    addAssetSource(id: string, source: string): Promise<SkillAsset> {
       return call<SkillAsset>(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/from-url`,
+        `/hub/skills/${encodeURIComponent(id)}/source`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ url }),
+          body: JSON.stringify({ source }),
         }
       )
     },
 
-    async deleteAsset(id: string, file: string): Promise<void> {
+    async deleteAsset(id: string, ref: string): Promise<void> {
       await call(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/assets/${encodeURIComponent(file)}`,
+        `/hub/skills/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
         { method: "DELETE" }
       )
     },
 
-    assetUrl(id: string, file: string): string {
-      return `${base}/hub/skills/${encodeURIComponent(id)}/assets/${encodeURIComponent(file)}`
+    assetUrl(ref: string): string {
+      return isLink(ref) ? ref : assetUrl(ref, base)
     },
 
     subscribe(): () => void {
