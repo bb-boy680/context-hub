@@ -41,6 +41,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     if (input.q !== undefined) params.set("q", input.q)
     if (input.tag !== undefined) params.set("tag", input.tag)
     if (input.enabled !== undefined) params.set("enabled", String(input.enabled))
+    if (input.source !== undefined) params.set("source", input.source)
     if (input.sort !== undefined) params.set("sort", input.sort)
     const search = params.toString()
     return search === "" ? "" : `?${search}`

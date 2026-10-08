@@ -64,7 +64,14 @@ export interface SkillQuery {
   tag?: string
   /** Keep only enabled, or only disabled, skills. */
   enabled?: boolean
+  /** Keep only skills from this origin. */
+  source?: SkillOrigin
   sort?: SkillSort
+}
+
+/** Rows per origin for the query's other filters, plus their sum. */
+export interface SkillCounts extends Record<SkillOrigin, number> {
+  all: number
 }
 
 /** One page of the catalog. */
@@ -72,6 +79,11 @@ export interface SkillPage {
   items: SkillSummary[]
   /** Rows matching the query, before paging. */
   total: number
+  /**
+   * Rows per origin, so a tab row can label every choice with its size. Counts
+   * describe the tag and search filters, not the origin filter itself.
+   */
+  counts: SkillCounts
   /** Bumped on every change, so callers can skip reloading unchanged data. */
   revision: number
   /** The root these rows came from, shown to a person; a browser cannot read

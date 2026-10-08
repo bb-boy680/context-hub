@@ -241,4 +241,36 @@ URL 应当只记录引用，只有真正"上传"的资源才落盘，落盘位�
 - **本地数据**：旧的技能目录内媒体（`video.eef090ae.mp4`、`video.86605038.mp4`）已移入
   `~/.context-hub/assets/`（未删除）；URL 已按新语义重新记录为链接引用。
 
+## 技能页签回到"来源"轴（2026-10-08，用户指出页签块不见了）
+
+### 问题
+
+设计稿的技能页签是 `All 42 / Built-in 24 / Workspace 12 / skill.sh 6`（**来源**轴，三轴之和 = 总数）；
+接入磁盘库时为了过滤启用状态，页签被换成了 `全部 / 已启用 / 已停用`，设计上的那一块就不见了。
+
+### 决策
+
+- **一个维度**：页签只承载"来源"，与设计稿一致（Plugins 的页签承载状态、来源放筛选行，两者不混）。
+- **计数由数据给出**：`SkillPage.counts` 随列表一起返回，计数**忽略来源筛选**、跟随标签筛选，
+  这样任何页签被选中时其余页签的数字仍然稳定。
+- **状态维度让位**：启用状态改由卡片/列表行的开关表达（与设计一致）；需要按状态筛选时再单独加控件。
+- **同一套措辞**：`skills.source.*` 成为唯一来源词表（`local` → Workspace/工作区、`builtin` → Built-in/内置、
+  `registry` → skill.sh），页签、卡片徽标、详情弹窗（原来直接打印 `local`）共用它；
+  删掉重复的 `skills.tab.builtin|workspace|registry` 与 `skills.filter.*`。
+
+### 接线变化
+
+- `SkillQuery.source`、`SkillPage.counts`（`SkillCounts`）；`skills-fs.ts` 先按标签/搜索收窄、再统计、后按来源取行。
+- 桥 `/hub/skills?source=` 只接受已知来源；`remote-store.ts` 透传；`useSkillLibrary` 暴露 `counts`。
+- `library.ts` 新增 `sourceLabel()`；`page.tsx` 用 `SOURCE_TABS` 渲染 `全部/内置/工作区/skill.sh` + 计数。
+
+### 验证
+
+- `check-store.ts`：**全绿**（新增：计数按来源归类、来源筛选只留本来源、计数不受来源筛选影响但跟随标签筛选、
+  重开 store 后记录里的来源仍然生效）。
+- `pnpm --filter @workspace/plugin-skills typecheck|lint`、`web`/`locale-zh-cn` typecheck：**通过**。
+- 浏览器：页签显示 `全部 2 / 内置 0 / 工作区 2 / skill.sh 0`；点"内置"得到空态，点"工作区"得到两行且计数不变；
+  卡片徽标与详情弹窗的"来源"都显示 `工作区`（不再出现裸 `local`）。
+- 注意：改动服务端桥代码后需**重启 dev server**（Vite 不会热更已加载的插件模块），否则前端会拿到没有 `counts` 的响应。
+
 

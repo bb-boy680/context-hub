@@ -10,10 +10,11 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
-import { useSkillLibrary } from "./library.ts"
+import { sourceLabel, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { seedTags, tagTone } from "./tags.ts"
+import type { SkillOrigin } from "./store.ts"
 import type { Skill } from "./types.ts"
 
 import { Spinner } from "@workspace/ui/components/spinner"
@@ -263,19 +264,16 @@ function skillMeta(skill: Skill, t: (key: string) => string): string {
   return parts.join(" · ")
 }
 
-/* Tab sets differ by mode: the bundle demonstrates sources, a live library filters by state. */
-const sampleTabs = [
-  { value: "all", labelKey: "skills.tab.all", count: 42 },
-  { value: "built-in", labelKey: "skills.tab.builtin", count: 24 },
-  { value: "workspace", labelKey: "skills.tab.workspace", count: 12 },
-  { value: "skill.sh", labelKey: "skills.tab.registry", count: 6 },
+/* The tab row carries one dimension: where a skill came from. */
+const SOURCE_TABS: { value: SkillOrigin | "all"; labelKey: string }[] = [
+  { value: "all", labelKey: "skills.tab.all" },
+  { value: "builtin", labelKey: "skills.source.builtin" },
+  { value: "local", labelKey: "skills.source.local" },
+  { value: "registry", labelKey: "skills.source.registry" },
 ]
 
-const liveTabs = [
-  { value: "all", labelKey: "skills.filter.all" },
-  { value: "enabled", labelKey: "skills.filter.enabled" },
-  { value: "disabled", labelKey: "skills.filter.disabled" },
-]
+/* Counts for the bundled demo rows, which have no store behind them. */
+const SAMPLE_COUNTS = { all: 42, builtin: 24, local: 12, registry: 6 }
 
 /* Column widths include the 16px gutter the design leaves between columns. */
 const columns = [
@@ -366,13 +364,10 @@ function InstallButton({
   )
 }
 
-const ORIGINS = ["local", "builtin", "registry"]
-
 /** Origins arrive as ids from the library; bundled rows carry a display label. */
 function SourceBadge({ source }: { source: string }) {
   const { t } = useI18n()
-  const label = ORIGINS.includes(source) ? t(`skills.source.${source}`) : source
-  return <Badge variant="secondary">{label}</Badge>
+  return <Badge variant="secondary">{sourceLabel(source, t)}</Badge>
 }
 
 /** Cover image that reports its own aspect ratio, for a card sized to the asset. */
@@ -774,7 +769,7 @@ function ViewButton({
 
 export function SkillsPage() {
   const { t } = useI18n()
-  const [tab, setTab] = React.useState("all")
+  const [tab, setTab] = React.useState<SkillOrigin | "all">("all")
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [tag, setTag] = React.useState("All tags")
@@ -791,10 +786,11 @@ export function SkillsPage() {
     offset: page * pageSize,
     limit: pageSize,
     sort: "updated",
-    enabled: tab === "enabled" ? true : tab === "disabled" ? false : undefined,
+    source: tab === "all" ? undefined : tab,
     tag: tag === "All tags" ? undefined : tag,
   })
   const usingStore = library.store !== null
+  const counts = usingStore ? library.counts : SAMPLE_COUNTS
 
   const skills = React.useMemo(() => {
     if (usingStore) return library.rows
@@ -858,21 +854,21 @@ export function SkillsPage() {
       <Tabs
         value={tab}
         onValueChange={(value) => {
-          setTab(value)
+          setTab(SOURCE_TABS.find((item) => item.value === value)?.value ?? "all")
           setPage(0)
         }}
         className="gap-6"
       >
         <div className="flex items-start justify-between gap-6">
           <TabsList className="h-9 gap-1 rounded-lg p-1">
-            {(usingStore ? liveTabs : sampleTabs).map((item) => (
+            {SOURCE_TABS.map((item) => (
               <TabsTrigger
                 key={item.value}
                 value={item.value}
                 className="h-7 flex-none rounded-md px-3 text-[13px] text-muted-foreground data-active:bg-accent data-active:text-foreground dark:data-active:bg-accent dark:data-active:text-foreground"
               >
                 {t(item.labelKey)}
-                {"count" in item ? ` ${item.count}` : ""}
+                {` ${counts[item.value]}`}
               </TabsTrigger>
             ))}
           </TabsList>

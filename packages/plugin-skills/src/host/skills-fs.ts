@@ -34,6 +34,7 @@ import {
 } from "../frontmatter.ts"
 import type {
   SkillAsset,
+  SkillCounts,
   SkillDetail,
   SkillDraft,
   SkillFileEntry,
@@ -331,7 +332,7 @@ export async function createFsSkillStore(
     async list(query: SkillQuery = {}): Promise<SkillPage> {
       const current = await loadCatalog()
       const needle = query.q?.trim().toLowerCase()
-      const rows: SkillSummary[] = []
+      const matching: SkillSummary[] = []
       for (const [id, row] of Object.entries(current.skills)) {
         if (query.tag !== undefined && !row.tags.includes(query.tag)) continue
         if (query.enabled !== undefined && row.enabled !== query.enabled) continue
@@ -343,7 +344,7 @@ export async function createFsSkillStore(
         ) {
           continue
         }
-        rows.push({
+        matching.push({
           id,
           name: row.name,
           description: row.description,
@@ -354,6 +355,18 @@ export async function createFsSkillStore(
           updatedAt: row.updatedAt,
         })
       }
+      /* Counted before the origin filter, so every tab keeps its size while chosen. */
+      const counts: SkillCounts = {
+        all: matching.length,
+        builtin: 0,
+        local: 0,
+        registry: 0,
+      }
+      for (const row of matching) counts[row.source] += 1
+      const rows =
+        query.source === undefined
+          ? matching
+          : matching.filter((row) => row.source === query.source)
       rows.sort((a, b) => {
         if (query.sort === "name") return a.name.localeCompare(b.name)
         /* Newest first, id as the tiebreaker so paging never drifts. */
@@ -366,6 +379,7 @@ export async function createFsSkillStore(
       return {
         items: rows.slice(offset, offset + limit),
         total: rows.length,
+        counts,
         revision: current.revision,
         root: displayPath(root),
       }

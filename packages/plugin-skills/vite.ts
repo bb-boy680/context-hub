@@ -11,10 +11,13 @@
 import type { IncomingMessage, ServerResponse } from "node:http"
 
 import { createFsSkillStore } from "./src/host/skills-fs.ts"
-import type { SkillStore } from "./src/store.ts"
+import type { SkillOrigin, SkillStore } from "./src/store.ts"
 
 /** Route prefix this bridge answers on. */
 const PREFIX = "/hub/skills"
+
+/** Origins a page may filter by; a query naming anything else reads as unfiltered. */
+const ORIGINS: readonly SkillOrigin[] = ["local", "builtin", "registry"]
 
 /** Read a whole request body into one buffer. */
 async function readBody(request: NodeJS.ReadableStream): Promise<Buffer> {
@@ -81,6 +84,7 @@ export function skillLibrary(options: { home?: string } = {}) {
             /* GET /hub/skills — the catalog page */
             if (rest === "" && method === "GET") {
               const enabled = url.searchParams.get("enabled")
+              const wanted = url.searchParams.get("source")
               const page = await api.list({
                 offset: Number(url.searchParams.get("offset") ?? 0),
                 limit:
@@ -90,6 +94,7 @@ export function skillLibrary(options: { home?: string } = {}) {
                 q: url.searchParams.get("q") ?? undefined,
                 tag: url.searchParams.get("tag") ?? undefined,
                 enabled: enabled === null ? undefined : enabled === "true",
+                source: ORIGINS.find((origin) => origin === wanted),
                 sort:
                   url.searchParams.get("sort") === "name" ? "name" : "updated",
               })

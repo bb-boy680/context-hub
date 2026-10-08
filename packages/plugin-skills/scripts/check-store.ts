@@ -127,6 +127,43 @@ const disabledOnly = await store.list({ enabled: false })
 check("enabled filter selects the switched-off row", disabledOnly.total === 1 && disabledOnly.items[0]?.id === "hand-made", disabledOnly.total)
 await store.update("hand-made", { enabled: true })
 
+/* The tab row labels every origin: counts describe the other filters, and the
+   origin filter itself only narrows the rows. */
+const counted = await store.list()
+check("counts report the whole library", counted.counts.all === 2, counted.counts)
+check(
+  "counts land under their own origin",
+  counted.counts.local === 2 && counted.counts.builtin === 0 && counted.counts.registry === 0,
+  counted.counts
+)
+check("a source filter keeps its own rows", (await store.list({ source: "local" })).total === 2)
+const noRegistry = await store.list({ source: "registry" })
+check("a source filter drops other origins", noRegistry.total === 0 && noRegistry.items.length === 0)
+check("counts ignore the origin filter", noRegistry.counts.all === 2, noRegistry.counts)
+check("counts follow the tag filter", (await store.list({ tag: "Docs" })).counts.all === 1)
+
+/* A reopened store reads the origin the catalog recorded and filters on it. */
+const catalogPath = path.join(root, "index.json")
+const recorded = JSON.parse(await fs.readFile(catalogPath, "utf8")) as {
+  skills: Record<string, { source: string }>
+}
+recorded.skills["hand-made"].source = "registry"
+await fs.writeFile(catalogPath, `${JSON.stringify(recorded, null, 2)}\n`, "utf8")
+const reopened = await createFsSkillStore({ home })
+const registryOnly = await reopened.list({ source: "registry" })
+check(
+  "a recorded origin survives a reopen",
+  registryOnly.total === 1 && registryOnly.items[0]?.id === "hand-made",
+  registryOnly.items.map((item) => item.id)
+)
+check(
+  "reopened counts follow the recorded origins",
+  registryOnly.counts.registry === 1 && registryOnly.counts.local === 1,
+  registryOnly.counts
+)
+check("the workspace tab drops the registry row", (await reopened.list({ source: "local" })).total === 1)
+reopened.dispose()
+
 /* A partial patch rewrites only its own line, so the rest of the file survives. */
 const before = await store.readFile("hand-made", "SKILL.md")
 await store.update("hand-made", { tags: ["Docs", "Safety"] })

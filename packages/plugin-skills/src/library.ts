@@ -7,7 +7,13 @@
 import * as React from "react"
 import { useHub, useI18n } from "@workspace/extensions/react"
 
-import type { SkillStore, SkillQuery, SkillSummary } from "./store.ts"
+import type {
+  SkillCounts,
+  SkillOrigin,
+  SkillStore,
+  SkillQuery,
+  SkillSummary,
+} from "./store.ts"
 import type { Skill } from "./types.ts"
 
 /** One page of the catalog, plus what the UI needs to render around it. */
@@ -16,6 +22,8 @@ export interface SkillLibrary {
   store: SkillStore | null
   rows: Skill[]
   total: number
+  /** Rows per origin under the current filters. */
+  counts: SkillCounts
   loading: boolean
   /** Display-ready failure from the last load, if any. */
   error: string | null
@@ -25,6 +33,26 @@ export interface SkillLibrary {
   tags: string[]
   /** Re-read the current page. */
   reload(): Promise<void>
+}
+
+const NO_ROWS: SkillCounts = { all: 0, builtin: 0, local: 0, registry: 0 }
+
+/** Catalog origin → the message key that names it; shared by badges and detail rows. */
+const SOURCE_KEYS: Record<SkillOrigin, string> = {
+  builtin: "skills.source.builtin",
+  local: "skills.source.local",
+  registry: "skills.source.registry",
+}
+
+/** How a row's source reads: a known origin's label, or the raw value a sample carries. */
+export function sourceLabel(
+  source: string,
+  t: (key: string) => string
+): string {
+  const key = Object.entries(SOURCE_KEYS).find(
+    ([origin]) => origin === source
+  )?.[1]
+  return key === undefined ? source : t(key)
 }
 
 /** Token count as a compact label, the way the cards show it. */
@@ -85,6 +113,7 @@ export function useSkillLibrary(query: SkillQuery): SkillLibrary {
 
   const [rows, setRows] = React.useState<Skill[]>([])
   const [total, setTotal] = React.useState(0)
+  const [counts, setCounts] = React.useState<SkillCounts>(NO_ROWS)
   const [loading, setLoading] = React.useState(store !== null)
   const [error, setError] = React.useState<string | null>(null)
   const [root, setRoot] = React.useState<string | null>(null)
@@ -103,6 +132,7 @@ export function useSkillLibrary(query: SkillQuery): SkillLibrary {
       if (current !== generation.current) return
       setRows(page.items.map((item) => toSkill(item, store, locale)))
       setTotal(page.total)
+      setCounts(page.counts)
       setRoot(page.root)
       setError(null)
     } catch (failure) {
@@ -145,6 +175,7 @@ export function useSkillLibrary(query: SkillQuery): SkillLibrary {
       store: null,
       rows: [],
       total: 0,
+      counts: NO_ROWS,
       loading: false,
       error: null,
       root: null,
@@ -152,5 +183,5 @@ export function useSkillLibrary(query: SkillQuery): SkillLibrary {
       reload: async () => undefined,
     }
   }
-  return { store, rows, total, loading, error, root, tags, reload }
+  return { store, rows, total, counts, loading, error, root, tags, reload }
 }

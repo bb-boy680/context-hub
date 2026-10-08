@@ -25,6 +25,7 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
+import { sourceLabel } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
@@ -819,7 +820,7 @@ function InfoPanel({
           </DialogTitle>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="h-[18px] px-1.5 text-[11px]">
-              {skill.source}
+              {sourceLabel(skill.source, t)}
             </Badge>
             <DialogDescription className="truncate text-xs text-muted-foreground">
               {`${t("skills.detail.updated")} ${skill.updated}`}
@@ -855,7 +856,7 @@ function InfoPanel({
       <dl className="flex flex-col">
         <MetaRow
           label={t("skills.detail.source")}
-          value={ORIGIN_KEYS.includes(skill.source) ? t(`skills.source.${skill.source}`) : skill.source}
+          value={sourceLabel(skill.source, t)}
         />
         <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
         <MetaRow
@@ -1002,9 +1003,6 @@ function FilesPanel({
     </div>
   )
 }
-
-/** Origins arrive as ids from the library; bundled rows carry a display label. */
-const ORIGIN_KEYS = ["local", "builtin", "registry"]
 
 /** One row of the files panel, from either the library's tree or the bundle's sample. */
 interface FileRow {
