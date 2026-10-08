@@ -28,6 +28,7 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
+import { parseSkillFile } from "./frontmatter.ts"
 import { skillKey } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
@@ -50,6 +51,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
+import { Markdown } from "@workspace/ui/components/markdown"
 import {
   Popover,
   PopoverArrow,
@@ -112,21 +114,17 @@ function titleCase(value: string) {
     .join(" ")
 }
 
-function MarkdownPreview({ skill }: { skill: Skill }) {
+/**
+ * A stage with nothing to play or show renders the skill's own document instead.
+ * It clips rather than scrolls: the stage is a fixed 16:9 preview, and the whole
+ * document is a click away in the files panel.
+ */
+function DocumentStage({ text }: { text: string }) {
   return (
-    <div className="flex size-full flex-col justify-center gap-0.5 bg-surface-raised px-4 font-mono text-[10.5px] leading-[14px]">
-      {frontmatterLines(skill).map((line, index) => (
-        <span
-          key={index}
-          className={
-            line === "---"
-              ? "truncate text-muted-foreground/70"
-              : "truncate text-secondary-foreground/80"
-          }
-        >
-          {line}
-        </span>
-      ))}
+    <div className="size-full overflow-hidden bg-surface-raised px-8 py-6">
+      <Markdown className="mx-auto max-w-[640px] text-[13px] leading-[21px] text-secondary-foreground">
+        {text}
+      </Markdown>
     </div>
   )
 }
@@ -148,11 +146,12 @@ async function startPlayback(video: HTMLVideoElement) {
 /** One slide: the image itself, or a video carrying its own play control. */
 function MediaSlide({
   item,
-  skill,
+  doc,
   active,
 }: {
   item?: MediaItem
-  skill: Skill
+  /** The skill's document, shown when the skill has no media at all. */
+  doc: string
   /** The slide Swiper currently shows; drives the video's own play state. */
   active: boolean
 }) {
@@ -194,7 +193,7 @@ function MediaSlide({
   return (
     <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#0f172a]">
       {!item ? (
-        <MarkdownPreview skill={skill} />
+        <DocumentStage text={doc} />
       ) : item.kind === "video" ? (
         <video
           ref={videoRef}
@@ -429,7 +428,14 @@ const navigationParams = { prevEl: null, nextEl: null }
  * Media column of the lightbox. Swiper owns paging, the thumbnails and the
  * keyboard shortcuts; the slides and the actions behind them come from the caller.
  */
-function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
+function MediaPane({
+  doc,
+  source,
+}: {
+  /** The skill's document, shown on a stage with no media. */
+  doc: string
+  source: MediaSource
+}) {
   const { t } = useI18n()
   const { items, busy, persists } = source
   const [activeIndex, setActiveIndex] = React.useState(0)
@@ -550,7 +556,11 @@ function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
         >
           {(count > 0 ? items : [undefined]).map((item, index) => (
             <SwiperSlide key={item?.id ?? "empty"}>
-              <MediaSlide item={item} skill={skill} active={index === activeIndex} />
+              <MediaSlide
+                item={item}
+                doc={doc}
+                active={index === activeIndex}
+              />
             </SwiperSlide>
           ))}
         </Swiper>
@@ -1378,6 +1388,19 @@ function LightboxBody({
   const [filesOpen, setFilesOpen] = React.useState(false)
   const media = useMediaItems(skill, store, detail, onChanged)
   const files = useFileRows(skill, detail, held, store === null)
+  /* The stage's fallback is the document itself: the stored body, the workspace's
+     own file without its frontmatter, or the row's heading and description. */
+  const doc = React.useMemo(() => {
+    const body =
+      detail !== null
+        ? detail.body
+        : held !== null
+          ? parseSkillFile(held.text).body
+          : ""
+    return body.trim() === ""
+      ? `# ${titleCase(skill.name)}\n\n${skill.description}`
+      : body
+  }, [detail, held, skill])
   /* Each skill's directory: the library's for a library skill, the workspace's
      for one kept there. */
   const base = skill.location === "workspace" ? workspacePath : root
@@ -1391,7 +1414,7 @@ function LightboxBody({
 
   return (
     <div className="relative flex h-full min-h-0">
-      <MediaPane skill={skill} source={media} />
+      <MediaPane doc={doc} source={media} />
       <InfoPanel
         skill={skill}
         reason={reason}

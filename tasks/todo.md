@@ -1596,3 +1596,124 @@ UI 上点 `创建工作区` → `showDirectoryPicker` 被调用（桩计数 1）
 **验证**（真机）：页脚只剩 `每页行数 12 ▼ 1 / 2`（右对齐到 x=1236，与内容右边缘齐），页面里搜不到 `1–3 / 3`；
 点 `收录 agent-experience` → 按钮变 `移除`、行变 `技能库 + 工作区`、**没有提示行**；再点 `移除` 还原成
 工作区自带（测试痕迹已清除）。四个检查脚本、整仓 tsc、两个包 eslint 全绿。
+
+## 瀑布流保留 + 列数上限 5（2026-10-08）
+
+两轮诉求：①"卡片展示在大的分辨率下显示得很难看，能不能做响应式布局，然后最大横向只能显示 5 个"；
+②（我先把瀑布流换成等高行网格之后）"瀑布流的样式不见了，我操" —— **瀑布流必须保留**，要改的只是列数上限。
+
+- 症状（浏览器复现，容器 1736px）：`columns-[266px]` 由 column-width 自动决定列数，2000px+ 的容器排到 **7 列**，
+  每张卡只剩 275 宽；叠加"封面高度随资源比例"的落差，整页参差（用户截图就是这个形态）。
+- 修法：**列数显式化、封顶 5**，其余一律保持原样（瀑布流 + 每张卡按资源自身比例）。
+  容器 ≥556 / 846 / 1136 / 1426 时 `columns-1 → 2 → 3 → 4 → 5`（一列 = 266 卡 + 24 间距，即 290n−24）。
+  用 `@container` + `@min-[…]` 容器查询而**不是视口断点**：网格可用宽度 = 视口 − 侧栏 − 内边距，两者不相等。
+- 改动只剩 `SkillGrid` 一处：`<div className="@container">` 包住
+  `columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4 @min-[1426px]:columns-5`。
+  卡片、`PhotoCover`、`FALLBACK_RATIO`、`knownAspect/rememberAspect`、`AutoplayVideo.onAspect` 全部不动
+  （中途曾整套删掉，已按用户要求还原）。
+- 实测（面板 2040px，容器→列数/卡宽）：1736→5/328、1380→4/327、1193→4/280、959→3/304、707→2/341、
+  473→1/473；列数不再超过 5；同一列内卡片高度 689/418/290 不等（瀑布流节奏在）；
+  卡片单击开灯箱、Esc 关闭正常。`pnpm --filter @workspace/plugin-skills typecheck && lint` 全绿。
+- 教训：宽屏"难看"来自**列数不受控**，不是瀑布流本身；把瀑布流一起砍掉是做过头了。
+
+## 无资源的封面/舞台改渲染真 Markdown（2026-10-08，用户："你这展示了个啥……用markdown的形式显示"）
+
+用户圈了两处：卡片封面（没有封面图时）与灯箱舞台（没有媒体时）。两处都在放**假的前言源码**——
+卡片是一排 mono 10px、透明度递降的 `---` / `name:` / `description:` 行，舞台只有四行 frontmatter，
+既不是文档也不是源码。用户要求用 markdown 组件把它**渲染**出来，插件指定为 **`react-markdown`**。
+
+- 新共享组件 `packages/ui/src/components/markdown.tsx`（导出 `Markdown`）：`react-markdown` + `remark-gfm`
+  （表格/删除线/任务列表，SKILL.md 里常见）。元素全部用后代选择器 + **em 相对字号**统一在一处
+  （`[&_h1]:text-[1.35em]` 这种），所以调用方只给一个字号，同一个组件在卡片与灯箱上就是两种尺寸。
+  默认不启用 raw HTML（react-markdown 的默认行为），链接仍走它的 URL 清洗。
+- 依赖加在 `@workspace/ui`：`react-markdown@^10.1.0`、`remark-gfm@^4.0.1`。
+- **卡片封面**（`page.tsx` 的 `MarkdownCover`）：渲染 `# {Title Case 名称}` + 描述。有 tag 时留 `pt-10`
+  给左上角的胶囊，没有 tag（工作区技能都没有）就 `pt-3`，不再空一条 40px 的带子。
+- **灯箱舞台**（`skill-detail-dialog.tsx`）：`MarkdownPreview` → `DocumentStage`，文档取
+  `detail.body`（库，已去 frontmatter）→ `parseSkillFile(held.text).body`（工作区，原始文件去掉 frontmatter）
+  → 兜底 `# 名称 + 描述`；`LightboxBody` 算好 `doc` 传给 `MediaPane` → `MediaSlide`（`skill` 属性换成了 `doc`）。
+  舞台可滚动（`overflow-y-auto`，`max-w-[640px]` 居中），一份 SKILL.md 几百行也读得下去。
+- 实测：工作区 `grilling` 卡片封面渲染标题 + 描述；`dsh-ci-test-reliability` 灯箱舞台渲染出
+  `# Reliable DSH CI tests` + 8 个列表 + 18 处行内代码（内容高 3038 / 视口 405，可滚动）；
+  明暗两套主题都看过。`ui` / `plugin-skills` 的 typecheck + lint 全绿。
+
+## 卡片封面渲染技能自己的正文（2026-10-09，用户："还有这个地方显示 markdown 正文、但是不用 react-markdown 渲染"）
+
+上一轮只把封面改成"标题 + 描述"，**不是技能真实的内容**。用户圈着封面指出：这里要显示 **markdown 正文**
+（即 SKILL.md 的 body），而且现在并没有真正用 react-markdown 渲染它。
+
+- 新钩子 `useSkillBody(skill, store)`（`library.ts`）：库里的技能读 `store.get(id).body`，
+  工作区自己的技能读 `store.workspaceSkill(id).text` 再去掉 frontmatter（`parseSkillFile`）；
+  结果按 `skillKey@stamp` 缓存在模块级 Map，重挂载与切页签都不再重复读。
+  **只有"没有封面资源"的卡片会调用它**（`MarkdownCover` 只在 `cardMedia === undefined` 时渲染），
+  有图的卡片一次请求都不多发；读不到时退回 `# 名称 + 描述`。
+- 封面只渲染正文的**开头 800 字符**（`COVER_EXCERPT`，按整行切）：封面高 ~150px，全文渲染会把
+  整篇文档塞进 DOM（实测一份 shadcn-ui 的技能体渲染出 5595px 高、上千节点），截断后每张卡只有 ~10 个节点。
+- `markdown.tsx` 被改坏的版本已修回：上一轮那份编辑把 `cn` / `base` / `className` 都留成了未使用
+  （`tsc` 报 3 个 TS6133，整个仓库 typecheck 直接失败），现在恢复成"包一层 div 应用 className"。
+- 实测（两个工作区、明暗主题）：`grilling` 封面显示 `Interview the user relentlessly until you reach a shared…`、
+  `shadcn-ui` 显示 `shadcn/ui Component Integration`，deepseek-harness 的 13 个技能封面各自显示真实标题
+  （`Reliable DSH CI tests`、`Reviewing a DeepSeek-Harness PR` …）；灯箱舞台不受影响（仍渲染全文、可滚动）；
+  `ui` / `plugin-skills` 的 typecheck + lint 全绿。
+
+## 舞台不再滚动、代码块换行（2026-10-09，用户："这一块内容我不要滚动条，并且我看到为什么还有文本溢出的情况，bug"）
+
+灯箱舞台（无媒体的技能）上一轮给了 `overflow-y-auto`，实测两个问题：
+
+- **滚动条**：`overflow-y: auto` 会让 `overflow-x` 一起变成 `auto`（CSS 规范：一个轴非 visible 时另一个 visible 也按 auto 算），
+  所以文档一超长就同时出现竖、横两条滚动条。
+- **文本溢出（真 bug）**：代码块用 `white-space: pre` 且不换行，`pre` 的内容宽 760px 而容器只有 117px，
+  于是横向溢出、被截断/横滚 —— 用户截图里那行 `<question body, might be multiple paragraphs…>` 就是这么跑出去的。
+
+修法两处：
+
+- `markdown.tsx` 的 `pre` 规则加 `whitespace-pre-wrap` + `break-words`：长代码行**换行**而不是横向溢出
+  （容器本就有 `break-words`，但 `pre` 的 `white-space: pre` 让它在里面失效）。
+- `DocumentStage` 改 `overflow-hidden`：舞台是固定 16:9 的预览位，不滚动、裁切显示；
+  完整正文点「查看文件」在文件面板里读（那里的滚动是代码查看器的正常行为，未动）。
+
+实测：舞台 720x405，`scroll == client`（无滚动条），`pre` 内容宽 640 == 容器宽 640 且 `white-space: pre-wrap`；
+两个工作区（4 张 / 12 张卡）全部封面 **零横向溢出元素**；灯箱与卡片截图复核过；typecheck + lint 全绿。
+
+# 技能更新的批量检查与徽标（2026-10-09，用户："那如果是远程仓库的 skills 更新了怎么办？"）
+
+## 问题
+远程仓库前进后，hub 里没有任何人知道 —— 现状只有一条路：「进灯箱 → 逐个点检查更新」，
+刷新即忘；而且每个技能各检查一次 = 各 clone 一次，N 个技能就是 N 次 clone。
+
+## 方案（检查显式化、按源去重、结果落盘）
+1. **按源去重**：同一仓库的 N 个技能合并为**一次** CLI 调用（`--skill a --skill b …`，一次 clone 出全部哈希）。
+   `skills-cli.ts` 增 `fetchUpstreamRecords(source, skills[])`；单技能 `fetchUpstreamRecord` 改为它的薄包装。
+2. **批量入口**：`SkillStore.checkUpdates()`（fs 实现 + remote-store + vite 桥 `?action=check-updates`）：
+   收集所有带 `upstream` 的行 → 按 source 分组 → 限并发 3 逐源跑 CLI → 比较 → 结果写 catalog。
+3. **结果落盘**：`SkillSummary` / `CatalogEntry` 增 `checked?: {at, latest}`（latest = 上游当时的哈希）；
+   `readEntry` 像 upstream 那样原样携带（manifest 不带这些字段）；单技能 `checkUpdate` 与
+   `updateFromUpstream` 成功后都刷新它。`outdated` 是派生值（`latest !== upstream.hash`），不落盘。
+4. **UI**：工具栏（视图切换与 Import 之间）加「检查更新」outline 按钮，检查中禁用 +「检查中…」，
+   失败的源在 refusal 行汇总；卡片/列表名字旁出示 amber「有更新」徽标；
+   灯箱 `UpdateRow` 从 `skill.checked` 播种（有缓存且 outdated → 直接「上游有更新」+「更新」按钮），
+   idle 时显示「上次检查：<age>」。
+5. **更新仍逐技能**（覆盖本地改动必须保留 `modified` 提示）；不做「全部更新」；不做自动轮询
+   （一次检查 = 多次 clone，保持显式）。
+
+## 计划
+- [ ] `skills-cli.ts`：`fetchUpstreamRecords` —— 一次调用装多技能进临时目录、读 lock、按名返回哈希 + 失败原因
+- [ ] `store.ts`：`SkillSummary.checked`、`SkillUpdateSummary`、`SkillStore.checkUpdates`
+- [ ] `skills-fs.ts`：`checkUpdates`（分组 / 并发 3 / 比较 / 落盘 / bump revision）；`readEntry` 携带 checked；
+      `checkUpdate` 单技能也落盘；`updateFromUpstream` 成功后刷新 checked
+- [ ] `remote-store.ts` + `vite.ts`：桥 action `check-updates`（改完必须重启 dev server）
+- [ ] `library.ts`：`checkAll`；`page.tsx`：按钮 + grid/list 徽标
+- [ ] `skill-detail-dialog.tsx`：`UpdateRow` 播种 +「上次检查」
+- [ ] 文案 en + zh：`skills.update.checkAll` / `.checkingAll` / `.badge` / `.lastChecked` / `.summaryFailed`
+- [ ] `scripts/check-updates.ts`：合并调用、checked 落盘与携带、更新后徽标条件、失败路径
+- [ ] 验证：真机（手改 catalog 的 `upstream.hash` 模拟上游前进 → 检查 → 徽标出现 → 更新 → 徽标消失）；
+      全绿：新脚本 + check-store / check-upstream / check-workspace-skills + tsc + eslint
+
+## 待确认
+- 工作区行（直接 `npx skills add` 进 `.agents/skills`、未收录的技能）这一轮要不要一起支持：
+  它们没有 upstream（没读工作区根的 `skills-lock.json`）。做 = `readWorkspaceSkills` 顺带读 lock、
+  检查同路径、更新目标改为工作区目录（`updateFromUpstream` 按 location 分派）。
+- 要不要给批量检查加 TTL 自动跑（打开技能页且上次检查超过 N 小时）—— 成本是每次多个 clone，默认不做。
+
+## 结果
+（待实施）

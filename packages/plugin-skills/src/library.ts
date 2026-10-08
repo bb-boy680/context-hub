@@ -7,6 +7,7 @@
 import * as React from "react"
 import { useHub, useI18n } from "@workspace/extensions/react"
 
+import { parseSkillFile } from "./frontmatter.ts"
 import type {
   SkillPage,
   SkillStore,
@@ -104,6 +105,49 @@ export function skillKey(skill: Skill): string {
 export function tokenLabel(body: string): string {
   const count = Math.round(body.length / 4)
   return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count)
+}
+
+/** Documents already read, so a re-mounted cover does not refetch. */
+const bodies = new Map<string, string>()
+
+/**
+ * The skill's own document — the SKILL.md body, read from wherever the skill
+ * lives. Only a cover that shows the document calls this, so a card with a
+ * picture never pays for the read.
+ *
+ * @param skill — the row whose document is shown.
+ * @param store — the form's library, or `null` when this form has none.
+ * @returns the body, or `null` until it is read.
+ */
+export function useSkillBody(skill: Skill, store: SkillStore | null): string | null {
+  const key = `${skillKey(skill)}@${skill.stamp ?? ""}`
+  const [body, setBody] = React.useState<string | null>(() => bodies.get(key) ?? null)
+
+  React.useEffect(() => {
+    if (store === null || bodies.has(key)) return
+    let live = true
+    void (async () => {
+      try {
+        /* A workspace skill has no library record; its manifest is read where it lives. */
+        const text =
+          skill.location === "workspace"
+            ? (await store.workspaceSkill(skill.id))?.text
+            : (await store.get(skill.id)).body
+        if (text === undefined) return
+        const body =
+          skill.location === "workspace" ? parseSkillFile(text).body : text
+        bodies.set(key, body)
+        if (live) setBody(body)
+      } catch {
+        /* An unreadable skill leaves the cover on its heading and description. */
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [key, store, skill.id, skill.location])
+
+  return body
 }
 
 /** A past timestamp as an age the list can print, localized to the active locale. */

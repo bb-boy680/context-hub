@@ -12,11 +12,12 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
-import { skillKey, useSkillLibrary } from "./library.ts"
+import { skillKey, useSkillBody, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { seedTags, tagTone } from "./tags.ts"
+import type { SkillStore } from "./store.ts"
 import type { Skill, SkillSource } from "./types.ts"
 
 import { Spinner } from "@workspace/ui/components/spinner"
@@ -30,6 +31,7 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
+import { Markdown } from "@workspace/ui/components/markdown"
 import {
   Table,
   TableBody,
@@ -429,28 +431,35 @@ function PhotoCover({
   )
 }
 
-function MarkdownCover({ skill }: { skill: Skill }) {
-  const lines = [
-    { text: "---", className: "text-muted-foreground/70" },
-    { text: `name: ${skill.name}`, className: "text-secondary-foreground" },
-    {
-      text: `description: ${skill.summary}`,
-      className: "text-secondary-foreground/85",
-    },
-    { text: "---", className: "text-muted-foreground/42" },
-    {
-      text: `# ${titleCase(skill.name)}`,
-      className: "text-secondary-foreground/15",
-    },
-  ]
+/** Opening of a document a cover renders; the rest of it is never on screen. */
+const COVER_EXCERPT = 800
+
+/** A card with no media shows the skill's own document: its SKILL.md body, rendered. */
+function MarkdownCover({
+  skill,
+  store,
+}: {
+  skill: Skill
+  store: SkillStore | null
+}) {
+  const body = useSkillBody(skill, store)
+  const source = React.useMemo(() => {
+    if (body === null) return `# ${titleCase(skill.name)}\n\n${skill.description}`
+    if (body.length <= COVER_EXCERPT) return body
+    const cut = body.lastIndexOf("\n", COVER_EXCERPT)
+    return body.slice(0, cut > 0 ? cut : COVER_EXCERPT)
+  }, [body, skill.name, skill.description])
 
   return (
-    <div className="flex h-full flex-col gap-0.5 bg-surface-raised px-3 pt-10 pb-2.5 font-mono text-[10px] leading-[14px]">
-      {lines.map((line, index) => (
-        <span key={index} className={`truncate ${line.className}`}>
-          {line.text}
-        </span>
-      ))}
+    <div
+      className={`size-full overflow-hidden bg-surface-raised px-3 pb-2.5 ${
+        /* Room for the tag pills, which sit over this corner; nothing to clear without them. */
+        skill.tags.length > 0 ? "pt-10" : "pt-3"
+      }`}
+    >
+      <Markdown className="text-[11px] leading-[16px] text-secondary-foreground">
+        {source}
+      </Markdown>
     </div>
   )
 }
@@ -460,6 +469,7 @@ const FALLBACK_RATIO = 16 / 9
 
 function SkillCard({
   skill,
+  store,
   blocked,
   onInstall,
   onAdopt,
@@ -467,6 +477,8 @@ function SkillCard({
   onOpen,
 }: {
   skill: Skill
+  /** The library behind the catalog, for a cover that reads the document. */
+  store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: () => void
@@ -502,7 +514,7 @@ function SkillCard({
         style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
       >
         {media === undefined ? (
-          <MarkdownCover skill={skill} />
+          <MarkdownCover skill={skill} store={store} />
         ) : media.kind === "video" ? (
           <AutoplayVideo
             src={media.src}
@@ -553,6 +565,7 @@ function SkillCard({
 
 function SkillGrid({
   skills,
+  store,
   blocked,
   onInstall,
   onAdopt,
@@ -560,6 +573,8 @@ function SkillGrid({
   onOpen,
 }: {
   skills: Skill[]
+  /** The library behind the catalog, for covers that read the document. */
+  store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: (skill: Skill) => void
@@ -568,22 +583,27 @@ function SkillGrid({
   onOpen: (skill: Skill) => void
 }) {
   /*
-   * Masonry: column-width lets the browser pick how many 266px columns fit
-   * (four at the design's 1136), and each card keeps its own height.
+   * Masonry with a responsive column count, capped at five so a wide window
+   * does not keep adding columns. A column needs a 266px card plus the 24px
+   * gutter, so each step is 290n - 24; container queries, so the sidebar
+   * width does not shift them.
    */
   return (
-    <div className="columns-[266px] gap-x-6">
-      {skills.map((skill) => (
-        <SkillCard
-          key={skillKey(skill)}
-          skill={skill}
-          blocked={blocked}
-          onInstall={() => onInstall(skill)}
-          onAdopt={() => onAdopt(skill)}
-          onRemove={() => onRemove(skill)}
-          onOpen={() => onOpen(skill)}
-        />
-      ))}
+    <div className="@container">
+      <div className="columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4 @min-[1426px]:columns-5">
+        {skills.map((skill) => (
+          <SkillCard
+            key={skillKey(skill)}
+            skill={skill}
+            store={store}
+            blocked={blocked}
+            onInstall={() => onInstall(skill)}
+            onAdopt={() => onAdopt(skill)}
+            onRemove={() => onRemove(skill)}
+            onOpen={() => onOpen(skill)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -1045,6 +1065,7 @@ export function SkillsPage() {
             <>
               <SkillGrid
                 skills={skills}
+                store={library.store}
                 blocked={blocked}
                 onInstall={install}
                 onAdopt={adopt}
