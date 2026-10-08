@@ -277,14 +277,14 @@ const SAMPLE_COUNTS = { all: 42, builtin: 24, local: 12, registry: 6 }
 
 /* Column widths include the 16px gutter the design leaves between columns. */
 const columns = [
-  { label: "", width: 32 },
-  { label: "SKILL", width: 340 },
-  { label: "TAGS", width: 166 },
-  { label: "SOURCE", width: 136 },
-  { label: "TOKENS", width: 96 },
-  { label: "TRIGGERS", width: 96 },
-  { label: "UPDATED", width: 120 },
-  { label: "ACTION", width: 102 },
+  { labelKey: "", width: 32 },
+  { labelKey: "skills.column.skill", width: 340 },
+  { labelKey: "skills.column.tags", width: 166 },
+  { labelKey: "skills.column.source", width: 136 },
+  { labelKey: "skills.column.tokens", width: 96 },
+  { labelKey: "skills.column.triggers", width: 96 },
+  { labelKey: "skills.column.updated", width: 120 },
+  { labelKey: "skills.column.action", width: 102 },
 ]
 
 const viewToggleSurface = "flex h-9 gap-1 rounded-lg bg-muted p-1"
@@ -603,11 +603,11 @@ function SkillTable({
             <TableRow className="h-10">
               {columns.map((column, index) => (
                 <TableHead
-                  key={column.label || index}
+                  key={column.labelKey || index}
                   style={{ width: column.width }}
                   className="text-muted-foreground"
                 >
-                  {column.label}
+                  {column.labelKey === "" ? "" : t(column.labelKey)}
                 </TableHead>
               ))}
             </TableRow>
@@ -620,7 +620,9 @@ function SkillTable({
                 className="h-11 cursor-pointer"
               >
                 <TableCell onClick={(event) => event.stopPropagation()}>
-                  <Checkbox aria-label={`Select ${skill.name}`} />
+                  <Checkbox
+                    aria-label={`${t("skills.table.select")} ${skill.name}`}
+                  />
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
@@ -830,6 +832,7 @@ export function SkillsPage() {
   const pagination = (
     <TablePagination
       pageText={`${page + 1} / ${pageCount}`}
+      label={t("pager.rowsPerPage")}
       pageSize={pageSize}
       canPrev={page > 0}
       canNext={page + 1 < pageCount}

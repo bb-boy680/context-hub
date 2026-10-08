@@ -464,6 +464,38 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
    所以"安装 ≠ 启用"，并标"未验证"。沙箱（Worker/iframe + 声明式协议）留作后续。
 4. **市场 UI**：Extensions 页加"从 URL / 文件安装"，列表显示来源、版本、权限、可更新。
 5. **升级/卸载语义**：升级=原地替换目录（保留 `state/` 数据 + 记录版本）；卸载=删目录 + 清记录，
-   `state/extensions.json` 的布尔值保留（重装后沿用选择）。
+   `state/` 数据与 `state/extensions.json` 的选择都保留。
+
+## 技能页国际化补漏（2026-10-08，用户："这个没有进国际化"）
+
+### 问题
+
+翻页器的 "Rows per page" 是写死在共享原语 `TablePagination` 里的，页签与列表表头也一样。
+
+### 决策
+
+- **共享原语不带文案**：`packages/ui` 是组件库，不依赖 i18n 服务；按"localized primitive props"
+  的约定改成 `label?: string`（默认英文），由调用方传 `t(...)`；同一字符串兼作可见说明与
+  `Select` 的无障碍名。
+- **分页键放在公共组**：新增 `pager.rowsPerPage`（en `Rows per page` / zh `每页行数`），
+  放内核的英文兜底表与 zh 包——分页是外壳的能力，不属于某个页面包。
+- **列表表头走词表**：`columns` 从 `label` 改成 `labelKey`（`skills.column.*`），
+  英文表里写成大写（`SKILL`/`TAGS`…）以保持设计稿的观感，中文正常写（技能/标签/…）；
+  这样不必用 CSS `uppercase`（它会把中文里的 "Token" 也变成 "TOKEN"）。
+- **排序下拉不再是"值即文案"**：`sortOptions` 改成 `{ value, labelKey }` + state，
+  触发器渲染当前项的词条（`SelectValue` 只会原样渲染 value）。
+
+### 验证
+
+- 浏览器（zh-CN）：列表视图表头 = 技能/标签/来源/Token 数/触发次数/更新时间/操作；
+  翻页器显示 `每页行数`（无障碍名同）；Add 弹窗排序 = 安装量最高/最近更新/趋势上升；
+  勾选框无障碍名 = `选择 <技能名>`。
+- `plugin-skills` typecheck+lint、`web`/`ui`/`extensions`/`locale-zh-cn` typecheck 通过
+  （`ui` 的 19 个 lint 错误是 shadcn 既有问题，本次未新增）；三个行为脚本全绿。
+
+### 仍待补（更大范围）
+
+`apps/web` 的 Overview / MCP / Plugins / Activity / Policies / Repository / Settings 仍是全英文页面
+（只有 Extensions 与占位页接了 i18n），要给这些页面做词表 + 接线，才算"整个界面可切换语言"。
 
 

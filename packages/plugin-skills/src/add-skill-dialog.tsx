@@ -13,6 +13,7 @@ import {
   XIcon,
   type LucideIcon,
 } from "lucide-react"
+import * as React from "react"
 
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
@@ -29,7 +30,6 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
 } from "@workspace/ui/components/select"
 import { useI18n } from "@workspace/extensions/react"
 
@@ -42,8 +42,12 @@ const segments: { value: AddSkillTab; labelKey: string }[] = [
   { value: "local", labelKey: "skills.add.segment.local" },
 ]
 
-/* Sort option labels double as the Select value, which SelectValue renders verbatim. */
-const sortOptions = ["Most installs", "Recently updated", "Trending"]
+/* The id is the Select value; each option's label resolves through the active locale. */
+const sortOptions = [
+  { value: "installs", labelKey: "skills.add.sort.installs" },
+  { value: "updated", labelKey: "skills.add.sort.updated" },
+  { value: "trending", labelKey: "skills.add.sort.trending" },
+]
 
 type RegistrySkill = {
   name: string
@@ -142,6 +146,8 @@ function SegmentRow({
 
 function RegistryResults() {
   const { t } = useI18n()
+  const [sort, setSort] = React.useState(sortOptions[0].value)
+  const activeSort = sortOptions.find((option) => option.value === sort) ?? sortOptions[0]
 
   return (
     <>
@@ -155,17 +161,17 @@ function RegistryResults() {
               aria-label={t("skills.add.searchPlaceholder")}
             />
           </div>
-          <Select defaultValue={sortOptions[0]}>
+          <Select value={sort} onValueChange={(value) => setSort(String(value))}>
             <SelectTrigger
               className={`w-[138px] data-[size=default]:h-9 ${outline}`}
               aria-label={t("skills.add.sort")}
             >
-              <SelectValue />
+              <span className="truncate">{t(activeSort.labelKey)}</span>
             </SelectTrigger>
             <SelectContent>
               {sortOptions.map((option) => (
-                <SelectItem key={option} value={option}>
-                  {option}
+                <SelectItem key={option.value} value={option.value}>
+                  {t(option.labelKey)}
                 </SelectItem>
               ))}
             </SelectContent>

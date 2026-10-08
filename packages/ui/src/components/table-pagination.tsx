@@ -22,6 +22,7 @@ const PAGE_SIZE_CHOICES = [12, 24, 48]
 /** Rows-per-page control plus a first/prev/next/last pager, shared by every collection footer. */
 export function TablePagination({
   pageText,
+  label = "Rows per page",
   compact = false,
   pageSize,
   onPageSizeChange,
@@ -33,6 +34,8 @@ export function TablePagination({
   canNext = false,
 }: {
   pageText: string
+  /* Localized caption and accessible name; the primitive ships no copy of its own. */
+  label?: string
   /* Grid footers keep only the page text and the two step arrows. */
   compact?: boolean
   /* Supplying the handlers wires the pager to real data; without them it is a static mock. */
@@ -50,15 +53,13 @@ export function TablePagination({
     <div className="flex items-center gap-4">
       {compact ? null : (
         <>
-          <span className="text-caption text-muted-foreground">
-            Rows per page
-          </span>
+          <span className="text-caption text-muted-foreground">{label}</span>
           <Select
             value={String(pageSize ?? 12)}
             onValueChange={(value) => onPageSizeChange?.(Number(value))}
             disabled={onPageSizeChange === undefined}
           >
-            <SelectTrigger className="w-[100px]" aria-label="Rows per page">
+            <SelectTrigger className="w-[100px]" aria-label={label}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

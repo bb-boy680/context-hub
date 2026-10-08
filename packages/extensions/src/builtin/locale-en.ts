@@ -23,6 +23,7 @@ const en: Record<string, string> = {
   "header.search": "Search context",
   "header.connectRepo": "Connect repo",
   "header.syncRepo": "Sync repo",
+  "pager.rowsPerPage": "Rows per page",
   "extensions.title": "Extensions",
   "extensions.description": "Extend Context Hub with agent integrations and language packs.",
   "extensions.searchPlaceholder": "Search extensions",
