@@ -8,6 +8,7 @@ import type { LucideIcon } from "lucide-react"
 import type { ComponentType } from "react"
 
 import type { PlatformHost } from "./host.ts"
+import type { I18nService } from "./i18n.ts"
 
 /** Extension API this kernel implements; manifests declare the range they were built for. */
 export const EXTENSION_API_VERSION = "0.1"
@@ -116,6 +117,12 @@ export interface ExtensionScope {
   readonly ctx: Context
   /** Form capabilities and persistence; extensions never touch platform APIs directly. */
   readonly host: PlatformHost
+  /**
+   * The kernel's translation service. A component rendered later cannot read it
+   * off {@link ctx}: a fiber's injected services resolve while `activate` runs,
+   * so take what you need to render with now.
+   */
+  readonly i18n?: I18nService
   /** Register one contribution; removed automatically when the extension is disabled. */
   contribute<P extends ExtensionPointId>(point: P, value: ContributionMap[P]): void
 }

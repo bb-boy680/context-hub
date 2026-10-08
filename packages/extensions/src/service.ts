@@ -224,6 +224,8 @@ export class ExtensionService extends Service {
       const scope: ExtensionScope = {
         ctx: pluginCtx,
         host: this.host,
+        /* Resolved now: a fiber's injected services do not survive activation. */
+        i18n: this.ctx.get("i18n"),
         contribute: (point, value) => {
           pluginCtx.effect(() => this.contribute(entry, point, value))
         },

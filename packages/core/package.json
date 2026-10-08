@@ -18,10 +18,12 @@
   },
   "exports": {
     ".": "./src/assets.ts",
+    "./plugins": "./src/plugins.ts",
     "./state": "./src/state.ts",
     "./host": "./src/host/assets-fs.ts",
     "./host/atomic": "./src/host/atomic.ts",
     "./host/home": "./src/host/home.ts",
+    "./host/plugins": "./src/host/plugins-fs.ts",
     "./host/state": "./src/host/state-fs.ts",
     "./vite": "./vite.ts"
   }

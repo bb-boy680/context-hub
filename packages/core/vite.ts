@@ -7,15 +7,18 @@
  * Assets are read-only: files are created and deleted through the store that
  * records them, which is what keeps a reference and its file in step. State
  * documents are read and written, because they are what a browser form cannot
- * keep anywhere else.
+ * keep anywhere else. Plugin files are read-only for the same reason assets
+ * are: installing is a host-side operation that writes the whole directory.
  */
 import { createReadStream, promises as fs } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
+import { PLUGIN_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
 import { resolveHubHome } from "./src/host/home.ts"
+import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
 import type { StateStore } from "./src/state.ts"
 
@@ -31,6 +34,11 @@ const MIME_TYPES: Record<string, string> = {
   mp4: "video/mp4",
   webm: "video/webm",
   mov: "video/quicktime",
+  js: "text/javascript",
+  mjs: "text/javascript",
+  css: "text/css",
+  json: "application/json",
+  map: "application/json",
 }
 
 function contentTypeOf(file: string): string {
@@ -128,6 +136,8 @@ function sendJson(response: ServerResponse, status: number, value: unknown) {
   response.writeHead(status, {
     "Content-Type": "application/json",
     "Content-Length": Buffer.byteLength(body),
+    /* A stale manifest would describe a plugin whose files just changed. */
+    "Cache-Control": "no-store",
   })
   response.end(body)
 }
@@ -186,6 +196,81 @@ export function stateStore(options: { home?: string } = {}) {
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             sendJson(response, 400, { error: message })
+          }
+        }
+      )
+    },
+  }
+}
+
+/**
+ * Send one file from the plugin space. Every response is `no-store`: an
+ * installed plugin's files change on update, and a cached module would run the
+ * old code in the page.
+ */
+async function sendPluginFile(
+  root: string,
+  id: string,
+  file: string,
+  response: ServerResponse
+): Promise<void> {
+  const target = resolveStoredFile(root, `${id}/${file}`)
+  const stat = await fs.stat(target).catch(() => null)
+  if (stat === null || !stat.isFile()) {
+    response.writeHead(404).end()
+    return
+  }
+  response.writeHead(200, {
+    "Content-Type": contentTypeOf(target),
+    "Content-Length": stat.size,
+    "Cache-Control": "no-store",
+  })
+  createReadStream(target).pipe(response)
+}
+
+/**
+ * Vite plugin that serves the plugin space over the dev server: the installed
+ * ids, and every file inside a plugin directory, so a browser form can import
+ * an installed plugin's entry module.
+ */
+export function pluginFiles(options: { home?: string } = {}) {
+  const store = createFsPluginStore(resolveHubHome(options.home))
+
+  return {
+    name: "context-hub-plugin-files",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(PLUGIN_ROUTE)) {
+            next()
+            return
+          }
+          if ((request.method ?? "GET") !== "GET") {
+            response.writeHead(405).end()
+            return
+          }
+          const rest = url.pathname.slice(PLUGIN_ROUTE.length).replace(/^\//, "")
+          try {
+            if (rest === "") {
+              sendJson(response, 200, { ids: await store.list() })
+              return
+            }
+            const slash = rest.indexOf("/")
+            const id = decodeURIComponent(slash === -1 ? rest : rest.slice(0, slash))
+            if (slash === -1) {
+              sendJson(response, 200, JSON.parse(await store.read(id, "plugin.json")) as unknown)
+              return
+            }
+            await sendPluginFile(store.root, id, rest.slice(slash + 1), response)
+          } catch {
+            response.writeHead(404).end()
           }
         }
       )

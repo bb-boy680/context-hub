@@ -391,4 +391,79 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
    `state/extensions.json` 是应用状态；如果希望它像 DSH 一样"可手编、可进版本库"，
    就把它做成 `extensions.yml` 之类的配置文档。目前保持 JSON（有校验、有原子写），暂不拆。
 
+## 插件空间：从磁盘加载插件（2026-10-08，用户："以后要做插件市场、从远程下载到本地"）
+
+### 用户提出的缺口
+
+现有插件（integration / 语言包 / Skills）都是**编译进应用**的代码；用户要的是"以后能装别人的插件、
+不改源码就长出新功能"。这件事必须先由内核开出**一条装载缝**——插件再厉害也只能用内核已有的扩展点，
+所以这一步不能靠插件自己补。
+
+### 这一轮做了什么（缝 + 磁盘格式）
+
+**磁盘格式**（= DSH 的"插件就是目录里的东西"，但入口用我们自己的 ESM 约定）：
+
+```
+<home>/plugins/
+  index.json                 # 安装记录：每个插件的 version / source / installedAt / integrity
+  <id>/
+    plugin.json              # 内核清单（唯一必需文件）：id/name/version/apiVersion/entry/icon/permissions/inject
+    index.js                 # 入口模块，导出 activate(scope)；默认 entry，可用 manifest 覆盖
+    …插件自己的文件
+```
+
+- `id` 同时是目录名：只允许 `a.b-c` 形态（不含分隔符/空格/首点，排除 Windows 保留名），
+  且 `plugin.json` 里的 `id` 必须与目录名一致；`locked: true` 被拒（下载来的插件不能自锁）。
+- 模块入口由**表单**负责导入：浏览器形态 `import(host 提供的 URL)`，Node 形态 `import(file URL)`。
+- **插件模块不 import 任何包**：React、图标表、i18n、UI 组件全部由内核通过 `activate(scope)` 交到手上。
+  原因有二：浏览器里裸模块名解析不了；而且 React 必须是**同一份实例**，否则 hooks 直接崩。
+
+**代码落点**
+
+- `packages/core`：`src/plugins.ts`（布局/命名/`PluginSource`/`PluginStore`/`PluginRecord`/`PLUGIN_ROUTE`）、
+  `src/host/plugins-fs.ts`（磁盘实现：列表=有 `plugin.json` 的目录、写入原子、路径不得越界、
+  `records()`/`setRecord()` 维护 `index.json`）、`vite.ts` 新增 `pluginFiles()` 桥
+  （`GET /hub/plugins` 列 id、`GET /hub/plugins/<id>/<file>` 供 JS/JSON/资源，全部 `no-store`）。
+- `packages/extensions`：`src/icons.ts`（清单只能写图标**名字**，这里解析成组件，缺省回退 puzzle）、
+  `src/plugin.ts`（清单校验 + `discoverPlugins()` 构建 `ExtensionDefinition`）、
+  `src/remote.ts`（浏览器侧只读 `PluginSource`）；`ExtensionScope` 新增 `i18n`。
+- `apps/web`：`lib/hub.ts` 启动前 `discoverPlugins()` 并追加进 catalog；`lib/ui-kit.ts` 作为 `hub.ui` 服务。
+- 示例插件：`packages/extensions/examples/hello/`（复制到 `~/.context-hub/plugins/` 即可看到）。
+
+**踩到的坑（重要，写插件的人会再踩）**
+
+- **fiber 的注入服务只在 `activate` 期间可读**：插件组件在渲染时读 `scopectx.i18n` 会抛
+  `cannot get property "i18n" without inject`（Cordis 的属性守卫）。所以内核**在激活时**
+  把 i18n 解析好放进 scope；插件应在 activate 里把需要的东西取出来再交给组件。
+- 浏览器会缓存清单：桥的 JSON 响应必须带 `Cache-Control: no-store`，否则改完 `plugin.json`
+  页面仍按旧清单（少字段）运行。
+- lucide 图标是 `forwardRef` 的**对象**不是函数，断言 `typeof icon === "function"` 会误判。
+
+### 验证
+
+- `node packages/extensions/scripts/check-plugins.ts`：**33 项断言全绿**（只有带清单的目录算插件、
+  有效插件可加载、清单字段进入 definition、id 与目录不符/apiVersion 不兼容/入口无 `activate`
+  三种拒绝各有原因、activate 收到 React+图标表+UI kit、贡献带真实图标组件、
+  9 个非法 id 被拒、读写不得越出插件目录、records 往返与坏文件容错、remove 连带清记录）。
+- `check-state.ts` / `check-store.ts`：全绿；`core`/`extensions`/`plugin-skills` lint 与
+  `web`/`extensions` typecheck 全绿。
+- 浏览器（真实 `~/.context-hub/plugins/acme.hello/`）：侧栏新增"示例插件"页、`/hello` 渲染插件页面、
+  插件自带 en / zh-CN 词条生效、按钮计数（React hooks）可用；卸载 → 侧栏与路由立即消失、
+  `state/extensions.json` 写入 `false`；刷新后仍停用；重新安装后恢复。
+
+### 下一轮：插件市场（用户明确要的"从远程下载到本地"）
+
+1. **宿主侧安装接口**（浏览器不能下载再写盘，CORS 也不允许）：
+   `POST /hub/plugins { source }`，source 三种形态 —— registry 名字/版本、直链、本地路径。
+   流程：拉取 → 校验（`integrity`；manifest 的 `apiVersion`/`id` 先验）→ 解压到临时目录 →
+   原子 rename 进 `<home>/plugins/<id>/` → 写 `index.json` 记录 → 默认**不启用**（UI 里点安装）。
+   失败回滚临时目录并写 `<home>/plugins/.logs/<id>-<time>.log`。
+2. **格式**：v1 建议"单文件 ESM + plugin.json"（`entry` 指一个自包含 bundle）；
+   zip/tgz 解压要引入维护中的依赖，等有真实来源再接。
+3. **信任**：清单已声明 `permissions`，安装/启用时展示并需确认；代码与页面同权（无沙箱），
+   所以"安装 ≠ 启用"，并标"未验证"。沙箱（Worker/iframe + 声明式协议）留作后续。
+4. **市场 UI**：Extensions 页加"从 URL / 文件安装"，列表显示来源、版本、权限、可更新。
+5. **升级/卸载语义**：升级=原地替换目录（保留 `state/` 数据 + 记录版本）；卸载=删目录 + 清记录，
+   `state/extensions.json` 的布尔值保留（重装后沿用选择）。
+
 

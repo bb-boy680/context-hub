@@ -2,20 +2,23 @@
  * Web form of the kernel: the host is the hub's own directory, reached over the
  * dev server. Everything the kernel remembers is read from there before it
  * starts and written back on every change, so nothing depends on this browser
- * profile. The browser cannot read the skill library itself, so `startHub`
- * offers that store only when a host answers for it; the skills plugin falls
- * back to its sample data when nobody does.
+ * profile. The browser cannot read the skill library or the installed plugins
+ * itself, so `startHub` offers those only when a host answers for them; the
+ * skills plugin falls back to its sample data when nobody does.
  */
 import { STATE_ROUTE } from "@workspace/core/state"
 import {
   builtinExtensions,
   createHubKernel,
+  createRemotePluginSource,
+  discoverPlugins,
   type HubKernel,
   type PlatformHost,
   type StoragePort,
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
+import * as ui from "./ui-kit.ts"
 
 /** Path the active form serves the skill library on, when it serves one at all. */
 const SKILLS_ENDPOINT = "/hub/skills"
@@ -94,6 +97,33 @@ async function skillStoreAvailable(): Promise<boolean> {
   }
 }
 
+/**
+ * Every plugin installed under `<home>/plugins`. One that cannot be loaded is
+ * reported to the console and left out, so a broken download never keeps the
+ * hub from starting.
+ */
+async function installedPlugins() {
+  try {
+    const found = await discoverPlugins({
+      source: createRemotePluginSource(),
+      /* The host serves the file; this import is the one the kernel cannot make itself. */
+      importModule: async (url) => import(/* @vite-ignore */ url) as Promise<unknown>,
+    })
+    const extensions = []
+    for (const plugin of found) {
+      if (plugin.definition === undefined) {
+        console.warn(`context hub: plugin "${plugin.id}" was not loaded: ${plugin.problem}`)
+        continue
+      }
+      extensions.push(plugin.definition)
+    }
+    return extensions
+  } catch {
+    /* No host behind this origin: the hub runs on the extensions this build ships. */
+    return []
+  }
+}
+
 /** Compose and activate the kernel; the app renders once this settles. */
 export async function startHub(): Promise<HubKernel> {
   const state = await openState()
@@ -112,14 +142,19 @@ export async function startHub(): Promise<HubKernel> {
       console[level](message)
     },
   }
-  const services: Record<string, unknown> = {}
+  const services: Record<string, unknown> = { "hub.ui": ui }
   if (await skillStoreAvailable()) {
     services["hub.skills"] = createRemoteSkillStore()
   }
   const kernel = await createHubKernel({
     host: webHost,
     services,
-    extensions: [...builtinExtensions, skillsExtension, simplifiedChineseLocale],
+    extensions: [
+      ...builtinExtensions,
+      skillsExtension,
+      simplifiedChineseLocale,
+      ...(await installedPlugins()),
+    ],
   })
   await kernel.start()
   return kernel
