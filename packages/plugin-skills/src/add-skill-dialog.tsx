@@ -83,11 +83,14 @@ function SkillRow({
   name,
   description,
   selected,
+  installed,
   onToggle,
 }: {
   name: string
   description: string
   selected: boolean
+  /** Already in this library: it cannot be picked again, and says so. */
+  installed: boolean
   onToggle: () => void
 }) {
   const { t } = useI18n()
@@ -104,20 +107,27 @@ function SkillRow({
           </span>
         )}
       </div>
-      <Button
-        variant={selected ? "ghost" : "default"}
-        aria-pressed={selected}
-        aria-label={`${t(selected ? "skills.add.selected" : "skills.add.select")} ${name}`}
-        onClick={onToggle}
-        className={
-          selected
-            ? "h-8 shrink-0 gap-1.5 px-2.5 text-xs font-medium"
-            : "h-8 shrink-0 px-3.5 text-xs font-medium"
-        }
-      >
-        {selected && <CheckIcon className="text-chart-2" />}
-        {t(selected ? "skills.add.selected" : "skills.add.select")}
-      </Button>
+      {installed ? (
+        <span className="flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium text-muted-foreground">
+          <CheckIcon className="text-chart-2" />
+          {t("skills.add.imported")}
+        </span>
+      ) : (
+        <Button
+          variant={selected ? "ghost" : "default"}
+          aria-pressed={selected}
+          aria-label={`${t(selected ? "skills.add.selected" : "skills.add.select")} ${name}`}
+          onClick={onToggle}
+          className={
+            selected
+              ? "h-8 shrink-0 gap-1.5 px-2.5 text-xs font-medium"
+              : "h-8 shrink-0 px-3.5 text-xs font-medium"
+          }
+        >
+          {selected && <CheckIcon className="text-chart-2" />}
+          {t(selected ? "skills.add.selected" : "skills.add.select")}
+        </Button>
+      )}
     </li>
   )
 }
@@ -126,10 +136,13 @@ function SkillRow({
 function ListHeader({
   summary,
   allSelected,
+  canToggleAll,
   onToggleAll,
 }: {
   summary: string
   allSelected: boolean
+  /** False when every row is already in the library, so there is nothing to take. */
+  canToggleAll: boolean
   onToggleAll: () => void
 }) {
   const { t } = useI18n()
@@ -141,8 +154,9 @@ function ListHeader({
       </span>
       <button
         type="button"
+        disabled={!canToggleAll}
         onClick={onToggleAll}
-        className="shrink-0 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+        className="shrink-0 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
       >
         {t(allSelected ? "skills.add.clearAll" : "skills.add.selectAll")}
       </button>
@@ -255,13 +269,42 @@ export function AddSkillDialog({
   const [source, setSource] = React.useState("")
   /** The source the package list came from; empty until a listing lands. */
   const [listed, setListed] = React.useState("")
+  /** The pins that listing seeded, so a new pin re-seeds without re-running the CLI. */
+  const [seeded, setSeeded] = React.useState("")
   const [picked, setPicked] = React.useState<string[]>([])
   const [packaged, setPackaged] = React.useState<PackageSkill[]>([])
   const [folder, setFolder] = React.useState<FolderSkill[] | null>(null)
+  /** Ids this library already holds, lower-cased for comparison. */
+  const [installed, setInstalled] = React.useState<string[]>([])
   const [busy, setBusy] = React.useState<"list" | "import" | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [failed, setFailed] = React.useState<{ name: string; reason: string }[]>([])
   const [confirming, setConfirming] = React.useState(false)
+
+  /** What the library holds now, so a row can say it is already in. */
+  const readInstalled = React.useCallback(async (): Promise<string[]> => {
+    if (store === null) return []
+    try {
+      const page = await store.list({ limit: 1000 })
+      return page.items.map((item) => item.id.toLowerCase())
+    } catch {
+      /* An unreadable library leaves every row selectable; the import itself
+         still refuses a name the library holds. */
+      return []
+    }
+  }, [store])
+
+  /* Every open re-reads what the library holds, so the marks are never stale. */
+  React.useEffect(() => {
+    if (!open) return
+    let live = true
+    void readInstalled().then((ids) => {
+      if (live) setInstalled(ids)
+    })
+    return () => {
+      live = false
+    }
+  }, [open, readInstalled])
 
   const dirty =
     tab === "local" ? folder !== null : source.trim() !== "" || picked.length > 0
@@ -269,6 +312,7 @@ export function AddSkillDialog({
   const reset = () => {
     setSource("")
     setListed("")
+    setSeeded("")
     setPicked([])
     setPackaged([])
     setFolder(null)
@@ -294,11 +338,17 @@ export function AddSkillDialog({
   /** Ask the CLI what the package holds, unless that list is already on screen. */
   const handleList = async () => {
     const request = parsePackageRequest(source)
-    if (request.source === "" || request.source === listed) return
+    if (request.source === "") return
+    /* The pinned skills are part of the request: changing them re-seeds the picks. */
+    const seed = request.skills.join(",")
+    if (request.source === listed && seed === seeded) return
+    const alreadyListed = request.source === listed
     setListed(request.source)
-    /* A pasted command's `--skill` flags are picks; a bare source starts clean. */
-    setPicked(request.skills)
+    setSeeded(seed)
+    /* A pasted command's `--skill` flags are picks, minus what is already in. */
+    setPicked(request.skills.filter((name) => !installed.includes(name.toLowerCase())))
     setFailed([])
+    if (alreadyListed) return
     if (store === null) {
       setPackaged([])
       setError(t("skills.add.offline"))
@@ -310,6 +360,7 @@ export function AddSkillDialog({
       setPackaged(await store.listPackage(request.source))
     } catch (failure) {
       setListed("")
+      setSeeded("")
       setPackaged([])
       setError(messageOf(failure))
     } finally {
@@ -317,7 +368,7 @@ export function AddSkillDialog({
     }
   }
 
-  /** Read a dropped folder into candidates, taking the first one the way the design does. */
+  /** Read a dropped folder into candidates, taking the first new one the way the design does. */
   const acceptFolder = async (files: DroppedFile[]) => {
     setError(null)
     setFailed([])
@@ -326,7 +377,8 @@ export function AddSkillDialog({
     try {
       const found = await scanFolder(files)
       setFolder(found)
-      setPicked(found.slice(0, 1).map((skill) => skill.name))
+      const first = found.find((skill) => !installed.includes(skill.name.toLowerCase()))
+      setPicked(first === undefined ? [] : [first.name])
     } catch (failure) {
       setFolder(null)
       setError(messageOf(failure))
@@ -357,6 +409,7 @@ export function AddSkillDialog({
       if (result.failed.length > 0) {
         /* Say what was refused, and let a second press retry what was not. */
         setFailed(result.failed)
+        void readInstalled().then(setInstalled)
         return
       }
       close(false)
@@ -370,13 +423,19 @@ export function AddSkillDialog({
   const candidates: { name: string; description: string }[] =
     tab === "local" ? (folder ?? []) : packaged
 
+  const inLibrary = (name: string) => installed.includes(name.toLowerCase())
+
+  /* Only what the library does not hold yet can be picked, so a second import
+     can never be attempted for a skill already in. */
+  const selectable = candidates.filter((skill) => !inLibrary(skill.name))
+
   /* A listing is on screen once it has been asked for, even when it found nothing. */
   const hasList = tab === "local" ? folder !== null : listed !== ""
   const showList = hasList || busy === "list" || error !== null
 
   const allSelected =
-    candidates.length > 0 &&
-    candidates.every((skill) => picked.includes(skill.name))
+    selectable.length > 0 &&
+    selectable.every((skill) => picked.includes(skill.name))
 
   const summary = (tab === "local"
     ? t("skills.add.foundFolder")
@@ -505,8 +564,9 @@ export function AddSkillDialog({
               <ListHeader
                 summary={summary}
                 allSelected={allSelected}
+                canToggleAll={selectable.length > 0}
                 onToggleAll={() =>
-                  setPicked(allSelected ? [] : candidates.map((skill) => skill.name))
+                  setPicked(allSelected ? [] : selectable.map((skill) => skill.name))
                 }
               />
             )}
@@ -524,6 +584,7 @@ export function AddSkillDialog({
                     name={skill.name}
                     description={skill.description}
                     selected={picked.includes(skill.name)}
+                    installed={inLibrary(skill.name)}
                     onToggle={() => toggle(skill.name)}
                   />
                 ))}

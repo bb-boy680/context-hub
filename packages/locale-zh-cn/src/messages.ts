@@ -110,6 +110,7 @@ export const messages: Record<string, string> = {
   "skills.add.foundFolder": "该文件夹里有 {count} 个技能",
   "skills.add.select": "选择",
   "skills.add.selected": "已选择",
+  "skills.add.imported": "已导入",
   "skills.add.selectAll": "全选",
   "skills.add.clearAll": "清空",
   "skills.add.offline": "当前形态没有可写入的技能库。",

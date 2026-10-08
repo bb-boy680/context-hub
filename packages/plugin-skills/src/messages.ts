@@ -55,6 +55,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.add.foundFolder": "Found {count} skills in this folder",
   "skills.add.select": "Select",
   "skills.add.selected": "Selected",
+  "skills.add.imported": "Imported",
   "skills.add.selectAll": "Select all",
   "skills.add.clearAll": "Clear all",
   "skills.add.offline": "This form cannot reach a skill library.",
