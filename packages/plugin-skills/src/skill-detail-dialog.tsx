@@ -12,6 +12,7 @@ import {
   PauseIcon,
   PlayIcon,
   PlusIcon,
+  PowerIcon,
   Trash2Icon,
   UploadIcon,
   Volume2Icon,
@@ -44,6 +45,7 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import {
   Popover,
+  PopoverArrow,
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
@@ -796,15 +798,107 @@ function CategoryEditor({
   )
 }
 
+/**
+ * The delete question, anchored to the button it belongs to. Deleting takes the
+ * skill's directory with it, so the bubble names the folder before it confirms —
+ * and stays open with the reason when the write is refused.
+ */
+function DeleteBubble({
+  name,
+  path,
+  onDelete,
+  children,
+}: {
+  name: string
+  /** Where the skill's directory sits, or `null` when this form has no library. */
+  path: string | null
+  onDelete: () => Promise<void>
+  children: React.ReactElement
+}) {
+  const { t } = useI18n()
+  const [open, setOpen] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  const confirm = () => {
+    setBusy(true)
+    setFailure(null)
+    void (async () => {
+      try {
+        await onDelete()
+      } catch (reason) {
+        /* The dialog unmounts on success, so a failure is the only state left. */
+        setFailure(reason instanceof Error ? reason.message : String(reason))
+        setBusy(false)
+      }
+    })()
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={children} />
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={7}
+        className="w-80 gap-2.5 rounded-lg bg-dialog px-4 py-3.5 shadow-[0_8px_24px_#0F172A29] ring-glass-border backdrop-blur-xl"
+      >
+        <PopoverArrow className="size-3 rotate-45 border-b border-l border-glass-border bg-dialog" />
+        <span className="text-[13.5px] leading-[17px] font-semibold">
+          {t("skills.delete.title").replace("{name}", name)}
+        </span>
+        <span className="text-xs leading-[15px] text-muted-foreground">
+          {t("skills.delete.text")}
+        </span>
+        {path !== null && (
+          <span className="truncate font-mono text-[11.5px] leading-[14px] text-secondary-foreground">
+            {path}
+          </span>
+        )}
+        {failure !== null && (
+          <span className="text-xs leading-[15px] text-destructive">
+            {failure}
+          </span>
+        )}
+        <div className="flex items-center justify-end gap-2 pt-0.5">
+          <Button
+            variant="outline"
+            size="sm"
+            className="border-border bg-transparent px-3 text-xs dark:border-input dark:bg-transparent"
+            disabled={busy}
+            onClick={() => setOpen(false)}
+          >
+            {t("skills.action.cancel")}
+          </Button>
+          <Button
+            size="sm"
+            className="bg-destructive px-3 text-xs text-white hover:bg-destructive/90"
+            disabled={busy}
+            onClick={confirm}
+          >
+            {t("skills.delete.confirm")}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 function InfoPanel({
   skill,
   installed,
+  path,
+  onDelete,
   onToggle,
   onViewFiles,
   onTagsChange,
 }: {
   skill: Skill
   installed: boolean
+  /** The skill's directory, spelled as a person would write it. */
+  path: string | null
+  /** `null` when this form has no library to delete from. */
+  onDelete: (() => Promise<void>) | null
   onToggle: () => void
   onViewFiles: () => void
   onTagsChange: (tags: string[]) => void
@@ -883,10 +977,22 @@ function InfoPanel({
           }
           onClick={onToggle}
         >
-          {installed ? <Trash2Icon /> : <DownloadIcon />}
+          {installed ? <PowerIcon /> : <DownloadIcon />}
           {t(installed ? "skills.action.uninstall" : "skills.action.install")}
         </Button>
       </div>
+
+      {onDelete !== null && (
+        <DeleteBubble name={skill.name} path={path} onDelete={onDelete}>
+          <Button
+            variant="outline"
+            className="h-9 w-full gap-[7px] border-destructive/35 bg-transparent px-2.5 text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
+          >
+            <Trash2Icon />
+            {t("skills.detail.delete")}
+          </Button>
+        </DeleteBubble>
+      )}
     </div>
   )
 }
@@ -1053,7 +1159,9 @@ function LightboxBody({
   skill,
   detail,
   store,
+  root,
   onToggle,
+  onDelete,
   onTagsChange,
   onChanged,
 }: {
@@ -1061,7 +1169,10 @@ function LightboxBody({
   /** The stored record, present when a library answered. */
   detail: SkillDetail | null
   store: SkillStore | null
+  /** The skills root as the library spells it, for the delete question. */
+  root: string | null
   onToggle: () => void
+  onDelete: (() => Promise<void>) | null
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
@@ -1069,6 +1180,8 @@ function LightboxBody({
   const [filesOpen, setFilesOpen] = React.useState(false)
   const media = useMediaItems(skill, store, detail, onChanged)
   const files = useFileRows(skill, detail)
+  const path =
+    root === null ? null : `${root.replaceAll("\\", "/")}/${skill.id}`
 
   /* The catalog stays mounted behind the dialog; stop its previews decoding. */
   React.useEffect(() => {
@@ -1082,6 +1195,8 @@ function LightboxBody({
       <InfoPanel
         skill={skill}
         installed={skill.enabled}
+        path={path}
+        onDelete={onDelete}
         onToggle={onToggle}
         onViewFiles={() => setFilesOpen(true)}
         onTagsChange={onTagsChange}
@@ -1106,7 +1221,9 @@ function LightboxBody({
 export function SkillDetailDialog({
   skill,
   store,
+  root,
   onToggle,
+  onDelete,
   onTagsChange,
   onChanged,
   onOpenChange,
@@ -1114,7 +1231,11 @@ export function SkillDetailDialog({
   skill: Skill | null
   /** The library behind the catalog, or `null` while the bundle is on screen. */
   store: SkillStore | null
+  /** Where the library keeps its skills, as it spells the path. */
+  root: string | null
   onToggle: () => void
+  /** Delete the skill and everything the hub stores for it. */
+  onDelete: (skill: Skill) => Promise<void>
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
@@ -1156,7 +1277,9 @@ export function SkillDetailDialog({
             skill={skill}
             detail={detail}
             store={store}
+            root={root}
             onToggle={onToggle}
+            onDelete={store === null ? null : () => onDelete(skill)}
             onTagsChange={onTagsChange}
             onChanged={onChanged}
           />

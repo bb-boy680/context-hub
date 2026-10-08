@@ -2,7 +2,7 @@ import {
   DownloadIcon,
   LayoutGridIcon,
   ListIcon,
-  Trash2Icon,
+  PowerIcon,
   UploadIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -355,7 +355,7 @@ function InstallButton({
       }
     >
       {installed ? (
-        <Trash2Icon className="size-3.5" />
+        <PowerIcon className="size-3.5" />
       ) : (
         <DownloadIcon className="size-3.5" />
       )}
@@ -821,6 +821,13 @@ export function SkillsPage() {
       library.store?.update(skill.id, { tags }) ?? Promise.resolve()
     )
 
+  /** Delete the skill, then close the lightbox it was open in. */
+  const removeSkill = async (skill: Skill) => {
+    await (library.store?.remove(skill.id) ?? Promise.resolve())
+    await library.reload()
+    setDetailId(null)
+  }
+
   const openDetail = (skill: Skill) => setDetailId(skill.id)
 
   const total = usingStore ? library.total : skills.length
@@ -954,9 +961,11 @@ export function SkillsPage() {
       <SkillDetailDialog
         skill={detail}
         store={library.store}
+        root={library.root}
         onToggle={() => {
           if (detail) toggleEnabled(detail)
         }}
+        onDelete={removeSkill}
         onTagsChange={(tags) => {
           if (detail) setTags(detail, tags)
         }}
