@@ -83,6 +83,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.detail.category": "Category",
   "skills.detail.description": "Description",
   "skills.detail.location": "Location",
+  "skills.detail.inWorkspace": "Read from this workspace",
   "skills.detail.tokens": "Tokens",
   "skills.detail.triggers": "Triggers",
   "skills.detail.updated": "Updated",

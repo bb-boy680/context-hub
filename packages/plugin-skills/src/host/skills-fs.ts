@@ -34,14 +34,17 @@ import {
   writeSkillFile,
 } from "../frontmatter.ts"
 import { importFolder } from "./folder-import.ts"
+import { walkSkillDir } from "./file-tree.ts"
 import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
 import {
   installSkillIntoWorkspace,
+  readWorkspaceSkill,
   readWorkspaceSkills,
   removeSkillFromWorkspace,
 } from "./workspace-skills.ts"
 import type {
   WorkspaceInstall,
+  WorkspaceSkillDetail as WorkspaceSkillRecord,
   WorkspaceSkillsView as WorkspaceSkills,
 } from "../store.ts"
 import type {
@@ -51,7 +54,6 @@ import type {
   SkillCounts,
   SkillDetail,
   SkillDraft,
-  SkillFileEntry,
   SkillImport,
   SkillOrigin,
   SkillPage,
@@ -301,7 +303,7 @@ export async function createFsSkillStore(
       .readFile(path.join(dir, MANIFEST), "utf8")
       .catch(() => null)
     if (manifest === null) throw new Error(`skill has no ${MANIFEST}: ${id}`)
-    const files = await walk(dir, dir, 0)
+    const files = await walkSkillDir(dir)
     const assetDetails: SkillAsset[] = row.assets.map((ref) => ({
       ref,
       kind: assetKind(ref),
@@ -558,6 +560,11 @@ export async function createFsSkillStore(
       return workspace === null ? null : readWorkspaceSkills(workspace, root)
     },
 
+    async workspaceSkill(id: string): Promise<WorkspaceSkillRecord | null> {
+      const workspace = await currentWorkspace()
+      return workspace === null ? null : readWorkspaceSkill(workspace, id)
+    },
+
     async installToWorkspace(id: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
       return installSkillIntoWorkspace(workspace, root, id)
@@ -610,32 +617,4 @@ export async function createFsSkillStore(
   }
 
   return store
-}
-
-/** Walk a skill directory into flat file entries. */
-async function walk(
-  dir: string,
-  base: string,
-  depth: number
-): Promise<SkillFileEntry[]> {
-  const entries = await readdirOrEmpty(dir)
-  const rows: SkillFileEntry[] = []
-  for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
-    if (entry.name.startsWith(".")) continue
-    const absolute = path.join(dir, entry.name)
-    const relative = path.relative(base, absolute).split(path.sep).join("/")
-    if (entry.isDirectory()) {
-      rows.push({ path: relative, depth, directory: true, bytes: 0 })
-      rows.push(...(await walk(absolute, base, depth + 1)))
-    } else {
-      const stat = await statOrNull(absolute)
-      rows.push({
-        path: relative,
-        depth,
-        directory: false,
-        bytes: stat?.size ?? 0,
-      })
-    }
-  }
-  return rows
 }

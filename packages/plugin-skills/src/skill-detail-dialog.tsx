@@ -30,7 +30,7 @@ import { locationLabel, skillKey } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
-import type { SkillDetail, SkillStore } from "./store.ts"
+import type { SkillDetail, SkillStore, WorkspaceSkillDetail } from "./store.ts"
 
 import { useI18n } from "@workspace/extensions/react"
 import { Badge } from "@workspace/ui/components/badge"
@@ -918,7 +918,9 @@ function InfoPanel({
               {locationLabel(skill.location, t)}
             </Badge>
             <DialogDescription className="truncate text-xs text-muted-foreground">
-              {`${t("skills.detail.updated")} ${skill.updated}`}
+              {skill.updated === ""
+                ? t("skills.detail.inWorkspace")
+                : `${t("skills.detail.updated")} ${skill.updated}`}
             </DialogDescription>
           </div>
         </div>
@@ -960,7 +962,10 @@ function InfoPanel({
             label={t("skills.detail.triggers")}
             value={skill.triggers === undefined ? "—" : String(skill.triggers)}
           />
-          <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
+          {/* The hub records no age for a skill it does not hold, so none is shown. */}
+          {skill.updated === "" ? null : (
+            <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
+          )}
         </dl>
       </div>
 
@@ -1135,42 +1140,60 @@ interface FileRow {
   active: boolean
 }
 
-/** The files the panel lists: the library's own tree, or the bundled example. */
+/** The files the panel lists: the library's own tree, the workspace's, or the bundled example. */
 function useFileRows(
   skill: Skill,
-  detail: SkillDetail | null
+  detail: SkillDetail | null,
+  held: WorkspaceSkillDetail | null,
+  sample: boolean
 ): { rows: FileRow[]; content: string } {
   return React.useMemo(() => {
-    if (detail === null) {
+    if (detail !== null) {
       return {
-        rows: fileTree.map((node) => ({
-          path: node.name,
-          name: node.name,
-          depth: node.depth,
-          directory: node.kind === "folder",
-          active: "active" in node && node.active,
+        rows: detail.files.map((file) => ({
+          path: file.path,
+          name: file.path.split("/").at(-1) ?? file.path,
+          depth: file.depth,
+          directory: file.directory,
+          active: file.path === "SKILL.md",
         })),
-        content: skillFile(skill)
-          .map((line) => line.text)
-          .join("\n"),
+        content: `---\nname: ${detail.name}\ndescription: ${detail.description}\ntags: [${detail.tags.join(", ")}]\n---\n\n${detail.body}`,
       }
     }
-    return {
-      rows: detail.files.map((file) => ({
-        path: file.path,
-        name: file.path.split("/").at(-1) ?? file.path,
-        depth: file.depth,
-        directory: file.directory,
-        active: file.path === "SKILL.md",
-      })),
-      content: `---\nname: ${detail.name}\ndescription: ${detail.description}\ntags: [${detail.tags.join(", ")}]\n---\n\n${detail.body}`,
+    /* A workspace skill is read where it lives, so its manifest is shown as written. */
+    if (held !== null) {
+      return {
+        rows: held.files.map((file) => ({
+          path: file.path,
+          name: file.path.split("/").at(-1) ?? file.path,
+          depth: file.depth,
+          directory: file.directory,
+          active: file.path === "SKILL.md",
+        })),
+        content: held.text,
+      }
     }
-  }, [skill, detail])
+    /* Nothing to read: only a form with no library at all falls back to the example. */
+    if (!sample) return { rows: [], content: "" }
+    return {
+      rows: fileTree.map((node) => ({
+        path: node.name,
+        name: node.name,
+        depth: node.depth,
+        directory: node.kind === "folder",
+        active: "active" in node && node.active,
+      })),
+      content: skillFile(skill)
+        .map((line) => line.text)
+        .join("\n"),
+    }
+  }, [skill, detail, held, sample])
 }
 
 function LightboxBody({
   skill,
   detail,
+  held,
   store,
   root,
   reason,
@@ -1182,6 +1205,8 @@ function LightboxBody({
   skill: Skill
   /** The stored record, present when a library answered. */
   detail: SkillDetail | null
+  /** The workspace's own record, present when the skill lives there. */
+  held: WorkspaceSkillDetail | null
   store: SkillStore | null
   /** The skills root as the library spells it, for the delete question. */
   root: string | null
@@ -1195,7 +1220,7 @@ function LightboxBody({
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
   const media = useMediaItems(skill, store, detail, onChanged)
-  const files = useFileRows(skill, detail)
+  const files = useFileRows(skill, detail, held, store === null)
   const path =
     root === null ? null : `${root.replaceAll("\\", "/")}/${skill.id}`
 
@@ -1261,12 +1286,15 @@ export function SkillDetailDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [loaded, setLoaded] = React.useState<{ id: string; detail: SkillDetail } | null>(null)
+  const [held, setHeld] = React.useState<{ id: string; detail: WorkspaceSkillDetail } | null>(null)
   const id = skill?.id ?? null
+  const at = skill?.location ?? null
 
   /* Load the stored record whenever the lightbox opens on a library skill, and
-     again after a write moves its timestamp. */
+     again after a write moves its timestamp. A skill the workspace holds has no
+     library record, and asking for one is a request that can only fail. */
   React.useEffect(() => {
-    if (store === null || id === null) return
+    if (store === null || id === null || at === "workspace" || at === null) return
     let live = true
     void (async () => {
       try {
@@ -1279,10 +1307,30 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, id, skill?.stamp])
+  }, [store, id, at, skill?.stamp])
 
   /* Only the record for the skill on screen counts; a stale one is ignored. */
   const detail = loaded !== null && loaded.id === id ? loaded.detail : null
+
+  /* A skill the workspace holds lives outside the library, so its own manifest
+     and files are read from the folder the hub is pointed at. */
+  React.useEffect(() => {
+    if (store === null || id === null || at !== "workspace") return
+    let live = true
+    void (async () => {
+      try {
+        const found = await store.workspaceSkill(id)
+        if (live && found !== null) setHeld({ id, detail: found })
+      } catch {
+        /* An unreadable skill leaves the panel on the catalog row it came from. */
+      }
+    })()
+    return () => {
+      live = false
+    }
+  }, [store, id, at])
+
+  const workspace = held !== null && held.id === id ? held.detail : null
 
   return (
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>
@@ -1295,11 +1343,15 @@ export function SkillDetailDialog({
             key={skillKey(skill)}
             skill={skill}
             detail={detail}
+            held={workspace}
             store={store}
             root={root}
             reason={reason}
             onToggle={onToggle}
-            onDelete={store === null ? null : () => onDelete(skill)}
+            /* The library cannot delete a skill it does not hold. */
+            onDelete={
+              store === null || skill.location === "workspace" ? null : () => onDelete(skill)
+            }
             onTagsChange={onTagsChange}
             onChanged={onChanged}
           />

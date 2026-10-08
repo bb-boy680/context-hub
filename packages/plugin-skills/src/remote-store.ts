@@ -18,6 +18,7 @@ import type {
   SkillQuery,
   SkillStore,
   WorkspaceInstall,
+  WorkspaceSkillDetail as WorkspaceSkillRecord,
   WorkspaceSkillsView as WorkspaceSkills,
 } from "./store.ts"
 
@@ -170,6 +171,13 @@ export function createRemoteSkillStore(base = ""): SkillStore {
 
     workspaceSkills(): Promise<WorkspaceSkills | null> {
       return call<WorkspaceSkills | null>(base, "/hub/skills?action=workspace")
+    },
+
+    workspaceSkill(id: string): Promise<WorkspaceSkillRecord | null> {
+      return call<WorkspaceSkillRecord | null>(
+        base,
+        `/hub/skills?action=workspace-skill&id=${encodeURIComponent(id)}`
+      )
     },
 
     async installToWorkspace(id: string): Promise<WorkspaceInstall> {

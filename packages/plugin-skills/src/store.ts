@@ -163,6 +163,17 @@ export interface WorkspaceSkillsView {
   skills: WorkspaceSkill[]
 }
 
+/** One workspace skill with its files, read where it lives. */
+export interface WorkspaceSkillDetail {
+  /** Directory name under the workspace's skills root. */
+  id: string
+  name: string
+  description: string
+  /** SKILL.md as it is written on disk, frontmatter included. */
+  text: string
+  files: SkillFileEntry[]
+}
+
 /** How an install landed: as a link, or as a copy the workspace now owns. */
 export type WorkspaceInstall = "link" | "copy"
 
@@ -222,6 +233,12 @@ export interface SkillStore {
    * the selected one has no folder path to read.
    */
   workspaceSkills(): Promise<WorkspaceSkillsView | null>
+  /**
+   * One skill the current workspace holds, read where it lives; `null` when the
+   * folder holds no such skill. A workspace skill is not in the library, so this
+   * is the only way to show its own manifest and files.
+   */
+  workspaceSkill(id: string): Promise<WorkspaceSkillDetail | null>
   /** Put one library skill into the current workspace; answers how it landed. */
   installToWorkspace(id: string): Promise<WorkspaceInstall>
   /** Take one library-installed skill out of the current workspace. */

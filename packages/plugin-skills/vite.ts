@@ -87,6 +87,21 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
               return
             }
 
+            /* GET /hub/skills?action=workspace-skill&id=… — one, read in place */
+            if (
+              rest === "" &&
+              method === "GET" &&
+              url.searchParams.get("action") === "workspace-skill"
+            ) {
+              const id = url.searchParams.get("id")
+              if (id === null || id === "") {
+                sendError(response, new Error("missing skill id"))
+                return
+              }
+              sendJson(response, 200, await api.workspaceSkill(id))
+              return
+            }
+
             /* POST /hub/skills?action=install-workspace — link one skill into it */
             if (
               rest === "" &&

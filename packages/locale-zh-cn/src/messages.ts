@@ -145,6 +145,7 @@ export const messages: Record<string, string> = {
   "skills.detail.category": "分类",
   "skills.detail.description": "描述",
   "skills.detail.location": "位置",
+  "skills.detail.inWorkspace": "读取自这个工作区",
   "skills.detail.tokens": "Token 数",
   "skills.detail.triggers": "触发次数",
   "skills.detail.updated": "更新于",

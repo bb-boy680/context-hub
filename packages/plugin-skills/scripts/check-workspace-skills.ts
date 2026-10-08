@@ -15,6 +15,7 @@ import path from "node:path"
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import {
   installSkillIntoWorkspace,
+  readWorkspaceSkill,
   readWorkspaceSkills,
   removeSkillFromWorkspace,
   workspaceSkillRoot,
@@ -139,6 +140,32 @@ try {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("removing what is not there is refused", refused.includes("not in this workspace"), refused)
+
+/* A skill the workspace owns is read where it lives, manifest and files both. */
+const own = await readWorkspaceSkill(workspace, "own-one")
+check("a workspace skill reads its own manifest", own?.name === "Own one", own?.name)
+check("and its description", own?.description === "Written here", own?.description)
+check("and the manifest as written, frontmatter included", own?.text.startsWith("---\n") === true, own?.text)
+check(
+  "and the files beside it",
+  JSON.stringify(own?.files.map((file) => file.path)) === JSON.stringify(["SKILL.md"]),
+  own?.files
+)
+await fs.writeFile(path.join(workspaceSkillRoot(workspace), "own-one", "notes.md"), "note")
+const withFile = await readWorkspaceSkill(workspace, "own-one")
+check(
+  "a file added beside the manifest shows up",
+  withFile?.files.some((file) => file.path === "notes.md") === true,
+  withFile?.files
+)
+check("a skill that is not there reads as nothing", (await readWorkspaceSkill(workspace, "missing")) === null)
+check(
+  "a name that would read outside the root is refused",
+  await readWorkspaceSkill(workspace, "../escape").then(
+    () => false,
+    (error: unknown) => (error as Error).message.includes("unusable skill name")
+  )
+)
 
 /* Installing twice is a mistake, not a second entry. */
 refused = ""

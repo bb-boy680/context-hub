@@ -14,8 +14,14 @@ import path from "node:path"
 import { displayPath } from "@workspace/core/host/home"
 
 import { parseSkillFile } from "../frontmatter.ts"
+import { walkSkillDir } from "./file-tree.ts"
 import { assertSkillName } from "./names.ts"
-import type { WorkspaceSkill, WorkspaceSkillOrigin, WorkspaceSkillsView } from "../store.ts"
+import type {
+  WorkspaceSkill,
+  WorkspaceSkillDetail,
+  WorkspaceSkillOrigin,
+  WorkspaceSkillsView,
+} from "../store.ts"
 
 /** Where a workspace keeps the skills its agents read. */
 export const WORKSPACE_SKILL_DIR = path.join(".agents", "skills")
@@ -95,6 +101,31 @@ export async function readWorkspaceSkills(
   }
   skills.sort((left, right) => left.id.localeCompare(right.id))
   return { ...view, skills }
+}
+
+/**
+ * Read one skill a workspace holds, where it lives.
+ *
+ * @param workspace — the workspace folder, absolute.
+ * @param id — the skill's directory name under the workspace's skills root.
+ * @returns the manifest as written and the files beside it, or `null` when the
+ *   folder holds no such skill.
+ */
+export async function readWorkspaceSkill(
+  workspace: string,
+  id: string
+): Promise<WorkspaceSkillDetail | null> {
+  const dir = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
+  const text = await fs.readFile(path.join(dir, MANIFEST), "utf8").catch(() => null)
+  if (text === null) return null
+  const frontmatter = parseSkillFile(text).frontmatter
+  return {
+    id,
+    name: frontmatter.name ?? id,
+    description: frontmatter.description ?? "",
+    text,
+    files: await walkSkillDir(dir),
+  }
 }
 
 /**

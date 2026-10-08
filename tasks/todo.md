@@ -1343,3 +1343,29 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 - `check-workspaces.ts` 增至 45 项（含 projectRoot / 收养 / 旧行原地治愈 / 宿主不匹配不动）；
   `check-workspace-skills.ts`、`check-store.ts`、`check-state.ts` 无回归；五个包 typecheck + lint 全绿。
 
+### 修正：工作区技能显示的是编造内容（2026-10-08，用户发现）
+
+**用户的发现**：灯箱「文件」面板里的内容和 `D:\work-space\dsh-context-hub\.agents\skills\grill-me` 对不上。
+
+**根因**：`useFileRows`（`skill-detail-dialog.tsx`）在 `detail === null` 时**回落到内置示例** ——
+一棵假文件树（`skill/`、`reference.md`、`examples/basic.md`、`scripts/extract.py`）加一段模板正文
+（`## Steps` / `## Guardrails`）。而 `detail` 来自 `store.get(id)`，那只认**hub 库**；
+工作区自带的技能不在库里，`get()` 抛错 → 一路按"没有记录"渲染，于是把示例当内容画了出来。
+
+**修法**：让工作区技能从它所在的目录读出**真实内容**。
+- `host/file-tree.ts`（新）：`walkSkillDir(dir)` —— 原来的 `walk` 从 `skills-fs.ts` 提出来共用
+  （`skills-fs.ts` 与 `workspace-skills.ts` 都要走文件树，放在任一边都会形成循环依赖）。
+- `host/workspace-skills.ts`：`readWorkspaceSkill(workspace, id)` → 读 `SKILL.md` **原文**（保留
+  frontmatter，`disable-model-invocation` 这类字段不再被丢掉）+ `files`。
+- 契约 `WorkspaceSkillDetail`；`SkillStore.workspaceSkill(id)`；桥 `GET /hub/skills?action=workspace-skill&id=…`。
+- 灯箱：工作区行（`location === "workspace"`）改读这条记录；`useFileRows` 的示例回落**只在完全没有库的形态**
+  （`store === null`，即样例数据）下生效；库里问不到的空结果现在是空面板，不再编内容。
+- 顺带：`stale`/工作区行不再向库发 `get()`（那一发必然 400，控制台留噪）；「删除技能」不再对工作区行显示
+  （库删不掉它不持有的技能）；`updated` 为空的行不再显示「更新于」空值，改显示「读取自这个工作区」。
+
+**验证**：`GET …action=workspace-skill&id=grill-me` 返回真实 `SKILL.md` 原文 +
+`agents/`、`agents/openai.yaml`、`SKILL.md` 三个条目；浏览器里工作区页签打开 `grill-me`：文件树与磁盘一致、
+正文含 `disable-model-invocation: true` 与 `Call the Skill tool with "grilling".`、**没有** Steps/Guardrails/extract.py、
+按钮只剩「查看文件」、控制台零报错。核对图 `designs/check-web/skills-workspace-files-real.png`。
+`check-workspace-skills.ts` 增 7 项（读原文 / 文件树 / 不存在返回 null / 越界名字被拒）共 37 项全过。
+
