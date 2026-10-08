@@ -31,3 +31,9 @@ dist-ssr
 
 # typescript
 *.tsbuildinfo
+
+# design check screenshots: regenerable exports, never part of the repository
+designs/**/*.png
+designs/**/*.jpg
+designs/**/*.jpeg
+designs/**/*.webp

@@ -304,6 +304,7 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 ### 验证
 
 - 全行扫描：除装饰 Blob（刻意的出血）外无布局问题；`Card Grid` 内的裁切是视口折线，不是缺陷。
-- 核对图：`designs/check-skills-masonry/libo0.png`（瀑布流网格）、`L9tdZp.png`（lightbox + 新背景）。
+- 核对图本轮已按新约定删除（`designs/` 下的截图不进仓库）：本地导出 `libo0`（瀑布流网格）与 `L9tdZp`
+  （lightbox + 新背景）逐块看过，确认封面比例、列高与折线位置正确。
 
 
