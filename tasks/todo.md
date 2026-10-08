@@ -1493,3 +1493,48 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 灯箱动作条同样显示「移除」；其余行仍是「收录」「安装」。两个包 tsc + eslint 全绿，
 `check-workspace-skills.ts`（53 项）与 `check-store.ts` 全过。**测试链接已删，用户状态已还原。**
 
+
+### 修正：链接进来的技能不显示日期（2026-10-08，用户反馈）
+
+用户：『我点击完收录那些东西的时候，你为什么改了日期啊？这个日期有啥意义啊？我又没改 skill 的内容。』
+
+原因：`readEntry` 对每条索引行都取 `SKILL.md` 的 mtime 当作 `updatedAt`。链接进来的技能指向工作区，
+那些文件本来就是「今天下载的」，一被收录就出现在库里并带上这个时间；`list()` 又按 `updatedAt`
+倒序排，于是它挤到最前面 —— 看起来像「收录改了日期」。
+
+改法：**链接行不带日期**。`readEntry` 在 `link !== undefined` 时写 `updatedAt: ""`（并让早先带日期的链接行
+重读一次自愈），`SkillSummary.updatedAt` 的契约补上「链接技能为空」。前端早已把空日期当作「没有日期」处理
+（`formatAge("")` → `""`，卡片/灯箱/列表都不渲染），排序随之落到 `id` 兜底，不再按日期漂移。
+自持技能的行不受影响，仍带自己那份 `SKILL.md` 的 mtime。
+
+**验证**：`check-workspace-skills.ts` 增至 56 项（链接行无日期 / 自持行有日期）全部通过；
+`check-store.ts` 74 项通过；tsc + eslint 全绿。提交 `cd7a583`。
+
+## 技能更新检测：npx skills 的哈希与 update（2026-10-08 调研）
+
+用户：『通过 npx skills 安装会生成 skills-lock.json，里面有个哈希记录这个 skill 是否产生变化，我后续更新要用；
+npx skills 指令可以检测 skill 有更新吗？』
+
+**哈希覆盖什么**（读 skills@1.7.1 的 dist/cli.mjs 得到，不是猜的）：`computeSkillFolderHash(dir)` —— 递归收集该技能目录下
+所有文件（跳过 `.git` / `node_modules`），按相对路径排序，`sha256.update(相对路径)` + `sha256.update(文件字节)`，
+无分隔符，取 hex。**覆盖整个目录**，不是只有 SKILL.md（实测 SKILL.md 自身 sha256 = `19e660…`，而 lock 里是 `5e0c68…`）。
+`--json` 报告里的 `hash` 与 lock 的 `computedHash` 完全一致（实测两端同为 `5e0c683385eafd…`），下载时不用自己算，
+直接收下来即可。v1.7.1 写出的 lock 只有 `{source, sourceType, skillPath, computedHash}`，**没有 `ref`**。
+
+**能不能检测更新：能。** `skills update [名字…]`（别名 `upgrade`，`-p` / `-g` / `-y`）：
+clone 源仓库 → 对上游同一目录算同一个哈希 → 与 lock 的 `computedHash` 比；不等就重装（内部再跑一次 `add`），
+相等就是 `All project skills are up to date`；技能在仓库里换了路径（`skillPath` 变化）也算更新。
+GitHub API 快路径需要 lock 里的 `skillFolderHash`（git tree hash，40 位十六进制），本版本不写该字段，所以目前都走 clone。
+
+**它不看本地。** 实测把一个技能的 SKILL.md 追加一行后再 update，仍报 `up to date` —— update 比的是「上游 vs 安装时记录」，
+不 hash 你现在磁盘上的内容。含义：上游一旦变了就会直接覆盖本地改动，没有保护；要判断「本地是否被改过」得我们自己算。
+Windows 坑：`skills update` 打印完之后 node 断言崩溃（`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`，exit 1），
+功能已生效但**退出码不可信**。
+
+**对 hub 的含义 / 待做（未开工，等确认）**：
+- [ ] catalog 记 provenance：`source`（owner/repo）、`skillPath`、`computedHash`（下载时从 `--json` 收下，不用自己算）。
+- [ ] 复刻 `computeSkillFolderHash`（host 侧约 20 行）：既用于判断本地是否被改过，也用于算上游哈希。
+- [ ] 「检查更新」：有 GitHub 源的走 API 取上游文件算哈希（或直接 clone），有新版在行上标出 + 一键更新；
+      更新前若本地哈希 ≠ 记录值，先告知「本地已改过，会被覆盖」。
+- [ ] 工作区页签读项目根的 `skills-lock.json`（npx skills 写的权威记录）：显示来源（`mattpocock/skills` 等）并支持检查更新。
+- 现状：hub 下载技能只写 `source: "registry"`，**没记 owner/repo、没记哈希**；库里现有 39 条自持技能都是这种状态。

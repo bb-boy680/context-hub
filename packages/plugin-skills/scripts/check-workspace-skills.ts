@@ -307,10 +307,10 @@ check(
   linkedRow?.link === path.join(workspaceSkillRoot(workspace), "linked-one"),
   linkedRow?.link
 )
-check(
-  "a skill the library holds itself carries no link",
-  page.items.find((item) => item.id === "own-one")?.link === undefined
-)
+check("a linked row carries no date", linkedRow?.updatedAt === "", linkedRow?.updatedAt)
+const heldRow = page.items.find((item) => item.id === "alpha")
+check("a skill the library holds itself carries no link", heldRow?.link === undefined, heldRow?.link)
+check("and it carries the date of its own files", (heldRow?.updatedAt ?? "") !== "", heldRow?.updatedAt)
 
 /* Removing a linked entry takes the link back and leaves those files alone. */
 await store.remove("linked-one")

@@ -86,6 +86,7 @@ interface CatalogEntry {
   assets: string[]
   /** Manifest mtime when this row was last read; drives refreshes. */
   mtimeMs: number
+  /** ISO timestamp of the last recorded change; empty for a linked skill. */
   updatedAt: string
 }
 
@@ -212,9 +213,11 @@ export async function createFsSkillStore(
     const manifest = path.join(skillDir(id), MANIFEST)
     const stat = await statOrNull(manifest)
     if (stat === null) return null
-    /* An untouched manifest keeps its recorded row without re-parsing. */
+    /* An untouched manifest keeps its recorded row without re-parsing; a link
+       keeps its row only once it carries no date, so a row recorded with one
+       is read again and dropped. */
     if (previous !== undefined && previous.mtimeMs === stat.mtimeMs && previous.link === link) {
-      return previous
+      if (link === undefined || previous.updatedAt === "") return previous
     }
     const { frontmatter } = parseSkillFile(await fs.readFile(manifest, "utf8"))
     return {
@@ -227,7 +230,13 @@ export async function createFsSkillStore(
       /* A skill's manifest carries no media; the references it had stay as they are. */
       assets: previous?.assets ?? [],
       mtimeMs: stat.mtimeMs,
-      updatedAt: stat.mtime.toISOString(),
+      /*
+       * A linked skill's files are somebody else's: the hub has recorded no
+       * change to them, and linking one in changes nothing about its contents.
+       * Its manifest time would make a date appear and jump on the adoption
+       * alone, so a link carries none.
+       */
+      updatedAt: link === undefined ? stat.mtime.toISOString() : "",
     }
   }
 

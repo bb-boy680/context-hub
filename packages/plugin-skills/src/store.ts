@@ -30,7 +30,11 @@ export interface SkillSummary {
    * files belong to wherever this points.
    */
   link?: string
-  /** ISO timestamp of the last recorded change. */
+  /**
+   * ISO timestamp of the last recorded change to the hub's own copy, empty for
+   * a linked skill: the hub has changed nothing about files it does not hold,
+   * so it has no date to report and the row sorts among the undated ones.
+   */
   updatedAt: string
 }
 
