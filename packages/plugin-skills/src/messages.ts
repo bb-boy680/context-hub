@@ -50,6 +50,8 @@ export const skillsMessages: Record<string, string> = {
     "owner/repo, owner/repo@skill, a Git URL, a SKILL.md link, or a pasted npx skills add command",
   "skills.add.packageNote": "Listed automatically when the field loses focus.",
   "skills.add.listing": "Reading the package…",
+  "skills.add.capped":
+    "This folder holds more than {count} files, so only the first ones were read.",
   "skills.add.none": "No skills found there.",
   "skills.add.foundPackage": "Found {count} skills in this package",
   "skills.add.foundFolder": "Found {count} skills in this folder",

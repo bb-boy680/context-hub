@@ -12,7 +12,13 @@ import path from "node:path"
 
 import { importFolder } from "../src/host/folder-import.ts"
 import { parsePackageList } from "../src/host/skills-cli.ts"
-import { readFolderFiles, scanFolder } from "../src/folder-scan.ts"
+import {
+  DEFAULT_LIMITS,
+  filesFromPicker,
+  readFolderFiles,
+  scanFolder,
+  walkEntries,
+} from "../src/folder-scan.ts"
 import { parsePackageRequest } from "../src/package-source.ts"
 
 let failures = 0
@@ -148,10 +154,13 @@ const manifest = (text: string) => new File([`${text}`], "SKILL.md")
 const doc = (name: string, description: string) =>
   manifest(`---\nname: ${name}\ndescription: ${description}\n---\n\nBody\n`)
 
+/** One file as a walk hands it over: a path, and an opener that waits. */
+const at = (filePath: string, file: File) => ({ path: filePath, open: async () => file })
+
 const droppedFiles = [
-  { path: "docs-writer/SKILL.md", file: doc("docs-writer", "Turn notes into a docs page.") },
-  { path: "docs-writer/references/guide.md", file: new File(["guide"], "guide.md") },
-  { path: "notes/readme.md", file: new File(["notes"], "readme.md") },
+  at("docs-writer/SKILL.md", doc("docs-writer", "Turn notes into a docs page.")),
+  at("docs-writer/references/guide.md", new File(["guide"], "guide.md")),
+  at("notes/readme.md", new File(["notes"], "readme.md")),
 ]
 
 const scanned = await scanFolder(droppedFiles)
@@ -170,17 +179,15 @@ check(
 )
 check(
   "a file at the drop's root belongs to no skill",
-  (await scanFolder([{ path: "SKILL.md", file: manifest("x") }])).length === 0
+  (await scanFolder([at("SKILL.md", manifest("x"))])).length === 0
 )
 
 /* A repository holds its skills under whatever folders it likes. */
 const repository = await scanFolder([
-  { path: "repo/README.md", file: new File(["readme"], "README.md") },
-  { path: "repo/skills/engineering/code-review/SKILL.md", file: doc("code-review", "Review changes.") },
-  { path: "repo/skills/engineering/code-review/reference.md", file: new File(["ref"], "reference.md") },
-  { path: "repo/skills/writing/tdd/SKILL.md", file: doc("tdd", "Test first.") },
-  { path: "repo/node_modules/pkg/SKILL.md", file: doc("pkg", "Dependency.") },
-  { path: "repo/.git/SKILL.md", file: doc("git", "Git internals.") },
+  at("repo/README.md", new File(["readme"], "README.md")),
+  at("repo/skills/engineering/code-review/SKILL.md", doc("code-review", "Review changes.")),
+  at("repo/skills/engineering/code-review/reference.md", new File(["ref"], "reference.md")),
+  at("repo/skills/writing/tdd/SKILL.md", doc("tdd", "Test first.")),
 ])
 same(
   "every skill under the picked folder is found, at any depth",
@@ -195,11 +202,11 @@ check(
 
 /* A picked project keeps its skills where the agents put them. */
 const project = await scanFolder([
-  { path: "app/src/index.ts", file: new File(["code"], "index.ts") },
-  { path: "app/.agents/skills/grill-me/SKILL.md", file: doc("grill-me", "Grill a plan.") },
-  { path: "app/.agents/skills/grill-me/references/notes.md", file: new File(["notes"], "notes.md") },
+  at("app/src/index.ts", new File(["code"], "index.ts")),
+  at("app/.agents/skills/grill-me/SKILL.md", doc("grill-me", "Grill a plan.")),
+  at("app/.agents/skills/grill-me/references/notes.md", new File(["notes"], "notes.md")),
   { path: "app/.claude/skills/retro/SKILL.md", file: doc("retro", "Run a retro.") },
-])
+].map((entry) => ("file" in entry ? at(entry.path, entry.file) : entry)))
 same(
   "a hidden agent directory is searched, not skipped",
   project.map((skill) => `${skill.name}@${skill.dir}`),
@@ -208,8 +215,8 @@ same(
 
 /* Picking the agent directory itself: its own name must not hide what is under it. */
 const agentRoot = await scanFolder([
-  { path: ".agents/skills/grill-me/SKILL.md", file: doc("grill-me", "Grill a plan.") },
-  { path: ".agents/skills/grill-me/references/notes.md", file: new File(["notes"], "notes.md") },
+  at(".agents/skills/grill-me/SKILL.md", doc("grill-me", "Grill a plan.")),
+  at(".agents/skills/grill-me/references/notes.md", new File(["notes"], "notes.md")),
 ])
 same(
   "the folder a person picked is searched whatever it is called",
@@ -224,15 +231,15 @@ check(
 
 /* A skill that carries another manifest is still one skill. */
 const nested = await scanFolder([
-  { path: "outer/SKILL.md", file: doc("outer", "Outer.") },
-  { path: "outer/examples/SKILL.md", file: doc("example", "An example.") },
+  at("outer/SKILL.md", doc("outer", "Outer.")),
+  at("outer/examples/SKILL.md", doc("example", "An example.")),
 ])
 same("a manifest inside a skill belongs to that skill", nested.map((skill) => skill.name), ["outer"])
 
 /* A picked folder that is itself a skill is one skill. */
 same(
   "the picked folder can be the skill",
-  (await scanFolder([{ path: "solo/SKILL.md", file: doc("solo", "Alone.") }])).map((s) => s.name),
+  (await scanFolder([at("solo/SKILL.md", doc("solo", "Alone."))])).map((s) => s.name),
   ["solo"]
 )
 
@@ -243,6 +250,153 @@ check(
   encoded[0]?.files.map((file) => file.path).join(",") === "SKILL.md,reference.md",
   encoded[0]?.files.map((file) => file.path)
 )
+
+/* --- the bounds that keep a big folder from taking the page down -------- */
+
+/* The walk never reads a byte: a file that cannot be opened still lists. */
+const unreadable = await scanFolder([
+  { path: "stale/SKILL.md", open: async () => null },
+  at("stale/reference.md", new File(["ref"], "reference.md")),
+])
+same("a stale handle still counts as a skill", unreadable.map((s) => s.name), ["stale"])
+check("with no description to show", unreadable[0]?.description === "", unreadable[0])
+
+/* A byte budget stops an oversized import before it reads anything. */
+let opened = 0
+const heavy = await scanFolder([
+  at("big/SKILL.md", doc("big", "Large.")),
+  {
+    path: "big/data.bin",
+    open: async () => {
+      opened += 1
+      return new File([new Uint8Array(2 * 1024 * 1024)], "data.bin")
+    },
+  },
+])
+const budget = await readFolderFiles(heavy, 1).then(
+  () => "read",
+  (failure: unknown) => (failure instanceof Error ? failure.message : String(failure))
+)
+check("an import over its byte budget refuses", budget !== "read", budget)
+check("and never finishes opening the files", opened <= 2, { opened })
+
+/* Generated directories are skipped wherever they sit. */
+const noise = await scanFolder(
+  ["node_modules", "dist", "build", ".venv", "coverage", ".git"].map((name) =>
+    at(`app/${name}/pkg/SKILL.md`, doc(name, "Generated."))
+  )
+)
+same("a generated directory holds no skills", noise, [])
+
+/* A picker that hands over more than the budget keeps only what it can use. */
+const picked = filesFromPicker(
+  {
+    files: [
+      ...Array.from({ length: 5 }, (_, index) =>
+        Object.assign(new File(["x"], `f${index}.md`), {
+          webkitRelativePath: `p/f${index}.md`,
+        })
+      ),
+      Object.assign(new File(["x"], "SKILL.md"), {
+        webkitRelativePath: "p/node_modules/pkg/SKILL.md",
+      }),
+      Object.assign(new File(["x"], "SKILL.md"), {
+        webkitRelativePath: "p/.agents/skills/grill-me/SKILL.md",
+      }),
+    ],
+  },
+  { ...DEFAULT_LIMITS, maxEntries: 3 }
+)
+check("a picker over its budget keeps three files", picked.files.length === 3, picked.files)
+check("and reports the cut", picked.truncated === true)
+check(
+  "putting the agent root before the plain files",
+  picked.files[0]?.path === "p/.agents/skills/grill-me/SKILL.md",
+  picked.files.map((file) => file.path)
+)
+check(
+  "and dropping the generated directories before it counts",
+  !picked.files.some((file) => file.path.includes("node_modules")),
+  picked.files.map((file) => file.path)
+)
+
+/* A walk stops at its budget instead of reading the rest of the tree. */
+function dir(name: string, children: FileSystemEntry[]): FileSystemEntry {
+  return {
+    name,
+    isFile: false,
+    isDirectory: true,
+    createReader: () => {
+      let done = false
+      return {
+        readEntries: (onBatch: (batch: FileSystemEntry[]) => void) => {
+          if (done) {
+            onBatch([])
+            return
+          }
+          done = true
+          onBatch(children)
+        },
+      }
+    },
+  } as FileSystemEntry
+}
+
+function entry(name: string): FileSystemEntry {
+  return {
+    name,
+    isFile: true,
+    isDirectory: false,
+    file: (onFile: (file: File) => void) => onFile(new File(["x"], name)),
+  } as FileSystemEntry
+}
+
+const wide = dir(
+  "wide",
+  Array.from({ length: 40 }, (_, index) => entry(`f${index}.md`))
+)
+const walked = await walkEntries([wide], { ...DEFAULT_LIMITS, maxEntries: 7 })
+check("a walk stops at its entry budget", walked.scanned === 7, walked.scanned)
+check("and says it was cut", walked.truncated === true)
+check(
+  "counting every entry it looked at, the root included",
+  walked.files.length === 6,
+  walked.files.length
+)
+check(
+  "and never opening a file while walking",
+  walked.files.every((file) => typeof file.open === "function"),
+  walked.files.length
+)
+
+/* A folder of bulky siblings must not spend the budget before the agent root. */
+const bulky = dir("huge", [
+  ...Array.from({ length: 50 }, (_, index) =>
+    dir(`pkg${index}`, Array.from({ length: 5 }, (_, f) => entry(`f${f}.js`)))
+  ),
+  dir(".agents", [dir("skills", [dir("grill-me", [entry("SKILL.md")])])]),
+])
+const narrowed = await walkEntries([bulky], { ...DEFAULT_LIMITS, maxEntries: 12 })
+check(
+  "the agent root is visited before its siblings",
+  narrowed.files.some((file) => file.path === "huge/.agents/skills/grill-me/SKILL.md"),
+  narrowed.files.map((file) => file.path)
+)
+check("so the skill survives the budget", narrowed.truncated === true, narrowed)
+check(
+  "and the skill is the one the scan reports",
+  (await scanFolder(narrowed.files)).map((skill) => skill.name).join(",") === "grill-me",
+  (await scanFolder(narrowed.files)).map((skill) => skill.name)
+)
+
+/* An aborted walk stops where it stands. */
+const aborted = new AbortController()
+aborted.abort()
+const stopped = await walkEntries([wide], DEFAULT_LIMITS, aborted.signal).then(
+  () => "walked",
+  (failure: unknown) => (failure instanceof Error ? failure.name : String(failure))
+)
+check("an aborted walk stops at once", stopped !== "walked", stopped)
 
 /* --- writing the skills a folder read produced ------------------------- */
 

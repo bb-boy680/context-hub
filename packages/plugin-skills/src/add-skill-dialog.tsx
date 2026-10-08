@@ -2,12 +2,15 @@ import { CheckIcon, DownloadIcon, UploadIcon, XIcon } from "lucide-react"
 import * as React from "react"
 
 import {
+  DEFAULT_LIMITS,
   filesFromPicker,
   readDrop,
   readFolderFiles,
   scanFolder,
+  walkDirectory,
   type DroppedFile,
   type FolderSkill,
+  type ScanLimits,
 } from "./folder-scan.ts"
 import { parsePackageRequest } from "./package-source.ts"
 import type { PackageSkill, SkillImport, SkillStore } from "./store.ts"
@@ -266,6 +269,8 @@ export function AddSkillDialog({
 }) {
   const { t } = useI18n()
   const pickerRef = React.useRef<HTMLInputElement>(null)
+  /** The folder read in flight; a newer read, or a close, stops it. */
+  const folderRead = React.useRef<AbortController | null>(null)
 
   const [source, setSource] = React.useState("")
   /** The source the package list came from; empty until a listing lands. */
@@ -275,6 +280,8 @@ export function AddSkillDialog({
   const [picked, setPicked] = React.useState<string[]>([])
   const [packaged, setPackaged] = React.useState<PackageSkill[]>([])
   const [folder, setFolder] = React.useState<FolderSkill[] | null>(null)
+  /** True when a bound stopped the read before the folder ran out. */
+  const [capped, setCapped] = React.useState(false)
   /** Ids this library already holds, lower-cased for comparison. */
   const [installed, setInstalled] = React.useState<string[]>([])
   const [busy, setBusy] = React.useState<"list" | "import" | null>(null)
@@ -311,12 +318,15 @@ export function AddSkillDialog({
     tab === "local" ? folder !== null : source.trim() !== "" || picked.length > 0
 
   const reset = () => {
+    folderRead.current?.abort()
+    folderRead.current = null
     setSource("")
     setListed("")
     setSeeded("")
     setPicked([])
     setPackaged([])
     setFolder(null)
+    setCapped(false)
     setBusy(null)
     setError(null)
     setFailed([])
@@ -369,22 +379,42 @@ export function AddSkillDialog({
     }
   }
 
-  /** Read a dropped folder into candidates, taking the first new one the way the design does. */
-  const acceptFolder = async (files: DroppedFile[]) => {
+  /**
+   * Read a folder into candidates, taking the first new one the way the design does.
+   *
+   * Reading goes through `read`, which is bounded and stoppable: a folder can
+   * hold anything, and this must not be the thing that freezes the page. A new
+   * read — or a closed dialog — aborts the one before it.
+   */
+  const acceptFolder = async (
+    read: (signal: AbortSignal) => Promise<{ files: DroppedFile[]; truncated: boolean }>
+  ) => {
+    folderRead.current?.abort()
+    const controller = new AbortController()
+    folderRead.current = controller
     setError(null)
     setFailed([])
     setPicked([])
+    setCapped(false)
     setBusy("list")
     try {
+      const { files, truncated } = await read(controller.signal)
       const found = await scanFolder(files)
+      /* A newer read, or a closed dialog, owns the state now. */
+      if (controller.signal.aborted) return
+      setCapped(truncated)
       setFolder(found)
       const first = found.find((skill) => !installed.includes(skill.name.toLowerCase()))
       setPicked(first === undefined ? [] : [first.name])
     } catch (failure) {
+      if (controller.signal.aborted) return
       setFolder(null)
       setError(messageOf(failure))
     } finally {
-      setBusy(null)
+      if (folderRead.current === controller) {
+        folderRead.current = null
+        setBusy(null)
+      }
     }
   }
 
@@ -443,6 +473,28 @@ export function AddSkillDialog({
     : t("skills.add.foundPackage")
   ).replace("{count}", String(candidates.length))
 
+  /** Both ways into a local folder land on the same bounded read. */
+  const limits: ScanLimits = DEFAULT_LIMITS
+
+  /** The picker walks the handle itself, so it never enumerates the whole folder. */
+  const browse = async () => {
+    const pick = (
+      window as { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> }
+    ).showDirectoryPicker
+    if (pick === undefined) {
+      pickerRef.current?.click()
+      return
+    }
+    let handle: FileSystemDirectoryHandle
+    try {
+      handle = await pick()
+    } catch {
+      /* The person dismissed the picker; nothing to read and nothing to say. */
+      return
+    }
+    await acceptFolder((signal) => walkDirectory(handle, limits, signal))
+  }
+
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent
@@ -477,7 +529,10 @@ export function AddSkillDialog({
               onDragOver={(event) => event.preventDefault()}
               onDrop={(event) => {
                 event.preventDefault()
-                void readDrop(event.dataTransfer).then(acceptFolder)
+                void acceptFolder((signal) => {
+                  const transfer = event.dataTransfer
+                  return readDrop(transfer, { signal, limits })
+                })
               }}
               className="flex h-[92px] items-center gap-3.5 rounded-lg bg-dropzone px-5 ring-2 ring-primary"
             >
@@ -495,7 +550,7 @@ export function AddSkillDialog({
               <Button
                 variant="outline"
                 className={`h-9 shrink-0 px-4 ${outline}`}
-                onClick={() => pickerRef.current?.click()}
+                onClick={() => void browse()}
               >
                 <UploadIcon />
                 {t("skills.add.browseFiles")}
@@ -508,11 +563,20 @@ export function AddSkillDialog({
                 className="sr-only"
                 {...{ webkitdirectory: "", directory: "" }}
                 onChange={(event) => {
-                  void acceptFolder(filesFromPicker(event.target))
-                  event.target.value = ""
+                  const input = event.target
+                  void acceptFolder(async () => filesFromPicker(input, limits))
+                  input.value = ""
                 }}
               />
             </div>
+            {capped && (
+              <p className="pt-2 text-[11px] leading-[14px] text-muted-foreground">
+                {t("skills.add.capped").replace(
+                  "{count}",
+                  String(DEFAULT_LIMITS.maxEntries)
+                )}
+              </p>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-2 px-6 pb-6">

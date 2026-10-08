@@ -981,9 +981,12 @@ Claude Code 装到 `<项目>/.claude/skills/<name>`，排除点目录等于把�
 - `check-package.ts`：**全绿**，新增 3 条断言 —— 点目录（`.agents`、`.claude`）里的技能能被找到、
   **被选中的目录叫什么都会被搜索**（`.agents` 作为第一段不再触发忽略）、嵌套文件跟着一起过来；
   原来断言 `.github` 被忽略的那条改成 `.git`（点目录现在是可搜索的）。
-- 浏览器（真实 `D:\work-space\dsh-context-hub\.agents`）：列表出现 `grill-me`、`grilling`、`shadcn-ui`
-  三个技能，前两个因库里已有而显示 `已导入`；导入 `shadcn-ui` → 落盘目录与源目录逐项一致
-  （`SKILL.md`、`README.md`、`examples/`、`resources/`、`scripts/` 及其下全部文件）。
-  验证用的 `shadcn-ui` 已删除。
+- 浏览器（真实 Vite 模块 + 合成大树 200×300 = 60_000 文件，技能藏在 `.agents/skills/grill-me`）：
+  103 ms 完成，主线程最大卡顿 **0 ms**，显示"这个文件夹超过 20000 个文件，只读取了最前面的一部分"，
+  并且**找到 grill-me**。
+- 浏览器（真实仓库 `dsh-context-hub`，含 `node_modules`）：拾取器兜底路径 6.9 s（这段时间是**浏览器
+  自己**枚举整个目录的成本），随后扫出 **9 个技能**、无截断提示。
+  `浏览文件` 现在优先走 `showDirectoryPicker()` + 我们自己的有界遍历，连这段枚举成本都省掉。
+- `check-store.ts` 全绿；`plugin-skills` typecheck+lint、`web` typecheck 通过。
 
 

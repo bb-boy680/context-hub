@@ -105,6 +105,7 @@ export const messages: Record<string, string> = {
     "owner/repo、owner/repo@skill、Git 地址、SKILL.md 链接，或直接粘贴 npx skills add 命令",
   "skills.add.packageNote": "输入框失去焦点时自动拉取列表。",
   "skills.add.listing": "正在读取来源包…",
+  "skills.add.capped": "这个文件夹超过 {count} 个文件，只读取了最前面的一部分。",
   "skills.add.none": "没有找到技能。",
   "skills.add.foundPackage": "该来源包里有 {count} 个技能",
   "skills.add.foundFolder": "该文件夹里有 {count} 个技能",
