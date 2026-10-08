@@ -941,4 +941,49 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
 改成 **`Import 1`**，与各画板里"已选一个"的状态对齐；图标沿用组件里已启用的 `download`。
 改的是实例的 `descendants` 覆盖，图标与配色的覆盖一并写上，避免只改文字把图标覆盖丢掉。
 
+### 去重与「已导入」标记（2026-10-08，用户："已经下载下来的需要显示已经导入了"）
+
+技能列表里已经在本库里的行不再让用户选，也不再出现在导入里。
+
+- **判定**：打开弹窗时读一次目录（`store.list({ limit: 1000 })` 拿全部 id），按目录名小写比对；
+  每次打开都重读，标记不会过期。
+- **行状态**：已在本库 → 绿色勾 + `已导入`（灰色文字，无按钮，与画布新增的 `State Imported` 一致）；
+  其余仍是 `选择` / `已选择`。
+- **不再重复导入**：`selectable` 只含未入库的行 —— 全选只选它们（38 个技能里已有 3 个时显示 `导入 35`），
+  粘贴 `…@grill-me`（已入库）不会再变成 chip，按钮显示 `导入` 并禁用。
+- **pin 变化要重新播种**：`listed` 只记来源，所以同一来源换 pin 时原来会直接 return、chip 不更新；
+  新增 `seeded`（pin 串）一起比对，pin 变了就地重播种，**不重跑 CLI**。
+- 宿主侧的重名拒绝保留为最后一道防线（脚本里有断言）。
+
+**验证**：真实仓库 `mattpocock/skills`（38 个）→ 本库已有的三行显示 `已导入`；`全选` → `导入 35`；
+`mattpocock/skills@tdd` → chip `tdd` + `导入 1`；`mattpocock/skills@grill-me` → 无 chip + 按钮禁用。
+
+**画布**：两块 Add skill 画板各把一行改成 `State Imported`（`Y2fjK1` 的 `code-review`、
+`DzRqf` 的 `api-review`）：绿色勾 14×14 + `Imported` 13/500 `$muted-foreground`，
+行内右对齐（x=501，与 `Button Select` 同位）。做法是把已有的 `State Selected` 帧 Copy 进行里，
+再把标签改字、改色，删掉原来的 `Button Select` 实例。
+
+### 修复：隐藏目录里的技能找不到（2026-10-08，用户："导入时还需要处理嵌套目录"）
+
+用户拿 `dsh-context-hub\.agents` 试：里面的技能在 `.agents/skills/<name>/SKILL.md`，
+而扫描把**任何以 `.` 开头的目录整支忽略**，于是"没有找到技能"。
+
+**改法**：噪声名单从"所有点目录"改成**明确的生成目录** `node_modules` 与 `.git`。
+理由：现在通行的技能布局恰恰在点目录里 —— CLI 装到 `<项目>/.agents/skills/<name>`、
+Claude Code 装到 `<项目>/.claude/skills/<name>`，排除点目录等于把主路径排掉。
+
+- 拖拽遍历 `readEntry` 同样跳过 `node_modules` / `.git`，免得拖一个装过依赖的项目时把整棵树读进来。
+- 其余规则不变：任意深度找 `SKILL.md`、浅的那层优先（技能自己的子目录算它的内容）、技能名取目录名、
+  文件按技能目录裁路径。
+
+**验证**
+
+- `check-package.ts`：**全绿**，新增 3 条断言 —— 点目录（`.agents`、`.claude`）里的技能能被找到、
+  **被选中的目录叫什么都会被搜索**（`.agents` 作为第一段不再触发忽略）、嵌套文件跟着一起过来；
+  原来断言 `.github` 被忽略的那条改成 `.git`（点目录现在是可搜索的）。
+- 浏览器（真实 `D:\work-space\dsh-context-hub\.agents`）：列表出现 `grill-me`、`grilling`、`shadcn-ui`
+  三个技能，前两个因库里已有而显示 `已导入`；导入 `shadcn-ui` → 落盘目录与源目录逐项一致
+  （`SKILL.md`、`README.md`、`examples/`、`resources/`、`scripts/` 及其下全部文件）。
+  验证用的 `shadcn-ui` 已删除。
+
 
