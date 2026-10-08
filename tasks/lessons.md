@@ -23,3 +23,10 @@
 - 打开详情用**单击**，不是双击（用户原话："单机后，希望打开弹窗是这样的"）。
 - 形态是 **lightbox**：左媒体（图片/视频 swiper + 缩略图 + 拖拽/＋上传）+ 右信息面板，"View files" 再从右往左滑入文件面板 —— 不是原来的 tab 弹窗。
 - 面板滑入用 `translate-x-full → translate-x-0` + `transition-transform duration-300 ease-out`；不要用 `useEffect` 里 `setState` 重置播放状态（eslint `react-hooks/set-state-in-effect` 会报错），改用 `key` 重挂载。
+
+## 接真实数据
+
+- 接磁盘库时不要用"更方便过滤"的控件替换设计稿已有的控件：技能页签原本是来源轴（All / Built-in / Workspace / skill.sh），
+  被换成启用状态轴后用户立刻发现"这一块不见了"。设计稿的控件先照搬，功能不够再加**新**位置，别改旧位置。
+- 改动服务端桥（`vite.ts` / host 侧 store）后要**重启 dev server**：Vite 不会热更已加载的插件模块，
+  前端会拿到缺少新字段的响应，表现为页面直接崩在渲染里。判断依据：接口返回值形状与前端类型不一致。
