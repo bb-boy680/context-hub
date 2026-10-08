@@ -1006,8 +1006,8 @@ function InfoPanel({
                 ? "skills.action.cleanup"
                 : skill.installed
                   ? skill.linkAt === "library"
-                    ? "skills.action.removeFromLibrary"
-                    : "skills.action.removeFromWorkspace"
+                    ? "skills.action.remove"
+                    : "skills.action.uninstall"
                   : "skills.action.install"
             )}
           </Button>

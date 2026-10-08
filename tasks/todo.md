@@ -1479,3 +1479,17 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 库目录列出该链接与其 `link` / 自带技能无 `link` / 移除链接不伤工作区）。四个包 tsc + eslint 全绿。
 截图 `designs/check-web/skills-linked-one-row.png`。**测试产生的链接已全部清理，用户状态已还原。**
 
+### 修正：动作文案收口为安装 / 卸载 / 收录 / 移除（2026-10-08，用户反馈）
+
+用户连提三次：装进工作区后按钮不能写「从工作区移除」，要写**卸载**；工作区技能进库的按钮英文
+**Push**、中文**收录**；库侧那条链接的移除按钮就叫**移除**，英文 **Remove**（此前中文写「取消收录」）。
+
+改动只在文案层：`skills.action.removeFromLibrary` 这个键整个删掉，两处调用
+（卡片行按钮、灯箱动作条）改用本来就存在却没人用的 `skills.action.remove`
+（en `Remove` / zh `移除`）；`skills.action.uninstall` 仍按 en `Uninstall` / zh `卸载`。
+现在四个动作各自一个词：安装 / 卸载 / 收录 / 移除，不再出现长短语。
+
+**验证**（真机）：卡片行 `本地 · 技能库 + 工作区` 右侧按钮显示「移除」、`aria-label="移除 grill-me"`；
+灯箱动作条同样显示「移除」；其余行仍是「收录」「安装」。两个包 tsc + eslint 全绿，
+`check-workspace-skills.ts`（53 项）与 `check-store.ts` 全过。**测试链接已删，用户状态已还原。**
+

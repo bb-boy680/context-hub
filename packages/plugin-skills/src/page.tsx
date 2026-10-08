@@ -335,8 +335,8 @@ function WorkspaceButton({
     const label = skill.stale
       ? t("skills.action.cleanup")
       : skill.linkAt === "library"
-        ? t("skills.action.removeFromLibrary")
-        : t("skills.action.removeFromWorkspace")
+        ? t("skills.action.remove")
+        : t("skills.action.uninstall")
     return (
       <Button
         type="button"

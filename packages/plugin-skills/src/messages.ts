@@ -13,10 +13,9 @@ export const skillsMessages: Record<string, string> = {
   "skills.view.list": "List view",
   "skills.action.import": "Import",
   "skills.action.install": "Install",
-  "skills.action.adopt": "Add to library",
+  "skills.action.uninstall": "Uninstall",
+  "skills.action.adopt": "Push",
   "skills.action.remove": "Remove",
-  "skills.action.removeFromLibrary": "Remove from library",
-  "skills.action.removeFromWorkspace": "Remove from workspace",
   "skills.action.cleanup": "Clean up",
   "skills.action.close": "Close",
   "skills.action.cancel": "Cancel",
@@ -51,9 +50,9 @@ export const skillsMessages: Record<string, string> = {
   "skills.notice.copied":
     "Copied instead of linked: this filesystem has no links, so the workspace owns its own copy.",
   "skills.notice.adopted":
-    "Linked {name} into the library; the workspace keeps the files.",
+    "Pushed {name} into the library; the workspace keeps the files.",
   "skills.notice.adoptedCopy":
-    "Copied {name} into the library: this filesystem has no links, so the two are now separate.",
+    "Pushed a copy of {name} into the library: this filesystem has no links, so the two are now separate.",
   "skills.range": "1–12 of 42 skills",
   "skills.range.long": "1–14 of 42 skills",
   "skills.page": "Page 1 of 4",
