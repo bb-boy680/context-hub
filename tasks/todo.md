@@ -1098,3 +1098,46 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 2. 工作区数据落在哪：文件夹里的 `.context-hub/`，还是 hub home 下按路径归档？
 3. 菜单里除了「切换 / 新建」，要不要「管理（重命名、移除）」以及行内 hover 操作；要不要出中文画板。
 
+### 落地：工作区切换与「从文件夹创建工作区」（2026-10-08，用户："根据设计稿还原功能"）
+
+**契约（`packages/core/src/workspace.ts`，浏览器与宿主共用的纯模块）**
+`WORKSPACE_ROUTE` / `WORKSPACE_DOCUMENT`（= `workspaces`）/ `WorkspaceView{path,name,display}` /
+`WorkspacePage{folders,current}` / `WorkspaceStore{page,select,pick}` / `workspaceName()` / `readWorkspaceState()`。
+**工作区就是一个文件夹**，所以名称取路径最后一段、显示路径取宿主 `displayPath()`（`~` 缩写）——两者都由宿主算，
+浏览器不解析路径（`displayPath` 在 `node:os` 模块里，前端拿不到 home）。
+
+**宿主（`packages/core/src/host/`）**
+- `folder-picker.ts`：原生目录对话框。Windows 用 PowerShell + WinForms `FolderBrowserDialog`，脚本以
+  **base64 UTF-16LE（`-EncodedCommand`）** 传入 —— 提示文案是本地化文本、可能带引号，这样它永远不进命令行解析；
+  macOS 用 `osascript`（`try/on error` 把取消变成空串），Linux 用 `zenity`（取消 = 退出码 1）。
+  取消 = 空输出，真失败才抛错（stderr 冒泡成 HTTP 400 里的原因）。
+- `workspaces-fs.ts`：读写 `<home>/state/workspaces.json`（复用 `createFsStateStore` + `readWorkspaceState` 校验），
+  `select` 拒绝不认识的路由（400 + 原因），`pick` 取消时不写盘、成功时追加（已存在则只切换）+ 设为当前。
+- `vite.ts` 新增 `workspaceList()` 桥：`GET /hub/workspaces`、`POST …/select`、`POST …/pick`（pick 会一直挂到
+  对话框关闭为止）。`package.json` 补 `./workspace` 与两个 `./host/*` 出口。
+
+**应用（`apps/web/`）**
+- `lib/workspaces.ts`：`useWorkspaces()`（fetch 列表 + select + pick，带 `pending`/`failure`）。
+- `components/workspace-menu.tsx`：侧栏头部按钮 = Popover 触发器（`side="right" align="start" sideOffset={8}`，
+  面板 300 宽、`gap-0.5 p-2`），行 = 28px 文件夹磁贴 + 文件夹名 + 等宽路径，当前行淡紫底 + 勾；
+  分隔行（13 高）+ `创建工作区` 行；失败原文显示在面板底部。`app-sidebar.tsx` 的 header 换成它，
+  头部第二行 = 当前工作区名（没有则 `workspace.none`）。
+- 文案：en 基础包 + zh 包各 5 个键（`workspace.menu.title/create/creating/none/picker.prompt`）。
+
+**顺带修的**：`state-fs.ts` 读文档时先剥 BOM —— Windows 编辑器写的状态文件带 BOM，`JSON.parse` 会直接失败，
+原先整份文档报 "not JSON"（本次用 PS 写验证数据时真的踩到）。
+
+**验证**
+- 新增 `packages/core/scripts/check-workspaces.ts`（18 项）：空 home / 行名与路径 / `~` 缩写 / 选择落盘并跨实例可见 /
+  未知路径被拒且不改状态 / 手改文档非法值被丢弃。`node scripts/check-workspaces.ts` → all checks passed。
+- 桥接实测：`GET /hub/workspaces` 读盘正确；`POST …/select` 选未知路径 → 400 + `not a known workspace: …`。
+- 浏览器（zh-CN，真实桥）：菜单面板 **300x245 @ (256, 8)**，行 44、磁贴 28x28 圆角 8、标题行 30、分隔行 13、
+  padding 8、gap 2 —— 与画板逐项一致；当前行底 `primary/10`、磁贴 `#4F46E5`。
+- 端到端：点行切换 → 侧栏第二行随即变化、`data-closed` 关闭；`workspaces.json` 的 `current` 同步改写。
+- **文件夹对话框真机验证**：`POST …/pick` 确实弹出 Windows「浏览文件夹」窗口（枚举到 `#32770` 窗口，
+  属主是本进程 spawn 的 powershell），用 `WM_CLOSE` 模拟取消 → 200 `{"cancelled":true,…}` 且状态文件未被改写。
+- `check-state.ts` 回归通过；web/core/extensions typecheck + lint 干净；locale-zh-cn typecheck 干净。
+
+**画板与实现的一处差异（有意）**：画板里"创建工作区"行点了直接弹对话框，实现里对话框弹出期间该行文字变
+「等待选择文件夹…」且不可再点（避免叠两个对话框）。
+
