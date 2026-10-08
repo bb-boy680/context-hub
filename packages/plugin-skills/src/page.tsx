@@ -1116,6 +1116,8 @@ export function SkillsPage() {
         onAdopt={(skill) => void adopt(skill)}
         onDelete={removeSkill}
         onDeleteWorkspace={removeWorkspaceSkill}
+        onCheckUpdate={(skill) => library.checkUpdate(skill.id)}
+        onUpdate={(skill) => library.update(skill.id)}
         onTagsChange={(tags) => {
           if (detail) setTags(detail, tags)
         }}

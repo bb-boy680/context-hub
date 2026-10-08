@@ -53,6 +53,15 @@ export const skillsMessages: Record<string, string> = {
     "Pushed {name} into the library; the workspace keeps the files.",
   "skills.notice.adoptedCopy":
     "Pushed a copy of {name} into the library: this filesystem has no links, so the two are now separate.",
+  "skills.update.check": "Check",
+  "skills.update.checking": "Checking the source…",
+  "skills.update.available": "A newer revision is available",
+  "skills.update.current": "Up to date",
+  "skills.update.apply": "Update",
+  "skills.update.applying": "Updating…",
+  "skills.update.modified":
+    "The files here were changed after the install; updating replaces them.",
+  "skills.update.unreadable": "The source records no revision for this skill",
   "skills.range": "1–12 of 42 skills",
   "skills.range.long": "1–14 of 42 skills",
   "skills.page": "Page 1 of 4",

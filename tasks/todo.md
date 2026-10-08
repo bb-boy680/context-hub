@@ -1531,10 +1531,27 @@ GitHub API 快路径需要 lock 里的 `skillFolderHash`（git tree hash，40 �
 Windows 坑：`skills update` 打印完之后 node 断言崩溃（`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING)`，exit 1），
 功能已生效但**退出码不可信**。
 
-**对 hub 的含义 / 待做（未开工，等确认）**：
-- [ ] catalog 记 provenance：`source`（owner/repo）、`skillPath`、`computedHash`（下载时从 `--json` 收下，不用自己算）。
-- [ ] 复刻 `computeSkillFolderHash`（host 侧约 20 行）：既用于判断本地是否被改过，也用于算上游哈希。
-- [ ] 「检查更新」：有 GitHub 源的走 API 取上游文件算哈希（或直接 clone），有新版在行上标出 + 一键更新；
-      更新前若本地哈希 ≠ 记录值，先告知「本地已改过，会被覆盖」。
-- [ ] 工作区页签读项目根的 `skills-lock.json`（npx skills 写的权威记录）：显示来源（`mattpocock/skills` 等）并支持检查更新。
-- 现状：hub 下载技能只写 `source: "registry"`，**没记 owner/repo、没记哈希**；库里现有 39 条自持技能都是这种状态。
+**实施（2026-10-08，用户：『也要用 NP X skills 来做，因为它会生成哈希』）**——用户质疑得对，方案改成
+**上游那一侧一律不自己算**：
+
+- 安装 / 收录：哈希**只读不算**。`downloadPackageSkills` 把 CLI 写在临时目录的 `skills-lock.json` 读出来
+  （`readLockedUpstream`），存进 catalog 行 `upstream: {source, sourceType, skillPath, hash}`；收录时读的是
+  **工作区根部的 `skills-lock.json`**，所以 npx 装过的技能一进库就带着来源和版本号。`--json` 的 `hash`
+  与 lock 的 `computedHash` 实测一致，两处取哪个都对。
+- 检查更新：`fetchUpstreamRecord(source, skill)` 让 CLI 在临时目录装一次，读它这次算出的哈希 ——
+  **用 CLI 自己的数字比对**，不做第二套实现；装完即删，库和磁盘都不动。
+- 我们只保留一个哈希函数 `skillFolderHash`，用途单一：CLI 从不 hash 磁盘上的文件（实测改本地后 update 仍报
+  up to date），所以「本地是否被改过」只有我们自己算。**它的正确性由黄金值证明**：
+  `scripts/check-upstream.ts` 里的固定夹具 + skills@1.7.1 实测值
+  `9db15463…c177`，函数与 CLI 逐字节一致，改一个字节即失配（.git / node_modules 按 CLI 规则跳过）。
+- 更新：仍是让 CLI 装进临时目录，然后把新副本换进目标（库目录，或链接指向的工作区目录 —— 两份是同一个技能），
+  记下的是**CLI 这次算的哈希**，不是我们事后重算的。替换用 `.名字.updating` / `.名字.previous` 过渡，
+  失败回滚，扫描器跳过点开头的条目。
+
+**验证**：`check-upstream.ts`（13 项：黄金哈希 / 单字节改动 / .git+node_modules 跳过 / lock 读取 / 按 skillPath
+找别名 / 缺字段与坏 JSON 拒绝 / local 来源不算上游）；`check-workspace-skills.ts` 增至 58 项（收录带入 lock 记录）。
+真机：收录 grilling → 行上带 `mattpocock/skills · skills/productivity/grilling/SKILL.md · 4fa026e5…`；
+检查更新 → 上游已到 `c3b3e67f…`，`outdated: true, modified: false`（**上游真的有更新**），
+灯箱显示「上游有更新」+「更新」按钮（截图 `designs/check-web/skills-update-available.png`）。
+一次性的临时 home 全链路（装 → 手改 → 记录落后 → 更新）证明：手改 → `modified:true`；记录落后 → `outdated:true`；
+更新后三者一致、手改内容被替换、无残留目录。

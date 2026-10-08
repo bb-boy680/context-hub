@@ -311,6 +311,19 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
               return
             }
 
+            /* /hub/skills/<id>/update — read the upstream, or install it over this copy */
+            if (section === "update") {
+              if (method === "GET") {
+                sendJson(response, 200, await api.checkUpdate(id))
+              } else if (method === "POST") {
+                await api.updateFromUpstream(id)
+                sendJson(response, 200, { ok: true })
+              } else {
+                sendError(response, new Error(`unsupported method ${method}`))
+              }
+              return
+            }
+
             /* POST /hub/skills/<id>/source — record a pasted source */
             if (section === "source" && method === "POST") {
               const body = JSON.parse(

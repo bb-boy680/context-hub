@@ -312,6 +312,31 @@ const heldRow = page.items.find((item) => item.id === "alpha")
 check("a skill the library holds itself carries no link", heldRow?.link === undefined, heldRow?.link)
 check("and it carries the date of its own files", (heldRow?.updatedAt ?? "") !== "", heldRow?.updatedAt)
 
+/* Adopting carries the workspace's own CLI record into the library, so the
+   row knows which revision it holds and can be checked against the source. */
+await writeSkill(path.join(workspaceSkillRoot(workspace), "tracked-one"), "Tracked one", "From a package")
+await fs.writeFile(
+  path.join(workspace, "skills-lock.json"),
+  `${JSON.stringify({
+    version: 1,
+    skills: {
+      "tracked-one": {
+        source: "mattpocock/skills",
+        sourceType: "github",
+        skillPath: "skills/productivity/tracked-one/SKILL.md",
+        computedHash: "a".repeat(64),
+      },
+    },
+  })}\n`
+)
+await store.importFromWorkspace("tracked-one")
+const tracked = (await store.list()).items.find((item) => item.id === "tracked-one")
+check("an adopted skill keeps the source its lock recorded", tracked?.upstream?.source === "mattpocock/skills", tracked?.upstream)
+check("with the recorded revision", tracked?.upstream?.hash === "a".repeat(64), tracked?.upstream?.hash)
+await store.remove("tracked-one")
+await fs.rm(path.join(workspaceSkillRoot(workspace), "tracked-one"), { recursive: true, force: true })
+await fs.rm(path.join(workspace, "skills-lock.json"), { force: true })
+
 /* Removing a linked entry takes the link back and leaves those files alone. */
 await store.remove("linked-one")
 check("the library's entry is gone", (await fs.lstat(inLibrary).catch(() => null)) === null)

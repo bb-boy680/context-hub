@@ -17,6 +17,7 @@ import type {
   SkillPatch,
   SkillQuery,
   SkillStore,
+  SkillUpdateCheck,
   WorkspaceInstall,
   WorkspaceSkillDetail as WorkspaceSkillRecord,
   WorkspaceSkillsView as WorkspaceSkills,
@@ -219,6 +220,19 @@ export function createRemoteSkillStore(base = ""): SkillStore {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
+      })
+    },
+
+    checkUpdate(id: string): Promise<SkillUpdateCheck> {
+      return call<SkillUpdateCheck>(
+        base,
+        `/hub/skills/${encodeURIComponent(id)}/update`
+      )
+    },
+
+    async updateFromUpstream(id: string): Promise<void> {
+      await call(base, `/hub/skills/${encodeURIComponent(id)}/update`, {
+        method: "POST",
       })
     },
 

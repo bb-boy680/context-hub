@@ -73,6 +73,9 @@ export async function readWorkspaceSkills(
 
   const skills: WorkspaceSkill[] = []
   for (const dirent of dirents) {
+    /* A dot-prefixed entry is somebody's working file, not a skill: it is also
+       what this hub's own directory swaps leave behind mid-replacement. */
+    if (dirent.name.startsWith(".")) continue
     const dir = path.join(root, dirent.name)
     const stat = await fs.lstat(dir).catch(() => null)
     if (stat === null) continue

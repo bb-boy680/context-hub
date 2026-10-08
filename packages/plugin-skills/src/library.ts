@@ -11,6 +11,7 @@ import type {
   SkillPage,
   SkillStore,
   SkillSummary,
+  SkillUpdateCheck,
   WorkspaceInstall,
   WorkspaceSkill,
   WorkspaceSkillsView,
@@ -48,6 +49,10 @@ export interface SkillLibrary {
   deleteWorkspaceSkill(id: string): Promise<void>
   /** Take one skill the hub installed back out of the current workspace. */
   remove(id: string): Promise<void>
+  /** Measure one library skill against the upstream its files came from. */
+  checkUpdate(id: string): Promise<SkillUpdateCheck>
+  /** Install that upstream's current revision over this copy. */
+  update(id: string): Promise<void>
 }
 
 /** Where a row lives, as its provenance line and the lightbox name it. */
@@ -140,6 +145,7 @@ export function toSkill(
     stamp: row.updatedAt,
     cover: gallery[0],
     gallery: gallery.length > 0 ? gallery : undefined,
+    ...(row.upstream === undefined ? {} : { upstream: row.upstream }),
   }
 }
 
@@ -326,6 +332,23 @@ export function useSkillLibrary(): SkillLibrary {
     [store, reload]
   )
 
+  const checkUpdate = React.useCallback(
+    async (id: string) => {
+      if (store === null) throw new Error("this form has no skill library")
+      return store.checkUpdate(id)
+    },
+    [store]
+  )
+
+  const update = React.useCallback(
+    async (id: string) => {
+      if (store === null) throw new Error("this form has no skill library")
+      await store.updateFromUpstream(id)
+      await reload()
+    },
+    [store, reload]
+  )
+
   if (store === null) {
     return {
       store: null,
@@ -343,6 +366,10 @@ export function useSkillLibrary(): SkillLibrary {
       adopt: async () => "link",
       deleteWorkspaceSkill: async () => undefined,
       remove: async () => undefined,
+      checkUpdate: async () => {
+        throw new Error("this form has no skill library")
+      },
+      update: async () => undefined,
     }
   }
   return {
@@ -364,5 +391,7 @@ export function useSkillLibrary(): SkillLibrary {
     adopt,
     deleteWorkspaceSkill,
     remove,
+    checkUpdate,
+    update,
   }
 }

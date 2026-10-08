@@ -12,8 +12,9 @@ import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import type { PackageSkill, SkillImport } from "../store.ts"
+import type { PackageSkill, SkillImport, SkillUpstream } from "../store.ts"
 import { assertSkillName } from "./names.ts"
+import { readLockedUpstream } from "./upstream.ts"
 
 /** The agent directory the CLI is asked for: `<cwd>/.agents/skills`. */
 const AGENT = "universal"
@@ -174,6 +175,42 @@ export async function listPackageSkills(source: string): Promise<PackageSkill[]>
 }
 
 /**
+ * Read what the CLI records for the source's current revision of one skill,
+ * without touching the library: the install runs in a throwaway directory and
+ * everything it writes is dropped. The hash in that record is the CLI's own,
+ * so a check never has to reproduce the algorithm.
+ *
+ * @param source — the package the lock named, in the form the CLI accepts.
+ * @param skill — the skill's directory name in the package.
+ * @returns the CLI's record for this revision.
+ * @throws when the CLI could not install it, carrying the CLI's own reason:
+ *   no network, a private package, or a skill the source no longer holds.
+ */
+export async function fetchUpstreamRecord(
+  source: string,
+  skill: string
+): Promise<SkillUpstream | null> {
+  const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-skills-"))
+  try {
+    const args = ["skills", "add", source, "--skill", skill, "-a", AGENT, "--copy", "-y", "--json"]
+    const { stdout, stderr, code } = await runCli(args, work)
+    const report = parseReport(stdout)
+    if (report.length === 0) throw new Error(failureText(code, stderr, stdout))
+    const outcome = report[0]
+    if (outcome.status !== "installed") {
+      throw new Error(
+        outcome.error ??
+          outcome.reason ??
+          `the source no longer holds this skill (${outcome.status ?? "unknown"})`
+      )
+    }
+    return await readLockedUpstream(work, skill)
+  } finally {
+    await fs.rm(work, { recursive: true, force: true })
+  }
+}
+
+/**
  * Download the named skills into a library root.
  *
  * @param source — the package to fetch.
@@ -194,7 +231,8 @@ export async function downloadPackageSkills(
     const { stdout, stderr, code } = await runCli(args, work)
     const report = parseReport(stdout)
     if (report.length === 0) throw new Error(failureText(code, stderr, stdout))
-    const result: SkillImport = { installed: [], failed: [] }
+    const records: Record<string, SkillUpstream> = {}
+    const result: SkillImport = { installed: [], failed: [], records }
     for (const entry of report) {
       const name = entry.name ?? ""
       if (entry.status !== "installed") {
@@ -208,6 +246,10 @@ export async function downloadPackageSkills(
         const safe = assertSkillName(name)
         await adopt(path.join(work, INSTALL_DIR, safe), path.join(root, safe))
         result.installed.push(safe)
+        /* The CLI's own lock, written beside where it installed, names the
+           package and the revision's hash — the record an update needs. */
+        const record = await readLockedUpstream(work, safe)
+        if (record !== null) records[safe] = record
       } catch (failure) {
         result.failed.push({
           name,

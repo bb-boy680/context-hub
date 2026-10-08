@@ -8,6 +8,24 @@
 /** Where a skill came from: this machine, the hub build, or a registry. */
 export type SkillOrigin = "local" | "builtin" | "registry"
 
+/**
+ * The upstream a skill was installed from, as the skills CLI records it in
+ * `skills-lock.json`. It is the only thing that makes an update askable: the
+ * `hash` is what the CLI computed over the skill's files at install time, so a
+ * later run over the same source tells whether the upstream moved, and a run
+ * over the local copy tells whether the files here were changed by hand.
+ */
+export interface SkillUpstream {
+  /** The package the CLI was given: `owner/repo`, or a git URL. */
+  source: string
+  /** How the CLI classified it: `github`, `git`, or a local path. */
+  sourceType: string
+  /** The manifest's path inside that package, forward slashes. */
+  skillPath: string
+  /** Directory hash of the installed revision; what updates are measured against. */
+  hash: string
+}
+
 /** One row of the catalog: the metadata the list renders, without file bodies. */
 export interface SkillSummary {
   /** Directory name under the skills root; the skill's identity. */
@@ -30,6 +48,9 @@ export interface SkillSummary {
    * files belong to wherever this points.
    */
   link?: string
+  /** Where the files came from, when anything recorded it; absent on a skill
+      written here or copied in by hand, which is why it cannot be checked. */
+  upstream?: SkillUpstream
   /**
    * ISO timestamp of the last recorded change to the hub's own copy, empty for
    * a linked skill: the hub has changed nothing about files it does not hold,
@@ -127,6 +148,22 @@ export interface SkillImport {
   installed: string[]
   /** Entries that did not land, each with a reason fit to show. */
   failed: { name: string; reason: string }[]
+  /** What each landed skill came from, by name; absent for what it does not know. */
+  records?: Record<string, SkillUpstream>
+}
+
+/** One skill measured against its upstream. */
+export interface SkillUpdateCheck {
+  /** The directory hash recorded when the skill was installed or last updated. */
+  recordedHash: string
+  /** The directory hash of the files on disk now. */
+  currentHash: string
+  /** The upstream revision's directory hash, or `null` when it could not be read. */
+  latestHash: string | null
+  /** The upstream holds a revision this copy does not have. */
+  outdated: boolean
+  /** The files on disk differ from the recorded revision. */
+  modified: boolean
 }
 
 /** One file of a folder read, relative to the skill directory it belongs to. */
@@ -264,6 +301,16 @@ export interface SkillStore {
   deleteWorkspaceSkill(id: string): Promise<void>
   /** Take one library-installed skill out of the current workspace. */
   removeFromWorkspace(id: string): Promise<void>
+  /**
+   * Measure one skill against the upstream it was installed from. Reads the
+   * source over the network, so it is asked for, never automatic.
+   */
+  checkUpdate(id: string): Promise<SkillUpdateCheck>
+  /**
+   * Install the upstream's current revision over the skill's files, wherever
+   * they live, and record the new hash. Refuses when nothing recorded a source.
+   */
+  updateFromUpstream(id: string): Promise<void>
   /** Change notifications from directory watching; returns an unsubscribe. */
   subscribe(listener: () => void): () => void
   /** Release the directory watcher. The store is unusable afterwards. */

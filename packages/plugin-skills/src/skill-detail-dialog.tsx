@@ -14,6 +14,7 @@ import {
   PlayIcon,
   PlusIcon,
   PowerIcon,
+  RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
   Volume2Icon,
@@ -32,7 +33,12 @@ import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill, SkillLocation } from "./types.ts"
-import type { SkillDetail, SkillStore, WorkspaceSkillDetail } from "./store.ts"
+import type {
+  SkillDetail,
+  SkillStore,
+  SkillUpdateCheck,
+  WorkspaceSkillDetail,
+} from "./store.ts"
 
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
@@ -888,6 +894,117 @@ function DeleteBubble({
   )
 }
 
+/**
+ * The update line for a library skill: the source its files were installed
+ * from, and the one action that follows from it. Reading the source means a
+ * clone of the whole package, so nothing here runs on its own — a person asks.
+ */
+function UpdateRow({
+  skill,
+  onCheck,
+  onUpdate,
+}: {
+  skill: Skill
+  onCheck: () => Promise<SkillUpdateCheck>
+  onUpdate: () => Promise<void>
+}) {
+  const { t } = useI18n()
+  const [state, setState] = React.useState<
+    | { kind: "idle" }
+    | { kind: "checking" }
+    | { kind: "applying" }
+    | { kind: "checked"; result: SkillUpdateCheck }
+    | { kind: "failed"; reason: string }
+  >({ kind: "idle" })
+  const upstream = skill.upstream
+
+  const check = async () => {
+    setState({ kind: "checking" })
+    try {
+      setState({ kind: "checked", result: await onCheck() })
+    } catch (failure) {
+      setState({
+        kind: "failed",
+        reason: failure instanceof Error ? failure.message : String(failure),
+      })
+    }
+  }
+
+  const apply = async () => {
+    setState({ kind: "applying" })
+    try {
+      await onUpdate()
+      setState({ kind: "idle" })
+    } catch (failure) {
+      setState({
+        kind: "failed",
+        reason: failure instanceof Error ? failure.message : String(failure),
+      })
+    }
+  }
+
+  /* Nothing recorded where these files came from — a skill written here, or
+     copied in by hand — so there is no line to show rather than an empty one;
+     the provenance line above already says it is local. */
+  if (skill.location === "workspace" || upstream === undefined) return null
+
+  const busy = state.kind === "checking" || state.kind === "applying"
+  const outdated = state.kind === "checked" && state.result.outdated
+  const text =
+    state.kind === "checking"
+      ? t("skills.update.checking")
+      : state.kind === "applying"
+        ? t("skills.update.applying")
+        : state.kind === "failed"
+          ? state.reason
+          : state.kind === "checked"
+            ? state.result.latestHash === null
+              ? t("skills.update.unreadable")
+              : state.result.outdated
+                ? t("skills.update.available")
+                : t("skills.update.current")
+            : upstream.source
+  const label = outdated ? t("skills.update.apply") : t("skills.update.check")
+
+  return (
+    <>
+      <div className="h-px shrink-0 bg-border" />
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className="min-w-0 truncate text-xs text-muted-foreground"
+            title={upstream.source}
+          >
+            {text}
+          </span>
+          <Button
+            type="button"
+            size="xs"
+            variant="outline"
+            disabled={busy}
+            aria-label={`${label} ${skill.name}`}
+            onClick={() => void (outdated ? apply() : check())}
+            className="gap-[5px] px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent"
+          >
+            {outdated ? (
+              <DownloadIcon className="size-3.5" />
+            ) : (
+              <RefreshCwIcon className="size-3.5" />
+            )}
+            {label}
+          </Button>
+        </div>
+        {/* Only a newer revision makes the loss real, so only then is it said. */}
+        {state.kind === "checked" && state.result.outdated && state.result.modified ? (
+          <span className="text-[11px] text-amber-600 dark:text-amber-400">
+            {t("skills.update.modified")}
+          </span>
+        ) : null}
+      </div>
+    </>
+  )
+}
+
 function InfoPanel({
   skill,
   reason,
@@ -895,6 +1012,8 @@ function InfoPanel({
   onDelete,
   onToggle,
   onAdopt,
+  onCheckUpdate,
+  onUpdate,
   onViewFiles,
   onTagsChange,
 }: {
@@ -908,6 +1027,11 @@ function InfoPanel({
   onToggle: () => void
   /** Copy a skill this workspace wrote into the library. */
   onAdopt: () => void
+  /** Measure this skill against the source it was installed from; `undefined`
+      on a form with no library, where there is nothing to compare. */
+  onCheckUpdate?: () => Promise<SkillUpdateCheck>
+  /** Install that source's current revision over this copy. */
+  onUpdate?: () => Promise<void>
   onViewFiles: () => void
   onTagsChange: (tags: string[]) => void
 }) {
@@ -970,6 +1094,12 @@ function InfoPanel({
           )}
         </dl>
       </div>
+
+      <div className="h-px shrink-0 bg-border" />
+
+      {onCheckUpdate === undefined || onUpdate === undefined ? null : (
+        <UpdateRow skill={skill} onCheck={onCheckUpdate} onUpdate={onUpdate} />
+      )}
 
       <div className="flex items-center gap-2">
         <Button className="h-9 w-[156px] gap-[7px]" onClick={onViewFiles}>
@@ -1215,6 +1345,8 @@ function LightboxBody({
   onToggle,
   onAdopt,
   onDelete,
+  onCheckUpdate,
+  onUpdate,
   onTagsChange,
   onChanged,
 }: {
@@ -1234,6 +1366,11 @@ function LightboxBody({
   /** Copy a skill this workspace wrote into the library. */
   onAdopt: () => void
   onDelete: (() => Promise<void>) | null
+  /** Measure this skill against the source it was installed from; `undefined`
+      on a form with no library, where there is nothing to compare. */
+  onCheckUpdate?: () => Promise<SkillUpdateCheck>
+  /** Install that source's current revision over this copy. */
+  onUpdate?: () => Promise<void>
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
@@ -1262,6 +1399,8 @@ function LightboxBody({
         onDelete={onDelete}
         onToggle={onToggle}
         onAdopt={onAdopt}
+        onCheckUpdate={onCheckUpdate}
+        onUpdate={onUpdate}
         onViewFiles={() => setFilesOpen(true)}
         onTagsChange={onTagsChange}
       />
@@ -1292,6 +1431,8 @@ export function SkillDetailDialog({
   onAdopt,
   onDelete,
   onDeleteWorkspace,
+  onCheckUpdate,
+  onUpdate,
   onTagsChange,
   onChanged,
   onOpenChange,
@@ -1312,6 +1453,10 @@ export function SkillDetailDialog({
   onDelete: (skill: Skill) => Promise<void>
   /** Delete a skill's directory from the workspace. */
   onDeleteWorkspace: (skill: Skill) => Promise<void>
+  /** Measure one skill against the source its files came from. */
+  onCheckUpdate?: (skill: Skill) => Promise<SkillUpdateCheck>
+  /** Install that source's current revision over this copy. */
+  onUpdate?: (skill: Skill) => Promise<void>
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
@@ -1393,6 +1538,12 @@ export function SkillDetailDialog({
                   ? null
                   : () => onDelete(skill)
             }
+            {...(onCheckUpdate === undefined || onUpdate === undefined
+              ? {}
+              : {
+                  onCheckUpdate: () => onCheckUpdate(skill),
+                  onUpdate: () => onUpdate(skill),
+                })}
             onTagsChange={onTagsChange}
             onChanged={onChanged}
           />

@@ -19,6 +19,7 @@
  * disk; no service sits in front of it.
  */
 import { promises as fs, watch } from "node:fs"
+import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { assetKind, assetUrl, isLink, readSource } from "@workspace/core"
@@ -35,7 +36,8 @@ import {
 } from "../frontmatter.ts"
 import { importFolder } from "./folder-import.ts"
 import { walkSkillDir } from "./file-tree.ts"
-import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
+import { downloadPackageSkills, fetchUpstreamRecord, listPackageSkills } from "./skills-cli.ts"
+import { readLockedUpstream, skillFolderHash } from "./upstream.ts"
 import {
   deleteSkillFromWorkspace,
   installSkillIntoWorkspace,
@@ -63,6 +65,8 @@ import type {
   SkillQuery,
   SkillStore,
   SkillSummary,
+  SkillUpdateCheck,
+  SkillUpstream,
 } from "../store.ts"
 
 const CATALOG_FILE = "index.json"
@@ -82,6 +86,8 @@ interface CatalogEntry {
    * for a skill whose files live under the library root.
    */
   link?: string
+  /** What the skills CLI recorded it was installed from; absent when nothing did. */
+  upstream?: SkillUpstream
   /** Media references, in the order the UI shows them. */
   assets: string[]
   /** Manifest mtime when this row was last read; drives refreshes. */
@@ -227,6 +233,9 @@ export async function createFsSkillStore(
       enabled: previous?.enabled ?? true,
       source: previous?.source ?? "local",
       ...(link === undefined ? {} : { link }),
+      /* Where the files came from is not in the manifest, so a scan carries
+         the recorded answer forward; only an install writes a new one. */
+      ...(previous?.upstream === undefined ? {} : { upstream: previous.upstream }),
       /* A skill's manifest carries no media; the references it had stay as they are. */
       assets: previous?.assets ?? [],
       mtimeMs: stat.mtimeMs,
@@ -396,6 +405,7 @@ export async function createFsSkillStore(
           source: row.source,
           enabled: row.enabled,
           ...(row.link === undefined ? {} : { link: row.link }),
+          ...(row.upstream === undefined ? {} : { upstream: row.upstream }),
           assets: row.assets,
           updatedAt: row.updatedAt,
         })
@@ -529,13 +539,20 @@ export async function createFsSkillStore(
     async installPackage(source: string, ids: string[]): Promise<SkillImport> {
       const result = await downloadPackageSkills(source, ids, root)
       await refreshCatalog()
-      /* A row says where it came from, so a download records its source. */
+      /* A row says where it came from and which revision, so a download
+         records both: they are what a later update check compares against. */
       const arrived = new Set(result.installed)
       if (arrived.size > 0) {
         await mutate((skills) => {
           for (const id of arrived) {
             const row = skills[id]
-            if (row !== undefined) skills[id] = { ...row, source: "registry" }
+            if (row === undefined) continue
+            const record = result.records?.[id]
+            skills[id] = {
+              ...row,
+              source: "registry",
+              ...(record === undefined ? {} : { upstream: record }),
+            }
           }
         })
       }
@@ -631,8 +648,81 @@ export async function createFsSkillStore(
     async importFromWorkspace(id: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
       const landed = await linkSkillIntoLibrary(workspace, root, id)
+      /* What the skills CLI installed this from, if it did: the lock beside
+         the workspace's skills is the record, and its hash is what an update
+         check compares against. Without it the skill is still listed, but
+         nothing can tell whether the upstream moved. */
+      const upstream = await readLockedUpstream(workspace, id)
       await refreshCatalog()
+      if (upstream !== null) {
+        await mutate((skills) => {
+          const row = skills[id]
+          if (row !== undefined) skills[id] = { ...row, upstream }
+        })
+      }
       return landed
+    },
+
+    async checkUpdate(id: string): Promise<SkillUpdateCheck> {
+      const current = await loadCatalog()
+      const row = current.skills[id]
+      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const upstream = row.upstream
+      if (upstream === undefined) {
+        throw new Error(`no recorded source for this skill, so nothing can be compared: ${id}`)
+      }
+      /* The source's current revision, installed into a throwaway directory by
+         the CLI itself: the hash it reports there is the one it would record
+         for an install now, so the comparison needs no second implementation. */
+      const latest = await fetchUpstreamRecord(upstream.source, id)
+      /* The files are read where they are, link or not: the question is what
+         this copy holds, not which directory holds it. The CLI never hashes
+         what is on disk, so this is the one number it cannot supply. */
+      const currentHash = await skillFolderHash(skillDir(id))
+      const latestHash = latest?.hash ?? null
+      return {
+        recordedHash: upstream.hash,
+        currentHash,
+        latestHash,
+        outdated: latestHash !== null && latestHash !== upstream.hash,
+        modified: currentHash !== upstream.hash,
+      }
+    },
+
+    async updateFromUpstream(id: string): Promise<void> {
+      const current = await loadCatalog()
+      const row = current.skills[id]
+      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const upstream = row.upstream
+      if (upstream === undefined) {
+        throw new Error(`no recorded source for this skill, so there is nothing to install from: ${id}`)
+      }
+      const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-skill-update-"))
+      try {
+        const result = await downloadPackageSkills(upstream.source, [id], work)
+        const landed = result.installed[0]
+        if (landed === undefined) {
+          const reason = result.failed.find((entry) => entry.name === id)?.reason
+          throw new Error(reason ?? `the skills CLI installed nothing for ${id}`)
+        }
+        /* The files live in the library's own directory, or in the workspace's
+           when the library reaches the skill through a link; that copy is the
+           one an update replaces, and the link keeps pointing at it. */
+        const held = skillDir(id)
+        const isLink = (await fs.lstat(held).catch(() => null))?.isSymbolicLink() === true
+        const target = isLink ? await fs.readlink(held) : held
+        await replaceDirectory(path.join(work, landed), target)
+        /* The hash to record is the one the CLI computed for what it just
+           installed, not a second reading of the same bytes. */
+        const fresh = result.records?.[landed]?.hash ?? (await skillFolderHash(target))
+        await mutate((skills) => {
+          const next = skills[id]
+          if (next !== undefined) skills[id] = { ...next, upstream: { ...upstream, hash: fresh } }
+        })
+      } finally {
+        await fs.rm(work, { recursive: true, force: true })
+      }
+      await refreshCatalog()
     },
 
     async deleteWorkspaceSkill(id: string): Promise<void> {
@@ -687,4 +777,31 @@ export async function createFsSkillStore(
   }
 
   return store
+}
+
+/**
+ * Replace one directory's contents with a fresh copy, keeping the path so a
+ * link pointing at it stays valid. The new revision lands beside the target
+ * first and the old one is moved aside rather than dropped, so a failure
+ * part-way restores what was there instead of leaving an empty skill. Both
+ * temporary names start with a dot, which every scan of a skills directory
+ * skips, so neither can be mistaken for a skill.
+ */
+async function replaceDirectory(fresh: string, target: string): Promise<void> {
+  const parent = path.dirname(target)
+  const name = path.basename(target)
+  const staging = path.join(parent, `.${name}.updating`)
+  const previous = path.join(parent, `.${name}.previous`)
+  await fs.rm(staging, { recursive: true, force: true })
+  await fs.rm(previous, { recursive: true, force: true })
+  await fs.cp(fresh, staging, { recursive: true, dereference: true })
+  const present = (await fs.lstat(target).catch(() => null)) !== null
+  if (present) await fs.rename(target, previous)
+  try {
+    await fs.rename(staging, target)
+  } catch (failure) {
+    if (present) await fs.rename(previous, target).catch(() => undefined)
+    throw failure
+  }
+  await fs.rm(previous, { recursive: true, force: true }).catch(() => undefined)
 }
