@@ -190,7 +190,7 @@ function PickedChips({
   if (picked.length === 0) return null
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex max-h-[68px] flex-wrap items-center gap-1.5 overflow-y-auto pr-1.5">
       {picked.map((skill) => (
         <span
           key={skill}
