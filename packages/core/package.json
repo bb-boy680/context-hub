@@ -18,7 +18,6 @@
   },
   "exports": {
     ".": "./src/assets.ts",
-    "./fs-browse": "./src/fs-browse.ts",
     "./plugins": "./src/plugins.ts",
     "./state": "./src/state.ts",
     "./workspace": "./src/workspace.ts",

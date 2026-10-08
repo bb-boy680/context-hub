@@ -1,13 +1,13 @@
 /**
  * Behaviour check for the disk-backed workspace list. It runs the store against
  * a temporary hub home and asserts the contract: a home with no document lists
- * nothing, the folder a form walked to becomes a row carrying the folder's own
- * name and its path, a folder that is not there is refused instead of stored,
- * adding and selecting persist and survive a reopen, an unknown workspace is
- * refused rather than silently ignored, and a hand-edited document cannot
- * smuggle in a value that is not a folder.
+ * nothing, the folder a person picked becomes a row carrying the folder's own
+ * name and its path, a name that no folder answers for is refused instead of
+ * stored, adding and selecting persist and survive a reopen, an unknown
+ * workspace is refused rather than silently ignored, and a hand-edited document
+ * cannot smuggle in a value that is not a folder.
  *
- * The folder tree belongs to the form, so it is exercised there, not here.
+ * The system's folder dialog belongs to the form, so it is exercised there.
  *
  * Run from the package: `node scripts/check-workspaces.ts`
  */
@@ -17,7 +17,7 @@ import path from "node:path"
 
 import { folderId, readWorkspaceState, workspaceName } from "../src/workspace.ts"
 import { createFsWorkspaceStore } from "../src/host/workspaces-fs.ts"
-import { listDirectory, projectRoot } from "../src/host/fs-browse.ts"
+import { projectRoot } from "../src/host/fs-browse.ts"
 
 let failures = 0
 
@@ -95,28 +95,49 @@ try {
 check("an unknown workspace is refused", refused.includes("not a known workspace"), refused)
 check("a refusal changes nothing", (await store.page()).current === inside)
 
-/* Browsing: one level at a time, folders only, links reported as links. */
-const listing = await listDirectory(path.join(home, "projects"))
+/* The system dialog reports a folder's name and nothing else, so a name is
+   placed among the folders the hub knows; a name that fits nowhere is refused
+   rather than guessed at. */
+const sibling = path.join(home, "projects", "marketing-site-copy")
+await fs.mkdir(sibling, { recursive: true })
+const byName = await store.add("marketing-site-copy")
 check(
-  "a listing shows the folders it holds and nothing else",
-  JSON.stringify(listing.entries.map((entry) => entry.name)) === JSON.stringify(["marketing-site"]),
-  listing.entries
+  "a folder's name finds it beside one the hub knows",
+  byName.folders.some((folder) => folder.path === sibling),
+  byName.folders
 )
-check("a listing carries an absolute path", listing.path === path.join(home, "projects"), listing.path)
+refused = ""
+try {
+  await store.add("a-folder-that-is-not-there")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a name no folder answers for is refused", refused.includes("no folder named"), refused)
+refused = ""
+try {
+  await store.add("projects/marketing-site")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a name that is a path is refused", refused.includes("not a folder"), refused)
+
+/* The same name beside two known folders names nothing in particular, so the
+   hub refuses rather than picking one of somebody else's projects. */
+await fs.mkdir(path.join(home, "west", "twin"), { recursive: true })
+await fs.mkdir(path.join(home, "east", "twin"), { recursive: true })
+await store.add(path.join(home, "west", "twin"))
+await store.add(path.join(home, "east", "twin"))
+refused = ""
+try {
+  await store.add("twin")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+/* Both are already known under this name, which is also a refusal to guess. */
 check(
-  "a listing names its parent",
-  listing.parent === home,
-  listing.parent
-)
-check(
-  "a listing carries the trail down from the home directory",
-  listing.crumbs.at(-1)?.path === path.join(home, "projects"),
-  listing.crumbs
-)
-await fs.mkdir(path.join(home, ".hidden-project"), { recursive: true })
-check(
-  "a hidden folder is still a folder a person can walk into",
-  (await listDirectory(home)).entries.some((entry) => entry.name === ".hidden-project")
+  "a name two folders answer for is refused",
+  refused.includes("more than one folder is named"),
+  refused
 )
 
 /* A hand-edited document is durable JSON, so its values are checked, not trusted. */
@@ -200,6 +221,38 @@ check(
   "a row the host does not name is left alone",
   healed.folders[1]?.name === "elsewhere" && healed.folders[1]?.path === null,
   healed.folders[1]
+)
+
+/* A row naming a folder beside one the hub knows takes that folder's path:
+   workspaces are folders a person keeps side by side. */
+const besideHome = path.join(hostHome, "beside")
+await fs.mkdir(path.join(besideHome, "state"), { recursive: true })
+const neighbour = path.join(hostHome, "neighbour-project")
+await fs.mkdir(neighbour, { recursive: true })
+await fs.writeFile(
+  path.join(besideHome, "state", "workspaces.json"),
+  JSON.stringify({
+    folders: [{ name: "my-project" }, { name: "neighbour-project" }, { name: "nowhere" }],
+    current: "neighbour-project",
+  })
+)
+const beside = await createFsWorkspaceStore(besideHome, { folder: repo }).page()
+check("the neighbour keeps its place as it takes a path", beside.folders[1]?.path === neighbour, beside.folders[1])
+check("and stays the current one", beside.current === neighbour, beside.current)
+check(
+  "a name nothing answers for stays name-only",
+  beside.folders[2]?.name === "nowhere" && beside.folders[2]?.path === null,
+  beside.folders[2]
+)
+check(
+  "the host's own name still takes the host's folder",
+  beside.folders[0]?.path === repo,
+  beside.folders[0]
+)
+check(
+  "healing is written down, not repeated",
+  JSON.stringify((await createFsWorkspaceStore(besideHome, { folder: repo }).page()).folders) ===
+    JSON.stringify(beside.folders)
 )
 
 /* A host with no folder of its own adopts nothing. */

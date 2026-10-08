@@ -16,7 +16,7 @@ import {
 } from "@workspace/ui/components/sidebar"
 import { cn } from "@workspace/ui/lib/utils"
 
-import { FolderPickerDialog } from "@/components/folder-picker-dialog"
+import { pickFolder } from "@/lib/folder-picker"
 import { useWorkspaces } from "@/lib/workspaces"
 
 /** How a row reads: the workspace in use, another one, or the action that adds one. */
@@ -83,9 +83,35 @@ export function WorkspaceMenu() {
   const { t } = useI18n()
   const { page, failure, select, add } = useWorkspaces()
   const [open, setOpen] = React.useState(false)
-  const [picking, setPicking] = React.useState(false)
+  /** Why the last create attempt did not land, ready to show. */
+  const [notice, setNotice] = React.useState<string | null>(null)
   const current = page?.current ?? null
   const currentName = page?.folders.find((folder) => folder.id === current)?.name ?? null
+
+  /**
+   * Ask for a folder through the system's own dialog, which is the one a person
+   * expects and the only one a page may open. It reports the folder's name and
+   * nothing else — a page is never told where a folder is — so the hub places
+   * that name among the folders it knows.
+   */
+  const create = async () => {
+    setOpen(false)
+    const picked = await pickFolder()
+    /* A dismissed dialog answers nothing, and is not a failure to report. */
+    if (picked === null) {
+      setNotice(null)
+      return
+    }
+    if (picked === "unsupported") {
+      setNotice(t("workspace.create.unsupported"))
+      return
+    }
+    setNotice(null)
+    await add(picked.name)
+  }
+
+  /* One line for whichever of the two answers last: the form's own, or the hub's. */
+  const message = notice ?? failure
 
   return (
     <>
@@ -142,19 +168,15 @@ export function WorkspaceMenu() {
                 icon={<PlusIcon className="size-[15px]" />}
                 name={t("workspace.create")}
                 state="action"
-                onClick={() => {
-                  setOpen(false)
-                  setPicking(true)
-                }}
+                onClick={() => void create()}
               />
-              {failure === null ? null : (
-                <span className="px-2.5 pb-1 text-xs leading-[15px] text-destructive">{failure}</span>
+              {message === null ? null : (
+                <span className="px-2.5 pb-1 text-xs leading-[15px] text-destructive">{message}</span>
               )}
             </PopoverContent>
           </Popover>
         </SidebarMenuItem>
       </SidebarMenu>
-      <FolderPickerDialog open={picking} onOpenChange={setPicking} onPicked={add} />
     </>
   )
 }

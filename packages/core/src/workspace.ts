@@ -54,8 +54,13 @@ export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null }
 export interface WorkspaceStore {
   /** Every known folder and the current one. */
   page(): Promise<WorkspacePage>
-  /** Remember the folder a person picked, and make it current. */
-  add(path: string): Promise<WorkspacePage>
+  /**
+   * Remember a folder the person picked, and make it current. The argument is
+   * the folder's path, or — because a browser's own dialog reports nothing else
+   * — its name, which the hub places among the folders it already knows; a
+   * name no folder answers for is refused rather than guessed at.
+   */
+  add(folder: string): Promise<WorkspacePage>
   /** Make one known folder current; an unknown id is an error, not a silent no-op. */
   select(id: string): Promise<WorkspacePage>
 }
@@ -77,8 +82,9 @@ export interface WorkspaceService {
   refresh(): Promise<void>
   /** Make one known folder current; `false` when the hub refused it. */
   select(id: string): Promise<boolean>
-  /** Add the folder at `path` and make it current; `false` when the hub refused it. */
-  add(path: string): Promise<boolean>
+  /** Add a folder and make it current; `false` when the hub refused it. The
+      argument is a path or the name a browser's own dialog reports. */
+  add(folder: string): Promise<boolean>
 }
 
 /**

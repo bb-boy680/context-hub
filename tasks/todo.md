@@ -1555,3 +1555,29 @@ Windows 坑：`skills update` 打印完之后 node 断言崩溃（`Assertion fai
 灯箱显示「上游有更新」+「更新」按钮（截图 `designs/check-web/skills-update-available.png`）。
 一次性的临时 home 全链路（装 → 手改 → 记录落后 → 更新）证明：手改 → `modified:true`；记录落后 → `outdated:true`；
 更新后三者一致、手改内容被替换、无残留目录。
+### 修正：创建工作区只走系统对话框，并修好「切过去读不到技能」（2026-10-08，用户反馈）
+
+用户先报『切到 deepseek-harness 为什么没扫到这个工作区下的 skills』，接着说『我不要内置浏览，就使用系统自带的』。
+
+**读不到技能的真因**：工作区行是**只有名字、没有路径**的（浏览器对话框只给名字），而 `currentWorkspace()`
+只认 `path`，于是那一行永远读不到任何文件夹 —— 换到它，技能列表自然是空的。扫描器本身没错
+（读的是 `<workspace>/.agents/skills`，npx skills 装的地方就是它）。
+
+**改法**：名字要能落到一个真实文件夹上，否则那一行毫无意义。
+- `createFsWorkspaceStore` 新增 `locate()`：绝对路径照用；否则**在已知工作区的同级目录里按名字找**——
+  工作区本来就是并排存放的文件夹（hub 自己那个 + 列表里已有的）。**唯一命中才用**；一个都没有、
+  或两个同名都命中，一律拒绝，绝不猜（猜错就是往别人的项目里写东西）。
+- 同一个查找也用来**治愈**旧的只有名字的行（`adoptNamedRows`），写回磁盘，与 `adoptHostFolder` 同源。
+
+**删掉内置浏览**（`91fa481` 引入、用户明确不要）：`folder-picker-dialog.tsx`、`apps/web/src/lib/fs.ts`、
+`packages/core/src/fs-browse.ts`、`vite.ts` 的 `folderBrowser()` / `GET /hub/fs/list` 全部删除，
+`package.json` 的 `./fs-browse` 导出同步移除；`host/fs-browse.ts` 只留 `isDirectory` / `projectRoot` / `hostFolder`。
+`创建工作区` 现在就是 `showDirectoryPicker()` → 拿名字 → `POST /hub/workspaces/add`，失败在菜单里显示一行
+（`workspace.create.unsupported` 用于浏览器没有该对话框时），`workspace.picker.*` 那 11 个键随之删除。
+
+**验证**（真机）：桥直调 `{"path":"deepseek-harness"}` → 落成 `D:\work-space\deepseek-harness` 并成为当前工作区，
+`?action=workspace` 读到该目录 **13 个技能**；页面切到之后页签 `全部 13 / 工作区 13`，侧栏第二行同步。
+UI 上点 `创建工作区` → `showDirectoryPicker` 被调用（桩计数 1）→ 工作区切换、技能页刷新；找不到的名字
+在菜单里显示一行失败原因（不再重复两行，也不再提"在浏览器里选"）。
+`check-workspaces.ts` 增至 30 项：按名字命中 / 无此名拒绝 / 含路径分隔符拒绝 / 同名两处拒绝 / 治愈写回一次。
+四个包 tsc + eslint 全绿。

@@ -4,6 +4,8 @@
  * with one browser profile. This module runs in the process that owns the disk,
  * which is where a folder's path becomes a path a person reads.
  */
+import path from "node:path"
+
 import { displayPath } from "./home.ts"
 import { isDirectory } from "./fs-browse.ts"
 import { createFsStateStore } from "./state-fs.ts"
@@ -27,7 +29,8 @@ export interface WorkspaceStoreOptions {
    * The folder this host itself is working in. A host that knows it does not
    * ask a person to pick it: the folder is a workspace by default, so switching
    * to it reads whatever the person is working on. A row that names the folder
-   * without a path — one added before the hub kept paths — takes the path.
+   * without a path — one added before the hub kept paths — takes the path, and
+   * so does a row naming a folder beside it.
    */
   folder?: string
 }
@@ -74,8 +77,96 @@ export function createFsWorkspaceStore(
     return next
   }
 
+  /**
+   * Every folder a name could mean: one of that name beside a folder the hub
+   * already knows. Workspaces are folders a person keeps side by side — this
+   * hub's own, and every one already in the list — so that is where the name a
+   * browser's dialog reports is looked for.
+   */
+  const foldersNamed = async (
+    state: WorkspaceState,
+    name: string
+  ): Promise<string[]> => {
+    const roots: string[] = []
+    if (options.folder !== undefined) {
+      roots.push(path.dirname(path.resolve(options.folder)))
+    }
+    for (const known of state.folders) {
+      if (known.path === undefined) continue
+      const parent = path.dirname(path.resolve(known.path))
+      if (!roots.includes(parent)) roots.push(parent)
+    }
+    const found: string[] = []
+    for (const root of roots) {
+      const beside = path.join(root, name)
+      if (!found.includes(beside) && (await isDirectory(beside))) found.push(beside)
+    }
+    return found
+  }
+
+  /**
+   * The folder a pick names: a path used as given, or a name placed among the
+   * folders the hub knows. A name that answers to nothing, or to more than one
+   * folder, is refused rather than guessed — a workspace is a folder the hub
+   * writes into, so the wrong guess would be somebody else's project.
+   */
+  const locate = async (target: string): Promise<string> => {
+    if (path.isAbsolute(target)) {
+      if (!(await isDirectory(target))) throw new Error(`not a folder: ${target}`)
+      return target
+    }
+    if (target === "" || path.basename(target) !== target) {
+      throw new Error(`not a folder: ${target}`)
+    }
+    const found = await foldersNamed(await read(), target)
+    const [only] = found
+    if (found.length === 1 && only !== undefined) return only
+    if (found.length === 0) {
+      throw new Error(
+        `no folder named ${target} sits beside a folder this hub knows; a browser reports a folder's name alone, so that is where it can be found`
+      )
+    }
+    throw new Error(
+      `more than one folder is named ${target}, so the hub cannot tell which: ${found.join(", ")}`
+    )
+  }
+
+  /**
+   * Give every name-only row the folder it names, when exactly one folder
+   * answers to that name. A name nothing answers for, or that two folders
+   * share, stays as it was: a row is not made up into a path by guessing.
+   */
+  const adoptNamedRows = async (state: WorkspaceState): Promise<WorkspaceState> => {
+    const taken = new Set(state.folders.map(folderId))
+    const folders: WorkspaceFolder[] = []
+    let current = state.current
+    let changed = false
+    for (const row of state.folders) {
+      if (row.path !== undefined) {
+        folders.push(row)
+        continue
+      }
+      const found = await foldersNamed(state, row.name)
+      const only = found[0]
+      if (found.length !== 1 || only === undefined || taken.has(only)) {
+        folders.push(row)
+        continue
+      }
+      folders.push({ name: row.name, path: only })
+      taken.add(only)
+      if (current === folderId(row)) current = only
+      changed = true
+    }
+    if (!changed) return state
+    const next: WorkspaceState = { folders, current }
+    await documents.write(WORKSPACE_DOCUMENT, next)
+    return next
+  }
+
   const read = async (): Promise<WorkspaceState> =>
-    adoptHostFolder(readWorkspaceState(await documents.read(WORKSPACE_DOCUMENT)))
+    adoptNamedRows(
+      await adoptHostFolder(readWorkspaceState(await documents.read(WORKSPACE_DOCUMENT)))
+    )
 
   const page = async (): Promise<WorkspacePage> => {
     const state = await read()
@@ -86,10 +177,8 @@ export function createFsWorkspaceStore(
     page,
 
     async add(target) {
-      if (!(await isDirectory(target))) {
-        throw new Error(`not a folder: ${target}`)
-      }
-      const folder: WorkspaceFolder = { name: workspaceName(target), path: target }
+      const at = await locate(target)
+      const folder: WorkspaceFolder = { name: workspaceName(at), path: at }
       const state = await read()
       const id = folderId(folder)
       const folders = state.folders.some((known) => folderId(known) === id)
