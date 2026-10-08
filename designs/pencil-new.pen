@@ -18432,11 +18432,11 @@
               "id": "wyldn",
               "layoutPosition": "absolute",
               "x": 400,
-              "y": 255,
+              "y": 242,
               "name": "Dialog",
               "clip": true,
               "width": 640,
-              "height": 570,
+              "height": 596,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -18715,10 +18715,55 @@
                           "fill": "$muted-foreground",
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
-                          "content": "owner/repo, owner/repo@skill, a Git URL, or a SKILL.md link",
+                          "content": "owner/repo, owner/repo@skill, a Git URL, a SKILL.md link, or a pasted npx skills add command",
                           "fontFamily": "$font-sans",
                           "fontSize": 11,
                           "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "s8Mip",
+                          "name": "Pinned Chips",
+                          "width": "fill_container",
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "s1xIw8",
+                              "name": "Chip grill-me",
+                              "fill": "$muted",
+                              "cornerRadius": "$radius-full",
+                              "gap": 6,
+                              "padding": [
+                                3,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "yF2AP",
+                                  "name": "Chip Label",
+                                  "fill": "$foreground",
+                                  "content": "grill-me",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "500"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "zn9L4",
+                                  "name": "Chip Remove",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "x",
+                                  "library": "lucide",
+                                  "fill": "$muted-foreground"
+                                }
+                              ]
+                            }
+                          ]
                         }
                       ]
                     },
@@ -18771,7 +18816,7 @@
                         {
                           "type": "frame",
                           "id": "kta6U",
-                          "name": "Skill code-review",
+                          "name": "Skill grill-me",
                           "width": "fill_container",
                           "height": 52,
                           "gap": 10,
@@ -18803,7 +18848,7 @@
                                   "id": "NMCw8",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
-                                  "content": "code-review",
+                                  "content": "grill-me",
                                   "fontFamily": "$font-mono",
                                   "fontSize": 13,
                                   "fontWeight": "600"
@@ -18815,7 +18860,7 @@
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Review the changes since a fixed point along Standards and Spec",
+                                  "content": "A relentless interview to sharpen a plan or design, which also writes the docs",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 11.5,
                                   "fontWeight": "normal"
@@ -18827,7 +18872,7 @@
                         {
                           "type": "frame",
                           "id": "q7X8Kn",
-                          "name": "Skill diagnosing-bugs",
+                          "name": "Skill code-review",
                           "width": "fill_container",
                           "height": 52,
                           "gap": 10,
@@ -18837,12 +18882,12 @@
                               "id": "gce02",
                               "type": "ref",
                               "ref": "cov6T",
-                              "fill": "$primary",
-                              "stroke": "$primary",
+                              "fill": "#00000000",
+                              "stroke": "$input",
                               "name": "Checkbox",
                               "descendants": {
                                 "h5J4H": {
-                                  "enabled": true
+                                  "enabled": false
                                 }
                               }
                             },
@@ -18859,7 +18904,7 @@
                                   "id": "C1Tj4Y",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
-                                  "content": "diagnosing-bugs",
+                                  "content": "code-review",
                                   "fontFamily": "$font-mono",
                                   "fontSize": 13,
                                   "fontWeight": "600"
@@ -18867,6 +18912,62 @@
                                 {
                                   "type": "text",
                                   "id": "zIHIJ",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Review the changes since a fixed point along Standards and Spec",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "vQoxX",
+                          "name": "Skill diagnosing-bugs",
+                          "width": "fill_container",
+                          "height": 52,
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "pNkcO",
+                              "type": "ref",
+                              "ref": "cov6T",
+                              "name": "Checkbox",
+                              "fill": "#00000000",
+                              "stroke": "$input",
+                              "descendants": {
+                                "h5J4H": {
+                                  "enabled": false
+                                }
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bHg7w",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "oAUfq",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "diagnosing-bugs",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ZdPnr",
                                   "name": "Skill Desc",
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
@@ -18882,57 +18983,8 @@
                         },
                         {
                           "type": "frame",
-                          "id": "vQoxX",
-                          "name": "Skill tdd",
-                          "width": "fill_container",
-                          "height": 52,
-                          "gap": 10,
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "id": "pNkcO",
-                              "type": "ref",
-                              "ref": "cov6T",
-                              "name": "Checkbox"
-                            },
-                            {
-                              "type": "frame",
-                              "id": "bHg7w",
-                              "name": "Text",
-                              "width": "fill_container",
-                              "layout": "vertical",
-                              "gap": 2,
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "oAUfq",
-                                  "name": "Skill Name",
-                                  "fill": "$foreground",
-                                  "content": "tdd",
-                                  "fontFamily": "$font-mono",
-                                  "fontSize": 13,
-                                  "fontWeight": "600"
-                                },
-                                {
-                                  "type": "text",
-                                  "id": "ZdPnr",
-                                  "name": "Skill Desc",
-                                  "fill": "$muted-foreground",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "Test-driven development: build features and fix bugs test-first",
-                                  "fontFamily": "$font-sans",
-                                  "fontSize": 11.5,
-                                  "fontWeight": "normal"
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
                           "id": "H7LiR",
-                          "name": "Skill wayfinder",
+                          "name": "Skill tdd",
                           "width": "fill_container",
                           "height": 52,
                           "gap": 10,
@@ -18942,7 +18994,14 @@
                               "id": "J5iljp",
                               "type": "ref",
                               "ref": "cov6T",
-                              "name": "Checkbox"
+                              "name": "Checkbox",
+                              "fill": "#00000000",
+                              "stroke": "$input",
+                              "descendants": {
+                                "h5J4H": {
+                                  "enabled": false
+                                }
+                              }
                             },
                             {
                               "type": "frame",
@@ -18957,7 +19016,7 @@
                                   "id": "uDtwP",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
-                                  "content": "wayfinder",
+                                  "content": "tdd",
                                   "fontFamily": "$font-mono",
                                   "fontSize": 13,
                                   "fontWeight": "600"
@@ -18969,7 +19028,7 @@
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "Plan a huge chunk of work as a shared map of decisions",
+                                  "content": "Test-driven development: build features and fix bugs test-first",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 11.5,
                                   "fontWeight": "normal"
@@ -19050,7 +19109,7 @@
                               "fill": "$primary-foreground"
                             },
                             "xFfMZ": {
-                              "content": "Download 2",
+                              "content": "Download 1",
                               "fill": "$primary-foreground"
                             }
                           }
