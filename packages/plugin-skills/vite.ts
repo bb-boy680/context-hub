@@ -81,6 +81,21 @@ export function skillLibrary(options: { home?: string } = {}) {
               return
             }
 
+            /* GET /hub/skills?action=package&source=… — what a package offers */
+            if (
+              rest === "" &&
+              method === "GET" &&
+              url.searchParams.get("action") === "package"
+            ) {
+              const source = url.searchParams.get("source")
+              if (source === null || source.trim() === "") {
+                sendError(response, new Error("missing package source"))
+                return
+              }
+              sendJson(response, 200, await api.listPackage(source))
+              return
+            }
+
             /* GET /hub/skills — the catalog page */
             if (rest === "" && method === "GET") {
               const enabled = url.searchParams.get("enabled")
@@ -110,6 +125,51 @@ export function skillLibrary(options: { home?: string } = {}) {
             ) {
               await api.refresh()
               sendJson(response, 200, { ok: true })
+              return
+            }
+
+            /* POST /hub/skills?action=install — download from a package */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "install"
+            ) {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                source?: unknown
+                skills?: unknown
+              }
+              if (typeof body.source !== "string" || body.source.trim() === "") {
+                sendError(response, new Error("missing package source"))
+                return
+              }
+              const skills = Array.isArray(body.skills)
+                ? body.skills.filter((item): item is string => typeof item === "string")
+                : []
+              sendJson(response, 200, await api.installPackage(body.source, skills))
+              return
+            }
+
+            /* POST /hub/skills?action=import — take over a dropped folder */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "import"
+            ) {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                files?: unknown
+              }
+              if (!Array.isArray(body.files)) {
+                sendError(response, new Error("missing folder files"))
+                return
+              }
+              const files = body.files.filter(
+                (item): item is { path: string; base64: string } =>
+                  typeof item === "object" &&
+                  item !== null &&
+                  typeof (item as { path?: unknown }).path === "string" &&
+                  typeof (item as { base64?: unknown }).base64 === "string"
+              )
+              sendJson(response, 200, await api.importFolder(files))
               return
             }
 

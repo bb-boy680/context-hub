@@ -568,10 +568,7 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 3. **要记的来源信息已经现成**：`skills-lock.json` 的 `source / skillPath / computedHash` + 报告里的
    `source/hash`，直接进我们 catalog 的安装记录（更新=同 spec 重跑并比 hash；卸载=删目录+记录）。
 4. **反馈状态要齐**：下载中（clone 可能几十秒）、成功（列出装了哪几个）、`skipped`（名字对不上，
-   当作失败报出）、`failed`（把 CLI 的 error 原文带 SSH/gh 提示一起显示）。
-5. **浏览/搜索体验留给插件**（用户既定路线）：skills.sh 的搜索 API（含 installs 计数）留给后续插件化的浏览器。
-
-（列表选择与多选下载的实测见下一节。）
+   当作失败报出）、`failed`（把 CLI 的 error 原文带 SSH/gh 提示一起显示出来，例如私有库的 Authentication failed）。
 
 ### 画布改动（本轮）
 
@@ -859,7 +856,79 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
 标题左对齐、说明居中，两行左边缘差一截（截图为证）。已改回 `left`，与标题同一左边界。
 
 顺带全文档扫了一遍 `textAlign: center` 的文本，只剩 Plugins「Install — From path」的
-`Dropzone Hint`（`pPF3z`）——那块是**整块居中的大拖拽区**（标题也居中、420 宽的说明框在 592 里居中），
+`Dropzone Hint`（`pPF3z`）——那块是**整块居中的大拖拽区**（标题也居中、420 宽的说明框在 592 里居中）,
 属预期，不动。
+
+## 代码实现：按设计稿落地（2026-10-08，用户："我说的根据设计稿完善代码"）
+
+设计稿改成什么样，代码就写成什么样：Add skill 弹窗从「skill.sh 注册表 + 本地拖拽」变成
+**Local / Download 两个 tab 共用一份列表**，Drop 与 Download 都真的能跑通，Cancel 用气泡二次确认。
+
+### 新增的三道缝
+
+| 模块 | 什么 | 在哪 |
+| --- | --- | --- |
+| `src/package-source.ts` | 把 Package 字段读回 `{ source, skills }` | 可移植，对话框与脚本共用 |
+| `src/folder-scan.ts` | 读一次拖入/选中的文件夹：按首段分组、只认带 `SKILL.md` 的组 | 浏览器侧（拖拽遍历 + base64） |
+| `src/host/skills-cli.ts`、`src/host/folder-import.ts`、`src/host/names.ts` | 跑 CLI、写文件夹、拒绝危险目录名 | 宿主侧（有盘的那一端） |
+
+`SkillStore` 因此多了三个方法：`listPackage(source)` / `installPackage(source, skills)` / `importFolder(files)`;
+桥接新增三条路由 `GET /hub/skills?action=package`、`POST …action=install`、`POST …action=import`。
+
+### 下载怎么落地（照实测的形状）
+
+- **在临时目录里跑 CLI**：`npx skills add <source> [--skill x]… -a universal --copy -y --json`,
+  `cwd` 是 `mkdtemp` 出来的空目录；CLI 只会往 agent 目录写，所以它写它的，写完我们**只把
+  `.agents/skills/<name>` 搬进 `<home>/skills/<name>`**。用户自己的 `~/.claude/skills` 全程不碰。
+- **Windows 必须绕 npx.cmd**：走 `process.execPath` + npm 自带的 `npx-cli.js`
+  （Windows 在 `<node>/node_modules/npm/bin/`，POSIX 在 `<node>/../lib/node_modules/npm/bin/`）。
+- **只信 `--json`**：文本输出永远带 ANSI。列表没有 JSON，只能解析文本，
+  所以 `parsePackageList()` 按实测结构读（`│` + 4 空格是名字、+ 6 空格是描述、无框线行是分组标题、
+  `└  Use --skill` 是结尾）。
+- **已有同名 = 拒绝，不覆盖**：`installPackage` 把"库里有这个 id"报成该技能的失败原因，
+  用户先卸载再下载即可（画布待定项 ⑤ 的默认取值）。
+- 失败原样透出：拼错技能名是 CLI 的 `No matching skill found in source`，仓库不存在是它的认证/克隆报错。
+
+### 本地导入怎么落地
+
+拖拽用 `webkitGetAsEntry()` 递归遍历（`readEntry` 逐层读目录，`readEntries` 要读到空数组才停）,
+选择器用 `<input type="file" webkitdirectory>` 的 `webkitRelativePath`；两者都变成
+`{ path, file }` 列表 → `scanFolder` 分组成候选 → 选中项编码成 base64 →
+`POST …action=import` → 宿主按 `<root>/<首段>/…` 逐文件写入，**目录必须先有 `SKILL.md`**，
+越界路径（`..`）直接丢弃，写一半失败就把该目录删掉。
+
+### 对话框行为
+
+- 两个 tab 共用一套状态：`picked` 就是 chip、就是勾选、就是导入内容；空 `picked` 在 Download 表示"整包"。
+- **失焦即拉列表**：`listed` 记住已列过的 source，同一个 source 不再重复拉（Claude 不会因为点一下别处就重跑 CLI）。
+- **粘贴命令直接可用**：`npx skills add … --skill x` → 解析出 source + chip，不点列表也能直接 Import。
+- **Cancel 气泡**：`Popover` 锚在 Cancel 上（`@workspace/ui` 补了 `PopoverArrow`）,
+  只有"有东西可丢"时才弹；Esc / 点外部 / 再次点 Cancel 只关气泡。空字段直接关弹窗。
+- 列表限高 `max-h-56`（224px，正好 4 行）
+
+### 验证
+
+- `node packages/plugin-skills/scripts/check-package.ts`：**全绿**（新增脚本：9 条 Package 解析断言、
+  列表文本解析、拖入分组与编码、写盘与越界拒绝、重名拒绝、二进制往返）。
+- `check-store.ts` / `check-state.ts` / `check-plugins.ts`：全绿；`plugin-skills` typecheck+lint、
+  `web`/`ui`/`locale-zh-cn` typecheck 通过（`ui` 既有 19 个 lint 错误与本次无关）。
+- 桥接实测：列表接口对 `mattpocock/skills` 返回 38 个技能；`install` 真的把 `prototype`、`wizard`
+  下进 `~/.context-hub/skills`（重名再装被拒、拼错名字回 CLI 原文）；`import` 写入
+  `docs-writer`（含 `references/guide.md`）与 `api-review` 并进了目录。
+- 浏览器（zh-CN）：工具栏只剩视图切换 + 导入；弹窗 Local/Download 两 tab、失焦拉列表（38 行、限高可滚动）、
+  行内"选择/已选择"、chip、页脚提示与按钮、Cancel 气泡（继续编辑只关气泡、放弃关弹窗）全部符合设计。
+- **验证用的技能已从 `~/.context-hub/skills` 删除**，用户原有两条（`pdf-extract`、`hand-made`）不变。
+
+### 画布待定项的默认取值（可再改）
+
+| 待定 | 本次取值 |
+| --- | --- |
+| Local 未拖入时列表 | 先不显示，读入后出现（含"没有找到技能"空态） |
+| 分组标题 | 不显示，平铺 |
+| CLI 安全信息 | 不显示 |
+| `DISABLE_TELEMETRY` | 默认带上 |
+| id 冲突 | 拒绝并提示 |
+| 粘贴命令里的 `-g` / `-a <agent>` | 忽略（我们固定装进 hub） |
+| 已安装标记 | 暂不做 |
 
 

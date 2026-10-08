@@ -898,13 +898,6 @@ export function SkillsPage() {
               <UploadIcon />
               {t("skills.action.import")}
             </Button>
-            <Button
-              className="h-9 gap-2 px-4"
-              onClick={() => setAddTab("skill.sh")}
-            >
-              <DownloadIcon />
-              {t("skills.action.browse")}
-            </Button>
           </div>
         </div>
         <TabsContent value={tab} className="flex flex-col gap-6">
@@ -950,8 +943,10 @@ export function SkillsPage() {
       </Tabs>
       <AddSkillDialog
         open={addTab !== null}
-        tab={addTab ?? "skill.sh"}
+        tab={addTab ?? "local"}
+        store={library.store}
         onTabChange={setAddTab}
+        onImported={() => void library.reload()}
         onOpenChange={(open) => {
           if (!open) setAddTab(null)
         }}

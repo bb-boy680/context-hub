@@ -32,12 +32,17 @@ import {
   starterSkillFile,
   writeSkillFile,
 } from "../frontmatter.ts"
+import { importFolder } from "./folder-import.ts"
+import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
 import type {
+  ImportedFile,
+  PackageSkill,
   SkillAsset,
   SkillCounts,
   SkillDetail,
   SkillDraft,
   SkillFileEntry,
+  SkillImport,
   SkillOrigin,
   SkillPage,
   SkillPatch,
@@ -434,6 +439,22 @@ export async function createFsSkillStore(
       await mutate((skills) => {
         delete skills[id]
       })
+    },
+
+    listPackage(source: string): Promise<PackageSkill[]> {
+      return listPackageSkills(source)
+    },
+
+    async installPackage(source: string, ids: string[]): Promise<SkillImport> {
+      const result = await downloadPackageSkills(source, ids, root)
+      await refreshCatalog()
+      return result
+    },
+
+    async importFolder(files: ImportedFile[]): Promise<SkillImport> {
+      const result = await importFolder(files, root)
+      await refreshCatalog()
+      return result
     },
 
     async readFile(id: string, file: string): Promise<string> {

@@ -7,9 +7,12 @@
 import { assetUrl, isLink } from "@workspace/core"
 
 import type {
+  ImportedFile,
+  PackageSkill,
   SkillAsset,
   SkillDetail,
   SkillDraft,
+  SkillImport,
   SkillPage,
   SkillPatch,
   SkillQuery,
@@ -134,6 +137,29 @@ export function createRemoteSkillStore(base = ""): SkillStore {
         `/hub/skills/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
         { method: "DELETE" }
       )
+    },
+
+    listPackage(source: string): Promise<PackageSkill[]> {
+      return call<PackageSkill[]>(
+        base,
+        `/hub/skills?action=package&source=${encodeURIComponent(source)}`
+      )
+    },
+
+    installPackage(source: string, skills: string[]): Promise<SkillImport> {
+      return call<SkillImport>(base, "/hub/skills?action=install", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source, skills }),
+      })
+    },
+
+    importFolder(files: ImportedFile[]): Promise<SkillImport> {
+      return call<SkillImport>(base, "/hub/skills?action=import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ files }),
+      })
     },
 
     assetUrl(ref: string): string {

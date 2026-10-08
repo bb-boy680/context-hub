@@ -77,8 +77,19 @@ function PopoverDescription({
   )
 }
 
+function PopoverArrow({ className, ...props }: PopoverPrimitive.Arrow.Props) {
+  return (
+    <PopoverPrimitive.Arrow
+      data-slot="popover-arrow"
+      className={cn(className)}
+      {...props}
+    />
+  )
+}
+
 export {
   Popover,
+  PopoverArrow,
   PopoverContent,
   PopoverDescription,
   PopoverHeader,

@@ -105,6 +105,28 @@ export interface SkillPatch {
   enabled?: boolean
 }
 
+/** One skill a package offers, before anything is written to disk. */
+export interface PackageSkill {
+  name: string
+  description: string
+}
+
+/** What one download or folder import put into the library, and what it refused. */
+export interface SkillImport {
+  /** Skills now in the library, under the name they took on disk. */
+  installed: string[]
+  /** Entries that did not land, each with a reason fit to show. */
+  failed: { name: string; reason: string }[]
+}
+
+/** One file of a folder a person dropped, as their browser read it. */
+export interface ImportedFile {
+  /** Path relative to the dropped folder, `/`-separated; first segment is the skill. */
+  path: string
+  /** The file's bytes in base64, because the body carrying them is JSON. */
+  base64: string
+}
+
 /**
  * The skill library. Implementations own the files; callers never touch paths.
  * Every method rejects with an `Error` carrying a displayable message.
@@ -129,6 +151,18 @@ export interface SkillStore {
   update(id: string, patch: SkillPatch): Promise<SkillDetail>
   /** Delete the skill: its directory, and every file the hub stores for it. */
   remove(id: string): Promise<void>
+  /**
+   * The skills a package offers, read without writing anything — what the
+   * download list shows before a person picks.
+   */
+  listPackage(source: string): Promise<PackageSkill[]>
+  /**
+   * Download the named skills from a package into this library and index them.
+   * An empty list takes everything the package holds.
+   */
+  installPackage(source: string, skills: string[]): Promise<SkillImport>
+  /** Take over a dropped folder: its files, keyed by their path in the drop. */
+  importFolder(files: ImportedFile[]): Promise<SkillImport>
   /** Read one text file inside the skill directory. */
   readFile(id: string, path: string): Promise<string>
   /** Replace one text file inside the skill directory. */
