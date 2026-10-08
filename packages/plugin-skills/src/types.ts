@@ -5,6 +5,11 @@
  */
 export type SkillLocation = "library" | "workspace" | "both"
 
+/** How a skill reached this machine; the first half of a row's provenance line. */
+export type { SkillOrigin as SkillSource } from "./store.ts"
+
+import type { SkillOrigin as SkillSource } from "./store.ts"
+
 /** One skill row, shared by the catalog page and the detail lightbox. */
 export type Skill = {
   /** Stable id from the library; the row key and the target of every action. */
@@ -15,7 +20,9 @@ export type Skill = {
   /** Full line the list row and the lightbox show. */
   description: string
   tags: string[]
-  /** Location, which is what the badge names. */
+  /** How it got here: imported from a folder, or downloaded from a registry. */
+  source: SkillSource
+  /** Location, which is what the row's provenance line names. */
   location: SkillLocation
   /** The workspace holds this library skill, installed by the hub as a link. */
   installed: boolean

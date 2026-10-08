@@ -26,14 +26,14 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
-import { locationLabel, skillKey } from "./library.ts"
+import { skillKey } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
+import { ProvenanceLine } from "./provenance-line.tsx"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
 import type { SkillDetail, SkillStore, WorkspaceSkillDetail } from "./store.ts"
 
 import { useI18n } from "@workspace/extensions/react"
-import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -914,14 +914,13 @@ function InfoPanel({
             {skill.name}
           </DialogTitle>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="h-[18px] px-1.5 text-[11px]">
-              {locationLabel(skill.location, t)}
-            </Badge>
-            <DialogDescription className="truncate text-xs text-muted-foreground">
-              {skill.updated === ""
-                ? t("skills.detail.inWorkspace")
-                : `${t("skills.detail.updated")} ${skill.updated}`}
-            </DialogDescription>
+            <ProvenanceLine skill={skill} />
+            {/* The line above already names the place; this adds only the age. */}
+            {skill.updated === "" ? null : (
+              <DialogDescription className="truncate text-xs text-muted-foreground">
+                {`${t("skills.detail.updated")} ${skill.updated}`}
+              </DialogDescription>
+            )}
           </div>
         </div>
         <DialogClose
@@ -953,10 +952,6 @@ function InfoPanel({
         <div className="h-px shrink-0 bg-border" />
 
         <dl className="flex flex-col">
-          <MetaRow
-            label={t("skills.detail.location")}
-            value={locationLabel(skill.location, t)}
-          />
           <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
           <MetaRow
             label={t("skills.detail.triggers")}

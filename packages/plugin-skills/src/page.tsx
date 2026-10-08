@@ -11,16 +11,16 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
-import { locationLabel, skillKey, useSkillLibrary } from "./library.ts"
+import { skillKey, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
+import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { seedTags, tagTone } from "./tags.ts"
-import type { Skill } from "./types.ts"
+import type { Skill, SkillSource } from "./types.ts"
 
 import { Spinner } from "@workspace/ui/components/spinner"
 
 import { useI18n } from "@workspace/extensions/react"
-import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   Card,
@@ -63,7 +63,7 @@ const demoVideo =
   "https://media.prompt-motion.com/stephanlivera-opus-5-5-on-max/video.86605038.mp4"
 
 /** Bundled rows the page renders when this form has no skill library. */
-const sampleSkills: Omit<Skill, "id" | "location" | "installed">[] = [
+const sampleSkills: Omit<Skill, "id" | "location" | "installed" | "source">[] = [
   {
     name: "pdf-extract",
     summary: "Extract tables from PDFs",
@@ -220,26 +220,27 @@ const sampleSkills: Omit<Skill, "id" | "location" | "installed">[] = [
 
 const filterTags: SkillTag[] = [...seedTags]
 
+/* The demo rows that did not simply arrive from this machine, so the grid shows
+   the range the design authored instead of one repeated label. */
+const SAMPLE_ORIGINS: Record<string, SkillSource> = {
+  "code-review": "builtin",
+  "api-design": "builtin",
+  "data-migration": "builtin",
+  "incident-postmortem": "builtin",
+  "doc-audit": "registry",
+  "release-notes": "registry",
+  "perf-profiling": "registry",
+  "schema-explorer": "registry",
+}
+
 /* A sample row is keyed by its name; samples stand in for library rows. */
 const sampleRows: Skill[] = sampleSkills.map((skill) => ({
   ...skill,
   id: skill.name,
+  source: SAMPLE_ORIGINS[skill.name] ?? "local",
   location: "library",
   installed: false,
 }))
-
-/** The size line under a card: only the parts this skill actually carries. */
-function skillMeta(skill: Skill, t: (key: string) => string): string {
-  const parts: string[] = []
-  if (skill.tokens !== undefined) {
-    parts.push(`${skill.tokens} ${t("skills.meta.tokens")}`)
-  }
-  if (skill.triggers !== undefined) {
-    parts.push(`${skill.triggers} ${t("skills.meta.triggers")}`)
-  }
-  if (parts.length === 0) parts.push(skill.updated)
-  return parts.join(" · ")
-}
 
 /* The tab row carries one dimension: where a skill is, not where it came from. */
 const TABS: { value: SkillTab; labelKey: string }[] = [
@@ -302,12 +303,6 @@ function TagPill({ tag }: { tag: string }) {
       {tag}
     </span>
   )
-}
-
-/** Where a row lives, which is what its badge names. */
-function LocationBadge({ skill }: { skill: Skill }) {
-  const { t } = useI18n()
-  return <Badge variant="secondary">{locationLabel(skill.location, t)}</Badge>
 }
 
 /**
@@ -450,7 +445,6 @@ function SkillCard({
   onRemove: () => void
   onOpen: () => void
 }) {
-  const { t } = useI18n()
   const shownTags = skill.tags.slice(0, 2)
   const extraTags = skill.tags.length - shownTags.length
   /* Stable identity keeps the ratio callback from re-running every render. */
@@ -503,15 +497,18 @@ function SkillCard({
       <div className="flex flex-col gap-1 px-3 py-2.5">
         <div className="flex h-[18px] items-center justify-between gap-2">
           <span className="truncate text-sm font-semibold">{skill.name}</span>
-          <LocationBadge skill={skill} />
+          {/* A skill the hub does not hold has no recorded age; nothing goes here. */}
+          {skill.updated === "" ? null : (
+            <span className="shrink-0 text-[11px] leading-[14px] text-muted-foreground">
+              {skill.updated}
+            </span>
+          )}
         </div>
         <p className="line-clamp-2 text-xs text-muted-foreground">
           {skill.description}
         </p>
-        <div className="mt-0.5 flex items-center justify-between gap-2">
-          <span className="truncate text-[11px] text-muted-foreground">
-            {skillMeta(skill, t)}
-          </span>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <ProvenanceLine skill={skill} />
           <WorkspaceButton
             skill={skill}
             blocked={blocked}
@@ -668,7 +665,7 @@ function SkillTable({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <LocationBadge skill={skill} />
+                  <ProvenanceLine skill={skill} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {skill.tokens ?? "—"}

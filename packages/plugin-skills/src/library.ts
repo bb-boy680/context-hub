@@ -15,7 +15,7 @@ import type {
   WorkspaceSkill,
   WorkspaceSkillsView,
 } from "./store.ts"
-import type { Skill, SkillLocation } from "./types.ts"
+import type { Skill, SkillLocation, SkillSource } from "./types.ts"
 
 /** One page of the catalog, plus what the UI needs to render around it. */
 export interface SkillLibrary {
@@ -46,12 +46,34 @@ export interface SkillLibrary {
   remove(id: string): Promise<void>
 }
 
-/** Where a row lives, as the badge and the lightbox name it. */
+/** Where a row lives, as its provenance line and the lightbox name it. */
 export function locationLabel(
   location: SkillLocation,
   t: (key: string) => string
 ): string {
   return t(location === "library" ? "skills.location.library" : "skills.location.workspace")
+}
+
+/** How a row reached this machine, as its provenance line names it. */
+const SOURCE_KEYS: Record<SkillSource, string> = {
+  local: "skills.source.local",
+  registry: "skills.source.registry",
+  builtin: "skills.source.builtin",
+}
+
+/**
+ * How a row's source reads.
+ *
+ * @param source — where the skill came from.
+ * @param t — the active locale's lookup.
+ * @returns the label, or the raw value for an origin this build does not know.
+ */
+export function sourceLabel(
+  source: string,
+  t: (key: string) => string
+): string {
+  const key = SOURCE_KEYS[source as SkillSource]
+  return key === undefined ? source : t(key)
 }
 
 /**
@@ -102,6 +124,7 @@ export function toSkill(
     summary: row.description,
     description: row.description,
     tags: row.tags,
+    source: row.source,
     tokens,
     updated: formatAge(row.updatedAt, locale),
     stamp: row.updatedAt,
@@ -121,6 +144,8 @@ function workspaceRow(skill: WorkspaceSkill): Skill {
     summary: skill.description,
     description: skill.description,
     tags: [],
+    /* A folder in the project is a skill somebody put there, on this machine. */
+    source: "local",
     updated: "",
     location: "workspace",
     installed: false,

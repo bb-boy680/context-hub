@@ -481,6 +481,16 @@ export async function createFsSkillStore(
     async installPackage(source: string, ids: string[]): Promise<SkillImport> {
       const result = await downloadPackageSkills(source, ids, root)
       await refreshCatalog()
+      /* A row says where it came from, so a download records its source. */
+      const arrived = new Set(result.installed)
+      if (arrived.size > 0) {
+        await mutate((skills) => {
+          for (const id of arrived) {
+            const row = skills[id]
+            if (row !== undefined) skills[id] = { ...row, source: "registry" }
+          }
+        })
+      }
       return result
     },
 

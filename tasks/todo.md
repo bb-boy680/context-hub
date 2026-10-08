@@ -1369,3 +1369,26 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 按钮只剩「查看文件」、控制台零报错。核对图 `designs/check-web/skills-workspace-files-real.png`。
 `check-workspace-skills.ts` 增 7 项（读原文 / 文件树 / 不存在返回 null / 越界名字被拒）共 37 项全过。
 
+### 改版：来源行取代灰色胶囊（2026-10-08，用户要求"改成截图那样、放左下角"）
+
+用户给了两张参考小图：`[图标] skills.sh · Basic`、`[图标] local · Basic` —— 灰色小图标 + 灰字 + 中点 +
+**琥珀色加粗**的词。要求照这个样式替换卡片里那个灰色胶囊，并放到左下角。
+
+**新增 `src/provenance-line.tsx` → `ProvenanceLine`**：`[图标] 来源 · 位置`，位置用琥珀
+（`text-amber-600 dark:text-amber-400`），其余 `muted-foreground`；12.5px，图标 3.5。图标按来源取
+（`local`=hard-drive、`registry`=store、`builtin`=package）。三处共用：卡片左下、列表「位置」列、灯箱标题下。
+
+- 卡片重排：标题行 = 名称 + 年龄（灰色 11px，无记录则不显示）；底部 = `ProvenanceLine`（左）+ 动作按钮（右）。
+  `skillMeta`（tokens/triggers 文本）与 `LocationBadge` 删除；Token 数 / 触发次数 仍由列表列与灯箱 MetaRow 承担。
+- `Skill` 重新带上 `source`（`SkillSource`），`sourceLabel()` 恢复（`skills.source.local|registry|builtin`）。
+- **顺带修一个真 bug**：下载来的技能一直被记成 `local`，所以 `registry` 永远显示不出来 ——
+  `installPackage` 现在把落地的技能标记为 `registry`，来源行才说了实话。
+- 灯箱里的 `位置` MetaRow 删除（来源行已经说了），`skills.detail.location` 键删除；
+  工作区行的 "读取自这个工作区" 也删除（与来源行重复）。
+- 样例数据（无宿主的形态）补 `SAMPLE_ORIGINS`，让演示仍保留四种来源的差别。
+
+**验证**：`本地 · 工作区` 实测宽 98px、高 15px；琥珀色浅色 `oklch(0.666 0.179 58.318)`、深色
+`oklch(0.828 0.189 84.429)`；卡片 / 列表 / 灯箱三处样式一致，深色可读。
+截图 `designs/check-web/{skills-provenance-line,provenance-line-zoom,skills-provenance-list,skills-provenance-dark}.png`。
+四个检查脚本全过，plugin-skills / locale-zh-cn / web 的 tsc 与 eslint 全绿。
+
