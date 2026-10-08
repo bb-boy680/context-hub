@@ -344,4 +344,51 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
   `extensions.json`、`locale.json`）；点"卸载 简体中文"→ 盘上该键变 `false`、localStorage 不同步变化；
   刷新后仍为已卸载（读盘生效）；重新安装恢复原值；刷新后 `localStorage` 只剩 `theme`。
 
+## 参考：DSH 的插件本地记录方式（2026-10-08，用户要求对照）
+
+读了 `deepseek-harness` 的 `boot/app-boot`、`boot/plugin-manager`、`client/ui-plugin-manager`。结论是
+**DSH 没有单独的"插件状态文件"，插件就是磁盘上的东西，记录分散在 profile 自己的三个文件里**：
+
+| 位置 | 记录什么 |
+| --- | --- |
+| `~/.dsh/profiles/<name>/node_modules/<pkg>/` | 插件本体（pnpm 装进来的真实包，`package.json` 里声明 `dsh.bundle.patch`） |
+| `…/profiles/<name>/package.json` | 装了哪些包（`dependencies`）+ 选中了哪些 bundle（有序的 `dsh.profile.bundles`） |
+| `…/profiles/<name>/cordis.patch.yml` | 每个条目的启停：最后一个匹配的覆盖项写 `disabled: true/false`，没有就 append 一条 |
+| `…/profiles/<name>/pnpm-workspace.yaml` | pnpm 的依赖构建脚本审批（`allowBuilds`） |
+| `…/profiles/<name>/.plugin-manager/logs/operation-*/pnpm.log` | 每次安装的 pnpm 输出 |
+
+关键做法：
+
+- **home 是唯一数据根**：显式路径 → `$DSH_HOME` → `~/.dsh`（空/纯空白视为未设置），profile 名做校验
+  后落在 `profiles/<name>`，一个 profile 一棵树（web / headless / sdk / acp 各一棵）。
+- **安装 = 在 profile 目录里跑 `pnpm add`**：`cwd` 是 profile 目录（不是调用目录），持有 profile 写锁，
+  manifest 用原子写；失败/取消会把 `package.json` 与 `pnpm-lock.yaml` 还原，并留下日志目录。
+- **启停是改配置，不是写状态库**：`writePluginEnabled` 只改 YAML 里 `disabled` 一个键，保留注释，
+  原子写、`mode 0o600`；文件本身可手改，运行时按它对齐。
+- **UI 便利项才放浏览器**：插件页唯一持久化的是"上次用过的 registry"（client store 的
+  `persist: { name: 'dsh.plugin-manager.install-registry' }`），插件与安装状态一律在盘上。
+
+### 与我们的对照
+
+| 维度 | DSH | 我们现在 |
+| --- | --- | --- |
+| 根目录 | `~/.dsh`（`$DSH_HOME`） | `~/.context-hub`（`CONTEXT_HUB_HOME`） |
+| 插件本体的位置 | `profiles/<name>/node_modules/<pkg>` | **没有**：扩展是编译进应用的代码 |
+| 装了哪些 / 选中哪些 | profile `package.json` | **没有**：目录由应用自带 |
+| 启停 | `cordis.patch.yml` 的 `disabled` | `state/extensions.json` 的布尔值 |
+| 安装日志 | `.plugin-manager/logs/` | 无（没有安装动作） |
+| 手改文件 | 支持（YAML 注释保留） | 支持（JSON，读取时逐项校验，非法项忽略） |
+
+所以上一轮做的 `state/` 方向是对的（**状态在 hub 目录、不在浏览器**），差别在 DSH 还多两层：
+真正的包安装，以及"选中/启停"拆成两个文件。
+
+### 待定（等用户定方向）
+
+1. **要不要做"下载插件"**：真做的话照 DSH 的形状 —— `<home>/plugins/<id>/` 放包本体、
+   `<home>/plugins.json`（或 `state/plugins.json`）记选择与版本、下载走 registry/git/path 三种 spec，
+   失败回滚 + 日志目录。编辑器界面再加"从 URL / registry 安装"入口。
+2. **启停记录要不要拆出来**：DSH 的启停是 profile 配置的一部分（可手写）。我们的
+   `state/extensions.json` 是应用状态；如果希望它像 DSH 一样"可手编、可进版本库"，
+   就把它做成 `extensions.yml` 之类的配置文档。目前保持 JSON（有校验、有原子写），暂不拆。
+
 
