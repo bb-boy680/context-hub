@@ -119,12 +119,19 @@ export interface SkillImport {
   failed: { name: string; reason: string }[]
 }
 
-/** One file of a folder a person dropped, as their browser read it. */
+/** One file of a folder read, relative to the skill directory it belongs to. */
 export interface ImportedFile {
-  /** Path relative to the dropped folder, `/`-separated; first segment is the skill. */
   path: string
   /** The file's bytes in base64, because the body carrying them is JSON. */
   base64: string
+}
+
+/** One skill a folder read produced, ready for the host to write. */
+export interface ImportedSkill {
+  /** The directory name the skill takes in the library. */
+  name: string
+  /** Everything under it, manifest included. */
+  files: ImportedFile[]
 }
 
 /**
@@ -161,8 +168,8 @@ export interface SkillStore {
    * An empty list takes everything the package holds.
    */
   installPackage(source: string, skills: string[]): Promise<SkillImport>
-  /** Take over a dropped folder: its files, keyed by their path in the drop. */
-  importFolder(files: ImportedFile[]): Promise<SkillImport>
+  /** Take over the skills a folder read produced, writing each into the library. */
+  importFolder(skills: ImportedSkill[]): Promise<SkillImport>
   /** Read one text file inside the skill directory. */
   readFile(id: string, path: string): Promise<string>
   /** Replace one text file inside the skill directory. */

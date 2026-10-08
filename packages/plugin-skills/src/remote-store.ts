@@ -7,7 +7,7 @@
 import { assetUrl, isLink } from "@workspace/core"
 
 import type {
-  ImportedFile,
+  ImportedSkill,
   PackageSkill,
   SkillAsset,
   SkillDetail,
@@ -154,11 +154,11 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       })
     },
 
-    importFolder(files: ImportedFile[]): Promise<SkillImport> {
+    importFolder(skills: ImportedSkill[]): Promise<SkillImport> {
       return call<SkillImport>(base, "/hub/skills?action=import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ files }),
+        body: JSON.stringify({ skills }),
       })
     },
 

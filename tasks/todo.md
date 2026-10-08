@@ -446,7 +446,7 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
   三种拒绝各有原因、activate 收到 React+图标表+UI kit、贡献带真实图标组件、
   9 个非法 id 被拒、读写不得越出插件目录、records 往返与坏文件容错、remove 连带清记录）。
 - `check-state.ts` / `check-store.ts`：全绿；`core`/`extensions`/`plugin-skills` lint 与
-  `web`/`extensions` typecheck 全绿。
+  `web`/`extensions`/`locale-zh-cn` typecheck 全绿。
 - 浏览器（真实 `~/.context-hub/plugins/acme.hello/`）：侧栏新增"示例插件"页、`/hello` 渲染插件页面、
   插件自带 en / zh-CN 词条生效、按钮计数（React hooks）可用；卸载 → 侧栏与路由立即消失、
   `state/extensions.json` 写入 `false`；刷新后仍停用；重新安装后恢复。
@@ -648,10 +648,11 @@ Package  [ https://github.com/mattpocock/skills      ] [ List ]
          ( grill-me × )                       ← 从粘贴的命令/`@` 解析出的已选技能
 ────────────────────────────────────────────────────────────
 Found 38 skills in this package                  Select all
- ☑ grill-me           A relentless interview to sharpen a plan or design, which also writes the docs
- ☐ code-review        Review the changes since a fixed point along Standards and Spec
- ☐ diagnosing-bugs    Diagnosis loop for hard bugs and performance regressions
- ☐ tdd                Test-driven development: build features and fix bugs test-first
+ docs-writer      Turn notes and pull requests…      ✓ Selected
+ release-notes    Summarise merged work…             [Select]
+ api-review       Review endpoint changes…           [Select]
+ onboarding       Walk a new contributor…            [Select]
+ changelog        Group commits into a…      （滚动区外）
 ────────────────────────────────────────────────────────────
 Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Import]
 ```

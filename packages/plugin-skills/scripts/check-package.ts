@@ -144,14 +144,12 @@ check("a report with no listing yields nothing", parsePackageList("◇  Cloning 
 
 /* --- reading a dropped folder ------------------------------------------ */
 
+const manifest = (text: string) => new File([`${text}`], "SKILL.md")
+const doc = (name: string, description: string) =>
+  manifest(`---\nname: ${name}\ndescription: ${description}\n---\n\nBody\n`)
+
 const droppedFiles = [
-  {
-    path: "docs-writer/SKILL.md",
-    file: new File(
-      ["---\nname: docs-writer\ndescription: Turn notes into a docs page.\n---\n\nBody\n"],
-      "SKILL.md"
-    ),
-  },
+  { path: "docs-writer/SKILL.md", file: doc("docs-writer", "Turn notes into a docs page.") },
   { path: "docs-writer/references/guide.md", file: new File(["guide"], "guide.md") },
   { path: "notes/readme.md", file: new File(["notes"], "readme.md") },
 ]
@@ -172,19 +170,52 @@ check(
 )
 check(
   "a file at the drop's root belongs to no skill",
-  (await scanFolder([{ path: "SKILL.md", file: new File(["x"], "SKILL.md") }])).length === 0
+  (await scanFolder([{ path: "SKILL.md", file: manifest("x") }])).length === 0
 )
 
-const encoded = await readFolderFiles(scanned)
+/* A repository holds its skills under whatever folders it likes. */
+const repository = await scanFolder([
+  { path: "repo/README.md", file: new File(["readme"], "README.md") },
+  { path: "repo/skills/engineering/code-review/SKILL.md", file: doc("code-review", "Review changes.") },
+  { path: "repo/skills/engineering/code-review/reference.md", file: new File(["ref"], "reference.md") },
+  { path: "repo/skills/writing/tdd/SKILL.md", file: doc("tdd", "Test first.") },
+  { path: "repo/node_modules/pkg/SKILL.md", file: doc("pkg", "Dependency.") },
+  { path: "repo/.github/SKILL.md", file: doc("hidden", "Hidden.") },
+])
+same(
+  "every skill under the picked folder is found, at any depth",
+  repository.map((skill) => `${skill.name}@${skill.dir}`),
+  ["code-review@repo/skills/engineering/code-review", "tdd@repo/skills/writing/tdd"]
+)
 check(
-  "a folder is encoded with its paths",
-  encoded.length === 2 &&
-    encoded.map((file) => file.path).join(",") ===
-      "docs-writer/SKILL.md,docs-writer/references/guide.md",
-  encoded.map((file) => file.path)
+  "a skill's own subfolders come with it",
+  repository[0]?.files.length === 2,
+  repository[0]?.files.map((entry) => entry.path)
 )
 
-/* --- writing a dropped folder ------------------------------------------ */
+/* A skill that carries another manifest is still one skill. */
+const nested = await scanFolder([
+  { path: "outer/SKILL.md", file: doc("outer", "Outer.") },
+  { path: "outer/examples/SKILL.md", file: doc("example", "An example.") },
+])
+same("a manifest inside a skill belongs to that skill", nested.map((skill) => skill.name), ["outer"])
+
+/* A picked folder that is itself a skill is one skill. */
+same(
+  "the picked folder can be the skill",
+  (await scanFolder([{ path: "solo/SKILL.md", file: doc("solo", "Alone.") }])).map((s) => s.name),
+  ["solo"]
+)
+
+const encoded = await readFolderFiles(repository)
+same("the chosen skills are read back", encoded.map((skill) => skill.name), ["code-review", "tdd"])
+check(
+  "each file is sent relative to its own skill",
+  encoded[0]?.files.map((file) => file.path).join(",") === "SKILL.md,reference.md",
+  encoded[0]?.files.map((file) => file.path)
+)
+
+/* --- writing the skills a folder read produced ------------------------- */
 
 const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-import-"))
 const root = path.join(home, "skills")
@@ -196,47 +227,57 @@ const file = (filePath: string, text: string) => ({
   base64: Buffer.from(text, "utf8").toString("base64"),
 })
 
-const dropped = [
-  file("docs-writer/SKILL.md", "---\nname: docs-writer\n---\n\nBody\n"),
-  file("docs-writer/references/guide.md", "guide"),
-  file("notes/readme.md", "not a skill"),
-  { path: "../escape/SKILL.md", base64: Buffer.from("x").toString("base64") },
-]
-
-const imported = await importFolder(dropped, root)
-same("only the folder with a SKILL.md is imported", imported.installed, ["docs-writer"])
-check("a folder without a SKILL.md is not reported as a failure", imported.failed.length === 0, imported.failed)
+const imported = await importFolder(await readFolderFiles(repository), root)
+same("both skills are imported", imported.installed, ["code-review", "tdd"])
+check("nothing was refused", imported.failed.length === 0, imported.failed)
 check(
   "the manifest lands at the skill root",
-  (await fs.readFile(path.join(root, "docs-writer", "SKILL.md"), "utf8")).includes("docs-writer")
+  (await fs.readFile(path.join(root, "code-review", "SKILL.md"), "utf8")).includes("code-review")
 )
 check(
   "nested files keep their directories",
-  (await fs.readFile(path.join(root, "docs-writer", "references", "guide.md"), "utf8")) === "guide"
+  (await fs.readFile(path.join(root, "code-review", "reference.md"), "utf8")) === "ref"
 )
 check(
-  "a folder without a manifest is not written",
-  (await fs.stat(path.join(root, "notes")).catch(() => null)) === null
-)
-check(
-  "a path that climbs out writes nothing",
-  (await fs.stat(path.join(home, "escape")).catch(() => null)) === null &&
-    (await fs.stat(path.join(root, "escape")).catch(() => null)) === null
+  "a folder without a manifest is never written",
+  (await fs.stat(path.join(root, "repo")).catch(() => null)) === null &&
+    (await fs.stat(path.join(root, "node_modules")).catch(() => null)) === null
 )
 
-const again = await importFolder(dropped, root)
+const again = await importFolder(await readFolderFiles(repository), root)
 same("an import never replaces a name already in the library", again.installed, [])
 check(
   "the refusal says which name is taken",
-  again.failed[0]?.name === "docs-writer" &&
+  again.failed[0]?.name === "code-review" &&
     again.failed[0]?.reason.includes("already in the library"),
   again.failed
 )
 
+const escaping = await importFolder(
+  [{ name: "escape", files: [file("SKILL.md", "x"), file("../outside.md", "x")] }],
+  root
+)
+same("a path that climbs out refuses the whole skill", escaping.installed, [])
+check("and says why", escaping.failed[0]?.reason.includes("unusable file path"), escaping.failed)
+check(
+  "and leaves nothing behind",
+  (await fs.stat(path.join(root, "escape")).catch(() => null)) === null &&
+    (await fs.stat(path.join(home, "outside.md")).catch(() => null)) === null
+)
+
+const nameless = await importFolder([{ name: "no-manifest", files: [file("readme.md", "x")] }], root)
+same("a skill without a manifest is refused", nameless.installed, [])
+check("and says why", nameless.failed[0]?.reason.includes("no SKILL.md"), nameless.failed)
+
 const bytes = await importFolder(
   [
-    { path: "binary/SKILL.md", base64: Buffer.from([0x00, 0xff, 0x41]).toString("base64") },
-    file("binary/extra.bin", "x"),
+    {
+      name: "binary",
+      files: [
+        { path: "SKILL.md", base64: Buffer.from([0x00, 0xff, 0x41]).toString("base64") },
+        file("extra.bin", "x"),
+      ],
+    },
   ],
   root
 )

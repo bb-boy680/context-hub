@@ -35,7 +35,7 @@ import {
 import { importFolder } from "./folder-import.ts"
 import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
 import type {
-  ImportedFile,
+  ImportedSkill,
   PackageSkill,
   SkillAsset,
   SkillCounts,
@@ -451,8 +451,8 @@ export async function createFsSkillStore(
       return result
     },
 
-    async importFolder(files: ImportedFile[]): Promise<SkillImport> {
-      const result = await importFolder(files, root)
+    async importFolder(skills: ImportedSkill[]): Promise<SkillImport> {
+      const result = await importFolder(skills, root)
       await refreshCatalog()
       return result
     },

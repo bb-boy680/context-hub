@@ -149,27 +149,34 @@ export function skillLibrary(options: { home?: string } = {}) {
               return
             }
 
-            /* POST /hub/skills?action=import — take over a dropped folder */
+            /* POST /hub/skills?action=import — take over the skills a folder read */
             if (
               rest === "" &&
               method === "POST" &&
               url.searchParams.get("action") === "import"
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-                files?: unknown
+                skills?: unknown
               }
-              if (!Array.isArray(body.files)) {
-                sendError(response, new Error("missing folder files"))
+              if (!Array.isArray(body.skills)) {
+                sendError(response, new Error("missing folder skills"))
                 return
               }
-              const files = body.files.filter(
-                (item): item is { path: string; base64: string } =>
+              const skills = body.skills.filter(
+                (item): item is { name: string; files: { path: string; base64: string }[] } =>
                   typeof item === "object" &&
                   item !== null &&
-                  typeof (item as { path?: unknown }).path === "string" &&
-                  typeof (item as { base64?: unknown }).base64 === "string"
+                  typeof (item as { name?: unknown }).name === "string" &&
+                  Array.isArray((item as { files?: unknown }).files) &&
+                  ((item as { files: unknown[] }).files as unknown[]).every(
+                    (file) =>
+                      typeof file === "object" &&
+                      file !== null &&
+                      typeof (file as { path?: unknown }).path === "string" &&
+                      typeof (file as { base64?: unknown }).base64 === "string"
+                  )
               )
-              sendJson(response, 200, await api.importFolder(files))
+              sendJson(response, 200, await api.importFolder(skills))
               return
             }
 

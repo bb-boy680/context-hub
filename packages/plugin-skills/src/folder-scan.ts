@@ -1,11 +1,11 @@
 /**
  * Reading a folder a person dropped or picked. The browser hands over files
- * with no directory structure of their own, so this module keeps each file's
- * path inside the drop, groups them by their first segment, and treats a group
- * as a skill only when it carries a SKILL.md.
+ * with no directory structure of their own, so this module rebuilds each file's
+ * path inside the drop, finds every skill under it, and reads the chosen ones
+ * back for the host to write.
  */
 import { parseSkillFile } from "./frontmatter.ts"
-import type { ImportedFile } from "./store.ts"
+import type { ImportedSkill } from "./store.ts"
 
 /** One file a folder read produced, with the path it had inside the drop. */
 export interface DroppedFile {
@@ -16,20 +16,40 @@ export interface DroppedFile {
 
 /** One skill found in a folder, before anything is copied into the library. */
 export interface FolderSkill {
-  /** Folder name, which is also the id it takes in the library. */
+  /** The skill directory's own name; the id it takes in the library. */
   name: string
+  /** Where the skill sits inside the drop, so its files can be read back. */
+  dir: string
   description: string
   files: DroppedFile[]
 }
 
 const MANIFEST = "SKILL.md"
 
+/** Directories whose contents are never a skill worth importing. */
+const NOISE = new Set(["node_modules"])
+
 /** Split a path into its segments, dropping the empty ones a leading slash leaves. */
 function segments(path: string): string[] {
   return path
     .replace(/\\/g, "/")
     .split("/")
-    .filter((part) => part !== "")
+    .filter((part) => part !== "" && part !== ".")
+}
+
+/** Whether a path sits under a hidden or generated directory. */
+function ignored(parts: string[]): boolean {
+  return parts.some((part) => part.startsWith(".") || NOISE.has(part))
+}
+
+/** Encode a file as base64, the form a JSON body carries bytes in. */
+async function toBase64(file: File): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer())
+  let binary = ""
+  for (let index = 0; index < bytes.length; index += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
+  }
+  return btoa(binary)
 }
 
 /** The files a directory picker answered with. */
@@ -103,49 +123,71 @@ export async function readDrop(transfer: DataTransfer): Promise<DroppedFile[]> {
   return groups.flat()
 }
 
-/** Find the skills a folder holds: one per subfolder carrying a SKILL.md. */
+/**
+ * Find the skills a folder holds.
+ *
+ * A skill is any directory carrying a SKILL.md, however deep it sits: a picked
+ * folder can be one skill, a repository of them under `skills/<group>/<name>`,
+ * or both. A directory that already holds a skill is not searched further —
+ * whatever sits under it is that skill's own content.
+ */
 export async function scanFolder(files: DroppedFile[]): Promise<FolderSkill[]> {
-  const groups = new Map<string, DroppedFile[]>()
-  for (const entry of files) {
-    const [name, ...rest] = segments(entry.path)
-    if (name === undefined || rest.length === 0) continue
-    const group = groups.get(name) ?? []
-    group.push(entry)
-    groups.set(name, group)
+  const usable = files
+    .map((entry) => ({ entry, parts: segments(entry.path) }))
+    .filter(({ parts }) => !ignored(parts))
+
+  /* Every directory that carries a manifest, keyed by its path in the drop. */
+  const manifests = new Map<string, DroppedFile>()
+  for (const { entry, parts } of usable) {
+    if (parts.length < 2) continue
+    const file = parts[parts.length - 1]
+    if (file.toLowerCase() !== MANIFEST.toLowerCase()) continue
+    manifests.set(parts.slice(0, -1).join("/"), entry)
+  }
+
+  /* Shallowest first, so a skill's own subfolders are read as its content. */
+  const roots = [...manifests.keys()].sort(
+    (left, right) =>
+      left.split("/").length - right.split("/").length || left.localeCompare(right)
+  )
+  const accepted: string[] = []
+  for (const root of roots) {
+    if (accepted.some((parent) => root.startsWith(`${parent}/`))) continue
+    accepted.push(root)
   }
 
   const found: FolderSkill[] = []
-  for (const [name, group] of groups) {
-    const manifest = group.find((entry) => {
-      const parts = segments(entry.path)
-      return parts.length === 2 && parts[1].toLowerCase() === MANIFEST.toLowerCase()
-    })
+  for (const root of accepted) {
+    const manifest = manifests.get(root)
     if (manifest === undefined) continue
-    const { frontmatter } = parseSkillFile(await manifest.file.text())
-    found.push({ name, description: frontmatter.description ?? "", files: group })
+    const group = usable
+      .filter(({ parts }) => parts.join("/").startsWith(`${root}/`))
+      .map(({ entry }) => entry)
+    /* An unreadable manifest still counts as a skill; it just carries no text. */
+    const text = await manifest.file.text().catch(() => "")
+    const { frontmatter } = parseSkillFile(text)
+    found.push({
+      name: root.split("/").pop() ?? root,
+      dir: root,
+      description: frontmatter.description ?? "",
+      files: group,
+    })
   }
-  return found.sort((left, right) => left.name.localeCompare(right.name))
-}
-
-/** Encode a file as base64, the form a JSON body carries bytes in. */
-async function toBase64(file: File): Promise<string> {
-  const bytes = new Uint8Array(await file.arrayBuffer())
-  let binary = ""
-  for (let index = 0; index < bytes.length; index += 0x8000) {
-    binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000))
-  }
-  return btoa(binary)
+  return found
 }
 
 /** Read the chosen skills for the host, which writes the bytes as they are. */
-export async function readFolderFiles(skills: FolderSkill[]): Promise<ImportedFile[]> {
-  const files = await Promise.all(
-    skills.flatMap((skill) =>
-      skill.files.map(async (entry) => ({
-        path: entry.path,
-        base64: await toBase64(entry.file),
-      }))
-    )
+export async function readFolderFiles(skills: FolderSkill[]): Promise<ImportedSkill[]> {
+  return Promise.all(
+    skills.map(async (skill) => ({
+      name: skill.name,
+      files: await Promise.all(
+        skill.files.map(async (entry) => ({
+          /* The host writes inside the skill directory, so the root comes off. */
+          path: entry.path.slice(skill.dir.length + 1),
+          base64: await toBase64(entry.file),
+        }))
+      ),
+    }))
   )
-  return files
 }

@@ -1,13 +1,13 @@
 /**
- * Taking over a folder a person dropped in the browser. The page already read
- * the files it was given, so what arrives here is a list of relative paths and
- * bytes; this module decides which of them are skills and writes each one into
- * the library root as its own directory.
+ * Writing the skills a folder read produced into the library. The page found
+ * them and read their bytes; what arrives here is one directory per skill, each
+ * with the files under it, and this module is what turns that into a skill the
+ * catalog can index.
  */
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import type { ImportedFile, SkillImport } from "../store.ts"
+import type { ImportedSkill, SkillImport } from "../store.ts"
 import { assertSkillName } from "./names.ts"
 
 const MANIFEST = "SKILL.md"
@@ -18,49 +18,43 @@ function segments(relative: string): string[] | null {
     .replace(/\\/g, "/")
     .split("/")
     .filter((part) => part !== "" && part !== ".")
-  if (parts.length < 2 || parts.some((part) => part === "..")) return null
+  if (parts.length === 0 || parts.some((part) => part === "..")) return null
   return parts
 }
 
 /**
- * Write the files of a dropped folder into the library.
+ * Write the chosen skills into the library.
  *
- * @param files — every file the page read, keyed by its path inside the drop.
- *   The first segment names the skill; a folder without a SKILL.md is not one
- *   and is skipped rather than reported.
+ * @param skills — one entry per skill: the directory name it takes, and every
+ *   file under it with paths relative to that directory.
  * @param root — the skills directory the folders land in.
- * @returns the folders that became skills and the ones that were refused.
+ * @returns the skills now in the library and the ones that were refused, each
+ *   with a reason fit to show. A skill that cannot be written whole is removed
+ *   again rather than left half in place.
  */
 export async function importFolder(
-  files: ImportedFile[],
+  skills: ImportedSkill[],
   root: string
 ): Promise<SkillImport> {
-  const groups = new Map<string, { path: string; base64: string }[]>()
-  for (const file of files) {
-    const parts = segments(file.path)
-    if (parts === null) continue
-    const [name, ...rest] = parts
-    const group = groups.get(name) ?? []
-    group.push({ path: rest.join("/"), base64: file.base64 })
-    groups.set(name, group)
-  }
-
   const result: SkillImport = { installed: [], failed: [] }
-  for (const [name, group] of groups) {
+  for (const skill of skills) {
     try {
-      const hasManifest = group.some(
+      const name = assertSkillName(skill.name)
+      const hasManifest = skill.files.some(
         (file) => file.path.toLowerCase() === MANIFEST.toLowerCase()
       )
-      if (!hasManifest) continue
-      const target = path.join(root, assertSkillName(name))
+      if (!hasManifest) throw new Error(`no ${MANIFEST} at the folder root`)
+      const target = path.join(root, name)
       const taken = await fs.stat(target).catch(() => null)
       if (taken !== null) {
         throw new Error("a skill with this name is already in the library")
       }
       await fs.mkdir(target, { recursive: true })
       try {
-        for (const file of group) {
-          const absolute = path.join(target, ...file.path.split("/"))
+        for (const file of skill.files) {
+          const parts = segments(file.path)
+          if (parts === null) throw new Error(`unusable file path: ${file.path}`)
+          const absolute = path.join(target, ...parts)
           await fs.mkdir(path.dirname(absolute), { recursive: true })
           await fs.writeFile(absolute, Buffer.from(file.base64, "base64"))
         }
@@ -72,7 +66,7 @@ export async function importFolder(
       result.installed.push(name)
     } catch (failure) {
       result.failed.push({
-        name,
+        name: skill.name,
         reason: failure instanceof Error ? failure.message : String(failure),
       })
     }
