@@ -23215,11 +23215,11 @@
               "id": "EHWkL",
               "layoutPosition": "absolute",
               "x": 400,
-              "y": 228,
+              "y": 209,
               "name": "Dialog",
               "clip": true,
               "width": 640,
-              "height": 623,
+              "height": 660,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -23402,7 +23402,7 @@
                   "id": "BCHhh",
                   "name": "Dialog Body",
                   "width": "fill_container",
-                  "height": 428,
+                  "height": 465,
                   "layout": "vertical",
                   "gap": 16,
                   "padding": [
@@ -23508,6 +23508,51 @@
                               "fill": "$foreground"
                             }
                           }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "t2gJ2C",
+                      "name": "Picked Chips",
+                      "width": "fill_container",
+                      "gap": 6,
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "YryIB",
+                          "name": "Chip docs-writer",
+                          "fill": "$muted",
+                          "cornerRadius": "$radius-full",
+                          "gap": 6,
+                          "padding": [
+                            3,
+                            8
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "T1u0vE",
+                              "name": "Chip Label",
+                              "fill": "$foreground",
+                              "content": "docs-writer",
+                              "fontFamily": "$font-mono",
+                              "fontSize": 11.5,
+                              "fontWeight": "500"
+                            },
+                            {
+                              "type": "icon",
+                              "id": "qHfUV",
+                              "name": "Chip Remove",
+                              "width": 12,
+                              "height": 12,
+                              "icon": "x",
+                              "library": "lucide",
+                              "fill": "$muted-foreground"
+                            }
+                          ]
                         }
                       ]
                     },
