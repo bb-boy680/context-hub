@@ -498,4 +498,94 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 `apps/web` 的 Overview / MCP / Plugins / Activity / Policies / Repository / Settings 仍是全英文页面
 （只有 Extensions 与占位页接了 i18n），要给这些页面做词表 + 接线，才算"整个界面可切换语言"。
 
+## 设计稿：Add skill 弹窗改为「本地导入 + 下载」（2026-10-08，用户先改设计）
+
+### 用户要求
+
+1. 导入弹窗的常态是"导入本地"，另一个 tab 用来**下载**：输入包名，用 `npx skills` 下到 hub 目录。
+2. skill.sh 这一块以后**用插件实现**，本次先从设计里移除它的 tab。
+3. 页脚提示 `Copied into .dsh/skills and enabled right away.` 是错的（那个路径不属于我们）。
+
+### 先做过的事实核查（`npx skills` 用法）
+
+细节与逐条实测见文末「`npx skills` 实测」一节；这里只留结论：命令形如
+`skills add <source> [--skill <name>] -a universal -y --copy --json`，来源可以是 `owner/repo`、
+`owner/repo@skill`、Git URL 或直链；不给技能名会把整个仓库装进来。
+
+### 画布改了什么
+
+- `Y2fjK1`：`Skills — skill.sh Browser` → **`Skills — Add skill — Download`**。搜素/排序/6 条结果列表全部删除，
+  换成 `Dialog Body`（gap 16, padding [0,24,24,24]）：`Field Package`（占位 `vercel-labs/agent-skills`）、
+  `Field Skill (optional)`（占位"留空则取整包"）、说明行 `Fetched with the skills CLI (npx skills).`；
+  页脚改为 `Downloaded into ~/.context-hub/skills and enabled right away.` + Cancel / Download。
+  弹窗 640×695 → **640×384**，y 由 193 → **348**（居中）。
+- `DzRqf`：`Skills — Import` → **`Skills — Add skill — Local`**；页脚提示改为
+  `Copied into ~/.context-hub/skills and enabled right away.`（原 `.dsh/skills` 是错的）。
+- 两个弹窗的分段行：`skill.sh` / `local` → **`Local` / `Download`**（Local 在左、默认选中）；
+  未选中项改 `$muted-foreground`/500，选中项 `$foreground`/600 + 白色胶囊。
+- 工具栏按钮（六块屏统一）：`Browse skill.sh` → **`Download`**（图标 `download`，仍是主按钮）。
+- 文案同源更新：弹窗描述 = `Import a folder from this machine, or download a skill by name.`；
+  页描述（Grid/List/两个弹窗/两块 lightbox 共 6 处）= `Import a folder, download a skill by name, or manage the ones in this workspace.`；
+  模块标签描述去掉 "skill.sh browser"。
+
+### 验证
+
+- 全行扫描：只有 4 个 masonry `Column` 报 "partially clipped"（既有的视口折线，非缺陷）。
+- 导出核对（本地看过，按约定不入库）：两个弹窗、Grid 工具栏、两屏整图；
+  分段行标签居中、字段圆角/描边与 MCP 表单一致、页脚右对齐（405+211 = 616 = 640-24）。
+
+### 待用户确认
+
+见文末 `npx skills` 实测一节的「仍待确认」；代码侧（移除 skill.sh tab、下载 tab、提示文案）尚未实现。
+
+## `npx skills` 实测：下载到底能怎么用、界面该怎么设计（2026-10-08）
+
+用户指出上一版没把 CLI 研究明白。实测对象 `skills@1.7.1`（`vercel-labs/skills`，注册表站点 skills.sh，
+规范 agentskills.io）。以下每条都跑过。
+
+### 能力边界
+
+| 问题 | 实测结论 |
+| --- | --- |
+| 能装什么 | `owner/repo`、`owner/repo@skill`、GitHub/GitLab/Azure/git URL、本地路径、**直链 SKILL.md 或 zip/tgz**（下载 ≤10 MiB、解压 ≤25 MiB、≤1000 文件，可用环境变量放宽） |
+| 注册表名 | `notion` 这类不是通用注册表查询，而是各家 CLI 集成（要求装 `ntn` 并登录）→ 不能当"按名字下载"的地基 |
+| 装到哪 | 项目级 `<cwd>/<agent>/skills/`；`-g` 全局 `~/<agent>/skills/`。`-a universal` 只落 `.agents/skills/<name>/`。**没有"装到指定目录"的参数** |
+| 选择行为 | 不给 `--skill` 时 `-y` 会**装整个仓库**（实测 vercel-labs/agent-skills 装了 9 个）；`--skill '*'` 同义；`--skill` 可重复 |
+| JSON 报告 | `--json` 输出 `[{name,status,source,ref,hash,path,scope,agents,mode,security{gen,socket,snyk,details}}]`；**status = installed / skipped / failed** |
+| 锁文件 | 仓库根写 `skills-lock.json`：`{version, skills:{<name>:{source,sourceType,skillPath,computedHash}}}` —— 正好是我们要记的来源与哈希 |
+| 失败形态 | 包不存在 → 退出码 1 + `{status:"failed",error:"Failed to clone… Authentication failed…（含 SSH/gh 提示）"}`；**技能名不存在 → 退出码 0** + `{status:"skipped",reason:"No matching skill found in source"}`（必须自己当失败处理） |
+| 列举技能 | `add <pkg> --list` 能列出名字+描述，但**不能与 `--json` 同用**、输出带 ANSI 与 spinner 光标控制 → 解析脆弱 |
+| 搜索注册表 | `find <q>` 可非交互，但只有文本（ANSI）；**`https://skills.sh/api/search?q=&limit=` 是公开 JSON API**（Algolia，最多 100 条，字段 `id/source/skillId/name/installs`；空 `q` → 400；无详情接口、无 description） |
+| 环境变量 | `DISABLE_TELEMETRY=1` / `DO_NOT_TRACK=1` 关遥测；`GITHUB_TOKEN`/`GH_TOKEN` 供私有库；`INSTALL_INTERNAL_SKILLS=1` 才装 `internal: true` 的技能 |
+| Windows | `execFile("npx.cmd")` 被 Node 22+ 拒绝（spawn EINVAL）→ 必须 `execFile(process.execPath, [<node>/node_modules/npm/bin/npx-cli.js, …])`；文本输出**永远带 ANSI**（`NO_COLOR`/`FORCE_COLOR` 无效），所以只信 `--json` |
+
+### 由此定下的设计
+
+1. **输入的是"来源"，不是"名字"**：所以字段叫 `Package`，hint 明写可接受 `owner/repo, owner/repo@skill, a Git URL, or a SKILL.md link`。
+2. **第二个字段是必需的**（不是可选装饰）：不给技能名就会把整个仓库装进来（实测 9 个），
+   所以 `Skill` 字段的占位文案要如实写 `Empty takes every skill in the package`。
+3. **执行在宿主侧、且必须沙箱化**：CLI 只能由有盘的进程跑，且它只会往 agent 目录写 →
+   在临时目录里 `cwd` 运行（`-a universal --copy -y --json`），再把 `.agents/skills/<name>` 收编进
+   `~/.context-hub/skills/<name>`；全程**不碰用户自己的 `~/.claude/skills` 等目录**。
+4. **要记的来源信息已经现成**：`skills-lock.json` 的 `source / skillPath / computedHash` + 报告里的
+   `source/hash`，直接进我们 catalog 的安装记录（更新=同 spec 重跑并比 hash；卸载=删目录+记录）。
+5. **反馈状态要齐**：下载中（clone 可能几十秒）、成功（列出装了哪几个）、`skipped`（名字对不上，
+   当作失败报出）、`failed`（把 CLI 的 error 原文带 SSH/gh 提示一起显示）。
+6. **浏览/搜索体验留给插件**（用户既定路线）：本期下载 tab 只做"按来源下载"，
+   skills.sh 的搜索 API（含 installs 计数）留给后续插件化的浏览器。
+
+### 画布改动（本轮）
+
+- `Y2fjK1`（Add skill — Download）随实测调整：Package 字段下新增 11px hint 列出可接受的来源形态；
+  Skill 字段占位改为 `Empty takes every skill in the package`；
+  body hint 改为 `Runs the skills CLI (npx skills add); private repositories use your git credentials.`；
+  弹窗 384 → **405** 并重新居中（y=337）。
+
+### 仍待确认
+
+1. `Skill` 留空=装全部，还是干脆**必填**（避免误装一整仓）？
+2. 装完要不要显示 CLI 报告里的安全信息（`security.gen/socket/snyk`）？
+3. 是否默认加 `DISABLE_TELEMETRY=1`（我们只借用 CLI 的拉取能力）？
+4. 目标 id 已存在时：拒绝，还是覆盖/加后缀？
+
 

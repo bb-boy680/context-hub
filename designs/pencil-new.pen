@@ -6515,7 +6515,7 @@
               "fill": "$muted-foreground",
               "textGrowth": "fixed-width",
               "width": "fill_container",
-              "content": "Grid and list views, skill.sh browser, drag-and-drop import, and the detail lightbox",
+              "content": "Grid and list views, folder import, a download dialog, and the detail lightbox",
               "fontFamily": "$font-sans",
               "fontSize": 14,
               "fontWeight": "normal"
@@ -6667,7 +6667,7 @@
                               "id": "pZVpN",
                               "name": "Description",
                               "fill": "$muted-foreground",
-                              "content": "Install skills from skill.sh or manage the ones in this workspace.",
+                              "content": "Import a folder, download a skill by name, or manage the ones in this workspace.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -7016,17 +7016,17 @@
                               "id": "dChHH",
                               "type": "ref",
                               "ref": "x3lnSj",
-                              "name": "Button Browse skill.sh",
+                              "name": "Button Download",
                               "height": 36,
                               "stroke": "$border",
                               "descendants": {
                                 "PXvdy": {
                                   "enabled": true,
-                                  "icon": "arrow-down-circle",
+                                  "icon": "download",
                                   "fill": "$primary-foreground"
                                 },
                                 "xFfMZ": {
-                                  "content": "Browse skill.sh",
+                                  "content": "Download",
                                   "fill": "$primary-foreground"
                                 }
                               }
@@ -10933,17 +10933,17 @@
                               "id": "W04Sk",
                               "type": "ref",
                               "ref": "x3lnSj",
-                              "name": "Button Browse skill.sh",
+                              "name": "Button Download",
                               "height": 36,
                               "stroke": "$border",
                               "descendants": {
                                 "PXvdy": {
                                   "enabled": true,
-                                  "icon": "library",
+                                  "icon": "download",
                                   "fill": "$primary-foreground"
                                 },
                                 "xFfMZ": {
-                                  "content": "Browse skill.sh",
+                                  "content": "Download",
                                   "fill": "$primary-foreground"
                                 }
                               }
@@ -11008,7 +11008,7 @@
                               "fill": "$muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Install skills from skill.sh, or manage the ones already in this workspace.",
+                              "content": "Import a folder, download a skill by name, or manage the ones in this workspace.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -14820,7 +14820,7 @@
           "id": "Y2fjK1",
           "x": 3248,
           "y": 48,
-          "name": "Context Hub — Skills — skill.sh Browser",
+          "name": "Context Hub — Skills — Add skill — Download",
           "clip": true,
           "width": 1440,
           "height": 1080,
@@ -15144,17 +15144,17 @@
                               "id": "f5I3v",
                               "type": "ref",
                               "ref": "x3lnSj",
-                              "name": "Button Browse skill.sh",
+                              "name": "Button Download",
                               "height": 36,
                               "stroke": "$border",
                               "descendants": {
                                 "PXvdy": {
                                   "enabled": true,
-                                  "icon": "library",
+                                  "icon": "download",
                                   "fill": "$primary-foreground"
                                 },
                                 "xFfMZ": {
-                                  "content": "Browse skill.sh",
+                                  "content": "Download",
                                   "fill": "$primary-foreground"
                                 }
                               }
@@ -15219,7 +15219,7 @@
                               "fill": "$muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Install skills from skill.sh, or manage the ones already in this workspace.",
+                              "content": "Import a folder, download a skill by name, or manage the ones in this workspace.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -18432,11 +18432,11 @@
               "id": "wyldn",
               "layoutPosition": "absolute",
               "x": 400,
-              "y": 193,
+              "y": 348,
               "name": "Dialog",
               "clip": true,
               "width": 640,
-              "height": 695,
+              "height": 384,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -18506,7 +18506,7 @@
                               "fill": "$muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Install from the skill.sh registry or import a folder from this machine.",
+                              "content": "Import a folder from this machine, or download a skill by name.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -18567,30 +18567,7 @@
                         {
                           "type": "frame",
                           "id": "gcQN9",
-                          "name": "Seg skill.sh",
-                          "width": 290,
-                          "height": 28,
-                          "fill": "#FFFFFF",
-                          "cornerRadius": "$radius-md",
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "i3nyB",
-                              "name": "Label",
-                              "fill": "$foreground",
-                              "content": "skill.sh",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 13,
-                              "fontWeight": "600"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "KxNhd",
-                          "name": "Seg local",
+                          "name": "Seg Local",
                           "width": 290,
                           "height": 28,
                           "fill": "#00000000",
@@ -18600,10 +18577,33 @@
                           "children": [
                             {
                               "type": "text",
+                              "id": "i3nyB",
+                              "name": "Label",
+                              "fill": "$muted-foreground",
+                              "content": "Local",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 13,
+                              "fontWeight": "500"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "KxNhd",
+                          "name": "Seg Download",
+                          "width": 290,
+                          "height": 28,
+                          "fill": "#FFFFFF",
+                          "cornerRadius": "$radius-md",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
                               "id": "I4K4a",
                               "name": "Label",
                               "fill": "$foreground",
-                              "content": "local",
+                              "content": "Download",
                               "fontFamily": "$font-sans",
                               "fontSize": 13,
                               "fontWeight": "600"
@@ -18616,874 +18616,131 @@
                 },
                 {
                   "type": "frame",
-                  "id": "vbkeK",
-                  "name": "Search Row",
+                  "id": "HNNPe",
+                  "name": "Dialog Body",
                   "width": "fill_container",
-                  "gap": 10,
+                  "layout": "vertical",
+                  "gap": 16,
                   "padding": [
                     0,
                     24,
-                    16,
-                    24
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "Ork86",
-                      "name": "Search Field",
-                      "width": "fill_container",
-                      "height": 40,
-                      "cornerRadius": "$radius-md",
-                      "stroke": "$primary",
-                      "strokeWidth": 1,
-                      "strokeAlignment": "inner",
-                      "gap": 8,
-                      "padding": [
-                        0,
-                        12
-                      ],
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "cO3Gu",
-                          "name": "Icon",
-                          "width": 16,
-                          "height": 16,
-                          "icon": "search",
-                          "library": "lucide",
-                          "fill": "$primary"
-                        },
-                        {
-                          "type": "text",
-                          "id": "eyRbr",
-                          "name": "Query",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Search skill.sh registry",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 14,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    },
-                    {
-                      "id": "sx2PA",
-                      "type": "ref",
-                      "ref": "Wr5iQ",
-                      "name": "Sort",
-                      "width": 138,
-                      "descendants": {
-                        "DEzpy": {
-                          "content": "Most installs"
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "rectangle",
-                  "id": "C5OmQz",
-                  "name": "Divider",
-                  "fill": "$border",
-                  "width": "fill_container",
-                  "height": 1
-                },
-                {
-                  "type": "frame",
-                  "id": "yBa8Y",
-                  "name": "Results Header",
-                  "width": "fill_container",
-                  "padding": [
-                    12,
                     24,
-                    8,
                     24
                   ],
-                  "justifyContent": "space_between",
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "L18RsD",
-                      "name": "Results Label",
-                      "fill": "$muted-foreground",
-                      "content": "Popular this week",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "500"
-                    },
-                    {
-                      "type": "text",
-                      "id": "E0nCSu",
-                      "name": "Results Hint",
-                      "fill": "$muted-foreground",
-                      "content": "Community skills, verified manifests",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "MnYG3",
-                  "name": "Result web-scraper",
-                  "width": "fill_container",
-                  "height": 68,
-                  "stroke": "$border",
-                  "strokeWidth": {
-                    "bottom": 1
-                  },
-                  "gap": 14,
-                  "padding": [
-                    0,
-                    24
-                  ],
-                  "alignItems": "center",
                   "children": [
                     {
                       "type": "frame",
-                      "id": "Maufz",
-                      "name": "Tile",
-                      "width": 40,
-                      "height": 40,
-                      "fill": "$blob-blue",
-                      "cornerRadius": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "Y204X",
-                          "name": "Icon",
-                          "width": 18,
-                          "height": 18,
-                          "icon": "globe",
-                          "library": "lucide",
-                          "fill": "$secondary-foreground"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "JjfvJ",
-                      "name": "Text",
+                      "id": "YhM6x",
+                      "name": "Field Package",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 3,
+                      "gap": 6,
                       "children": [
                         {
+                          "type": "text",
+                          "id": "CX0nG",
+                          "name": "Label",
+                          "fill": "$muted-foreground",
+                          "content": "Package",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
                           "type": "frame",
-                          "id": "zn4BP",
-                          "name": "Name Row",
+                          "id": "KiqPc",
+                          "name": "Input",
                           "width": "fill_container",
+                          "height": 38,
+                          "cornerRadius": "$radius-md",
+                          "stroke": "$input",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
                           "gap": 8,
+                          "padding": [
+                            0,
+                            12
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
                               "type": "text",
-                              "id": "q9rdHS",
-                              "name": "Name",
-                              "fill": "$foreground",
-                              "content": "web-scraper",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 14,
-                              "fontWeight": "600"
-                            },
-                            {
-                              "type": "text",
-                              "id": "e590d",
-                              "name": "Author",
+                              "id": "bYxEF",
+                              "name": "Value",
                               "fill": "$muted-foreground",
-                              "content": "by @dataforge",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "vercel-labs/agent-skills",
                               "fontFamily": "$font-sans",
-                              "fontSize": 12,
+                              "fontSize": 13,
                               "fontWeight": "normal"
                             }
                           ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "sI7pP",
-                          "name": "Desc",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Scrape and summarize public web pages",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "IwedA",
-                      "name": "Installs",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
-                      "width": 104,
-                      "content": "48.2k installs",
-                      "textAlign": "right",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "id": "NFIKL",
-                      "type": "ref",
-                      "ref": "x3lnSj",
-                      "name": "Button Install",
-                      "height": 32,
-                      "stroke": "$border",
-                      "descendants": {
-                        "PXvdy": {
-                          "enabled": true,
-                          "icon": "download",
-                          "fill": "$primary-foreground"
-                        },
-                        "xFfMZ": {
-                          "content": "Install",
-                          "fill": "$primary-foreground"
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "kJsle",
-                  "name": "Result sql-optimizer",
-                  "width": "fill_container",
-                  "height": 68,
-                  "stroke": "$border",
-                  "strokeWidth": {
-                    "bottom": 1
-                  },
-                  "gap": 14,
-                  "padding": [
-                    0,
-                    24
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "YwBhG",
-                      "name": "Tile",
-                      "width": 40,
-                      "height": 40,
-                      "fill": "#A7F3D066",
-                      "cornerRadius": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "GPDPC",
-                          "name": "Icon",
-                          "width": 18,
-                          "height": 18,
-                          "icon": "database",
-                          "library": "lucide",
-                          "fill": "$secondary-foreground"
                         }
                       ]
                     },
                     {
                       "type": "frame",
-                      "id": "KpGKi",
-                      "name": "Text",
+                      "id": "Qx4wT",
+                      "name": "Field Skill",
                       "width": "fill_container",
                       "layout": "vertical",
-                      "gap": 3,
+                      "gap": 6,
                       "children": [
                         {
+                          "type": "text",
+                          "id": "M8oMqt",
+                          "name": "Label",
+                          "fill": "$muted-foreground",
+                          "content": "Skill (optional)",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
                           "type": "frame",
-                          "id": "JruAf",
-                          "name": "Name Row",
+                          "id": "TKG8t",
+                          "name": "Input",
                           "width": "fill_container",
+                          "height": 38,
+                          "cornerRadius": "$radius-md",
+                          "stroke": "$input",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
                           "gap": 8,
+                          "padding": [
+                            0,
+                            12
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
                               "type": "text",
-                              "id": "EtXdk",
-                              "name": "Name",
-                              "fill": "$foreground",
-                              "content": "sql-optimizer",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 14,
-                              "fontWeight": "600"
-                            },
-                            {
-                              "type": "text",
-                              "id": "Oz35k",
-                              "name": "Author",
+                              "id": "c9oYN6",
+                              "name": "Value",
                               "fill": "$muted-foreground",
-                              "content": "by @queryguild",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "Optional — empty takes every skill",
                               "fontFamily": "$font-sans",
-                              "fontSize": 12,
+                              "fontSize": 13,
                               "fontWeight": "normal"
                             }
                           ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "cEjKH",
-                          "name": "Desc",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Rewrite slow SQL and explain the plan",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
                         }
                       ]
                     },
                     {
                       "type": "text",
-                      "id": "L4Lj9P",
-                      "name": "Installs",
+                      "id": "j8lxKD",
+                      "name": "Body Hint",
                       "fill": "$muted-foreground",
                       "textGrowth": "fixed-width",
-                      "width": 104,
-                      "content": "31.7k installs",
-                      "textAlign": "right",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "id": "R0IPF",
-                      "type": "ref",
-                      "ref": "Mml1j",
-                      "name": "Badge Installed",
-                      "fill": "#00000000",
-                      "stroke": "$border",
-                      "descendants": {
-                        "L07t2Q": {
-                          "type": "icon",
-                          "id": "t2f2K",
-                          "width": 12,
-                          "height": 12,
-                          "icon": "check",
-                          "library": "lucide",
-                          "fill": "$chart-2"
-                        },
-                        "oB8F6": {
-                          "content": "Installed",
-                          "fill": "$foreground"
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "xSMuH",
-                  "name": "Result figma-handoff",
-                  "width": "fill_container",
-                  "height": 68,
-                  "stroke": "$border",
-                  "strokeWidth": {
-                    "bottom": 1
-                  },
-                  "gap": 14,
-                  "padding": [
-                    0,
-                    24
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "O41tx",
-                      "name": "Tile",
-                      "width": 40,
-                      "height": 40,
-                      "fill": "$blob-pink",
-                      "cornerRadius": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "U9ziL",
-                          "name": "Icon",
-                          "width": 18,
-                          "height": 18,
-                          "icon": "pen-tool",
-                          "library": "lucide",
-                          "fill": "$secondary-foreground"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "Dqgyq",
-                      "name": "Text",
                       "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 3,
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "gAr3w",
-                          "name": "Name Row",
-                          "width": "fill_container",
-                          "gap": 8,
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "Ci5kI",
-                              "name": "Name",
-                              "fill": "$foreground",
-                              "content": "figma-handoff",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 14,
-                              "fontWeight": "600"
-                            },
-                            {
-                              "type": "text",
-                              "id": "V5ums",
-                              "name": "Author",
-                              "fill": "$muted-foreground",
-                              "content": "by @uikraft",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 12,
-                              "fontWeight": "normal"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "f3UjVK",
-                          "name": "Desc",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Turn Figma frames into component specs",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "Xl6Oz",
-                      "name": "Installs",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
-                      "width": 104,
-                      "content": "22.4k installs",
-                      "textAlign": "right",
+                      "content": "Fetched with the skills CLI (npx skills).",
                       "fontFamily": "$font-sans",
                       "fontSize": 12,
                       "fontWeight": "normal"
-                    },
-                    {
-                      "id": "Q8eaze",
-                      "type": "ref",
-                      "ref": "x3lnSj",
-                      "name": "Button Install",
-                      "height": 32,
-                      "stroke": "$border",
-                      "descendants": {
-                        "PXvdy": {
-                          "enabled": true,
-                          "icon": "download",
-                          "fill": "$primary-foreground"
-                        },
-                        "xFfMZ": {
-                          "content": "Install",
-                          "fill": "$primary-foreground"
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "wToLN",
-                  "name": "Result log-triage",
-                  "width": "fill_container",
-                  "height": 68,
-                  "stroke": "$border",
-                  "strokeWidth": {
-                    "bottom": 1
-                  },
-                  "gap": 14,
-                  "padding": [
-                    0,
-                    24
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "RrpgW",
-                      "name": "Tile",
-                      "width": 40,
-                      "height": 40,
-                      "fill": "#FCD34D66",
-                      "cornerRadius": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "olxOv",
-                          "name": "Icon",
-                          "width": 18,
-                          "height": 18,
-                          "icon": "scroll-text",
-                          "library": "lucide",
-                          "fill": "$secondary-foreground"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "FPVY0",
-                      "name": "Text",
-                      "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 3,
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "h72trF",
-                          "name": "Name Row",
-                          "width": "fill_container",
-                          "gap": 8,
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "QcJVL",
-                              "name": "Name",
-                              "fill": "$foreground",
-                              "content": "log-triage",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 14,
-                              "fontWeight": "600"
-                            },
-                            {
-                              "type": "text",
-                              "id": "f7azy",
-                              "name": "Author",
-                              "fill": "$muted-foreground",
-                              "content": "by @srecollective",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 12,
-                              "fontWeight": "normal"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "QItis",
-                          "name": "Desc",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Cluster noisy logs into incident timelines",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "txehX",
-                      "name": "Installs",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
-                      "width": 104,
-                      "content": "18.9k installs",
-                      "textAlign": "right",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "id": "WNuR3",
-                      "type": "ref",
-                      "ref": "x3lnSj",
-                      "name": "Button Install",
-                      "height": 32,
-                      "stroke": "$border",
-                      "descendants": {
-                        "PXvdy": {
-                          "enabled": true,
-                          "icon": "download",
-                          "fill": "$primary-foreground"
-                        },
-                        "xFfMZ": {
-                          "content": "Install",
-                          "fill": "$primary-foreground"
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "yt45e",
-                  "name": "Result api-mock",
-                  "width": "fill_container",
-                  "height": 68,
-                  "stroke": "$border",
-                  "strokeWidth": {
-                    "bottom": 1
-                  },
-                  "gap": 14,
-                  "padding": [
-                    0,
-                    24
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "Tanve",
-                      "name": "Tile",
-                      "width": 40,
-                      "height": 40,
-                      "fill": "$blob-violet",
-                      "cornerRadius": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "l8yApx",
-                          "name": "Icon",
-                          "width": 18,
-                          "height": 18,
-                          "icon": "network",
-                          "library": "lucide",
-                          "fill": "$secondary-foreground"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "P4PObM",
-                      "name": "Text",
-                      "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 3,
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "uEj4U",
-                          "name": "Name Row",
-                          "width": "fill_container",
-                          "gap": 8,
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "cfwnM",
-                              "name": "Name",
-                              "fill": "$foreground",
-                              "content": "api-mock",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 14,
-                              "fontWeight": "600"
-                            },
-                            {
-                              "type": "text",
-                              "id": "IDCjE",
-                              "name": "Author",
-                              "fill": "$muted-foreground",
-                              "content": "by @mockyard",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 12,
-                              "fontWeight": "normal"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "t4zkvH",
-                          "name": "Desc",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Generate mock servers from OpenAPI specs",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "ZnSVe",
-                      "name": "Installs",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
-                      "width": 104,
-                      "content": "15.3k installs",
-                      "textAlign": "right",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "id": "V5Tgu",
-                      "type": "ref",
-                      "ref": "x3lnSj",
-                      "name": "Button Install",
-                      "height": 32,
-                      "stroke": "$border",
-                      "descendants": {
-                        "PXvdy": {
-                          "enabled": true,
-                          "icon": "download",
-                          "fill": "$primary-foreground"
-                        },
-                        "xFfMZ": {
-                          "content": "Install",
-                          "fill": "$primary-foreground"
-                        }
-                      }
-                    }
-                  ]
-                },
-                {
-                  "type": "frame",
-                  "id": "LzL7x",
-                  "name": "Result i18n-sync",
-                  "width": "fill_container",
-                  "height": 68,
-                  "stroke": "$border",
-                  "strokeWidth": {
-                    "bottom": 1
-                  },
-                  "gap": 14,
-                  "padding": [
-                    0,
-                    24
-                  ],
-                  "alignItems": "center",
-                  "children": [
-                    {
-                      "type": "frame",
-                      "id": "p9P01m",
-                      "name": "Tile",
-                      "width": 40,
-                      "height": 40,
-                      "fill": "#A5B4FC66",
-                      "cornerRadius": 8,
-                      "justifyContent": "center",
-                      "alignItems": "center",
-                      "children": [
-                        {
-                          "type": "icon",
-                          "id": "JJEO1",
-                          "name": "Icon",
-                          "width": 18,
-                          "height": 18,
-                          "icon": "languages",
-                          "library": "lucide",
-                          "fill": "$secondary-foreground"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "frame",
-                      "id": "E5XY43",
-                      "name": "Text",
-                      "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 3,
-                      "children": [
-                        {
-                          "type": "frame",
-                          "id": "P4yvM",
-                          "name": "Name Row",
-                          "width": "fill_container",
-                          "gap": 8,
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "LwAyz",
-                              "name": "Name",
-                              "fill": "$foreground",
-                              "content": "i18n-sync",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 14,
-                              "fontWeight": "600"
-                            },
-                            {
-                              "type": "text",
-                              "id": "QO1qP",
-                              "name": "Author",
-                              "fill": "$muted-foreground",
-                              "content": "by @localelab",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 12,
-                              "fontWeight": "normal"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "text",
-                          "id": "Utiif",
-                          "name": "Desc",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": "fill_container",
-                          "content": "Keep locale files aligned across branches",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "text",
-                      "id": "s2RLQ8",
-                      "name": "Installs",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
-                      "width": 104,
-                      "content": "9.8k installs",
-                      "textAlign": "right",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
-                    },
-                    {
-                      "id": "h0EuZ",
-                      "type": "ref",
-                      "ref": "x3lnSj",
-                      "name": "Button Install",
-                      "height": 32,
-                      "stroke": "$border",
-                      "descendants": {
-                        "PXvdy": {
-                          "enabled": true,
-                          "icon": "download",
-                          "fill": "$primary-foreground"
-                        },
-                        "xFfMZ": {
-                          "content": "Install",
-                          "fill": "$primary-foreground"
-                        }
-                      }
                     }
                   ]
                 },
@@ -19506,61 +18763,57 @@
                   "children": [
                     {
                       "type": "text",
-                      "id": "j9e3H",
-                      "name": "Count",
+                      "id": "M3v33",
+                      "name": "Footer Hint",
                       "fill": "$muted-foreground",
-                      "content": "1–6 of 1,284 skills",
+                      "content": "Downloaded into ~/.context-hub/skills and enabled right away.",
                       "fontFamily": "$font-sans",
                       "fontSize": 12,
                       "fontWeight": "normal"
                     },
                     {
                       "type": "frame",
-                      "id": "gvq0H",
+                      "id": "ECmU1",
                       "name": "Actions",
                       "gap": 8,
                       "alignItems": "center",
                       "children": [
                         {
-                          "id": "YPzFy",
+                          "id": "mREq5",
                           "type": "ref",
-                          "ref": "NfOyJ",
-                          "name": "Pagination",
+                          "ref": "x3lnSj",
+                          "name": "Button Cancel",
+                          "height": 32,
+                          "fill": "#00000000",
+                          "stroke": "#00000000",
                           "descendants": {
-                            "KOJCk": {
-                              "enabled": false
+                            "PXvdy": {
+                              "enabled": false,
+                              "icon": "plus",
+                              "fill": "$muted-foreground"
                             },
-                            "iscVd": {
-                              "enabled": false
-                            },
-                            "Th6pj": {
-                              "content": "Page 1 of 214"
-                            },
-                            "MCt5f": {
-                              "enabled": false
-                            },
-                            "K6fpf": {
-                              "enabled": false
+                            "xFfMZ": {
+                              "content": "Cancel",
+                              "fill": "$foreground"
                             }
                           }
                         },
                         {
-                          "id": "RtSmF",
+                          "id": "P60pZQ",
                           "type": "ref",
                           "ref": "x3lnSj",
-                          "name": "Button Close",
+                          "name": "Button Download",
                           "height": 32,
                           "stroke": "$border",
-                          "fill": "#00000000",
                           "descendants": {
                             "PXvdy": {
-                              "enabled": false,
+                              "enabled": true,
                               "icon": "download",
                               "fill": "$primary-foreground"
                             },
                             "xFfMZ": {
-                              "content": "Close",
-                              "fill": "$foreground"
+                              "content": "Download",
+                              "fill": "$primary-foreground"
                             }
                           }
                         }
@@ -19577,7 +18830,7 @@
           "id": "DzRqf",
           "x": 4808,
           "y": 48,
-          "name": "Context Hub — Skills — Import",
+          "name": "Context Hub — Skills — Add skill — Local",
           "clip": true,
           "width": 1440,
           "height": 1080,
@@ -20067,17 +19320,17 @@
                               "id": "GOQ9a",
                               "type": "ref",
                               "ref": "x3lnSj",
-                              "name": "Button Browse skill.sh",
+                              "name": "Button Download",
                               "height": 36,
                               "stroke": "$border",
                               "descendants": {
                                 "PXvdy": {
                                   "enabled": true,
-                                  "icon": "library",
+                                  "icon": "download",
                                   "fill": "$primary-foreground"
                                 },
                                 "xFfMZ": {
-                                  "content": "Browse skill.sh",
+                                  "content": "Download",
                                   "fill": "$primary-foreground"
                                 }
                               }
@@ -20142,7 +19395,7 @@
                               "fill": "$muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Install skills from skill.sh, or manage the ones already in this workspace.",
+                              "content": "Import a folder, download a skill by name, or manage the ones in this workspace.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -23678,7 +22931,7 @@
                               "fill": "$muted-foreground",
                               "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "content": "Install from the skill.sh registry or import a folder from this machine.",
+                              "content": "Import a folder from this machine, or download a skill by name.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -23739,30 +22992,7 @@
                         {
                           "type": "frame",
                           "id": "RNrL9",
-                          "name": "Seg skill.sh",
-                          "width": 290,
-                          "height": 28,
-                          "fill": "#00000000",
-                          "cornerRadius": "$radius-md",
-                          "justifyContent": "center",
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "q8vka9",
-                              "name": "Label",
-                              "fill": "$foreground",
-                              "content": "skill.sh",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 13,
-                              "fontWeight": "600"
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
-                          "id": "beCwi",
-                          "name": "Seg local",
+                          "name": "Seg Local",
                           "width": 290,
                           "height": 28,
                           "fill": "#FFFFFF",
@@ -23772,13 +23002,36 @@
                           "children": [
                             {
                               "type": "text",
-                              "id": "scwwM",
+                              "id": "q8vka9",
                               "name": "Label",
                               "fill": "$foreground",
-                              "content": "local",
+                              "content": "Local",
                               "fontFamily": "$font-sans",
                               "fontSize": 13,
                               "fontWeight": "600"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "beCwi",
+                          "name": "Seg Download",
+                          "width": 290,
+                          "height": 28,
+                          "fill": "#00000000",
+                          "cornerRadius": "$radius-md",
+                          "justifyContent": "center",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "scwwM",
+                              "name": "Label",
+                              "fill": "$muted-foreground",
+                              "content": "Download",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 13,
+                              "fontWeight": "500"
                             }
                           ]
                         }
@@ -23910,7 +23163,7 @@
                       "id": "q7SCFa",
                       "name": "Footer Hint",
                       "fill": "$muted-foreground",
-                      "content": "Copied into .dsh/skills and enabled right away.",
+                      "content": "Copied into ~/.context-hub/skills and enabled right away.",
                       "fontFamily": "$font-sans",
                       "fontSize": 12,
                       "fontWeight": "normal"
@@ -24114,7 +23367,7 @@
                               "id": "Vcy3I",
                               "name": "Description",
                               "fill": "$muted-foreground",
-                              "content": "Install skills from skill.sh or manage the ones in this workspace.",
+                              "content": "Import a folder, download a skill by name, or manage the ones in this workspace.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -24463,17 +23716,17 @@
                               "id": "f7qrf",
                               "type": "ref",
                               "ref": "x3lnSj",
-                              "name": "Button Browse skill.sh",
+                              "name": "Button Download",
                               "height": 36,
                               "stroke": "$border",
                               "descendants": {
                                 "PXvdy": {
                                   "enabled": true,
-                                  "icon": "arrow-down-circle",
+                                  "icon": "download",
                                   "fill": "$primary-foreground"
                                 },
                                 "xFfMZ": {
-                                  "content": "Browse skill.sh",
+                                  "content": "Download",
                                   "fill": "$primary-foreground"
                                 }
                               }
@@ -28854,7 +28107,7 @@
                               "id": "Kymsx",
                               "name": "Description",
                               "fill": "$muted-foreground",
-                              "content": "Install skills from skill.sh or manage the ones in this workspace.",
+                              "content": "Import a folder, download a skill by name, or manage the ones in this workspace.",
                               "fontFamily": "$font-sans",
                               "fontSize": 14,
                               "fontWeight": "normal"
@@ -29203,17 +28456,17 @@
                               "id": "oxV1o",
                               "type": "ref",
                               "ref": "x3lnSj",
-                              "name": "Button Browse skill.sh",
+                              "name": "Button Download",
                               "height": 36,
                               "stroke": "$border",
                               "descendants": {
                                 "PXvdy": {
                                   "enabled": true,
-                                  "icon": "arrow-down-circle",
+                                  "icon": "download",
                                   "fill": "$primary-foreground"
                                 },
                                 "xFfMZ": {
-                                  "content": "Browse skill.sh",
+                                  "content": "Download",
                                   "fill": "$primary-foreground"
                                 }
                               }
