@@ -415,7 +415,7 @@
                       "id": "Ek8Ah",
                       "name": "Workspace Name",
                       "fill": "$foreground",
-                      "content": "dsh-context-hub",
+                      "content": "Context Hub",
                       "fontFamily": "$font-sans",
                       "fontSize": 14,
                       "fontWeight": "500"
@@ -425,9 +425,9 @@
                       "id": "QhUvN",
                       "name": "Workspace Meta",
                       "fill": "$muted-foreground",
-                      "content": "~/work/dsh-context-hub",
-                      "fontFamily": "$font-mono",
-                      "fontSize": 11.5,
+                      "content": "dsh-context-hub",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
                       "fontWeight": "normal"
                     }
                   ]
