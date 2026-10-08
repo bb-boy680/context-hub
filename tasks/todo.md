@@ -553,7 +553,7 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 | 选择行为 | 不给 `--skill` 时 `-y` 会**装整个仓库**（实测 vercel-labs/agent-skills 装了 9 个）；`--skill '*'` 同义；`--skill` 可重复 |
 | JSON 报告 | `--json` 输出 `[{name,status,source,ref,hash,path,scope,agents,mode,security{gen,socket,snyk,details}}]`；**status = installed / skipped / failed** |
 | 锁文件 | 仓库根写 `skills-lock.json`：`{version, skills:{<name>:{source,sourceType,skillPath,computedHash}}}` —— 正好是我们要记的来源与哈希 |
-| 失败形态 | 包不存在 → 退出码 1 + `{status:"failed",error:"Failed to clone… Authentication failed…（含 SSH/gh 提示）"}`；**技能名不存在 → 退出码 0** + `{status:"skipped",reason:"No matching skill found in source"}`（必须自己当失败处理） |
+| 失败形态 | 三种都是**退出码 1**：包不存在 → `{status:"failed",error:"Failed to clone… Authentication failed…（含 SSH/gh 提示）"}`；技能名拼错 → `{name,status:"skipped",reason:"No matching skill found in source"}`。所以只判退出码不够，还要看报告里的 `status` |
 | 列举技能 | `add <pkg> --list` 能列出名字+描述，但**不能与 `--json` 同用**、输出带 ANSI 与 spinner 光标控制 → 解析脆弱 |
 | 搜索注册表 | `find <q>` 可非交互，但只有文本（ANSI）；**`https://skills.sh/api/search?q=&limit=` 是公开 JSON API**（Algolia，最多 100 条，字段 `id/source/skillId/name/installs`；空 `q` → 400；无详情接口、无 description） |
 | 环境变量 | `DISABLE_TELEMETRY=1` / `DO_NOT_TRACK=1` 关遥测；`GITHUB_TOKEN`/`GH_TOKEN` 供私有库；`INSTALL_INTERNAL_SKILLS=1` 才装 `internal: true` 的技能 |
@@ -577,14 +577,16 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 
 - `Y2fjK1`（Add skill — Download）随实测调整：Package 字段下新增 11px hint 列出可接受的来源形态；
   body hint 改为 `Runs the skills CLI (npx skills add); private repositories use your git credentials.`；
-  弹窗随下一节改为列表选择版（640×570）。
+  弹窗随下一节改为列表选择版。
 
 ### 仍待确认
 
-1. `Skill` 留空=装全部，还是干脆**必填**（避免误装一整仓）？
-2. 装完要不要显示 CLI 报告里的安全信息（`security.gen/socket/snyk`）？
-3. 是否默认加 `DISABLE_TELEMETRY=1`（我们只借用 CLI 的拉取能力）？
-4. 目标 id 已存在时：拒绝，还是覆盖/加后缀？
+1. 需要"已安装"标记吗（列表里某技能已在 `~/.context-hub/skills` 时）？
+2. 分组标题要不要在列表里显示（现在只显示不带分组的平铺清单）？
+3. 装完显示 CLI 的安全信息（`security.snyk: medium` 等）吗？
+4. 默认加 `DISABLE_TELEMETRY=1`？
+5. 目标 id 已存在：拒绝 / 覆盖 / 加后缀？
+6. 粘贴的命令里如果带 `-g`（全局）或 `-a <agent>`，忽略还是提示？（我们固定 `-a universal` 装进 hub）
 
 ## 能否"贴仓库 → 拉列表 → 勾选 → 下载"？能，已实测（2026-10-08）
 
@@ -645,29 +647,63 @@ skills add https://github.com/mattpocock/skills \
 ```
 [Local | Download]
 Package  [ https://github.com/mattpocock/skills      ] [ List ]
-         owner/repo, owner/repo@skill, a Git URL, or a SKILL.md link
+         owner/repo, owner/repo@skill, a Git URL, a SKILL.md link, or a pasted npx skills add command
+         ( grill-me × )                       ← 从粘贴的命令/`@` 解析出的已选技能
 ────────────────────────────────────────────────────────────
 Found 38 skills in this package                  Select all
- ☑ code-review        Review the changes since a fixed point along Standards and Spec
- ☑ diagnosing-bugs    Diagnosis loop for hard bugs and performance regressions
+ ☑ grill-me           A relentless interview to sharpen a plan or design, which also writes the docs
+ ☐ code-review        Review the changes since a fixed point along Standards and Spec
+ ☐ diagnosing-bugs    Diagnosis loop for hard bugs and performance regressions
  ☐ tdd                Test-driven development: build features and fix bugs test-first
- ☐ wayfinder          Plan a huge chunk of work as a shared map of decisions
 ────────────────────────────────────────────────────────────
-Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Download 2]
+Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Download 1]
 ```
 
-- 弹窗 640×**570**，y=255（居中）；Body 374 = 字段 78 + 分隔 1 + 标题行 15 + 列表 208（4×52）。
+- 弹窗 640×**596**，y=242（居中）；Body 401 = 字段 105（标签 15 + 输入 38 + hint 13 + chips 21 + 间距）
+  + 分隔 1 + 标题行 15 + 列表 208（4×52）+ 间距。
 - 行 = 复选框（选中=$primary 填充+白色勾）+ 等宽技能名 13/600 + 描述 11.5 muted（实现里截一行）。
-- 按钮带选中数量（`Download 2`），未选中时禁用。
+- **chip 就是"已选技能"的唯一状态**：勾选行 = 增删 chip；List 回来的行按 chip 预勾选；
+  Download 把 chips 逐个变成 `--skill`。
+- 按钮带选中数量（`Download 1`），未选中时禁用。
 - 需要一起实现的三个状态（尚未画）：**列表加载中**（"Fetching skills…"）、**空结果**、
   **失败**（把 CLI 的 error 原文连同 SSH/gh 提示显示出来，例如私有库的 Authentication failed）。
 
-### 仍待确认
+## 精确指令怎么填？表单要能接住"用户手里已有一条命令"（2026-10-08）
 
-1. 需要"已安装"标记吗（列表里某技能已在 `~/.context-hub/skills` 时）？
-2. 分组标题要不要在列表里显示（现在只显示不带分组的平铺清单）？
-3. 装完显示 CLI 的安全信息（`security.snyk: medium` 等）吗？
-4. 默认加 `DISABLE_TELEMETRY=1`？
-5. 目标 id 已存在：拒绝 / 覆盖 / 加后缀？
+用户问：如果用户手里就是 `npx skills add https://github.com/mattpocock/skills --skill grill-me`
+这样的准确命令，表单怎么填？实测了各种"精确写法"的边界。
+
+### 实测边界
+
+| 写法 | 结果 |
+| --- | --- |
+| `--skill grill-me` | ✅ 只装 grill-me |
+| `-s grill-me`（短参） | ✅ 同上 |
+| `mattpocock/skills@grill-me`（简写 + `@`） | ✅ 只装 grill-me |
+| `https://github.com/mattpocock/skills@grill-me`（**URL + `@`**） | ❌ **失败**：git 把 `@` 当成凭据分隔符，报认证失败并中止 |
+| `mattpocock/skills@grill-me@tdd`（两个 `@`） | ❌ 失败，`skipped`：`grill-me@tdd` 被当成一个技能名；**多个技能只能用重复的 `--skill`** |
+| `--list` 带上 `@skill` 或 `--skill` | 列表**照样列出全部**（38 个），pin 被忽略 |
+| 技能名拼错 / 仓库不存在 / 无匹配 | 三种都 **exit 1**（技能名拼错时报告里是 `skipped` + `No matching skill found in source`） |
+
+**结论（实现要点）**：`@skill` 只能跟在 `owner/repo` 简写后面，**绝不能把 `@` 拼到 URL 上**；
+所以表单要自己解析 `@`，把来源与技能名拆开，安装时统一用 `--skill` 传（这也是我们唯一能控的形态）。
+
+### 表单怎么填（三种都通）
+
+1. **直接粘贴整条命令**（最贴近用户现状）：`npx skills add … [--skill X]` 贴进 Package 字段 →
+   表单剥掉 `npx skills[ @version] add`，取出 source 与所有 `--skill/-s` 值，
+   把技能名变成输入框下方的 chip，**不点 List 也能直接 Download**。
+2. **简写 pin**：`owner/repo@skill` —— 同样解析成 chip。
+3. **浏览挑选**：点 `List` 拉列表 → 勾选（chip 与勾选是同一个状态，互相联动）。
+
+因为 `--list` 会忽略 pin，实现上：**chips 即"已选技能"的唯一状态** → List 回来后按 chip 预勾选；
+若某个 chip 在列表里找不到，就地提示（多半是拼错）。
+
+### 画布改动
+
+`Y2fjK1` 的 Package 字段：hint 补上 `or a pasted npx skills add command`；
+输入框下方新增 **Chip 行**（`grill-me ×`，圆角胶囊 `$muted`，等宽 11.5 + 12px `x` 图标）；
+列表第一行改成 `grill-me` 且已勾选（对应 chip），其余三行改为未勾选；
+按钮改为 `Download 1`；弹窗 570 → **596** 并居中（y=242）。
 
 

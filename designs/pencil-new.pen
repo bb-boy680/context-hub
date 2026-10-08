@@ -18432,11 +18432,11 @@
               "id": "wyldn",
               "layoutPosition": "absolute",
               "x": 400,
-              "y": 337,
+              "y": 255,
               "name": "Dialog",
               "clip": true,
               "width": 640,
-              "height": 405,
+              "height": 570,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -18630,7 +18630,7 @@
                   "children": [
                     {
                       "type": "frame",
-                      "id": "YhM6x",
+                      "id": "dShKn",
                       "name": "Field Package",
                       "width": "fill_container",
                       "layout": "vertical",
@@ -18638,7 +18638,7 @@
                       "children": [
                         {
                           "type": "text",
-                          "id": "CX0nG",
+                          "id": "PGXxZ",
                           "name": "Label",
                           "fill": "$muted-foreground",
                           "content": "Package",
@@ -18648,38 +18648,69 @@
                         },
                         {
                           "type": "frame",
-                          "id": "KiqPc",
-                          "name": "Input",
+                          "id": "Y01Gm9",
+                          "name": "Package Row",
                           "width": "fill_container",
-                          "height": 38,
-                          "cornerRadius": "$radius-md",
-                          "stroke": "$input",
-                          "strokeWidth": 1,
-                          "strokeAlignment": "inner",
                           "gap": 8,
-                          "padding": [
-                            0,
-                            12
-                          ],
                           "alignItems": "center",
                           "children": [
                             {
-                              "type": "text",
-                              "id": "bYxEF",
-                              "name": "Value",
-                              "fill": "$muted-foreground",
-                              "textGrowth": "fixed-width",
+                              "type": "frame",
+                              "id": "ZXJCr",
+                              "name": "Input",
                               "width": "fill_container",
-                              "content": "vercel-labs/agent-skills",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 13,
-                              "fontWeight": "normal"
+                              "height": 38,
+                              "cornerRadius": "$radius-md",
+                              "stroke": "$input",
+                              "strokeWidth": 1,
+                              "strokeAlignment": "inner",
+                              "gap": 8,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "w0tpfU",
+                                  "name": "Value",
+                                  "fill": "$foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "https://github.com/mattpocock/skills",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "vCcN9",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button List",
+                              "height": 32,
+                              "fill": "#00000000",
+                              "stroke": "#00000000",
+                              "width": 72,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "plus",
+                                  "fill": "$muted-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "List",
+                                  "fill": "$foreground"
+                                }
+                              }
                             }
                           ]
                         },
                         {
                           "type": "text",
-                          "id": "mYCuj",
+                          "id": "p4tioq",
                           "name": "Field Hint",
                           "fill": "$muted-foreground",
                           "textGrowth": "fixed-width",
@@ -18692,67 +18723,262 @@
                       ]
                     },
                     {
-                      "type": "frame",
-                      "id": "Qx4wT",
-                      "name": "Field Skill",
+                      "type": "rectangle",
+                      "id": "K7f51v",
+                      "name": "Divider",
+                      "fill": "$border",
                       "width": "fill_container",
-                      "layout": "vertical",
-                      "gap": 6,
+                      "height": 1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "OMjir",
+                      "name": "Results Header",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
                       "children": [
                         {
                           "type": "text",
-                          "id": "M8oMqt",
-                          "name": "Label",
+                          "id": "ruQqi",
+                          "name": "Count",
                           "fill": "$muted-foreground",
-                          "content": "Skill (optional)",
+                          "content": "Found 38 skills in this package",
                           "fontFamily": "$font-sans",
                           "fontSize": 12,
                           "fontWeight": "500"
                         },
                         {
-                          "type": "frame",
-                          "id": "TKG8t",
-                          "name": "Input",
-                          "width": "fill_container",
-                          "height": 38,
-                          "cornerRadius": "$radius-md",
-                          "stroke": "$input",
-                          "strokeWidth": 1,
-                          "strokeAlignment": "inner",
-                          "gap": 8,
-                          "padding": [
-                            0,
-                            12
-                          ],
-                          "alignItems": "center",
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "c9oYN6",
-                              "name": "Value",
-                              "fill": "$muted-foreground",
-                              "textGrowth": "fixed-width",
-                              "width": "fill_container",
-                              "content": "Empty takes every skill in the package",
-                              "fontFamily": "$font-sans",
-                              "fontSize": 13,
-                              "fontWeight": "normal"
-                            }
-                          ]
+                          "type": "text",
+                          "id": "VZkUq",
+                          "name": "Select All",
+                          "fill": "$primary",
+                          "content": "Select all",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
                         }
                       ]
                     },
                     {
-                      "type": "text",
-                      "id": "j8lxKD",
-                      "name": "Body Hint",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
+                      "type": "frame",
+                      "id": "CZ3mH",
+                      "name": "Skill List",
                       "width": "fill_container",
-                      "content": "Runs the skills CLI (npx skills add); private repositories use your git credentials.",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 12,
-                      "fontWeight": "normal"
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "kta6U",
+                          "name": "Skill code-review",
+                          "width": "fill_container",
+                          "height": 52,
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "mZV6K",
+                              "type": "ref",
+                              "ref": "cov6T",
+                              "fill": "$primary",
+                              "stroke": "$primary",
+                              "name": "Checkbox",
+                              "descendants": {
+                                "h5J4H": {
+                                  "enabled": true
+                                }
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "dx6xz",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "NMCw8",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "code-review",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "YGOWb",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Review the changes since a fixed point along Standards and Spec",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "q7X8Kn",
+                          "name": "Skill diagnosing-bugs",
+                          "width": "fill_container",
+                          "height": 52,
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "gce02",
+                              "type": "ref",
+                              "ref": "cov6T",
+                              "fill": "$primary",
+                              "stroke": "$primary",
+                              "name": "Checkbox",
+                              "descendants": {
+                                "h5J4H": {
+                                  "enabled": true
+                                }
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Psvqw",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "C1Tj4Y",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "diagnosing-bugs",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "zIHIJ",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Diagnosis loop for hard bugs and performance regressions",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "vQoxX",
+                          "name": "Skill tdd",
+                          "width": "fill_container",
+                          "height": 52,
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "pNkcO",
+                              "type": "ref",
+                              "ref": "cov6T",
+                              "name": "Checkbox"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bHg7w",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "oAUfq",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "tdd",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ZdPnr",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Test-driven development: build features and fix bugs test-first",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "H7LiR",
+                          "name": "Skill wayfinder",
+                          "width": "fill_container",
+                          "height": 52,
+                          "gap": 10,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "id": "J5iljp",
+                              "type": "ref",
+                              "ref": "cov6T",
+                              "name": "Checkbox"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "l5C0f",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "uDtwP",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "wayfinder",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "Wva6Q",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Plan a huge chunk of work as a shared map of decisions",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
                     }
                   ]
                 },
@@ -18824,7 +19050,7 @@
                               "fill": "$primary-foreground"
                             },
                             "xFfMZ": {
-                              "content": "Download",
+                              "content": "Download 2",
                               "fill": "$primary-foreground"
                             }
                           }
