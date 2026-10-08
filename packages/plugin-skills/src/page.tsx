@@ -621,7 +621,6 @@ function SkillThumb({ skill }: { skill: Skill }) {
 
 function SkillTable({
   skills,
-  rangeText,
   pagination,
   blocked,
   onInstall,
@@ -630,8 +629,6 @@ function SkillTable({
   onOpen,
 }: {
   skills: Skill[]
-  /** Footer summary above the pager, e.g. "1–12 / 42". */
-  rangeText: string
   pagination: React.ReactNode
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
@@ -725,8 +722,7 @@ function SkillTable({
           </TableBody>
         </Table>
       </div>
-      <div className="flex items-center justify-between px-6">
-        <span className="text-xs text-muted-foreground">{rangeText}</span>
+      <div className="flex items-center justify-end px-6">
         {pagination}
       </div>
     </Card>
@@ -834,8 +830,9 @@ export function SkillsPage() {
   const [tag, setTag] = React.useState("All tags")
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
-  /* One line above the list: how an install landed, or why it did not. */
-  const [notice, setNotice] = React.useState<{ tone: "info" | "error"; text: string } | null>(null)
+  /* Why the last action did not go through. A success says nothing: the row it
+     changed already shows the result. */
+  const [refusal, setRefusal] = React.useState<string | null>(null)
   /* The open lightbox is a row key, because the same id can be two rows. */
   const [detailKey, setDetailKey] = React.useState<string | null>(null)
   /* Bundled rows have no library behind them; edits stay in this map. */
@@ -886,14 +883,10 @@ export function SkillsPage() {
 
   const install = async (skill: Skill) => {
     try {
-      const landed = await library.install(skill.id)
-      setNotice(
-        landed === "copy"
-          ? { tone: "info", text: t("skills.notice.copied") }
-          : null
-      )
+      await library.install(skill.id)
+      setRefusal(null)
     } catch (failure) {
-      setNotice({ tone: "error", text: reasonOf(failure) })
+      setRefusal(reasonOf(failure))
     }
   }
 
@@ -907,25 +900,19 @@ export function SkillsPage() {
       } else {
         await library.remove(skill.id)
       }
-      setNotice(null)
+      setRefusal(null)
     } catch (failure) {
-      setNotice({ tone: "error", text: reasonOf(failure) })
+      setRefusal(reasonOf(failure))
     }
   }
 
   /** Link a skill the workspace wrote into the library. */
   const adopt = async (skill: Skill) => {
     try {
-      const landed = await library.adopt(skill.id)
-      setNotice({
-        tone: "info",
-        text: t(landed === "copy" ? "skills.notice.adoptedCopy" : "skills.notice.adopted").replace(
-          "{name}",
-          skill.name
-        ),
-      })
+      await library.adopt(skill.id)
+      setRefusal(null)
     } catch (failure) {
-      setNotice({ tone: "error", text: reasonOf(failure) })
+      setRefusal(reasonOf(failure))
     }
   }
 
@@ -950,10 +937,7 @@ export function SkillsPage() {
   const openDetail = (skill: Skill) => setDetailKey(skillKey(skill))
 
   const total = matching.length
-  const from = total === 0 ? 0 : page * pageSize + 1
-  const to = Math.min(total, (page + 1) * pageSize)
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
-  const rangeText = `${from}–${to} / ${total}`
 
   const pagination = (
     <TablePagination
@@ -1026,14 +1010,8 @@ export function SkillsPage() {
             </Button>
           </div>
         </div>
-        {notice === null ? null : (
-          <span
-            className={`text-xs leading-[15px] ${
-              notice.tone === "error" ? "text-destructive" : "text-muted-foreground"
-            }`}
-          >
-            {notice.text}
-          </span>
+        {refusal === null ? null : (
+          <span className="text-xs leading-[15px] text-destructive">{refusal}</span>
         )}
         <TabsContent value={tab} className="flex flex-col gap-6">
           {library.loading ? (
@@ -1073,15 +1051,13 @@ export function SkillsPage() {
                 onRemove={uninstall}
                 onOpen={openDetail}
               />
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">{rangeText}</span>
+              <div className="flex items-center justify-end">
                 {pagination}
               </div>
             </>
           ) : (
             <SkillTable
               skills={skills}
-              rangeText={rangeText}
               pagination={pagination}
               blocked={blocked}
               onInstall={install}

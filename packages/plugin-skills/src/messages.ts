@@ -47,12 +47,6 @@ export const skillsMessages: Record<string, string> = {
   "skills.workspace.noPath": "This workspace has no folder path to read.",
   "skills.workspace.taken": "This workspace has its own skill with that name.",
   "skills.workspace.empty": "This workspace has no skills yet.",
-  "skills.notice.copied":
-    "Copied instead of linked: this filesystem has no links, so the workspace owns its own copy.",
-  "skills.notice.adopted":
-    "Pushed {name} into the library; the workspace keeps the files.",
-  "skills.notice.adoptedCopy":
-    "Pushed a copy of {name} into the library: this filesystem has no links, so the two are now separate.",
   "skills.update.check": "Check",
   "skills.update.checking": "Checking the source…",
   "skills.update.available": "A newer revision is available",
