@@ -22,11 +22,11 @@ import { useWorkspaces } from "@/lib/workspaces"
 /** How a row reads: the workspace in use, another one, or the action that adds one. */
 type RowState = "current" | "idle" | "action"
 
-/** One menu row: a tile, the folder's name, and the path it lives at. */
+/** One menu row: a tile and the folder's own name. */
 function MenuRow({
   icon,
   name,
-  display,
+  hint,
   state,
   trailing,
   disabled,
@@ -34,8 +34,8 @@ function MenuRow({
 }: {
   icon: React.ReactNode
   name: string
-  /** The folder's path; `null` when this form cannot know one. */
-  display?: string | null
+  /** The folder's path, kept as a hover hint rather than a line of its own. */
+  hint?: string | null
   state: RowState
   trailing?: React.ReactNode
   disabled?: boolean
@@ -46,6 +46,7 @@ function MenuRow({
       type="button"
       disabled={disabled}
       onClick={onClick}
+      title={hint ?? undefined}
       className={cn(
         "flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left disabled:pointer-events-none disabled:opacity-50",
         state === "current" ? "bg-primary/10" : "hover:bg-muted"
@@ -63,12 +64,7 @@ function MenuRow({
       >
         {icon}
       </span>
-      <span
-        className={cn(
-          "flex min-w-0 flex-1 flex-col",
-          display === undefined || display === null ? "justify-center" : null
-        )}
-      >
+      <span className="flex min-w-0 flex-1 flex-col justify-center">
         <span
           className={cn(
             "truncate text-[13px] leading-[17px] font-medium",
@@ -77,11 +73,6 @@ function MenuRow({
         >
           {name}
         </span>
-        {display === undefined || display === null ? null : (
-          <span className="truncate font-mono text-[11px] leading-[14px] text-muted-foreground">
-            {display}
-          </span>
-        )}
       </span>
       {trailing}
     </button>
@@ -131,7 +122,7 @@ export function WorkspaceMenu() {
                   key={folder.id}
                   icon={<FolderIcon className="size-[15px]" />}
                   name={folder.name}
-                  display={folder.display}
+                hint={folder.display}
                   state={folder.id === current ? "current" : "idle"}
                   trailing={
                     folder.id === current ? (

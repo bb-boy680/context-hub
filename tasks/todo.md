@@ -1392,3 +1392,14 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 截图 `designs/check-web/{skills-provenance-line,provenance-line-zoom,skills-provenance-list,skills-provenance-dark}.png`。
 四个检查脚本全过，plugin-skills / locale-zh-cn / web 的 tsc 与 eslint 全绿。
 
+### 改版：工作区菜单只显示文件夹名（2026-10-08，用户要求）
+
+用户明确：**工作区这一块只显示文件夹名称**，不要再显示那行等宽路径（`D:\work-space\dsh-context-hub`）。
+
+`workspace-menu.tsx` 的 `MenuRow` 去掉路径行：行内只有图标 + 文件夹名，行高仍 44（内容单行，
+文字列 `justify-center`）；路径改为按钮的 `title`（悬停才出现，不占视觉）。选择、创建流程不变。
+
+验证：菜单面板仍 300x245，四行各 44 高、单行；`dsh-context-hub` / `project` 的 `title` 是各自真实路径，
+`deepseek-harness`（无路径）没有 title。`apps/web` tsc + eslint 干净。
+截图 `designs/check-web/workspace-menu-panel.png`。
+
