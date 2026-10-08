@@ -804,4 +804,44 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
 ① 列表区在未拖入时隐藏（弹窗变矮、拖入后长高）；② 始终保留列表区、未拖入时显示空提示（布局稳定但首屏有空洞）。
 倾向前者（拖入是用户的主动动作，长高不突兀），实现时确认。
 
+## Cancel 加二次确认（2026-10-08，用户要求"防止用户误操作"）
+
+用户要求：点 Cancel 出现二次确认，避免误操作丢掉已填/已选的内容。
+
+### 新画板
+
+`eddWl` 行内新增第 6 块：**`Context Hub — Skills — Add skill — Discard confirm`**（`Bn0cT`），
+紧邻两块 Add skill 的右侧（左邻是 `DzRqf`「Add skill — Local」，右邻是 lightbox）。
+为插入它，两块 lightbox 右移 1560（`L9tdZp` 6368→9488、`Mnwzp` 7928→11048），行宽 9496 → **12488**。
+
+### 确认框样式
+
+`Bn0cT` = `Y2fjK1` 的整屏拷贝 + 一层更浅的 scrim + 居中的 420×**138** 小弹窗：
+
+```
+┌────────────────────────────────────────┐
+│  Discard this import?                15/600
+│  The package and the skills you      13 muted
+│  picked are not saved.
+│                                        (留白)
+│              [Keep editing] [Discard] │   ← 描边 / $destructive 实心
+└────────────────────────────────────────┘
+```
+
+- 位置：x=510, y=471（屏幕居中）；`Confirm Scrim` 用 `#0F172A4D`（比外层 `$scrim` 浅），
+  这样父弹窗仍可辨认——它是"叠在导入弹窗之上"的第二层模态，不是新页面。
+- Body padding `[20,24,12,24]`：标题 15/600 + 8 间距 + 说明 13 muted；页脚 h64 右对齐两枚 32 高按钮。
+- 按钮：`Keep editing`（描边 `$border`，116 宽，**默认/安全选项在左**）、
+  `Discard`（`$destructive` 实心 + `$destructive-foreground`，104 宽）。
+- 两块 Add skill 弹窗页脚完全同构，所以**这一块画板同时代表 Local 与 Download 两个 tab** 的确认态。
+
+### 实现规则（重要，别做成一刀切的确认）
+
+1. **只在"有东西可丢"时才确认**：字段为空且没有选中任何技能时，Cancel 直接关闭——
+   打开弹窗又立刻关掉是最常见的用法，这种时候弹确认是纯打扰。
+2. **同一规则覆盖所有退出路径**：Cancel 按钮、右上角 `×`、Esc、点 scrim —— 四条都要走同一个判断，
+   否则用户绕开确认就失去意义。
+3. 文案区分动作：标题说清丢什么（`Discard this import?`），说明说清代价
+   （`The package and the skills you picked are not saved.`），主按钮用动词 `Discard` 而不是 `OK`。
+
 
