@@ -723,16 +723,46 @@ Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Downlo
 
 ### 列表限高与滚动
 
-- `Skill List`：`height: 232` + **`clip: true`**，5 行内容（5×56 = 280）→ 第 5 行被裁掉一半，
-  这正是"内容超过最大高度"的视觉信号；实现里对应 `max-h-[232px] overflow-y-auto`。
-- 右缘新增 **`Scrollbar`**：4×96 圆角 `#0F172A40`，绝对定位（x=584, y=4，宽 592 的列表右缘留 4px）。
+- `Skill List`：`height: 224` + **`clip: true`**，5 行内容（5×56 = 280）→ 第 5 行整体在滚动区外，
+  边界落在整行上（实现里对应 `max-h-[224px] overflow-y-auto`）。
+- 右缘新增 **`Scrollbar`**：4×186 圆角 `#0F172A40`，绝对定位（x=584, y=4），长度≈可见比（4/5 ≈ 78%）。
 - 弹窗 596 → **620**（Body 425 = 字段 105 + 分隔 1 + 标题行 15 + 列表 232 + 间距 48 + 下内边距 24），
   重新居中（y=230）。
 
 ### 验证
 
-- 全弹窗扫描：唯一的问题节点是 `Skill wayfinder partially clipped` —— 那是有意为之的滚动折线。
+- 全弹窗扫描：唯一的问题节点是滚动折线本身，其余无问题。
 - 截图逐块看过：行左两行文字对齐、按钮右对齐（x=494..578）、滚动条不压按钮、
   `✓ Selected` 与 `Select` 两种状态的视觉差与参考图一致。
+
+## 表单去掉 List 按钮、入口统一为 Import（2026-10-08）
+
+用户三轮反馈：① 表单样式不对（List 是个裸文字按钮）；② 底部按钮统一显示 Import；
+③ 工具栏的 Download 按钮不要了，统一从 Import 进入。
+
+### 改动
+
+- **List 按钮删除**：`Package Row` 整个行框架删掉，输入框直接放在字段列里（宽度 592 占满整行，
+  不再被按钮挤到 491）。拉列表改为**输入框失焦自动触发**，并在提示行下加一行说明
+  `Listed automatically when the field loses focus.`（11px muted，位于来源形态说明与 chip 行之间，
+  顺序：Label → Input → Hint（可填什么）→ Note（何时拉列表）→ Chips（已选））。
+- **工具栏**：删掉六块屏的 `Button Download`，操作簇只剩 `[视图切换] [Import]`（宽 192）。
+- **弹窗页脚**：Download tab 的 `Download 1` → **`Import`**；Local tab 本来就是 `Import`，
+  两个页脚现在完全一致（Cancel 79 + Import 100）。
+- 字段高度 105 → 124（多一行 Note），弹窗 620 → **631**，重新居中（y=224）。
+- 列表高度 232 → **224**：正好 4 行（4×56），底部是干净的边界而不是 8px 半截条；
+  「还有更多」由滚动条表达（滑块 186/224 ≈ 78%，对应 4 行可见 / 5 行内容）。
+
+### 验证
+
+- 全弹窗扫描：只有 `Skill wayfinder fully clipped`（列表第 5 行在滚动区外，符合预期）。
+- 视觉复核（逐块导出看）：工具栏右侧 = 网格/列表切换 + 描边 `Import`，无 Download；
+  页脚 = `Cancel` + 靛蓝 `Import`；列表滚动条可见、最后一行下方边界干净；
+  表单里输入框整行、两行灰色说明、chip 行顺序正确。
+
+### 待定
+
+工具栏的 `Import` 目前仍是**描边（次要）**样式——它过去是次级入口（主按钮是已删除的 Browse skill.sh）。
+现在它是页面唯一入口，是否要提为主按钮（靛蓝实心）？未擅自改动。
 
 

@@ -7011,25 +7011,6 @@
                                   "fill": "$foreground"
                                 }
                               }
-                            },
-                            {
-                              "id": "dChHH",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button Download",
-                              "height": 36,
-                              "stroke": "$border",
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": true,
-                                  "icon": "download",
-                                  "fill": "$primary-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "Download",
-                                  "fill": "$primary-foreground"
-                                }
-                              }
                             }
                           ]
                         }
@@ -10926,25 +10907,6 @@
                                 "xFfMZ": {
                                   "content": "Import",
                                   "fill": "$foreground"
-                                }
-                              }
-                            },
-                            {
-                              "id": "W04Sk",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button Download",
-                              "height": 36,
-                              "stroke": "$border",
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": true,
-                                  "icon": "download",
-                                  "fill": "$primary-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "Download",
-                                  "fill": "$primary-foreground"
                                 }
                               }
                             }
@@ -15139,25 +15101,6 @@
                                   "fill": "$foreground"
                                 }
                               }
-                            },
-                            {
-                              "id": "f5I3v",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button Download",
-                              "height": 36,
-                              "stroke": "$border",
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": true,
-                                  "icon": "download",
-                                  "fill": "$primary-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "Download",
-                                  "fill": "$primary-foreground"
-                                }
-                              }
                             }
                           ]
                         }
@@ -18432,11 +18375,11 @@
               "id": "wyldn",
               "layoutPosition": "absolute",
               "x": 400,
-              "y": 242,
+              "y": 224,
               "name": "Dialog",
               "clip": true,
               "width": 640,
-              "height": 596,
+              "height": 631,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -18648,63 +18591,32 @@
                         },
                         {
                           "type": "frame",
-                          "id": "Y01Gm9",
-                          "name": "Package Row",
+                          "id": "ZXJCr",
+                          "name": "Input",
                           "width": "fill_container",
+                          "height": 38,
+                          "cornerRadius": "$radius-md",
+                          "stroke": "$input",
+                          "strokeWidth": 1,
+                          "strokeAlignment": "inner",
                           "gap": 8,
+                          "padding": [
+                            0,
+                            12
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
-                              "type": "frame",
-                              "id": "ZXJCr",
-                              "name": "Input",
+                              "type": "text",
+                              "id": "w0tpfU",
+                              "name": "Value",
+                              "fill": "$foreground",
+                              "textGrowth": "fixed-width",
                               "width": "fill_container",
-                              "height": 38,
-                              "cornerRadius": "$radius-md",
-                              "stroke": "$input",
-                              "strokeWidth": 1,
-                              "strokeAlignment": "inner",
-                              "gap": 8,
-                              "padding": [
-                                0,
-                                12
-                              ],
-                              "alignItems": "center",
-                              "children": [
-                                {
-                                  "type": "text",
-                                  "id": "w0tpfU",
-                                  "name": "Value",
-                                  "fill": "$foreground",
-                                  "textGrowth": "fixed-width",
-                                  "width": "fill_container",
-                                  "content": "https://github.com/mattpocock/skills",
-                                  "fontFamily": "$font-sans",
-                                  "fontSize": 13,
-                                  "fontWeight": "normal"
-                                }
-                              ]
-                            },
-                            {
-                              "id": "vCcN9",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button List",
-                              "height": 32,
-                              "fill": "#00000000",
-                              "stroke": "#00000000",
-                              "width": 72,
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": false,
-                                  "icon": "plus",
-                                  "fill": "$muted-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "List",
-                                  "fill": "$foreground"
-                                }
-                              }
+                              "content": "https://github.com/mattpocock/skills",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 13,
+                              "fontWeight": "normal"
                             }
                           ]
                         },
@@ -18716,6 +18628,18 @@
                           "textGrowth": "fixed-width",
                           "width": "fill_container",
                           "content": "owner/repo, owner/repo@skill, a Git URL, a SKILL.md link, or a pasted npx skills add command",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "BxxrM",
+                          "name": "Field Note",
+                          "fill": "$muted-foreground",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Listed automatically when the field loses focus.",
                           "fontFamily": "$font-sans",
                           "fontSize": 11,
                           "fontWeight": "normal"
@@ -18810,34 +18734,29 @@
                       "type": "frame",
                       "id": "CZ3mH",
                       "name": "Skill List",
+                      "clip": true,
                       "width": "fill_container",
+                      "height": 224,
                       "layout": "vertical",
                       "children": [
                         {
                           "type": "frame",
-                          "id": "kta6U",
+                          "id": "F5EZP",
                           "name": "Skill grill-me",
                           "width": "fill_container",
-                          "height": 52,
-                          "gap": 10,
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
-                              "id": "mZV6K",
-                              "type": "ref",
-                              "ref": "cov6T",
-                              "fill": "$primary",
-                              "stroke": "$primary",
-                              "name": "Checkbox",
-                              "descendants": {
-                                "h5J4H": {
-                                  "enabled": true
-                                }
-                              }
-                            },
-                            {
                               "type": "frame",
-                              "id": "dx6xz",
+                              "id": "TkwfC",
                               "name": "Text",
                               "width": "fill_container",
                               "layout": "vertical",
@@ -18845,25 +18764,54 @@
                               "children": [
                                 {
                                   "type": "text",
-                                  "id": "NMCw8",
+                                  "id": "lxso1",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
                                   "content": "grill-me",
                                   "fontFamily": "$font-mono",
-                                  "fontSize": 13,
+                                  "fontSize": 13.5,
                                   "fontWeight": "600"
                                 },
                                 {
                                   "type": "text",
-                                  "id": "YGOWb",
+                                  "id": "mKeWI",
                                   "name": "Skill Desc",
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
                                   "width": "fill_container",
-                                  "content": "A relentless interview to sharpen a plan or design, which also writes the docs",
+                                  "content": "A relentless interview to sharpen a plan or design",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 11.5,
                                   "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "dyS24",
+                              "name": "State Selected",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "Mnv9r",
+                                  "name": "Check",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "check",
+                                  "library": "lucide",
+                                  "fill": "$chart-2"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "j9Q2fS",
+                                  "name": "Selected Label",
+                                  "fill": "$chart-2",
+                                  "content": "Selected",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
                                 }
                               ]
                             }
@@ -18871,29 +18819,22 @@
                         },
                         {
                           "type": "frame",
-                          "id": "q7X8Kn",
+                          "id": "p7YqH",
                           "name": "Skill code-review",
                           "width": "fill_container",
-                          "height": 52,
-                          "gap": 10,
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
-                              "id": "gce02",
-                              "type": "ref",
-                              "ref": "cov6T",
-                              "fill": "#00000000",
-                              "stroke": "$input",
-                              "name": "Checkbox",
-                              "descendants": {
-                                "h5J4H": {
-                                  "enabled": false
-                                }
-                              }
-                            },
-                            {
                               "type": "frame",
-                              "id": "Psvqw",
+                              "id": "A0mlsF",
                               "name": "Text",
                               "width": "fill_container",
                               "layout": "vertical",
@@ -18901,17 +18842,17 @@
                               "children": [
                                 {
                                   "type": "text",
-                                  "id": "C1Tj4Y",
+                                  "id": "xGSIP",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
                                   "content": "code-review",
                                   "fontFamily": "$font-mono",
-                                  "fontSize": 13,
+                                  "fontSize": 13.5,
                                   "fontWeight": "600"
                                 },
                                 {
                                   "type": "text",
-                                  "id": "zIHIJ",
+                                  "id": "o9mUpD",
                                   "name": "Skill Desc",
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
@@ -18922,34 +18863,48 @@
                                   "fontWeight": "normal"
                                 }
                               ]
+                            },
+                            {
+                              "id": "pcaoH",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
                             }
                           ]
                         },
                         {
                           "type": "frame",
-                          "id": "vQoxX",
+                          "id": "WEgFE",
                           "name": "Skill diagnosing-bugs",
                           "width": "fill_container",
-                          "height": 52,
-                          "gap": 10,
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
-                              "id": "pNkcO",
-                              "type": "ref",
-                              "ref": "cov6T",
-                              "name": "Checkbox",
-                              "fill": "#00000000",
-                              "stroke": "$input",
-                              "descendants": {
-                                "h5J4H": {
-                                  "enabled": false
-                                }
-                              }
-                            },
-                            {
                               "type": "frame",
-                              "id": "bHg7w",
+                              "id": "K8Awd",
                               "name": "Text",
                               "width": "fill_container",
                               "layout": "vertical",
@@ -18957,17 +18912,17 @@
                               "children": [
                                 {
                                   "type": "text",
-                                  "id": "oAUfq",
+                                  "id": "K4V90T",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
                                   "content": "diagnosing-bugs",
                                   "fontFamily": "$font-mono",
-                                  "fontSize": 13,
+                                  "fontSize": 13.5,
                                   "fontWeight": "600"
                                 },
                                 {
                                   "type": "text",
-                                  "id": "ZdPnr",
+                                  "id": "sBeyp",
                                   "name": "Skill Desc",
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
@@ -18978,34 +18933,48 @@
                                   "fontWeight": "normal"
                                 }
                               ]
+                            },
+                            {
+                              "id": "pix2I",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
                             }
                           ]
                         },
                         {
                           "type": "frame",
-                          "id": "H7LiR",
+                          "id": "DEnkB",
                           "name": "Skill tdd",
                           "width": "fill_container",
-                          "height": 52,
-                          "gap": 10,
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
                           "alignItems": "center",
                           "children": [
                             {
-                              "id": "J5iljp",
-                              "type": "ref",
-                              "ref": "cov6T",
-                              "name": "Checkbox",
-                              "fill": "#00000000",
-                              "stroke": "$input",
-                              "descendants": {
-                                "h5J4H": {
-                                  "enabled": false
-                                }
-                              }
-                            },
-                            {
                               "type": "frame",
-                              "id": "l5C0f",
+                              "id": "c6oMC1",
                               "name": "Text",
                               "width": "fill_container",
                               "layout": "vertical",
@@ -19013,17 +18982,17 @@
                               "children": [
                                 {
                                   "type": "text",
-                                  "id": "uDtwP",
+                                  "id": "MjHFo",
                                   "name": "Skill Name",
                                   "fill": "$foreground",
                                   "content": "tdd",
                                   "fontFamily": "$font-mono",
-                                  "fontSize": 13,
+                                  "fontSize": 13.5,
                                   "fontWeight": "600"
                                 },
                                 {
                                   "type": "text",
-                                  "id": "Wva6Q",
+                                  "id": "Q6XJo2",
                                   "name": "Skill Desc",
                                   "fill": "$muted-foreground",
                                   "textGrowth": "fixed-width",
@@ -19034,8 +19003,111 @@
                                   "fontWeight": "normal"
                                 }
                               ]
+                            },
+                            {
+                              "id": "w8GFF",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
                             }
                           ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "Aq1sG",
+                          "name": "Skill wayfinder",
+                          "width": "fill_container",
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "fF3Zy",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "rwrtO",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "wayfinder",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13.5,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "y32MrG",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Plan a huge chunk of work as a shared map of decisions",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "LsUBr",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "zBgi2",
+                          "layoutPosition": "absolute",
+                          "x": 584,
+                          "y": 4,
+                          "name": "Scrollbar",
+                          "width": 4,
+                          "height": 186,
+                          "fill": "#0F172A40",
+                          "cornerRadius": 999
                         }
                       ]
                     }
@@ -19099,7 +19171,7 @@
                           "id": "P60pZQ",
                           "type": "ref",
                           "ref": "x3lnSj",
-                          "name": "Button Download",
+                          "name": "Button Import",
                           "height": 32,
                           "stroke": "$border",
                           "descendants": {
@@ -19109,7 +19181,7 @@
                               "fill": "$primary-foreground"
                             },
                             "xFfMZ": {
-                              "content": "Download 1",
+                              "content": "Import",
                               "fill": "$primary-foreground"
                             }
                           }
@@ -19610,25 +19682,6 @@
                                 "xFfMZ": {
                                   "content": "Import",
                                   "fill": "$foreground"
-                                }
-                              }
-                            },
-                            {
-                              "id": "GOQ9a",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button Download",
-                              "height": 36,
-                              "stroke": "$border",
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": true,
-                                  "icon": "download",
-                                  "fill": "$primary-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "Download",
-                                  "fill": "$primary-foreground"
                                 }
                               }
                             }
@@ -24006,25 +24059,6 @@
                                 "xFfMZ": {
                                   "content": "Import",
                                   "fill": "$foreground"
-                                }
-                              }
-                            },
-                            {
-                              "id": "f7qrf",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button Download",
-                              "height": 36,
-                              "stroke": "$border",
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": true,
-                                  "icon": "download",
-                                  "fill": "$primary-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "Download",
-                                  "fill": "$primary-foreground"
                                 }
                               }
                             }
@@ -28746,25 +28780,6 @@
                                 "xFfMZ": {
                                   "content": "Import",
                                   "fill": "$foreground"
-                                }
-                              }
-                            },
-                            {
-                              "id": "oxV1o",
-                              "type": "ref",
-                              "ref": "x3lnSj",
-                              "name": "Button Download",
-                              "height": 36,
-                              "stroke": "$border",
-                              "descendants": {
-                                "PXvdy": {
-                                  "enabled": true,
-                                  "icon": "download",
-                                  "fill": "$primary-foreground"
-                                },
-                                "xFfMZ": {
-                                  "content": "Download",
-                                  "fill": "$primary-foreground"
                                 }
                               }
                             }
