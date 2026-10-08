@@ -7,6 +7,7 @@
  */
 import { SparklesIcon } from "lucide-react"
 
+import type { WorkspaceService } from "@workspace/core/workspace"
 import type { ExtensionDefinition } from "@workspace/extensions"
 
 import { skillsMessages } from "./messages.ts"
@@ -21,6 +22,8 @@ declare module "@deepseek-ai/cordis" {
   interface Context {
     /** The form-owned skill library; absent when this form cannot reach one. */
     "hub.skills"?: SkillStore
+    /** The form-owned workspace list; the skills page reads the current folder from it. */
+    "hub.workspaces"?: WorkspaceService
   }
 }
 

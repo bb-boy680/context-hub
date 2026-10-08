@@ -5,8 +5,14 @@
  * which is where a folder's path becomes a path a person reads.
  */
 import { displayPath } from "./home.ts"
+import { isDirectory } from "./fs-browse.ts"
 import { createFsStateStore } from "./state-fs.ts"
-import { folderId, readWorkspaceState, WORKSPACE_DOCUMENT } from "../workspace.ts"
+import {
+  folderId,
+  readWorkspaceState,
+  WORKSPACE_DOCUMENT,
+  workspaceName,
+} from "../workspace.ts"
 import type {
   WorkspaceFolder,
   WorkspacePage,
@@ -22,6 +28,7 @@ export function createFsWorkspaceStore(home: string): WorkspaceStore {
   const view = (folder: WorkspaceFolder): WorkspaceView => ({
     id: folderId(folder),
     name: folder.name,
+    path: folder.path ?? null,
     display: folder.path === undefined ? null : displayPath(folder.path),
   })
 
@@ -36,7 +43,11 @@ export function createFsWorkspaceStore(home: string): WorkspaceStore {
   return {
     page,
 
-    async add(folder) {
+    async add(target) {
+      if (!(await isDirectory(target))) {
+        throw new Error(`not a folder: ${target}`)
+      }
+      const folder: WorkspaceFolder = { name: workspaceName(target), path: target }
       const state = await read()
       const id = folderId(folder)
       const folders = state.folders.some((known) => folderId(known) === id)

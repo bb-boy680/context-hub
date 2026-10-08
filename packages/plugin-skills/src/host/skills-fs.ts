@@ -25,6 +25,7 @@ import { assetKind, assetUrl, isLink, readSource } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
 import { TEMP_PREFIX, writeFileAtomic } from "@workspace/core/host/atomic"
 import { displayPath, resolveHubHome } from "@workspace/core/host/home"
+import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
 import type { AssetLibrary } from "@workspace/core"
 
 import {
@@ -34,6 +35,15 @@ import {
 } from "../frontmatter.ts"
 import { importFolder } from "./folder-import.ts"
 import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
+import {
+  installSkillIntoWorkspace,
+  readWorkspaceSkills,
+  removeSkillFromWorkspace,
+} from "./workspace-skills.ts"
+import type {
+  WorkspaceInstall,
+  WorkspaceSkillsView as WorkspaceSkills,
+} from "../store.ts"
 import type {
   ImportedSkill,
   PackageSkill,
@@ -158,6 +168,22 @@ export async function createFsSkillStore(
   const listeners = new Set<() => void>()
   /** In-memory copy of the catalog; a page render never re-reads the file. */
   let catalog: CatalogFile | null = null
+  /** The workspace list holds the folder a skill installs into. */
+  const workspaces = createFsWorkspaceStore(home)
+
+  /** The current workspace folder, or `null` when none is picked or it has no path. */
+  const currentWorkspace = async (): Promise<string | null> => {
+    const page = await workspaces.page()
+    const folder = page.folders.find((item) => item.id === page.current)
+    return folder?.path ?? null
+  }
+
+  /** The current workspace, refused when there is no folder to install into. */
+  const requiredWorkspace = async (): Promise<string> => {
+    const workspace = await currentWorkspace()
+    if (workspace === null) throw new Error("no workspace is selected")
+    return workspace
+  }
 
   const skillDir = (id: string) =>
     path.join(root, assertSafeSegment(id, "skill id"))
@@ -520,6 +546,21 @@ export async function createFsSkillStore(
 
     assetUrl(ref: string): string {
       return isLink(ref) ? ref : assetUrl(ref)
+    },
+
+    async workspaceSkills(): Promise<WorkspaceSkills | null> {
+      const workspace = await currentWorkspace()
+      return workspace === null ? null : readWorkspaceSkills(workspace, root)
+    },
+
+    async installToWorkspace(id: string): Promise<WorkspaceInstall> {
+      const workspace = await requiredWorkspace()
+      return installSkillIntoWorkspace(workspace, root, id)
+    },
+
+    async removeFromWorkspace(id: string): Promise<void> {
+      const workspace = await requiredWorkspace()
+      await removeSkillFromWorkspace(workspace, root, id)
     },
 
     subscribe(listener: () => void): () => void {

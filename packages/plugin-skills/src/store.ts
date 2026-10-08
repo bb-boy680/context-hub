@@ -134,6 +134,38 @@ export interface ImportedSkill {
   files: ImportedFile[]
 }
 
+/** Where a skill in a workspace came from. */
+export type WorkspaceSkillOrigin =
+  /** Installed from the library by this hub, as a link into it. */
+  | "hub"
+  /** The project's own directory; the hub reads it and leaves it alone. */
+  | "own"
+  /** A link into the library whose skill is gone; only cleanup can follow. */
+  | "stale"
+
+/** One skill the current workspace holds, as `<workspace>/.agents/skills` has it. */
+export interface WorkspaceSkill {
+  /** Directory name under the workspace's skills root. */
+  id: string
+  name: string
+  description: string
+  origin: WorkspaceSkillOrigin
+  /** Where a link points, for a skill this workspace holds as one. */
+  link?: string
+}
+
+/** The skills of one workspace, read without changing anything. */
+export interface WorkspaceSkillsView {
+  /** The workspace's own skills directory, absolute. */
+  root: string
+  /** The same path as a person reads it. */
+  display: string
+  skills: WorkspaceSkill[]
+}
+
+/** How an install landed: as a link, or as a copy the workspace now owns. */
+export type WorkspaceInstall = "link" | "copy"
+
 /**
  * The skill library. Implementations own the files; callers never touch paths.
  * Every method rejects with an `Error` carrying a displayable message.
@@ -185,6 +217,15 @@ export interface SkillStore {
   deleteAsset(id: string, ref: string): Promise<void>
   /** The URL that shows one reference; a remote URL passes through unchanged. */
   assetUrl(ref: string): string
+  /**
+   * The skills the current workspace holds, or `null` when none is selected or
+   * the selected one has no folder path to read.
+   */
+  workspaceSkills(): Promise<WorkspaceSkillsView | null>
+  /** Put one library skill into the current workspace; answers how it landed. */
+  installToWorkspace(id: string): Promise<WorkspaceInstall>
+  /** Take one library-installed skill out of the current workspace. */
+  removeFromWorkspace(id: string): Promise<void>
   /** Change notifications from directory watching; returns an unsubscribe. */
   subscribe(listener: () => void): () => void
   /** Release the directory watcher. The store is unusable afterwards. */

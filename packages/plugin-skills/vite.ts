@@ -71,6 +71,51 @@ export function skillLibrary(options: { home?: string } = {}) {
             const api = await getStore()
             const method = request.method ?? "GET"
 
+            /* GET /hub/skills?action=workspace — what the current workspace holds */
+            if (
+              rest === "" &&
+              method === "GET" &&
+              url.searchParams.get("action") === "workspace"
+            ) {
+              sendJson(response, 200, await api.workspaceSkills())
+              return
+            }
+
+            /* POST /hub/skills?action=install-workspace — link one skill into it */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "install-workspace"
+            ) {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                id?: unknown
+              }
+              if (typeof body.id !== "string" || body.id === "") {
+                sendError(response, new Error("missing skill id"))
+                return
+              }
+              sendJson(response, 200, { mode: await api.installToWorkspace(body.id) })
+              return
+            }
+
+            /* POST /hub/skills?action=remove-workspace — take one back out */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "remove-workspace"
+            ) {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                id?: unknown
+              }
+              if (typeof body.id !== "string" || body.id === "") {
+                sendError(response, new Error("missing skill id"))
+                return
+              }
+              await api.removeFromWorkspace(body.id)
+              sendJson(response, 200, { ok: true })
+              return
+            }
+
             /* GET /hub/skills?action=tags — every category in use */
             if (
               rest === "" &&

@@ -3,6 +3,7 @@ import {
   LayoutGridIcon,
   ListIcon,
   PowerIcon,
+  Trash2Icon,
   UploadIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -10,11 +11,10 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
-import { sourceLabel, useSkillLibrary } from "./library.ts"
+import { locationLabel, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { seedTags, tagTone } from "./tags.ts"
-import type { SkillOrigin } from "./store.ts"
 import type { Skill } from "./types.ts"
 
 import { Spinner } from "@workspace/ui/components/spinner"
@@ -63,17 +63,15 @@ const demoVideo =
   "https://media.prompt-motion.com/stephanlivera-opus-5-5-on-max/video.86605038.mp4"
 
 /** Bundled rows the page renders when this form has no skill library. */
-const sampleSkills: Omit<Skill, "id">[] = [
+const sampleSkills: Omit<Skill, "id" | "location" | "installed">[] = [
   {
     name: "pdf-extract",
     summary: "Extract tables from PDFs",
     description: "Extract tables from PDFs and scans",
     tags: ["Documents"],
-    source: "Workspace",
     tokens: "1.2k",
     triggers: 4,
     updated: "2 hours ago",
-    enabled: true,
     cover: cover("photo-1761671614144-e8c003fff544", 390),
     gallery: [
       shot("photo-1761671614144-e8c003fff544"),
@@ -86,11 +84,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Review checklists with severity",
     description: "Repo review checklist with severity rubric",
     tags: ["Engineering", "Quality"],
-    source: "Built-in",
     tokens: "2.4k",
     triggers: 9,
     updated: "yesterday",
-    enabled: true,
     cover: cover("photo-1580584126903-c17d41830450", 292),
     gallery: [
       shot("photo-1580584126903-c17d41830450"),
@@ -102,22 +98,18 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Audit the docs tree",
     description: "Audit the docs tree for structure and budgets",
     tags: ["Docs"],
-    source: "skill.sh",
     tokens: "0.9k",
     triggers: 3,
     updated: "2 days ago",
-    enabled: true,
   },
   {
     name: "api-design",
     summary: "Design REST and JSON contracts",
     description: "Design REST and JSON contracts from models",
     tags: ["Engineering"],
-    source: "Built-in",
     tokens: "1.8k",
     triggers: 6,
     updated: "2 days ago",
-    enabled: true,
     cover: cover("photo-1618388810903-840bb0d15ea5", 390),
     gallery: [
       shot("photo-1618388810903-840bb0d15ea5"),
@@ -129,11 +121,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Diagnose flaky tests",
     description: "Diagnose flaky tests and resource leaks",
     tags: ["Engineering"],
-    source: "Workspace",
     tokens: "1.4k",
     triggers: 5,
     updated: "3 days ago",
-    enabled: true,
     cover: cover("photo-1599727277643-b0c9cfb7705d", 292),
   },
   {
@@ -141,11 +131,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Draft notes from merged PRs",
     description: "Draft release notes from merged PR labels",
     tags: ["Docs"],
-    source: "skill.sh",
     tokens: "0.6k",
     triggers: 2,
     updated: "3 days ago",
-    enabled: true,
     cover: cover("photo-1516849841032-87cbac4d88f7", 347),
   },
   {
@@ -153,11 +141,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Two-way sync with Jira",
     description: "Two-way sync with legacy Jira projects",
     tags: ["Integrations"],
-    source: "Workspace",
     tokens: "1.1k",
     triggers: 4,
     updated: "5 days ago",
-    enabled: false,
     cover: cover("photo-1549164330-86c63b6d4195", 390),
   },
   {
@@ -165,22 +151,18 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Plan schema migrations",
     description: "Plan schema migrations with rollback steps",
     tags: ["Data"],
-    source: "Built-in",
     tokens: "1.6k",
     triggers: 4,
     updated: "6 days ago",
-    enabled: false,
   },
   {
     name: "onboarding-guide",
     summary: "Generate onboarding paths",
     description: "Generate a contributor onboarding path",
     tags: ["Docs"],
-    source: "Workspace",
     tokens: "0.7k",
     triggers: 3,
     updated: "8 days ago",
-    enabled: true,
     cover: cover("photo-1580894908361-967195033215", 693),
   },
   {
@@ -188,11 +170,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Profile hot paths",
     description: "Profile hot paths and propose measured fixes",
     tags: ["Engineering"],
-    source: "skill.sh",
     tokens: "2.1k",
     triggers: 7,
     updated: "9 days ago",
-    enabled: true,
     /* A video as the first asset: the card and the list row preview it muted. */
     gallery: [demoVideo],
   },
@@ -201,11 +181,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Apply brand tone rules",
     description: "Apply brand tone rules to product copy",
     tags: ["Marketing"],
-    source: "Workspace",
     tokens: "0.5k",
     triggers: 2,
     updated: "12 days ago",
-    enabled: false,
     cover: cover("photo-1611269154421-4e27233ac5c7", 520),
   },
   {
@@ -213,11 +191,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Structure incident timelines",
     description: "Structure incident timelines and follow-ups",
     tags: ["Reliability"],
-    source: "Built-in",
     tokens: "1.3k",
     triggers: 4,
     updated: "14 days ago",
-    enabled: true,
     cover: cover("flagged/photo-1551954810-43cd6aef5b1f", 292),
   },
   {
@@ -225,11 +201,9 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Map tables into summaries",
     description: "Map database tables into context summaries",
     tags: ["Data"],
-    source: "skill.sh",
     tokens: "1.0k",
     triggers: 3,
     updated: "18 days ago",
-    enabled: true,
     cover: cover("photo-1544383835-bda2bc66a55d", 390),
   },
   {
@@ -237,19 +211,22 @@ const sampleSkills: Omit<Skill, "id">[] = [
     summary: "Check against WCAG",
     description: "Check interfaces against WCAG criteria",
     tags: ["Design"],
-    source: "Workspace",
     tokens: "1.5k",
     triggers: 5,
     updated: "21 days ago",
-    enabled: false,
     cover: cover("photo-1523289333742-be1143f6b766", 347),
   },
 ]
 
 const filterTags: SkillTag[] = [...seedTags]
 
-/* A sample row is keyed by its name, which is also its id in the catalog. */
-const sampleRows: Skill[] = sampleSkills.map((skill) => ({ ...skill, id: skill.name }))
+/* A sample row is keyed by its name; samples stand in for library rows. */
+const sampleRows: Skill[] = sampleSkills.map((skill) => ({
+  ...skill,
+  id: skill.name,
+  location: "library",
+  installed: false,
+}))
 
 /** The size line under a card: only the parts this skill actually carries. */
 function skillMeta(skill: Skill, t: (key: string) => string): string {
@@ -264,23 +241,24 @@ function skillMeta(skill: Skill, t: (key: string) => string): string {
   return parts.join(" · ")
 }
 
-/* The tab row carries one dimension: where a skill came from. */
-const SOURCE_TABS: { value: SkillOrigin | "all"; labelKey: string }[] = [
+/* The tab row carries one dimension: where a skill is, not where it came from. */
+const TABS: { value: SkillTab; labelKey: string }[] = [
   { value: "all", labelKey: "skills.tab.all" },
-  { value: "builtin", labelKey: "skills.source.builtin" },
-  { value: "local", labelKey: "skills.source.local" },
-  { value: "registry", labelKey: "skills.source.registry" },
+  { value: "workspace", labelKey: "skills.tab.workspace" },
 ]
 
+/** Which rows a tab shows. */
+type SkillTab = "all" | "workspace"
+
 /* Counts for the bundled demo rows, which have no store behind them. */
-const SAMPLE_COUNTS = { all: 42, builtin: 24, local: 12, registry: 6 }
+const SAMPLE_COUNTS = { all: 42, workspace: 12 }
 
 /* Column widths include the 16px gutter the design leaves between columns. */
 const columns = [
   { labelKey: "", width: 32 },
   { labelKey: "skills.column.skill", width: 340 },
   { labelKey: "skills.column.tags", width: 166 },
-  { labelKey: "skills.column.source", width: 136 },
+  { labelKey: "skills.column.location", width: 136 },
   { labelKey: "skills.column.tokens", width: 96 },
   { labelKey: "skills.column.triggers", width: 96 },
   { labelKey: "skills.column.updated", width: 120 },
@@ -326,48 +304,73 @@ function TagPill({ tag }: { tag: string }) {
   )
 }
 
-function InstallButton({
-  installed,
-  onToggle,
-  label,
+/** Where a row lives, which is what its badge names. */
+function LocationBadge({ skill }: { skill: Skill }) {
+  const { t } = useI18n()
+  return <Badge variant="secondary">{locationLabel(skill.location, t)}</Badge>
+}
+
+/**
+ * What the page can do with one row: put a library skill into the workspace,
+ * take back one the workspaces holds as the hub's link, or clean up a link the
+ * library no longer answers for. A skill the workspace owns has no action —
+ * the hub did not put it there and will not take it away.
+ */
+function WorkspaceButton({
+  skill,
+  blocked,
+  onInstall,
+  onRemove,
 }: {
-  installed: boolean
-  onToggle: () => void
-  label: string
+  skill: Skill
+  /** No workspace to install into; the action is offered but not available. */
+  blocked: boolean
+  onInstall: () => void
+  onRemove: () => void
 }) {
   const { t } = useI18n()
-  const action = t(installed ? "skills.action.uninstall" : "skills.action.install")
+  const shell =
+    "gap-[5px] px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+  if (skill.stale || skill.installed) {
+    const label = skill.stale ? t("skills.action.cleanup") : t("skills.action.remove")
+    return (
+      <Button
+        type="button"
+        size="xs"
+        variant="outline"
+        aria-label={`${label} ${skill.name}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          onRemove()
+        }}
+        className={`${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
+      >
+        {skill.stale ? <Trash2Icon className="size-3.5" /> : <PowerIcon className="size-3.5" />}
+        {label}
+      </Button>
+    )
+  }
+
+  if (skill.location !== "library") return null
 
   return (
     <Button
       type="button"
       size="xs"
-      variant={installed ? "outline" : "default"}
-      aria-label={`${action} ${label}`}
+      aria-label={`${t("skills.action.install")} ${skill.name}`}
+      disabled={blocked}
+      title={blocked ? t("skills.workspace.none") : undefined}
       onClick={(event) => {
         event.stopPropagation()
-        onToggle()
+        onInstall()
       }}
-      className={
-        installed
-          ? "gap-[5px] border-border bg-transparent px-2.5 text-xs font-medium text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent"
-          : "gap-[5px] px-2.5 text-xs font-medium"
-      }
+      className={shell}
     >
-      {installed ? (
-        <PowerIcon className="size-3.5" />
-      ) : (
-        <DownloadIcon className="size-3.5" />
-      )}
-      {action}
+      <DownloadIcon className="size-3.5" />
+      {t("skills.action.install")}
     </Button>
   )
-}
-
-/** Origins arrive as ids from the library; bundled rows carry a display label. */
-function SourceBadge({ source }: { source: string }) {
-  const { t } = useI18n()
-  return <Badge variant="secondary">{sourceLabel(source, t)}</Badge>
 }
 
 /** Cover image that reports its own aspect ratio, for a card sized to the asset. */
@@ -433,11 +436,15 @@ const FALLBACK_RATIO = 16 / 9
 
 function SkillCard({
   skill,
-  onToggle,
+  blocked,
+  onInstall,
+  onRemove,
   onOpen,
 }: {
   skill: Skill
-  onToggle: () => void
+  blocked: boolean
+  onInstall: () => void
+  onRemove: () => void
   onOpen: () => void
 }) {
   const { t } = useI18n()
@@ -493,7 +500,7 @@ function SkillCard({
       <div className="flex flex-col gap-1 px-3 py-2.5">
         <div className="flex h-[18px] items-center justify-between gap-2">
           <span className="truncate text-sm font-semibold">{skill.name}</span>
-          <SourceBadge source={skill.source} />
+          <LocationBadge skill={skill} />
         </div>
         <p className="line-clamp-2 text-xs text-muted-foreground">
           {skill.description}
@@ -502,10 +509,11 @@ function SkillCard({
           <span className="truncate text-[11px] text-muted-foreground">
             {skillMeta(skill, t)}
           </span>
-          <InstallButton
-            installed={skill.enabled}
-            onToggle={onToggle}
-            label={skill.name}
+          <WorkspaceButton
+            skill={skill}
+            blocked={blocked}
+            onInstall={onInstall}
+            onRemove={onRemove}
           />
         </div>
       </div>
@@ -515,11 +523,15 @@ function SkillCard({
 
 function SkillGrid({
   skills,
-  onToggle,
+  blocked,
+  onInstall,
+  onRemove,
   onOpen,
 }: {
   skills: Skill[]
-  onToggle: (skill: Skill) => void
+  blocked: boolean
+  onInstall: (skill: Skill) => void
+  onRemove: (skill: Skill) => void
   onOpen: (skill: Skill) => void
 }) {
   /*
@@ -532,7 +544,9 @@ function SkillGrid({
         <SkillCard
           key={skill.id}
           skill={skill}
-          onToggle={() => onToggle(skill)}
+          blocked={blocked}
+          onInstall={() => onInstall(skill)}
+          onRemove={() => onRemove(skill)}
           onOpen={() => onOpen(skill)}
         />
       ))}
@@ -575,14 +589,18 @@ function SkillTable({
   skills,
   rangeText,
   pagination,
-  onToggle,
+  blocked,
+  onInstall,
+  onRemove,
   onOpen,
 }: {
   skills: Skill[]
   /** Footer summary above the pager, e.g. "1–12 / 42". */
   rangeText: string
   pagination: React.ReactNode
-  onToggle: (skill: Skill) => void
+  blocked: boolean
+  onInstall: (skill: Skill) => void
+  onRemove: (skill: Skill) => void
   onOpen: (skill: Skill) => void
 }) {
   const { t } = useI18n()
@@ -645,7 +663,7 @@ function SkillTable({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <SourceBadge source={skill.source} />
+                  <LocationBadge skill={skill} />
                 </TableCell>
                 <TableCell className="text-sm text-muted-foreground">
                   {skill.tokens ?? "—"}
@@ -657,10 +675,11 @@ function SkillTable({
                   {skill.updated}
                 </TableCell>
                 <TableCell>
-                  <InstallButton
-                    installed={skill.enabled}
-                    onToggle={() => onToggle(skill)}
-                    label={skill.name}
+                  <WorkspaceButton
+                    skill={skill}
+                    blocked={blocked}
+                    onInstall={() => onInstall(skill)}
+                    onRemove={() => onRemove(skill)}
                   />
                 </TableCell>
               </TableRow>
@@ -771,12 +790,14 @@ function ViewButton({
 
 export function SkillsPage() {
   const { t } = useI18n()
-  const [tab, setTab] = React.useState<SkillOrigin | "all">("all")
+  const [tab, setTab] = React.useState<SkillTab>("all")
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [tag, setTag] = React.useState("All tags")
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
+  /* One line above the list: how an install landed, or why it did not. */
+  const [notice, setNotice] = React.useState<{ tone: "info" | "error"; text: string } | null>(null)
   /* The open lightbox is an id, so edits to the catalog show through it. */
   const [detailId, setDetailId] = React.useState<string | null>(null)
   /* Bundled rows have no library behind them; edits stay in this map. */
@@ -784,22 +805,28 @@ export function SkillsPage() {
     Record<string, Partial<Skill>>
   >({})
 
-  const library = useSkillLibrary({
-    offset: page * pageSize,
-    limit: pageSize,
-    sort: "updated",
-    source: tab === "all" ? undefined : tab,
-    tag: tag === "All tags" ? undefined : tag,
-  })
+  const library = useSkillLibrary()
   const usingStore = library.store !== null
   const counts = usingStore ? library.counts : SAMPLE_COUNTS
+  /* With no folder to install into the action is offered but not available. */
+  const blocked = library.workspaceRoot === null
 
-  const skills = React.useMemo(() => {
-    if (usingStore) return library.rows
-    return sampleRows.map((skill) => ({ ...skill, ...samplePatch[skill.id] }))
-  }, [usingStore, library.rows, samplePatch])
+  /* The page filters and pages what the hook hands it: rows come from the
+     library and the workspace both, and only one of the two has a server page. */
+  const matching = React.useMemo(() => {
+    const rows = usingStore
+      ? library.rows
+      : sampleRows.map((skill) => ({ ...skill, ...samplePatch[skill.id] }))
+    const onTab = tab === "workspace" ? rows.filter((row) => row.location !== "library") : rows
+    return tag === "All tags" ? onTab : onTab.filter((row) => row.tags.includes(tag))
+  }, [usingStore, library.rows, tab, tag, samplePatch])
 
-  const detail = skills.find((skill) => skill.id === detailId) ?? null
+  const skills = React.useMemo(
+    () => matching.slice(page * pageSize, (page + 1) * pageSize),
+    [matching, page, pageSize]
+  )
+
+  const detail = matching.find((skill) => skill.id === detailId) ?? null
 
   /** Apply a change, then re-read the page so the list shows what was stored. */
   const applyTo = async (skill: Skill, patch: Partial<Skill>, persist: () => Promise<unknown>) => {
@@ -811,10 +838,30 @@ export function SkillsPage() {
     setSamplePatch((current) => ({ ...current, [skill.id]: { ...current[skill.id], ...patch } }))
   }
 
-  const toggleEnabled = (skill: Skill) =>
-    void applyTo(skill, { enabled: !skill.enabled }, () =>
-      library.store?.update(skill.id, { enabled: !skill.enabled }) ?? Promise.resolve()
-    )
+  /** Why an action did not go through, ready to show. */
+  const reasonOf = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure))
+
+  const install = async (skill: Skill) => {
+    try {
+      const landed = await library.install(skill.id)
+      setNotice(
+        landed === "copy"
+          ? { tone: "info", text: t("skills.notice.copied") }
+          : null
+      )
+    } catch (failure) {
+      setNotice({ tone: "error", text: reasonOf(failure) })
+    }
+  }
+
+  const uninstall = async (skill: Skill) => {
+    try {
+      await library.remove(skill.id)
+      setNotice(null)
+    } catch (failure) {
+      setNotice({ tone: "error", text: reasonOf(failure) })
+    }
+  }
 
   const setTags = (skill: Skill, tags: string[]) =>
     void applyTo(skill, { tags }, () =>
@@ -830,7 +877,7 @@ export function SkillsPage() {
 
   const openDetail = (skill: Skill) => setDetailId(skill.id)
 
-  const total = usingStore ? library.total : skills.length
+  const total = matching.length
   const from = total === 0 ? 0 : page * pageSize + 1
   const to = Math.min(total, (page + 1) * pageSize)
   const pageCount = Math.max(1, Math.ceil(total / pageSize))
@@ -864,14 +911,14 @@ export function SkillsPage() {
       <Tabs
         value={tab}
         onValueChange={(value) => {
-          setTab(SOURCE_TABS.find((item) => item.value === value)?.value ?? "all")
+          setTab(TABS.find((item) => item.value === value)?.value ?? "all")
           setPage(0)
         }}
         className="gap-6"
       >
         <div className="flex items-start justify-between gap-6">
           <TabsList className="h-9 gap-1 rounded-lg p-1">
-            {SOURCE_TABS.map((item) => (
+            {TABS.map((item) => (
               <TabsTrigger
                 key={item.value}
                 value={item.value}
@@ -907,6 +954,15 @@ export function SkillsPage() {
             </Button>
           </div>
         </div>
+        {notice === null ? null : (
+          <span
+            className={`text-xs leading-[15px] ${
+              notice.tone === "error" ? "text-destructive" : "text-muted-foreground"
+            }`}
+          >
+            {notice.text}
+          </span>
+        )}
         <TabsContent value={tab} className="flex flex-col gap-6">
           {library.loading ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -922,14 +978,26 @@ export function SkillsPage() {
             </div>
           ) : skills.length === 0 ? (
             <div className="flex flex-col items-start gap-2 py-12 text-sm text-muted-foreground">
-              <span>{t("skills.empty")}</span>
-              <span className="text-xs">{library.root}</span>
+              <span>
+                {tab === "workspace"
+                  ? library.workspaceId === null
+                    ? t("skills.workspace.none")
+                    : library.workspaceRoot === null
+                      ? t("skills.workspace.noPath")
+                      : t("skills.workspace.empty")
+                  : t("skills.empty")}
+              </span>
+              <span className="text-xs">
+                {tab === "workspace" ? (library.workspaceRoot ?? "") : library.root}
+              </span>
             </div>
           ) : view === "grid" ? (
             <>
               <SkillGrid
                 skills={skills}
-                onToggle={toggleEnabled}
+                blocked={blocked}
+                onInstall={install}
+                onRemove={uninstall}
                 onOpen={openDetail}
               />
               <div className="flex items-center justify-between">
@@ -942,7 +1010,9 @@ export function SkillsPage() {
               skills={skills}
               rangeText={rangeText}
               pagination={pagination}
-              onToggle={toggleEnabled}
+              blocked={blocked}
+              onInstall={install}
+              onRemove={uninstall}
               onOpen={openDetail}
             />
           )}
@@ -962,8 +1032,11 @@ export function SkillsPage() {
         skill={detail}
         store={library.store}
         root={library.root}
+        disabled={blocked}
         onToggle={() => {
-          if (detail) toggleEnabled(detail)
+          if (detail === null) return
+          if (detail.installed || detail.stale) void uninstall(detail)
+          else void install(detail)
         }}
         onDelete={removeSkill}
         onTagsChange={(tags) => {

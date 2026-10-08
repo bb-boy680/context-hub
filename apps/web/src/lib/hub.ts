@@ -19,6 +19,7 @@ import {
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import * as ui from "./ui-kit.ts"
+import { createRemoteWorkspaceService } from "./workspaces.ts"
 
 /** Path the active form serves the skill library on, when it serves one at all. */
 const SKILLS_ENDPOINT = "/hub/skills"
@@ -146,6 +147,9 @@ export async function startHub(): Promise<HubKernel> {
   if (await skillStoreAvailable()) {
     services["hub.skills"] = createRemoteSkillStore()
   }
+  const workspaces = createRemoteWorkspaceService()
+  services["hub.workspaces"] = workspaces
+  void workspaces.refresh()
   const kernel = await createHubKernel({
     host: webHost,
     services,

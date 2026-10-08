@@ -1,0 +1,195 @@
+/**
+ * Behaviour check for the workspace half of the skill library: the skills a
+ * workspace folder holds, and the link that installs one into it. It runs
+ * against temporary directories and asserts the contract — reading never
+ * creates anything, an install is a link whose target says where it came from,
+ * the hub removes only links it made, and the store answers for the workspace
+ * the hub is pointed at.
+ *
+ * Run from the package: `node scripts/check-workspace-skills.ts`
+ */
+import { promises as fs } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
+import { createFsSkillStore } from "../src/host/skills-fs.ts"
+import {
+  installSkillIntoWorkspace,
+  readWorkspaceSkills,
+  removeSkillFromWorkspace,
+  workspaceSkillRoot,
+} from "../src/host/workspace-skills.ts"
+
+let failures = 0
+
+function check(what: string, ok: boolean, detail?: unknown) {
+  if (ok) {
+    console.log(`  ok   ${what}`)
+    return
+  }
+  failures += 1
+  console.log(`  FAIL ${what}${detail === undefined ? "" : ` — ${JSON.stringify(detail)}`}`)
+}
+
+/** Write one skill directory with a manifest the reader can parse. */
+async function writeSkill(dir: string, name: string, description: string) {
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(
+    path.join(dir, "SKILL.md"),
+    `---\nname: ${name}\ndescription: ${description}\n---\n\n# ${name}\n`
+  )
+}
+
+const step = async (what: string, run: () => Promise<void>) => {
+  try {
+    await run()
+  } catch (error) {
+    failures += 1
+    console.log(`  FAIL ${what} — ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-ws-skills-"))
+const library = path.join(home, "skills")
+const workspace = path.join(home, "project")
+console.log(`home: ${home}`)
+
+await writeSkill(path.join(library, "alpha"), "Alpha", "First skill")
+await writeSkill(path.join(library, "beta"), "Beta", "Second skill")
+await fs.mkdir(workspace, { recursive: true })
+
+/* Reading a workspace the hub has never touched creates nothing. */
+const empty = await readWorkspaceSkills(workspace, library)
+check("a workspace with no skills directory reads as empty", empty.skills.length === 0, empty.skills)
+check("it names the directory it looked in", empty.root === workspaceSkillRoot(workspace), empty.root)
+check(
+  "reading creates nothing",
+  (await fs.stat(workspaceSkillRoot(workspace)).catch(() => null)) === null
+)
+
+/* Installing is a link, and the link is the record of where it came from. */
+const first = await installSkillIntoWorkspace(workspace, library, "alpha")
+check("installing answers how it landed", first === "link", first)
+const installed = path.join(workspaceSkillRoot(workspace), "alpha")
+const stat = await fs.lstat(installed).catch(() => null)
+check("the entry is a link", stat?.isSymbolicLink() === true, stat?.isSymbolicLink())
+check(
+  "the link points at the library's own directory",
+  path.resolve(path.dirname(installed), await fs.readlink(installed)) === path.join(library, "alpha")
+)
+check(
+  "the link reads through to the manifest",
+  (await fs.readFile(path.join(installed, "SKILL.md"), "utf8")).includes("Alpha")
+)
+
+const held = await readWorkspaceSkills(workspace, library)
+check("the workspace now holds one skill", held.skills.length === 1, held.skills)
+check("an installed skill reads as the hub's", held.skills[0]?.origin === "hub", held.skills[0])
+check("its name comes from the manifest", held.skills[0]?.name === "Alpha", held.skills[0])
+check("its description comes from the manifest", held.skills[0]?.description === "First skill")
+
+/* The project's own skills belong to the project, and are read, never claimed. */
+await writeSkill(path.join(workspaceSkillRoot(workspace), "own-one"), "Own one", "Written here")
+await fs.mkdir(path.join(workspaceSkillRoot(workspace), "not-a-skill"), { recursive: true })
+const withOwn = await readWorkspaceSkills(workspace, library)
+check("the project's own skill is listed", withOwn.skills.some((skill) => skill.id === "own-one"))
+check(
+  "the project's own skill reads as its own",
+  withOwn.skills.find((skill) => skill.id === "own-one")?.origin === "own"
+)
+check(
+  "a directory with no manifest is not a skill",
+  !withOwn.skills.some((skill) => skill.id === "not-a-skill"),
+  withOwn.skills.map((skill) => skill.id)
+)
+
+/* A link the library no longer answers for is what cleanup is for. */
+await installSkillIntoWorkspace(workspace, library, "beta")
+await fs.rm(path.join(library, "beta"), { recursive: true, force: true })
+const broken = await readWorkspaceSkills(workspace, library)
+const stale = broken.skills.find((skill) => skill.id === "beta")
+check("a link with no library skill reads as stale", stale?.origin === "stale", stale)
+check("a stale link keeps its id as a name", stale?.name === "beta", stale?.name)
+
+/* Removing: the hub takes back its own link, and refuses everything else. */
+await step("removing an installed skill", () => removeSkillFromWorkspace(workspace, library, "alpha"))
+check(
+  "the link is gone",
+  (await fs.lstat(installed).catch(() => null)) === null
+)
+check(
+  "the library's own copy stays",
+  (await fs.stat(path.join(library, "alpha"))).isDirectory()
+)
+let refused = ""
+try {
+  await removeSkillFromWorkspace(workspace, library, "own-one")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("the hub refuses to remove a skill it did not install", refused.includes("not installed by Context Hub"), refused)
+check(
+  "the refused skill is still there",
+  (await fs.stat(path.join(workspaceSkillRoot(workspace), "own-one"))).isDirectory()
+)
+refused = ""
+try {
+  await removeSkillFromWorkspace(workspace, library, "missing")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("removing what is not there is refused", refused.includes("not in this workspace"), refused)
+
+/* Installing twice is a mistake, not a second entry. */
+refused = ""
+await installSkillIntoWorkspace(workspace, library, "alpha")
+try {
+  await installSkillIntoWorkspace(workspace, library, "alpha")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("installing a skill twice is refused", refused.includes("already in this workspace"), refused)
+refused = ""
+try {
+  await installSkillIntoWorkspace(workspace, library, "nowhere")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("installing a skill the library does not have is refused", refused.includes("not a skill in the library"), refused)
+refused = ""
+try {
+  await installSkillIntoWorkspace(workspace, library, "../escape")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a name that would write outside the root is refused", refused.includes("unusable skill name"), refused)
+
+/* The store answers for the workspace the hub is pointed at. */
+await removeSkillFromWorkspace(workspace, library, "alpha")
+const store = await createFsSkillStore({ home })
+check("with no workspace picked the store answers nothing", (await store.workspaceSkills()) === null)
+const state = path.join(home, "state")
+await fs.mkdir(state, { recursive: true })
+await fs.writeFile(
+  path.join(state, "workspaces.json"),
+  JSON.stringify({ folders: [{ name: "project", path: workspace }], current: workspace })
+)
+const forWorkspace = await store.workspaceSkills()
+check("the store reads the picked workspace", forWorkspace?.skills.some((skill) => skill.id === "own-one") === true, forWorkspace)
+check("it reads the same root the reader named", forWorkspace?.root === workspaceSkillRoot(workspace), forWorkspace?.root)
+const landed = await store.installToWorkspace("alpha")
+check("the store installs into that workspace", landed === "link", landed)
+check(
+  "and the workspace now holds it",
+  (await readWorkspaceSkills(workspace, library)).skills.some((skill) => skill.id === "alpha")
+)
+await store.removeFromWorkspace("alpha")
+check(
+  "and takes it back out",
+  (await readWorkspaceSkills(workspace, library)).skills.every((skill) => skill.id !== "alpha")
+)
+
+await store.dispose()
+await fs.rm(home, { recursive: true, force: true })
+console.log(failures === 0 ? "all checks passed" : `${failures} check(s) failed`)
+process.exit(failures === 0 ? 0 : 1)

@@ -26,7 +26,7 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
-import { sourceLabel } from "./library.ts"
+import { locationLabel } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
@@ -886,7 +886,7 @@ function DeleteBubble({
 
 function InfoPanel({
   skill,
-  installed,
+  disabled,
   path,
   onDelete,
   onToggle,
@@ -894,7 +894,8 @@ function InfoPanel({
   onTagsChange,
 }: {
   skill: Skill
-  installed: boolean
+  /** No workspace to install into; the lightbox offers the action without it. */
+  disabled: boolean
   /** The skill's directory, spelled as a person would write it. */
   path: string | null
   /** `null` when this form has no library to delete from. */
@@ -914,7 +915,7 @@ function InfoPanel({
           </DialogTitle>
           <div className="flex items-center gap-2">
             <Badge variant="secondary" className="h-[18px] px-1.5 text-[11px]">
-              {sourceLabel(skill.source, t)}
+              {locationLabel(skill.location, t)}
             </Badge>
             <DialogDescription className="truncate text-xs text-muted-foreground">
               {`${t("skills.detail.updated")} ${skill.updated}`}
@@ -951,8 +952,8 @@ function InfoPanel({
 
         <dl className="flex flex-col">
           <MetaRow
-            label={t("skills.detail.source")}
-            value={sourceLabel(skill.source, t)}
+            label={t("skills.detail.location")}
+            value={locationLabel(skill.location, t)}
           />
           <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
           <MetaRow
@@ -968,18 +969,27 @@ function InfoPanel({
           <FileTextIcon />
           {t("skills.detail.files.action")}
         </Button>
-        <Button
-          variant={installed ? "outline" : "default"}
-          className={
-            installed
-              ? "h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
-              : "h-9 flex-1 gap-[7px] px-2.5"
-          }
-          onClick={onToggle}
-        >
-          {installed ? <PowerIcon /> : <DownloadIcon />}
-          {t(installed ? "skills.action.uninstall" : "skills.action.install")}
-        </Button>
+        {!skill.installed && skill.location !== "library" ? null : (
+          <Button
+            variant={skill.installed || skill.stale ? "outline" : "default"}
+            className={
+              skill.installed || skill.stale
+                ? "h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
+                : "h-9 flex-1 gap-[7px] px-2.5"
+            }
+            disabled={!skill.installed && !skill.stale && disabled}
+            onClick={onToggle}
+          >
+            {skill.stale ? <Trash2Icon /> : skill.installed ? <PowerIcon /> : <DownloadIcon />}
+            {t(
+              skill.stale
+                ? "skills.action.cleanup"
+                : skill.installed
+                  ? "skills.action.remove"
+                  : "skills.action.install"
+            )}
+          </Button>
+        )}
       </div>
 
       {onDelete !== null && (
@@ -1160,6 +1170,7 @@ function LightboxBody({
   detail,
   store,
   root,
+  disabled,
   onToggle,
   onDelete,
   onTagsChange,
@@ -1171,6 +1182,8 @@ function LightboxBody({
   store: SkillStore | null
   /** The skills root as the library spells it, for the delete question. */
   root: string | null
+  /** No workspace to install into; the action is offered without it. */
+  disabled: boolean
   onToggle: () => void
   onDelete: (() => Promise<void>) | null
   onTagsChange: (tags: string[]) => void
@@ -1194,7 +1207,7 @@ function LightboxBody({
       <MediaPane skill={skill} source={media} />
       <InfoPanel
         skill={skill}
-        installed={skill.enabled}
+        disabled={disabled}
         path={path}
         onDelete={onDelete}
         onToggle={onToggle}
@@ -1222,6 +1235,7 @@ export function SkillDetailDialog({
   skill,
   store,
   root,
+  disabled,
   onToggle,
   onDelete,
   onTagsChange,
@@ -1233,6 +1247,8 @@ export function SkillDetailDialog({
   store: SkillStore | null
   /** Where the library keeps its skills, as it spells the path. */
   root: string | null
+  /** No workspace to install into; the action is offered without it. */
+  disabled: boolean
   onToggle: () => void
   /** Delete the skill and everything the hub stores for it. */
   onDelete: (skill: Skill) => Promise<void>
@@ -1278,6 +1294,7 @@ export function SkillDetailDialog({
             detail={detail}
             store={store}
             root={root}
+            disabled={disabled}
             onToggle={onToggle}
             onDelete={store === null ? null : () => onDelete(skill)}
             onTagsChange={onTagsChange}

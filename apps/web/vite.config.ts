@@ -1,7 +1,7 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import { assetLibrary, pluginFiles, stateStore, workspaceList } from "@workspace/core/vite"
+import { assetLibrary, folderBrowser, pluginFiles, stateStore, workspaceList } from "@workspace/core/vite"
 import { skillLibrary } from "@workspace/plugin-skills/vite"
 import { defineConfig } from "vite"
 
@@ -16,6 +16,7 @@ export default defineConfig({
     stateStore(),
     pluginFiles(),
     workspaceList(),
+    folderBrowser(),
     skillLibrary(),
   ],
   resolve: {

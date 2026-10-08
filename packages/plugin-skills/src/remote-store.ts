@@ -17,6 +17,8 @@ import type {
   SkillPatch,
   SkillQuery,
   SkillStore,
+  WorkspaceInstall,
+  WorkspaceSkillsView as WorkspaceSkills,
 } from "./store.ts"
 
 /** One page of the catalog as the bridge returns it. */
@@ -164,6 +166,31 @@ export function createRemoteSkillStore(base = ""): SkillStore {
 
     assetUrl(ref: string): string {
       return isLink(ref) ? ref : assetUrl(ref, base)
+    },
+
+    workspaceSkills(): Promise<WorkspaceSkills | null> {
+      return call<WorkspaceSkills | null>(base, "/hub/skills?action=workspace")
+    },
+
+    async installToWorkspace(id: string): Promise<WorkspaceInstall> {
+      const body = await call<{ mode: WorkspaceInstall }>(
+        base,
+        "/hub/skills?action=install-workspace",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      )
+      return body.mode
+    },
+
+    async removeFromWorkspace(id: string): Promise<void> {
+      await call(base, "/hub/skills?action=remove-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
     },
 
     subscribe(): () => void {

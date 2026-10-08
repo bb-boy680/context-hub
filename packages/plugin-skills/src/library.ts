@@ -8,51 +8,50 @@ import * as React from "react"
 import { useHub, useI18n } from "@workspace/extensions/react"
 
 import type {
-  SkillCounts,
-  SkillOrigin,
+  SkillPage,
   SkillStore,
-  SkillQuery,
   SkillSummary,
+  WorkspaceInstall,
+  WorkspaceSkill,
+  WorkspaceSkillsView,
 } from "./store.ts"
-import type { Skill } from "./types.ts"
+import type { Skill, SkillLocation } from "./types.ts"
 
 /** One page of the catalog, plus what the UI needs to render around it. */
 export interface SkillLibrary {
   /** The form-owned library, or `null` when this form has none. */
   store: SkillStore | null
+  /** Every skill the hub knows here: the library's own, then the workspace's. */
   rows: Skill[]
-  total: number
-  /** Rows per origin under the current filters. */
-  counts: SkillCounts
+  /** Rows under each tab: everything, and what the current workspace holds. */
+  counts: { all: number; workspace: number }
+  /** The current workspace's skills; `null` when no folder is selected. */
+  workspace: WorkspaceSkillsView | null
+  /** The workspace in use, or `null` when this form has none selected. */
+  workspaceId: string | null
+  /** Where the current workspace keeps its skills, as it reads; `null` when there is no folder. */
+  workspaceRoot: string | null
   loading: boolean
   /** Display-ready failure from the last load, if any. */
   error: string | null
-  /** Where the rows came from, once a page has answered. */
+  /** Where the library's rows came from, once a page has answered. */
   root: string | null
   /** Every category in use across the library. */
   tags: string[]
-  /** Re-read the current page. */
+  /** Re-read the library and the workspace. */
   reload(): Promise<void>
+  /** Put one library skill into the current workspace; answers how it landed. */
+  install(id: string): Promise<WorkspaceInstall>
+  /** Take one skill the hub installed back out of the current workspace. */
+  remove(id: string): Promise<void>
 }
 
-const NO_ROWS: SkillCounts = { all: 0, builtin: 0, local: 0, registry: 0 }
-
-/** Catalog origin → the message key that names it; shared by badges and detail rows. */
-const SOURCE_KEYS: Record<SkillOrigin, string> = {
-  builtin: "skills.source.builtin",
-  local: "skills.source.local",
-  registry: "skills.source.registry",
-}
-
-/** How a row's source reads: a known origin's label, or the raw value a sample carries. */
-export function sourceLabel(
-  source: string,
+/** Where a row lives, as the badge and the lightbox name it. */
+export function locationLabel(
+  location: SkillLocation,
   t: (key: string) => string
 ): string {
-  const key = Object.entries(SOURCE_KEYS).find(
-    ([origin]) => origin === source
-  )?.[1]
-  return key === undefined ? source : t(key)
+  return t(location === "library" ? "skills.location.library" : "skills.location.workspace")
 }
 
 /** Token count as a compact label, the way the cards show it. */
@@ -86,7 +85,7 @@ export function toSkill(
   store: SkillStore,
   locale: string,
   tokens?: string
-): Skill {
+): Omit<Skill, "location" | "installed"> {
   const gallery = row.assets.map((ref) => store.assetUrl(ref))
   return {
     id: row.id,
@@ -94,46 +93,76 @@ export function toSkill(
     summary: row.description,
     description: row.description,
     tags: row.tags,
-    source: row.source,
     tokens,
     updated: formatAge(row.updatedAt, locale),
     stamp: row.updatedAt,
-    enabled: row.enabled,
     cover: gallery[0],
     gallery: gallery.length > 0 ? gallery : undefined,
   }
 }
 
-/** Load one page of the catalog and follow the library's change notifications. */
-export function useSkillLibrary(query: SkillQuery): SkillLibrary {
+/** Nothing to follow when this form provides no workspace list. */
+const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
+
+/** One skill's row for a skill the workspace holds and the library does not. */
+function workspaceRow(skill: WorkspaceSkill): Skill {
+  return {
+    id: skill.id,
+    name: skill.name,
+    summary: skill.description,
+    description: skill.description,
+    tags: [],
+    updated: "",
+    location: "workspace",
+    installed: false,
+    stale: skill.origin === "stale",
+  }
+}
+
+/**
+ * Load the whole catalog and the current workspace's skills, and follow the
+ * library's change notifications. The page filters and pages what it gets, so a
+ * row that lives in either place is in one list with one meaning.
+ */
+export function useSkillLibrary(): SkillLibrary {
   const ctx = useHub()
   const { state } = useI18n()
   const locale = state.active
   const store = React.useMemo(() => ctx.get("hub.skills") ?? null, [ctx])
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
 
-  const [rows, setRows] = React.useState<Skill[]>([])
-  const [total, setTotal] = React.useState(0)
-  const [counts, setCounts] = React.useState<SkillCounts>(NO_ROWS)
+  const subscribeWorkspaces = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const readWorkspaceId = React.useCallback(
+    () => workspaces?.current()?.current ?? null,
+    [workspaces]
+  )
+  /* The workspace in use decides which skills are in reach, so it is a reload key. */
+  const workspaceId = React.useSyncExternalStore(subscribeWorkspaces, readWorkspaceId)
+
+  const [page, setPage] = React.useState<SkillPage | null>(null)
+  const [workspace, setWorkspace] = React.useState<WorkspaceSkillsView | null>(null)
   const [loading, setLoading] = React.useState(store !== null)
   const [error, setError] = React.useState<string | null>(null)
-  const [root, setRoot] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string[]>([])
-
-  /* The key drives reloading: a new page, filter, or search re-reads the store. */
-  const key = JSON.stringify(query)
   const generation = React.useRef(0)
 
   const reload = React.useCallback(async () => {
     if (store === null) return
+    /* The workspace in use is a reload key: it decides what the rows mean. */
+    void workspaceId
     const current = ++generation.current
     try {
-      const page = await store.list(JSON.parse(key) as SkillQuery)
+      const [catalog, held] = await Promise.all([
+        store.list({ sort: "updated" }),
+        store.workspaceSkills(),
+      ])
       /* A slower earlier request must not overwrite a newer one. */
       if (current !== generation.current) return
-      setRows(page.items.map((item) => toSkill(item, store, locale)))
-      setTotal(page.total)
-      setCounts(page.counts)
-      setRoot(page.root)
+      setPage(catalog)
+      setWorkspace(held)
       setError(null)
     } catch (failure) {
       if (current !== generation.current) return
@@ -141,9 +170,9 @@ export function useSkillLibrary(query: SkillQuery): SkillLibrary {
     } finally {
       if (current === generation.current) setLoading(false)
     }
-  }, [store, key, locale])
+  }, [store, workspaceId])
 
-  /* The filter row spans the whole library, not the page on screen. */
+  /* The filter row spans the whole library, not the rows on screen. */
   const loadTags = React.useCallback(async () => {
     if (store === null) return
     try {
@@ -170,18 +199,76 @@ export function useSkillLibrary(query: SkillQuery): SkillLibrary {
     })
   }, [store, reload, loadTags])
 
+  const rows = React.useMemo((): Skill[] => {
+    if (store === null) return []
+    const held = new Map((workspace?.skills ?? []).map((skill) => [skill.id, skill]))
+    const library: Skill[] = (page?.items ?? []).map((item) => {
+      const installed = held.get(item.id)?.origin === "hub"
+      return {
+        ...toSkill(item, store, locale),
+        location: installed ? "both" : "library",
+        installed,
+      }
+    })
+    const known = new Set(library.map((row) => row.id))
+    const own = (workspace?.skills ?? [])
+      .filter((skill) => !known.has(skill.id))
+      .map(workspaceRow)
+    return [...library, ...own]
+  }, [store, page, workspace, locale])
+
+  const install = React.useCallback(
+    async (id: string) => {
+      if (store === null) throw new Error("this form has no skill library")
+      const landed = await store.installToWorkspace(id)
+      await reload()
+      return landed
+    },
+    [store, reload]
+  )
+
+  const remove = React.useCallback(
+    async (id: string) => {
+      if (store === null) throw new Error("this form has no skill library")
+      await store.removeFromWorkspace(id)
+      await reload()
+    },
+    [store, reload]
+  )
+
   if (store === null) {
     return {
       store: null,
       rows: [],
-      total: 0,
-      counts: NO_ROWS,
+      counts: { all: 0, workspace: 0 },
+      workspace: null,
+      workspaceId,
+      workspaceRoot: null,
       loading: false,
       error: null,
       root: null,
       tags: [],
       reload: async () => undefined,
+      install: async () => "link",
+      remove: async () => undefined,
     }
   }
-  return { store, rows, total, counts, loading, error, root, tags, reload }
+  return {
+    store,
+    rows,
+    counts: {
+      all: rows.length,
+      workspace: rows.filter((row) => row.location !== "library").length,
+    },
+    workspace,
+    workspaceId,
+    workspaceRoot: workspace?.display ?? null,
+    loading,
+    error,
+    root: page?.root ?? null,
+    tags,
+    reload,
+    install,
+    remove,
+  }
 }

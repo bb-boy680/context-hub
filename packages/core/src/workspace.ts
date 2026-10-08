@@ -29,6 +29,8 @@ export interface WorkspaceView {
   /** What selection matches on: the path when this form knows one, else the name. */
   id: string
   name: string
+  /** The folder itself, absolute, for the work that reads inside it. */
+  path: string | null
   /** The path as a person reads it, e.g. `~/work/hub`; `null` when a form knows no path. */
   display: string | null
 }
@@ -52,10 +54,31 @@ export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null }
 export interface WorkspaceStore {
   /** Every known folder and the current one. */
   page(): Promise<WorkspacePage>
-  /** Remember one folder the person picked, and make it current. */
-  add(folder: WorkspaceFolder): Promise<WorkspacePage>
+  /** Remember the folder a person picked, and make it current. */
+  add(path: string): Promise<WorkspacePage>
   /** Make one known folder current; an unknown id is an error, not a silent no-op. */
   select(id: string): Promise<WorkspacePage>
+}
+
+/**
+ * The workspace list as a running form keeps it: the last read, its listeners,
+ * and the actions a form offers. A form provides this on the kernel so the
+ * sidebar menu and the pages that read the current folder cannot disagree about
+ * which one it is.
+ */
+export interface WorkspaceService {
+  /** The list as of the last read; `null` until one answers. */
+  current(): WorkspacePage | null
+  /** Why the last action failed, ready to show; cleared by the next one that works. */
+  failure(): string | null
+  /** Follow either of the above; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void
+  /** Read the list again. */
+  refresh(): Promise<void>
+  /** Make one known folder current; `false` when the hub refused it. */
+  select(id: string): Promise<boolean>
+  /** Add the folder at `path` and make it current; `false` when the hub refused it. */
+  add(path: string): Promise<boolean>
 }
 
 /**

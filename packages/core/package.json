@@ -18,11 +18,13 @@
   },
   "exports": {
     ".": "./src/assets.ts",
+    "./fs-browse": "./src/fs-browse.ts",
     "./plugins": "./src/plugins.ts",
     "./state": "./src/state.ts",
     "./workspace": "./src/workspace.ts",
     "./host": "./src/host/assets-fs.ts",
     "./host/atomic": "./src/host/atomic.ts",
+    "./host/fs-browse": "./src/host/fs-browse.ts",
     "./host/home": "./src/host/home.ts",
     "./host/plugins": "./src/host/plugins-fs.ts",
     "./host/state": "./src/host/state-fs.ts",

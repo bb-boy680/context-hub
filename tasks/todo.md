@@ -1164,3 +1164,150 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 侧栏第二行同步、`workspaces.json` 写入 `{"folders":[{"name":"dsh-context-hub"}],"current":"dsh-context-hub"}`；
 桩改为抛 `AbortError`（取消）→ 不写盘、不报错、列表不变。core/web/extensions/locale 的类型检查与 lint 干净。
 
+# 技能 × 工作区：功能对齐与链条设计（2026-10-08，讨论稿，**待用户拍板后实施**）
+
+## 一、现状核对（结论都有代码依据）
+
+| 模块 | 真实还是样例 | 依据 |
+| --- | --- | --- |
+| Workspaces | **真实**：`state/workspaces.json` + `/hub/workspaces` | `packages/core/src/workspace.ts` |
+| Skills | **真实**：本地导入 + skill.sh 下载都落 `<home>/skills` | `host/skills-fs.ts` / `host/skills-cli.ts` |
+| Overview / MCP / Plugins / Repository | **样例数据**，模块级常量，背后没有 store | `pages/*.tsx` 里 `const kpis` / `const servers` … |
+| 顶栏 Connect repo / Sync repo | 无 `onClick` | `components/app-header.tsx` |
+| Ctrl+K 调色板 | query 不过滤、列表写死 | `components/search-palette.tsx` |
+| Activity / Policies / Settings | 落到 `PlaceholderPage` | `lib/navigation.ts` |
+
+**技能四个页签的真实情况**（`SkillOrigin = local | builtin | registry`，`store.ts`）：
+
+| 页签 | 谁写这个值 | 结果 |
+| --- | --- | --- |
+| 内置 `builtin` | **没有任何代码写它** | 永远 0 |
+| 工作区 `local` | `readEntry` 的默认 `previous?.source ?? "local"` | 磁盘上所有技能都是它 |
+| skill.sh `registry` | **没有任何代码写它**：下载先落 temp 再 `refreshCatalog()`，新目录被当成 `local` | 永远 0 |
+
+用户截图 `全部 2 / 内置 0 / 工作区 2 / skill.sh 0` 不是巧合，是当前代码的唯一可能输出。
+
+## 二、四个断点
+
+1. **页签轴选错了**：它描述"来源"，可 store 只记录了三种来源里的一种，另外两种无人写入。
+2. **「工作区」名不副实**：`local` 的含义是"被拷进 hub 自己的库"，与任何工作区目录无关。
+3. **`enabled` 是全局的**：写在 `index.json` 的一行里，跟选中的工作区无关 —— 这就是"安装态是错的"。
+4. **工作区自带的技能，hub 完全看不到**：技能模块不知道工作区存在（`useSkillLibrary` 只跟 `hub.skills` 说话）。
+
+## 三、定稿模型：两个位置 + 链接安装
+
+**两个位置**（技能只有这两个家）：
+
+| 位置 | 内容 | 归属 |
+| --- | --- | --- |
+| Hub 库 `<home>/skills` | 货架：导入 / 下载的落点，唯一被 hub 管理的那份 | hub 拥有，可增删改 |
+| 工作区 `<workspace>/.agents/skills` | 项目自带 + hub 安装进来的，跟 git 走 | 项目拥有 |
+
+`.claude/skills` 这一版**不读也不写**：那是 Claude Code 插件的领地（已有 `target` 贡献点里
+`hub.target.claude-code` 声明了 `Skills → ~/.claude/skills/<name>/SKILL.md`），项目级位置以后由它补。
+
+**两个页签**（按"在哪"分，取代按"哪来的"分）：
+
+- **全部** = Hub 库 + 当前工作区里的，合并列表；来自工作区的行带标记。
+- **工作区** = 只看当前工作区 `.agents/skills` 里的；没选工作区时是空态提示。
+
+**只有两个动作，都只碰同一条链**：
+
+| 动作 | 方向 | 方式 | 触发 |
+| --- | --- | --- | --- |
+| 安装到工作区 | 库 → 工作区 | **建链接** `<workspace>/.agents/skills/<id>` → `<home>/skills/<id>` | 行上的按钮 |
+| 从工作区移除 | 删链接 | 只删自己建的链接，`lstat` 先判类型 | 行上的按钮 |
+
+工作区 → 库**不复制**（只读投影）：项目拥有它、git 是真相，拷进库就变成两个真相。
+"收进库"（fork / 收藏）留到 v2，只做单行显式动作。
+
+**链接就是安装记录**（"怎么看出是 Context Hub 装的"，按 host 侧 `lstat` 判定）：
+
+| 条目 | 判定 | 显示 | 动作 |
+| --- | --- | --- | --- |
+| 链接，目标在 `<home>/skills/<id>` 且存在 | 通过 Context Hub 安装 | 已安装 | 从工作区移除 |
+| 链接，目标在 `<home>/skills/<id>` 但已不存在 | 断链 | 已失效 | 清理 |
+| 链接指向别处 / 真目录 | 工作区自带 | 只读 | — |
+| 无条目 | 未安装 | — | 安装到工作区 |
+
+零状态：不需要同步记录、哈希账本、全局 `enabled` —— **文件系统就是记录**，外部工具也看得见。
+
+**本机实测（2026-10-08，Windows + Node 24）**：
+
+- `junction` 建链与穿透读全部正常；`lstat().isSymbolicLink()` = **true**、`readlink` 返回绝对路径 →
+  判定代码与 POSIX 统一，不需要分平台分支；
+- `symlink(…, "dir")` 在这台机器报 **EPERM**（开发者模式未开），junction 却成功 → **Windows 用 junction，免提权**；
+- **悬空 junction 可以建出来** → 断链状态必须处理。
+- 代价（如实）：链接**不能随 git 分发** —— Windows `core.symlinks=false` 会把它落成 17 字节的文本文件
+  （DSH 仓库里 `.claude/skills` 实测如此）。安装处文案写明"仅本机"；要提交的场景留一个
+  "复制到工作区"作为后续次要动作。
+
+**跨平台核查（2026-10-08 追加；本机无 WSL，macOS/Linux 一列为 OS 既定语义）**：
+
+| | Windows | macOS / Linux |
+| --- | --- | --- |
+| 建目录链接 | `junction`，免提权 | `symlink(target, path)`，**无需提权**，`type` 参数被忽略 |
+| 判定 | `lstat().isSymbolicLink()` = true | 同左 |
+| 删除 | `fs.rm(link, {force:true})` 实测 OK | `unlink` / `rm` 删链接本身；**`rmdir` 会 ENOTDIR** |
+| 跨卷 | junction 限本机本地卷 | 任意 |
+
+- **失败面在文件系统，不在操作系统**：FAT/exFAT 不支持链接（macOS/Linux 直接 ENOTSUP）、
+  网络共享（macOS 挂 SMB 需 `mfsymlinks`，Windows 共享里建 junction 一般失败）、
+  云同步目录可能破坏链接 → 安装动作要有**降级链：链接失败 → 复制**，并如实说明
+  "已复制，此后归工作区所有，hub 不再跟踪它"（真实目录从 `lstat` 看不出是谁装的）。
+- 实测安全项：`fs.rm(link, {recursive:true})` **不会**穿透链接删库（库与 `SKILL.md` 完好）；
+  仍统一发不带 `recursive` 的形式，少一个参数少一个风险。
+- 同步结论：链接指向用户机器上的绝对路径，**任何平台都不该提交**（macOS/Linux 上 git 能存 mode 120000，
+  Windows 会落成文本文件）——与"仅本机"的定位一致，不构成跨平台障碍。
+
+**同步的触发**（没有需要触发的"同步"，只有刷新）：切工作区 → 重列；`fs.watch` 监听
+`<workspace>/.agents/skills` 变更即刷新（技能库已有先例）；安装/移除后同一次刷新。
+
+## 四、定稿（2026-10-08 用户拍板）
+
+- [x] 工作区技能**只读不复制**，不做自动收编
+- [x] 安装方向**库 → 工作区**，方式**链接**（junction / dir symlink），不复制
+- [x] 目标统一 `<workspace>/.agents/skills`；`.claude` 留给 Claude Code 插件
+
+## 五、分期计划（1–5 已实现，2026-10-08）
+
+- [x] 1. Host 目录能力：桥新增 `GET /hub/fs/list?path=`（宿主 `readdir` + `lstat`，返回 `path / display /
+      parent / crumbs / entries[{name, path, link?}]`，上限 2000 条），工作区身份从"文件夹名"升级为
+      host 给出的**绝对路径**（`WorkspaceView.path`；`add(path)` 先验证目录存在，拒绝时明说 "not a folder"）
+- [x] 2. 应用内目录浏览器（替换 `showDirectoryPicker`，`apps/web/src/lib/folder-picker.ts` 已删）：
+      `components/folder-picker-dialog.tsx` = 面包屑 + 逐层 + 上级行 + 底部当前路径；每次打开都从 home 开始
+      （按 `open` 挂载内层组件，不用重置 effect）；新建文件夹**未做**（见"遗留"）
+- [x] 3. 技能页两页签（全部 / 工作区）+ 工作区只读投影：`SkillStore.workspaceSkills()` 读
+      `<workspace>/.agents/skills`（宿主侧 `host/workspace-skills.ts`），页签计数与筛选移到客户端
+- [x] 4. 安装 / 移除 = 建链 / 删链（`installToWorkspace` / `removeFromWorkspace`）+ 三态判定与文案；
+      `enabled` 退出界面（仍是库内记录，UI 不再读它）
+- [x] 5. 验证：新增 `packages/plugin-skills/scripts/check-workspace-skills.ts`（30 项，含 junction 判定、
+      断链、同名拒装、越界名字拒装、库外技能拒删）；`check-workspaces.ts` 重写到 33 项（含列目录）；
+      `check-store.ts` / `check-state.ts` 无回归；浏览器实测见下
+
+**浏览器实测（zh-CN，真实桥，Windows junction）**：侧栏菜单 →`创建工作区`→ 选文件夹对话框（560 宽，
+面包屑 `~ / AppData / Local / Temp / hub-demo / project`，底部等宽当前路径）→ `选择此文件夹` →
+侧栏第二行变 `project`、页签 `全部 3 / 工作区 2`、列表混排（`grilling` 工作区/移除、`grill-me` 技能库/安装、
+`notes-writer` 工作区/无动作）→ 点 `安装` 后磁盘出现
+`<ws>\.agents\skills\grilling → ~\.context-hub\skills\grilling`（Junction，免提权）、按钮变 `移除`、
+页签变 `工作区 2`；点 `移除` → 链接消失、库完好、页签回到 1。灯箱同一套语义（`位置` 行 + `安装`/`移除`）。
+截图：`designs/check-web/skills-workspace-all.png`、`designs/check-web/workspace-folder-picker.png`。
+
+**本轮改到的文件**：`packages/core`（`src/fs-browse.ts`、`src/host/fs-browse.ts`、`src/workspace.ts`、
+`src/host/workspaces-fs.ts`、`vite.ts`、`package.json`、`scripts/check-workspaces.ts`）、
+`packages/plugin-skills`（`src/host/workspace-skills.ts`、`src/host/skills-fs.ts`、`src/store.ts`、
+`src/remote-store.ts`、`src/library.ts`、`src/types.ts`、`src/page.tsx`、`src/skill-detail-dialog.tsx`、
+`src/messages.ts`、`vite.ts`、`scripts/check-workspace-skills.ts`）、
+`apps/web`（`src/lib/fs.ts`、`src/lib/workspaces.ts`、`src/lib/hub.ts`、`src/components/folder-picker-dialog.tsx`、
+`src/components/workspace-menu.tsx`、`vite.config.ts`，删 `src/lib/folder-picker.ts`）、
+`packages/extensions`（`src/builtin/locale-en.ts`）、`packages/locale-zh-cn`（`src/messages.ts`）。
+
+**遗留（本轮明确没做）**：
+- 目录浏览器没有"新建文件夹"；没有手动刷新工作区技能（只有切工作区 / 装完后重读）
+- 没有"移除工作区"（菜单只能加和切）；`~/.context-hub/state/workspaces.json` 里旧的无路径条目不显示技能，
+  工作区页签会提示"没有可读取的文件夹路径"——重新添加一次即可换成带路径的条目
+- 工作区技能**变化不推送**：外部 `git pull` 或手改 `.agents/skills` 后需要切一次工作区/刷新页面
+- "库 → 工作区"只有链接一种；FAT/网络盘会降级为复制并提示（本机未触发，代码路径在
+  `installSkillIntoWorkspace` 的 `LINK_UNSUPPORTED` 分支）
+- 6. 其他模块对齐（另开）：Overview/MCP/Plugins/Repository 接真实 store、顶栏两个按钮、Ctrl+K 过滤
+

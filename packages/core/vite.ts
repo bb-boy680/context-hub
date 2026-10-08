@@ -12,12 +12,15 @@
  */
 import { createReadStream, promises as fs } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
+import { homedir } from "node:os"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
+import { FS_ROUTE } from "./src/fs-browse.ts"
 import { PLUGIN_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
+import { listDirectory } from "./src/host/fs-browse.ts"
 import { resolveHubHome } from "./src/host/home.ts"
 import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
@@ -281,9 +284,9 @@ export function pluginFiles(options: { home?: string } = {}) {
 }
 
 /**
- * Vite plugin that keeps the workspace list over the dev server. The folder
- * dialog belongs to the form, so the page reports the folder it picked and this
- * keeps it; a product form mounts the same store itself.
+ * Vite plugin that keeps the workspace list over the dev server. The form
+ * reports the folder the person walked to and this keeps it; a product form
+ * mounts the same store itself.
  */
 export function workspaceList(options: { home?: string } = {}) {
   const store = createFsWorkspaceStore(resolveHubHome(options.home))
@@ -312,12 +315,12 @@ export function workspaceList(options: { home?: string } = {}) {
               return
             }
             if (action === "add" && method === "POST") {
-              const body = JSON.parse((await readBody(request)).toString("utf8")) as { name?: unknown }
-              if (typeof body.name !== "string" || body.name === "") {
-                sendJson(response, 400, { error: "add needs the folder's name" })
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { path?: unknown }
+              if (typeof body.path !== "string" || body.path === "") {
+                sendJson(response, 400, { error: "add needs the folder's path" })
                 return
               }
-              sendJson(response, 200, await store.add({ name: body.name }))
+              sendJson(response, 200, await store.add(body.path))
               return
             }
             if (action === "select" && method === "POST") {
@@ -330,6 +333,47 @@ export function workspaceList(options: { home?: string } = {}) {
               return
             }
             response.writeHead(405).end()
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            sendJson(response, 400, { error: message })
+          }
+        }
+      )
+    },
+  }
+}
+
+/**
+ * Vite plugin that lists folders over the dev server, so a browser form can
+ * offer a folder tree without a dialog of its own. Only the form's own browsing
+ * is served: nothing here writes, and the paths a person walks are the paths
+ * this process reads. A product form mounts the same reader itself.
+ */
+export function folderBrowser() {
+  return {
+    name: "context-hub-folder-browser",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(FS_ROUTE)) {
+            next()
+            return
+          }
+          const action = url.pathname.slice(FS_ROUTE.length).replace(/^\//, "")
+          if (action !== "list" || (request.method ?? "GET") !== "GET") {
+            response.writeHead(405).end()
+            return
+          }
+          try {
+            const target = url.searchParams.get("path")
+            sendJson(response, 200, await listDirectory(target ?? homedir()))
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             sendJson(response, 400, { error: message })

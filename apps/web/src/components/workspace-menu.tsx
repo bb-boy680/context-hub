@@ -16,6 +16,7 @@ import {
 } from "@workspace/ui/components/sidebar"
 import { cn } from "@workspace/ui/lib/utils"
 
+import { FolderPickerDialog } from "@/components/folder-picker-dialog"
 import { useWorkspaces } from "@/lib/workspaces"
 
 /** How a row reads: the workspace in use, another one, or the action that adds one. */
@@ -89,74 +90,80 @@ function MenuRow({
 
 export function WorkspaceMenu() {
   const { t } = useI18n()
-  const { page, failure, pending, select, add } = useWorkspaces()
+  const { page, failure, select, add } = useWorkspaces()
   const [open, setOpen] = React.useState(false)
+  const [picking, setPicking] = React.useState(false)
   const current = page?.current ?? null
   const currentName = page?.folders.find((folder) => folder.id === current)?.name ?? null
 
   return (
-    <SidebarMenu>
-      <SidebarMenuItem>
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            render={
-              <SidebarMenuButton size="lg" aria-expanded={open}>
-                <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <WaypointsIcon className="size-4" />
-                </div>
-                <div className="grid flex-1 text-left leading-none">
-                  <span className="text-sm font-medium">Context Hub</span>
-                  <span className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {currentName ?? t("workspace.none")}
-                  </span>
-                </div>
-                <ChevronsUpDownIcon className="ml-auto text-muted-foreground" />
-              </SidebarMenuButton>
-            }
-          />
-          <PopoverContent
-            side="right"
-            align="start"
-            sideOffset={8}
-            className="w-[300px] gap-0.5 rounded-lg bg-dialog p-2 shadow-[0_8px_24px_#0F172A29] ring-glass-border backdrop-blur-xl"
-          >
-            <span className="flex h-[30px] items-center px-2.5 text-[13px] leading-[17px] font-medium text-muted-foreground">
-              {t("workspace.menu.title")}
-            </span>
-            {(page?.folders ?? []).map((folder) => (
+    <>
+      <SidebarMenu>
+        <SidebarMenuItem>
+          <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger
+              render={
+                <SidebarMenuButton size="lg" aria-expanded={open}>
+                  <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                    <WaypointsIcon className="size-4" />
+                  </div>
+                  <div className="grid flex-1 text-left leading-none">
+                    <span className="text-sm font-medium">Context Hub</span>
+                    <span className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {currentName ?? t("workspace.none")}
+                    </span>
+                  </div>
+                  <ChevronsUpDownIcon className="ml-auto text-muted-foreground" />
+                </SidebarMenuButton>
+              }
+            />
+            <PopoverContent
+              side="right"
+              align="start"
+              sideOffset={8}
+              className="w-[300px] gap-0.5 rounded-lg bg-dialog p-2 shadow-[0_8px_24px_#0F172A29] ring-glass-border backdrop-blur-xl"
+            >
+              <span className="flex h-[30px] items-center px-2.5 text-[13px] leading-[17px] font-medium text-muted-foreground">
+                {t("workspace.menu.title")}
+              </span>
+              {(page?.folders ?? []).map((folder) => (
+                <MenuRow
+                  key={folder.id}
+                  icon={<FolderIcon className="size-[15px]" />}
+                  name={folder.name}
+                  display={folder.display}
+                  state={folder.id === current ? "current" : "idle"}
+                  trailing={
+                    folder.id === current ? (
+                      <CheckIcon className="size-[15px] shrink-0 text-primary" />
+                    ) : null
+                  }
+                  onClick={() => {
+                    select(folder.id)
+                    setOpen(false)
+                  }}
+                />
+              ))}
+              <span className="flex h-[13px] items-center py-1.5">
+                <span className="h-px w-full bg-border" />
+              </span>
               <MenuRow
-                key={folder.id}
-                icon={<FolderIcon className="size-[15px]" />}
-                name={folder.name}
-                display={folder.display}
-                state={folder.id === current ? "current" : "idle"}
-                trailing={
-                  folder.id === current ? (
-                    <CheckIcon className="size-[15px] shrink-0 text-primary" />
-                  ) : null
-                }
+                icon={<PlusIcon className="size-[15px]" />}
+                name={t("workspace.create")}
+                state="action"
                 onClick={() => {
-                  select(folder.id)
                   setOpen(false)
+                  setPicking(true)
                 }}
               />
-            ))}
-            <span className="flex h-[13px] items-center py-1.5">
-              <span className="h-px w-full bg-border" />
-            </span>
-            <MenuRow
-              icon={<PlusIcon className="size-[15px]" />}
-              name={t("workspace.create")}
-              state="action"
-              disabled={pending}
-              onClick={() => add()}
-            />
-            {failure === null ? null : (
-              <span className="px-2.5 pb-1 text-xs leading-[15px] text-destructive">{failure}</span>
-            )}
-          </PopoverContent>
-        </Popover>
-      </SidebarMenuItem>
-    </SidebarMenu>
+              {failure === null ? null : (
+                <span className="px-2.5 pb-1 text-xs leading-[15px] text-destructive">{failure}</span>
+              )}
+            </PopoverContent>
+          </Popover>
+        </SidebarMenuItem>
+      </SidebarMenu>
+      <FolderPickerDialog open={picking} onOpenChange={setPicking} onPicked={add} />
+    </>
   )
 }

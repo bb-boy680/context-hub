@@ -1,13 +1,13 @@
 /**
  * Behaviour check for the disk-backed workspace list. It runs the store against
  * a temporary hub home and asserts the contract: a home with no document lists
- * nothing, a folder the form reports becomes a row carrying the folder's own
- * name, a path a person reads is derived only when the form knows one, adding
- * and selecting persist and survive a reopen, an unknown workspace is refused
- * rather than silently ignored, and a hand-edited document cannot smuggle in a
- * value that is not a folder.
+ * nothing, the folder a form walked to becomes a row carrying the folder's own
+ * name and its path, a folder that is not there is refused instead of stored,
+ * adding and selecting persist and survive a reopen, an unknown workspace is
+ * refused rather than silently ignored, and a hand-edited document cannot
+ * smuggle in a value that is not a folder.
  *
- * The folder dialog belongs to the form, so it is exercised there, not here.
+ * The folder tree belongs to the form, so it is exercised there, not here.
  *
  * Run from the package: `node scripts/check-workspaces.ts`
  */
@@ -17,6 +17,7 @@ import path from "node:path"
 
 import { folderId, readWorkspaceState, workspaceName } from "../src/workspace.ts"
 import { createFsWorkspaceStore } from "../src/host/workspaces-fs.ts"
+import { listDirectory } from "../src/host/fs-browse.ts"
 
 let failures = 0
 
@@ -39,11 +40,13 @@ check(
   JSON.stringify(await store.page()) === JSON.stringify({ folders: [], current: null })
 )
 
-/* A form that knows a path: the row shows the path, and selection matches on it. */
-const withPath = await store.add({ name: workspaceName(project), path: project })
+/* The form reports a folder it walked to: the row carries the name and the path. */
+await fs.mkdir(project, { recursive: true })
+const withPath = await store.add(project)
 check("adding a folder makes it the only row", withPath.folders.length === 1, withPath.folders)
 check("a row carries the folder's own name", withPath.folders[0]?.name === "marketing-site", withPath.folders[0])
 check("a row's id is its path", withPath.folders[0]?.id === project, withPath.folders[0])
+check("a row carries the path itself", withPath.folders[0]?.path === project, withPath.folders[0])
 check(
   "a path a person reads is the shortened path",
   withPath.folders[0]?.display === project.replace(homedir(), "~"),
@@ -53,33 +56,35 @@ check("the added folder is current", withPath.current === project, withPath.curr
 
 /* A folder inside the home directory is shortened, which is why the disk does it. */
 const inside = path.join(homedir(), "hub-notes")
-const twoRows = await store.add({ name: "hub-notes", path: inside })
+await fs.mkdir(inside, { recursive: true })
+const twoRows = await store.add(inside)
 check(
   "a folder under the home directory reads with a tilde",
   twoRows.folders[1]?.display === `~${inside.slice(homedir().length)}`,
   twoRows.folders[1]
 )
 
-/* A form that knows only a name, which is what a browser's dialog leaves behind. */
-const named = await store.add({ name: "skills" })
-check("a folder with no path is still a row", named.folders.length === 3, named.folders)
-check("its id is its name", named.folders[2]?.id === "skills", named.folders[2])
-check("it shows no path line", named.folders[2]?.display === null, named.folders[2])
-check("adding it makes it current", named.current === "skills", named.current)
+/* A path the hub cannot read is not a workspace, and storing it would be a lie. */
+let missing = ""
+try {
+  await store.add(path.join(home, "nowhere-at-all"))
+} catch (error) {
+  missing = error instanceof Error ? error.message : String(error)
+}
+check("a folder that does not exist is refused", missing.includes("not a folder"), missing)
+check("the refusal stores nothing", (await store.page()).folders.length === 2)
 
 /* Adding the same folder twice is not a second row. */
-const again = await store.add({ name: "skills" })
-check("a folder already known is not added twice", again.folders.length === 3, again.folders)
-const samePath = await store.add({ name: "ignored-name", path: project })
-check("a known path is not added twice either", samePath.folders.length === 3, samePath.folders)
-check("the name the hub already had is kept", samePath.folders[0]?.name === "marketing-site", samePath.folders[0])
+const again = await store.add(project)
+check("a folder already known is not added twice", again.folders.length === 2, again.folders)
+check("adding it again makes it current", again.current === project, again.current)
 
 /* Selecting is a write, and it is what a reload reads back. */
-const afterSelect = await store.select(project)
-check("selecting makes that folder current", afterSelect.current === project, afterSelect.current)
+const afterSelect = await store.select(inside)
+check("selecting makes that folder current", afterSelect.current === inside, afterSelect.current)
 check(
   "selecting is visible to a store that opens the same home",
-  (await createFsWorkspaceStore(home).page()).current === project
+  (await createFsWorkspaceStore(home).page()).current === inside
 )
 let refused = ""
 try {
@@ -88,7 +93,31 @@ try {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("an unknown workspace is refused", refused.includes("not a known workspace"), refused)
-check("a refusal changes nothing", (await store.page()).current === project)
+check("a refusal changes nothing", (await store.page()).current === inside)
+
+/* Browsing: one level at a time, folders only, links reported as links. */
+const listing = await listDirectory(path.join(home, "projects"))
+check(
+  "a listing shows the folders it holds and nothing else",
+  JSON.stringify(listing.entries.map((entry) => entry.name)) === JSON.stringify(["marketing-site"]),
+  listing.entries
+)
+check("a listing carries an absolute path", listing.path === path.join(home, "projects"), listing.path)
+check(
+  "a listing names its parent",
+  listing.parent === home,
+  listing.parent
+)
+check(
+  "a listing carries the trail down from the home directory",
+  listing.crumbs.at(-1)?.path === path.join(home, "projects"),
+  listing.crumbs
+)
+await fs.mkdir(path.join(home, ".hidden-project"), { recursive: true })
+check(
+  "a hidden folder is still a folder a person can walk into",
+  (await listDirectory(home)).entries.some((entry) => entry.name === ".hidden-project")
+)
 
 /* A hand-edited document is durable JSON, so its values are checked, not trusted. */
 check(
@@ -116,6 +145,10 @@ check(
 check(
   "a duplicate id is kept once",
   readWorkspaceState({ folders: [{ name: "skills" }, { name: "skills" }] }).folders.length === 1
+)
+check(
+  "a row written before the hub kept paths is still readable",
+  readWorkspaceState({ folders: [{ name: "skills" }] }).folders[0]?.path === undefined
 )
 
 check("an id is the path when there is one", folderId({ name: "x", path: project }) === project)
