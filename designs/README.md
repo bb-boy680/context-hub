@@ -65,7 +65,7 @@ Skills / Rules / Plugins / Prompts 四类各有一整套同构的屏（卡片 / 
 | ⑦b | 状态与交互集 | `RCRkQ` | ⑦ 弹窗与状态 |
 | ⑧a | 设计系统 | `oxBFx` | ⑧ 设计系统 |
 
-成套导出见 `designs/canvas7/`（23 块画板，scale 1）；单屏核对图见 `designs/check14/`–`check19/`。`png/`、`png-v2~v5/`、`canvas/`–`canvas6/`、`export*/`、`final*/`、`check1~19/` 均为过程产物，含已废弃节点 id 与旧配色，可整目录删除。
+**截图不入库**：`designs/` 下的导出图（`check*/`、`png*/`、`canvas*/`、`export*/`、`final*/` 等）只是本地核对的过程产物，`.gitignore` 已忽略 `designs/**/*.png|jpg|jpeg|webp`，提交前删掉即可，需要时用 `Export` 重新导出。仓库里只保留 `pencil-new.pen`（画布的唯一事实）与本文档。
 
 ### 画布分组：一类一行
 
