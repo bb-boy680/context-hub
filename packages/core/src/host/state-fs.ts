@@ -46,7 +46,8 @@ export function createFsStateStore(home: string): StateStore {
       const raw = await fs.readFile(file, "utf8").catch(() => null)
       if (raw === null) return null
       try {
-        return JSON.parse(raw) as unknown
+        /* An editor on Windows may save the file with a byte order mark. */
+        return JSON.parse(raw.replace(/^\uFEFF/, "")) as unknown
       } catch {
         throw new Error(`state document is not JSON: ${file}`)
       }

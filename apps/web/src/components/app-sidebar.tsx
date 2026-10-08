@@ -1,5 +1,4 @@
 import * as React from "react"
-import { ChevronsUpDownIcon, WaypointsIcon } from "lucide-react"
 import { Link, useLocation } from "react-router"
 
 import {
@@ -13,6 +12,7 @@ import {
   SidebarMenuItem,
 } from "@workspace/ui/components/sidebar"
 
+import { WorkspaceMenu } from "@/components/workspace-menu"
 import { useNavGroups } from "@/lib/navigation"
 import { useI18n } from "@workspace/extensions/react"
 
@@ -24,22 +24,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar className="border-sidebar-border backdrop-blur-glass" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton size="lg" render={<Link to="/" />}>
-              <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <WaypointsIcon className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left leading-none">
-                <span className="text-sm font-medium">Context Hub</span>
-                <span className="mt-0.5 text-xs text-muted-foreground">
-                  dsh-context-hub
-                </span>
-              </div>
-              <ChevronsUpDownIcon className="ml-auto text-muted-foreground" />
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <WorkspaceMenu />
       </SidebarHeader>
       <SidebarContent className="gap-4 p-2">
         {navGroups.map((group) => (

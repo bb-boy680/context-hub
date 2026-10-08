@@ -20,11 +20,14 @@
     ".": "./src/assets.ts",
     "./plugins": "./src/plugins.ts",
     "./state": "./src/state.ts",
+    "./workspace": "./src/workspace.ts",
     "./host": "./src/host/assets-fs.ts",
     "./host/atomic": "./src/host/atomic.ts",
+    "./host/folder-picker": "./src/host/folder-picker.ts",
     "./host/home": "./src/host/home.ts",
     "./host/plugins": "./src/host/plugins-fs.ts",
     "./host/state": "./src/host/state-fs.ts",
+    "./host/workspaces": "./src/host/workspaces-fs.ts",
     "./vite": "./vite.ts"
   }
 }

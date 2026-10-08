@@ -16,10 +16,12 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import { ASSET_ROUTE } from "./src/assets.ts"
 import { PLUGIN_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
+import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
 import { resolveHubHome } from "./src/host/home.ts"
 import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
+import { createFsWorkspaceStore } from "./src/host/workspaces-fs.ts"
 import type { StateStore } from "./src/state.ts"
 
 /** One `Content-Type` for a stored file, from its extension. */
@@ -271,6 +273,67 @@ export function pluginFiles(options: { home?: string } = {}) {
             await sendPluginFile(store.root, id, rest.slice(slash + 1), response)
           } catch {
             response.writeHead(404).end()
+          }
+        }
+      )
+    },
+  }
+}
+
+/**
+ * Vite plugin that keeps the workspace list over the dev server. Picking opens
+ * a folder dialog on this machine and holds the request for as long as the
+ * dialog is up, so the browser form shows the folder only once somebody chose
+ * one. A product form mounts the same store itself.
+ */
+export function workspaceList(options: { home?: string } = {}) {
+  const store = createFsWorkspaceStore(resolveHubHome(options.home))
+
+  return {
+    name: "context-hub-workspace-list",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(WORKSPACE_ROUTE)) {
+            next()
+            return
+          }
+          const action = url.pathname.slice(WORKSPACE_ROUTE.length).replace(/^\//, "")
+          const method = request.method ?? "GET"
+          try {
+            if (action === "" && method === "GET") {
+              sendJson(response, 200, await store.page())
+              return
+            }
+            if (action === "select" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { path?: unknown }
+              if (typeof body.path !== "string") {
+                sendJson(response, 400, { error: "select needs a folder path" })
+                return
+              }
+              sendJson(response, 200, await store.select(body.path))
+              return
+            }
+            if (action === "pick" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { prompt?: unknown }
+              if (typeof body.prompt !== "string" || body.prompt === "") {
+                sendJson(response, 400, { error: "pick needs the dialog prompt" })
+                return
+              }
+              sendJson(response, 200, await store.pick(body.prompt))
+              return
+            }
+            response.writeHead(405).end()
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            sendJson(response, 400, { error: message })
           }
         }
       )
