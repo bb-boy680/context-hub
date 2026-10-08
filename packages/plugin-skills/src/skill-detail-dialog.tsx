@@ -812,7 +812,7 @@ function InfoPanel({
   const { t } = useI18n()
 
   return (
-    <div className="flex w-[360px] shrink-0 flex-col gap-4 border-l border-border p-5">
+    <div className="flex w-[360px] min-h-0 shrink-0 flex-col gap-4 border-l border-border p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-1.5">
           <DialogTitle className="truncate text-base leading-[19px] font-semibold">
@@ -842,31 +842,34 @@ function InfoPanel({
 
       <div className="h-px shrink-0 bg-border" />
 
-      <CategoryEditor tags={skill.tags} onChange={onTagsChange} />
+      {/* A description can outrun the panel; it scrolls so the actions stay put. */}
+      <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-2">
+        <CategoryEditor tags={skill.tags} onChange={onTagsChange} />
 
-      <section className="flex flex-col gap-2">
-        <span className="text-xs font-semibold text-muted-foreground">
-          {t("skills.detail.description")}
-        </span>
-        <p className="text-[13px] leading-[1.5]">{skill.description}</p>
-      </section>
+        <section className="flex flex-col gap-2">
+          <span className="text-xs font-semibold text-muted-foreground">
+            {t("skills.detail.description")}
+          </span>
+          <p className="text-[13px] leading-[1.5]">{skill.description}</p>
+        </section>
 
-      <div className="h-px shrink-0 bg-border" />
+        <div className="h-px shrink-0 bg-border" />
 
-      <dl className="flex flex-col">
-        <MetaRow
-          label={t("skills.detail.source")}
-          value={sourceLabel(skill.source, t)}
-        />
-        <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
-        <MetaRow
-          label={t("skills.detail.triggers")}
-          value={skill.triggers === undefined ? "—" : String(skill.triggers)}
-        />
-        <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
-      </dl>
+        <dl className="flex flex-col">
+          <MetaRow
+            label={t("skills.detail.source")}
+            value={sourceLabel(skill.source, t)}
+          />
+          <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
+          <MetaRow
+            label={t("skills.detail.triggers")}
+            value={skill.triggers === undefined ? "—" : String(skill.triggers)}
+          />
+          <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
+        </dl>
+      </div>
 
-      <div className="mt-auto flex items-center gap-2">
+      <div className="flex items-center gap-2">
         <Button className="h-9 w-[156px] gap-[7px]" onClick={onViewFiles}>
           <FileTextIcon />
           {t("skills.detail.files.action")}

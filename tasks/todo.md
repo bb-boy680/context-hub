@@ -653,7 +653,7 @@ Found 38 skills in this package                  Select all
  ☐ diagnosing-bugs    Diagnosis loop for hard bugs and performance regressions
  ☐ tdd                Test-driven development: build features and fix bugs test-first
 ────────────────────────────────────────────────────────────
-Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Download 1]
+Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Import]
 ```
 
 - 弹窗 640×**596**，y=242（居中）；Body 401 = 字段 105（标签 15 + 输入 38 + hint 13 + chips 21 + 间距）
@@ -847,7 +847,7 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
    否则用户绕开确认就失去意义。
 3. 文案区分动作：标题说清丢什么（`Discard this import?`），说明说清代价
    （`The package and the skills you picked are not saved.`），主按钮用动词 `Discard` 而不是 `OK`。
-4. 气泡不是模态：Esc、点气泡外、再次点 Cancel 都只关掉气泡、留在弹窗里；
+4. 气泡不是模态：Esc、点气泡外、再次点 Cancel 只关掉气泡、留在弹窗里；
    组件层把一个 Popover/Popper 锚在 Cancel 上，不要自己按弹窗坐标算位置。
 
 ## 对齐修复：拖拽区说明文字还残留居中（2026-10-08，用户："文字没有对齐"）
