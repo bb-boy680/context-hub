@@ -193,12 +193,17 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       return body.mode
     },
 
-    async importFromWorkspace(id: string): Promise<void> {
-      await call(base, "/hub/skills?action=import-workspace", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      })
+    async importFromWorkspace(id: string): Promise<WorkspaceInstall> {
+      const body = await call<{ mode: WorkspaceInstall }>(
+        base,
+        "/hub/skills?action=import-workspace",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        }
+      )
+      return body.mode
     },
 
     async deleteWorkspaceSkill(id: string): Promise<void> {

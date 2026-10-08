@@ -15,12 +15,15 @@ export const skillsMessages: Record<string, string> = {
   "skills.action.install": "Install",
   "skills.action.adopt": "Add to library",
   "skills.action.remove": "Remove",
+  "skills.action.removeFromLibrary": "Remove from library",
+  "skills.action.removeFromWorkspace": "Remove from workspace",
   "skills.action.cleanup": "Clean up",
   "skills.action.close": "Close",
   "skills.action.cancel": "Cancel",
   "skills.tab.all": "All",
   "skills.tab.workspace": "Workspace",
   "skills.location.library": "Library",
+  "skills.location.both": "Library + Workspace",
   "skills.location.workspace": "Workspace",
   "skills.source.local": "local",
   "skills.source.registry": "skills.sh",
@@ -48,7 +51,9 @@ export const skillsMessages: Record<string, string> = {
   "skills.notice.copied":
     "Copied instead of linked: this filesystem has no links, so the workspace owns its own copy.",
   "skills.notice.adopted":
-    "Copied {name} into the library; the workspace keeps its own copy.",
+    "Linked {name} into the library; the workspace keeps the files.",
+  "skills.notice.adoptedCopy":
+    "Copied {name} into the library: this filesystem has no links, so the two are now separate.",
   "skills.range": "1–12 of 42 skills",
   "skills.range.long": "1–14 of 42 skills",
   "skills.page": "Page 1 of 4",

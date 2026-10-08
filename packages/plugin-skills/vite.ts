@@ -119,7 +119,7 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
               return
             }
 
-            /* POST /hub/skills?action=import-workspace — copy one into the library */
+            /* POST /hub/skills?action=import-workspace — link one into the library */
             if (
               rest === "" &&
               method === "POST" &&
@@ -132,8 +132,7 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              await api.importFromWorkspace(body.id)
-              sendJson(response, 200, { ok: true })
+              sendJson(response, 200, { mode: await api.importFromWorkspace(body.id) })
               return
             }
 

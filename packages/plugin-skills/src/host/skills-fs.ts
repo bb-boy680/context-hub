@@ -38,8 +38,8 @@ import { walkSkillDir } from "./file-tree.ts"
 import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
 import {
   deleteSkillFromWorkspace,
-  importSkillFromWorkspace,
   installSkillIntoWorkspace,
+  linkSkillIntoLibrary,
   readWorkspaceSkill,
   readWorkspaceSkills,
   removeSkillFromWorkspace,
@@ -76,6 +76,12 @@ interface CatalogEntry {
   tags: string[]
   enabled: boolean
   source: SkillOrigin
+  /**
+   * The directory this entry is a link to, absolute, when the hub linked a
+   * skill in from somewhere else instead of holding the files itself. Absent
+   * for a skill whose files live under the library root.
+   */
+  link?: string
   /** Media references, in the order the UI shows them. */
   assets: string[]
   /** Manifest mtime when this row was last read; drives refreshes. */
@@ -200,13 +206,14 @@ export async function createFsSkillStore(
   /** Read one manifest into a catalog row. */
   const readEntry = async (
     id: string,
-    previous: CatalogEntry | undefined
+    previous: CatalogEntry | undefined,
+    link: string | undefined
   ): Promise<CatalogEntry | null> => {
     const manifest = path.join(skillDir(id), MANIFEST)
     const stat = await statOrNull(manifest)
     if (stat === null) return null
     /* An untouched manifest keeps its recorded row without re-parsing. */
-    if (previous !== undefined && previous.mtimeMs === stat.mtimeMs) {
+    if (previous !== undefined && previous.mtimeMs === stat.mtimeMs && previous.link === link) {
       return previous
     }
     const { frontmatter } = parseSkillFile(await fs.readFile(manifest, "utf8"))
@@ -216,6 +223,7 @@ export async function createFsSkillStore(
       tags: frontmatter.tags ?? [],
       enabled: previous?.enabled ?? true,
       source: previous?.source ?? "local",
+      ...(link === undefined ? {} : { link }),
       /* A skill's manifest carries no media; the references it had stay as they are. */
       assets: previous?.assets ?? [],
       mtimeMs: stat.mtimeMs,
@@ -228,6 +236,10 @@ export async function createFsSkillStore(
    * directory, a hand-edited manifest, a deleted folder) reach the list here;
    * recorded fields the manifest does not carry — enablement and asset order —
    * survive.
+   *
+   * A skill the hub linked in from elsewhere is a directory entry too, reached
+   * through the link; it is listed as a skill and remembered as a link, because
+   * who owns those files is a different answer.
    */
   const rebuild = async (): Promise<CatalogFile> => {
     const previous =
@@ -235,8 +247,19 @@ export async function createFsSkillStore(
     const entries = await readdirOrEmpty(root)
     const skills: Record<string, CatalogEntry> = {}
     for (const entry of entries) {
-      if (!entry.isDirectory() || entry.name.startsWith(".")) continue
-      const row = await readEntry(entry.name, previous?.skills[entry.name])
+      if (entry.name.startsWith(".")) continue
+      const dir = path.join(root, entry.name)
+      let link: string | undefined
+      if (entry.isSymbolicLink()) {
+        const raw = await fs.readlink(dir).catch(() => null)
+        if (raw === null) continue
+        const target = path.resolve(root, raw)
+        if ((await statOrNull(target))?.isDirectory() !== true) continue
+        link = target
+      } else if (!entry.isDirectory()) {
+        continue
+      }
+      const row = await readEntry(entry.name, previous?.skills[entry.name], link)
       if (row !== null) skills[entry.name] = row
     }
     return {
@@ -363,6 +386,7 @@ export async function createFsSkillStore(
           tags: row.tags,
           source: row.source,
           enabled: row.enabled,
+          ...(row.link === undefined ? {} : { link: row.link }),
           assets: row.assets,
           updatedAt: row.updatedAt,
         })
@@ -469,11 +493,24 @@ export async function createFsSkillStore(
       const row = current.skills[id]
       if (row === undefined) throw new Error(`unknown skill: ${id}`)
       /* Files first: a failure leaves the row intact rather than orphaning them. */
-      await dropStored(row.assets)
-      await fs.rm(skillDir(id), { recursive: true, force: true })
+      /*
+       * The catalog first, the files second: if the write fails, the files are
+       * still there and the next rebuild lists them again, while the other
+       * order can leave a row whose directory is already gone — and nothing
+       * would ever bring the two back in step.
+       */
       await mutate((skills) => {
         delete skills[id]
       })
+      await dropStored(row.assets)
+      const dir = skillDir(id)
+      if ((await fs.lstat(dir).catch(() => null))?.isSymbolicLink() === true) {
+        /* A linked skill is somebody else's directory; the hub takes back its
+           own link and leaves those files where they are. */
+        await fs.rm(dir, { force: true })
+      } else {
+        await fs.rm(dir, { recursive: true, force: true })
+      }
     },
 
     listPackage(source: string): Promise<PackageSkill[]> {
@@ -582,10 +619,11 @@ export async function createFsSkillStore(
       return installSkillIntoWorkspace(workspace, root, id)
     },
 
-    async importFromWorkspace(id: string): Promise<void> {
+    async importFromWorkspace(id: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
-      await importSkillFromWorkspace(workspace, root, id)
+      const landed = await linkSkillIntoLibrary(workspace, root, id)
       await refreshCatalog()
+      return landed
     },
 
     async deleteWorkspaceSkill(id: string): Promise<void> {

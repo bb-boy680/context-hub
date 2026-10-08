@@ -1451,3 +1451,31 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 `check-workspace-skills.ts` 增 5 项（删除目录 / 不存在拒绝 / 无 manifest 拒绝 / 被拒目录仍在 / `..` 拒绝）共 48 项全过；
 其余脚本无回归；四个包 tsc + eslint 全绿。
 
+### 修正：加入技能库改为**链接**，并且只有一行（2026-10-08，用户反馈）
+
+用户：「是科比（copy）进去的还是怎么回事？我需要 link 进去，然后加入之后跟本地的好像有冲突，我只需要一个就行了」。
+
+**① 复制 → 链接**：`importSkillFromWorkspace`（复制）改为 `linkSkillIntoLibrary` ——
+在 `<home>/skills/<id>` 建链接指向 `<ws>/.agents/skills/<id>`（Windows junction），工作区保留文件；
+文件系统不支持链接时降级复制并如实提示（`skills.notice.adoptedCopy`）。
+**顺带发现扫描器根本不认链接**：`rebuild()` 只收 `entry.isDirectory()`，而符号链接的 `Dirent` 不是目录 ——
+库里放了链接会**整条看不见**。现在链接目录也算技能，并把 `link`（解析后的绝对目标）记进目录行/`SkillSummary`，
+这样上层才知道"这条的文件在别处、归谁所有"。
+**② 一份而不是两份**：合并规则改为按**目录**判断 —— 库行的 `link` 落在当前工作区 skills root 里，
+就是同一个技能，合成一行（`location: "both"`），不再出现"库一份 + 工作区一份"。
+新增 `Skill.linkAt`（`"library"` / `"workspace"`）表示**链接在哪一侧**，动作按它分派：
+工作区持有链接 → 「从工作区移除」；库持有链接 → 「从技能库移除」（各自删掉那条链接，真实文件不受影响）。
+库侧 `remove()` 遇到链接只删链接（不 follow 到工作区）。
+**③ 顺带修两个真问题**：
+- 来源行对 "both" 一律显示 `Workspace`（假话）→ 新增 `skills.location.both`「技能库 + 工作区」。
+- `remove()` 原先"先删文件再改索引"：索引写失败就留下**一条目录已消失的幽灵行**，而且再没有任何重建机会
+  （用户库里那条 `grill-me` 就是这么来的，已用一次 refresh 清掉）。改成**先改索引再删文件**——
+  失败时文件还在，下次重建重新列出，两个方向都能自愈。
+
+**验证**：`linkSkillIntoLibrary` 建出 Junction 指向工作区；`index.json` 里该行带 `link` 字段；
+页面合并为**一行**、来源行 `本地 · 技能库 + 工作区`、按钮「从技能库移除」，顶部提示
+「已把 grilling 链接进技能库；文件仍留在工作区。」；点移除后库链接消失、工作区文件完好、页签与行数不变。
+`check-workspace-skills.ts` 增至 53 项（链接落链 / 目标正确 / 工作区保留 / 重名拒绝 / 源不存在拒绝 /
+库目录列出该链接与其 `link` / 自带技能无 `link` / 移除链接不伤工作区）。四个包 tsc + eslint 全绿。
+截图 `designs/check-web/skills-linked-one-row.png`。**测试产生的链接已全部清理，用户状态已还原。**
+

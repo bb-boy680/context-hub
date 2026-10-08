@@ -27,6 +27,12 @@ export type Skill = {
   /** The workspace holds this library skill, installed by the hub as a link. */
   installed: boolean
   /**
+   * Which side holds the link when a skill is in both places: the workspace,
+   * for one the hub installed; the library, for one linked in from a workspace.
+   * Taking the link back is what an action on such a row does.
+   */
+  linkAt?: "library" | "workspace"
+  /**
    * The workspace holds a skill of its own under this id, so the name is taken:
    * installing the library's copy under it is not possible.
    */

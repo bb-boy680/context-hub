@@ -17,6 +17,7 @@ import { parseSkillFile } from "../frontmatter.ts"
 import { walkSkillDir } from "./file-tree.ts"
 import { assertSkillName } from "./names.ts"
 import type {
+  WorkspaceInstall,
   WorkspaceSkill,
   WorkspaceSkillDetail,
   WorkspaceSkillOrigin,
@@ -171,21 +172,22 @@ export async function installSkillIntoWorkspace(
 }
 
 /**
- * Copy one skill a workspace holds into the hub's library. The workspace keeps
- * its own directory: it is the project's, and the project is what reads it, so
- * the library takes a copy rather than taking it over.
+ * Link one skill a workspace holds into the hub's library. The workspace keeps
+ * its own directory and the library reaches it through the link, so the skill
+ * stays one skill in two places rather than two copies that drift apart.
  *
  * @param workspace — the workspace folder, absolute.
- * @param libraryRoot — the hub's own library, where the copy lands.
+ * @param libraryRoot — the hub's own library, where the link is made.
  * @param id — the skill's directory name under the workspace's skills root.
- * @returns nothing; a name the library already holds is refused, because the
- *   library's copy is the one a person may have edited.
+ * @returns how it landed: `link` where the filesystem allows one, else `copy`.
+ *   A copy is the only option on a filesystem with no links, and then the
+ *   library owns its own set of files.
  */
-export async function importSkillFromWorkspace(
+export async function linkSkillIntoLibrary(
   workspace: string,
   libraryRoot: string,
   id: string
-): Promise<void> {
+): Promise<WorkspaceInstall> {
   const name = assertSkillName(id)
   const source = path.join(workspaceSkillRoot(workspace), name)
   const listed = await fs.stat(source).catch(() => null)
@@ -193,16 +195,25 @@ export async function importSkillFromWorkspace(
     throw new Error(`not a skill in this workspace: ${id}`)
   }
   const target = path.join(libraryRoot, name)
-  if ((await fs.stat(target).catch(() => null)) !== null) {
+  if ((await fs.lstat(target).catch(() => null)) !== null) {
     throw new Error(`a skill with this name is already in the library: ${id}`)
   }
+
   try {
-    /* Links inside the skill become the files they point at: a library copy
-       has to stand on its own, and a link out of it would not. */
-    await fs.cp(source, target, { recursive: true, dereference: true })
-  } catch (failure) {
-    await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
-    throw failure
+    await fs.symlink(source, target, process.platform === "win32" ? "junction" : "dir")
+    return "link"
+  } catch (error) {
+    const code = (error as { code?: string }).code ?? ""
+    if (!LINK_UNSUPPORTED.has(code)) throw error
+    /* The filesystem cannot hold a link, so the library keeps its own copy and
+       the two stop being the same skill. */
+    try {
+      await fs.cp(source, target, { recursive: true, dereference: true })
+    } catch (failure) {
+      await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
+      throw failure
+    }
+    return "copy"
   }
 }
 

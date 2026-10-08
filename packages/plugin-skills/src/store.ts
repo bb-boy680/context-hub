@@ -24,6 +24,12 @@ export interface SkillSummary {
    * owns and deletes with the skill.
    */
   assets: string[]
+  /**
+   * The directory this entry is a link to, absolute, when the hub linked the
+   * skill in from somewhere else rather than holding the files itself. The
+   * files belong to wherever this points.
+   */
+  link?: string
   /** ISO timestamp of the last recorded change. */
   updatedAt: string
 }
@@ -242,10 +248,11 @@ export interface SkillStore {
   /** Put one library skill into the current workspace; answers how it landed. */
   installToWorkspace(id: string): Promise<WorkspaceInstall>
   /**
-   * Copy one skill the current workspace holds into the library; the workspace
-   * keeps its own directory.
+   * Link one skill the current workspace holds into the library; the workspace
+   * keeps its own directory. Answers how it landed: a link, or a copy where the
+   * filesystem cannot hold one.
    */
-  importFromWorkspace(id: string): Promise<void>
+  importFromWorkspace(id: string): Promise<WorkspaceInstall>
   /**
    * Delete one skill from the current workspace folder, its directory included.
    * This is the destructive one; `removeFromWorkspace` only takes back a link.

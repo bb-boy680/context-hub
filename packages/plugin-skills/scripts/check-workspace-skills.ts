@@ -15,8 +15,8 @@ import path from "node:path"
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import {
   deleteSkillFromWorkspace,
-  importSkillFromWorkspace,
   installSkillIntoWorkspace,
+  linkSkillIntoLibrary,
   readWorkspaceSkill,
   readWorkspaceSkills,
   removeSkillFromWorkspace,
@@ -169,43 +169,6 @@ check(
   )
 )
 
-/* The library can take a copy of a skill the workspace wrote. */
-const adopted = path.join(library, "adopted-one")
-await writeSkill(path.join(workspaceSkillRoot(workspace), "own-two"), "Own two", "Copied from here")
-await step("copying a workspace skill into the library", () =>
-  importSkillFromWorkspace(workspace, library, "own-two")
-)
-check(
-  "the library now holds it",
-  (await fs.readFile(path.join(library, "own-two", "SKILL.md"), "utf8")).includes("Own two")
-)
-check(
-  "and the workspace keeps its own copy",
-  (await fs.readFile(path.join(workspaceSkillRoot(workspace), "own-two", "SKILL.md"), "utf8")).includes("Own two")
-)
-refused = ""
-try {
-  await importSkillFromWorkspace(workspace, library, "own-two")
-} catch (error) {
-  refused = error instanceof Error ? error.message : String(error)
-}
-check("copying the same name twice is refused", refused.includes("already in the library"), refused)
-refused = ""
-try {
-  await importSkillFromWorkspace(workspace, library, "not-here")
-} catch (error) {
-  refused = error instanceof Error ? error.message : String(error)
-}
-check("copying a skill the workspace lacks is refused", refused.includes("not a skill in this workspace"), refused)
-refused = ""
-try {
-  await importSkillFromWorkspace(workspace, library, "..")
-} catch (error) {
-  refused = error instanceof Error ? error.message : String(error)
-}
-check("a name that would write outside the library is refused", refused.includes("unusable skill name"), refused)
-check("the library did not gain a stray entry", (await fs.stat(adopted).catch(() => null)) === null)
-
 /* Deleting takes the directory, which is what the row's delete offers. */
 await writeSkill(path.join(workspaceSkillRoot(workspace), "doomed"), "Doomed", "About to go")
 await fs.writeFile(path.join(workspaceSkillRoot(workspace), "doomed", "extra.md"), "x")
@@ -240,6 +203,50 @@ try {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("a name that would delete outside the root is refused", refused.includes("unusable skill name"), refused)
+
+/* The library links a workspace skill in, so the two are one skill. */
+await writeSkill(path.join(workspaceSkillRoot(workspace), "linked-one"), "Linked one", "Lives here")
+const linkMode = await linkSkillIntoLibrary(workspace, library, "linked-one")
+check("linking into the library answers how it landed", linkMode === "link", linkMode)
+const inLibrary = path.join(library, "linked-one")
+check(
+  "the library entry is a link",
+  (await fs.lstat(inLibrary).catch(() => null))?.isSymbolicLink() === true
+)
+check(
+  "pointing at the workspace's own directory",
+  path.resolve(library, await fs.readlink(inLibrary)) === path.join(workspaceSkillRoot(workspace), "linked-one"),
+  await fs.readlink(inLibrary)
+)
+check(
+  "the workspace keeps the files",
+  (await fs.readFile(path.join(workspaceSkillRoot(workspace), "linked-one", "SKILL.md"), "utf8")).includes("Linked one")
+)
+refused = ""
+try {
+  await linkSkillIntoLibrary(workspace, library, "linked-one")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("linking the same name twice is refused", refused.includes("already in the library"), refused)
+refused = ""
+try {
+  await linkSkillIntoLibrary(workspace, library, "not-here")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("linking a skill the workspace lacks is refused", refused.includes("not a skill in this workspace"), refused)
+refused = ""
+try {
+  await linkSkillIntoLibrary(workspace, library, "..")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a name that would write outside the library is refused", refused.includes("unusable skill name"), refused)
+check(
+  "the library gained no stray entry",
+  (await fs.lstat(path.join(library, "adopted-one")).catch(() => null)) === null
+)
 
 /* Installing twice is a mistake, not a second entry. */
 refused = ""
@@ -288,6 +295,31 @@ await store.removeFromWorkspace("alpha")
 check(
   "and takes it back out",
   (await readWorkspaceSkills(workspace, library)).skills.every((skill) => skill.id !== "alpha")
+)
+
+/* The library lists a linked skill like any other, and says it is a link. */
+await store.refresh()
+const page = await store.list()
+const linkedRow = page.items.find((item) => item.id === "linked-one")
+check("a linked skill is listed by the library", linkedRow !== undefined, page.items.map((item) => item.id))
+check(
+  "and the row says where its files live",
+  linkedRow?.link === path.join(workspaceSkillRoot(workspace), "linked-one"),
+  linkedRow?.link
+)
+check(
+  "a skill the library holds itself carries no link",
+  page.items.find((item) => item.id === "own-one")?.link === undefined
+)
+
+/* Removing a linked entry takes the link back and leaves those files alone. */
+await store.remove("linked-one")
+check("the library's entry is gone", (await fs.lstat(inLibrary).catch(() => null)) === null)
+check(
+  "the workspace's skill is untouched",
+  (await fs.readFile(path.join(workspaceSkillRoot(workspace), "linked-one", "SKILL.md"), "utf8")).includes(
+    "Linked one"
+  )
 )
 
 await store.dispose()

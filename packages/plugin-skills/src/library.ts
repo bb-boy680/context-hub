@@ -43,7 +43,7 @@ export interface SkillLibrary {
   /** Put one library skill into the current workspace; answers how it landed. */
   install(id: string): Promise<WorkspaceInstall>
   /** Copy one skill the current workspace holds into the library. */
-  adopt(id: string): Promise<void>
+  adopt(id: string): Promise<WorkspaceInstall>
   /** Delete one skill from the current workspace folder, its directory included. */
   deleteWorkspaceSkill(id: string): Promise<void>
   /** Take one skill the hub installed back out of the current workspace. */
@@ -55,7 +55,13 @@ export function locationLabel(
   location: SkillLocation,
   t: (key: string) => string
 ): string {
-  return t(location === "library" ? "skills.location.library" : "skills.location.workspace")
+  const key =
+    location === "library"
+      ? "skills.location.library"
+      : location === "both"
+        ? "skills.location.both"
+        : "skills.location.workspace"
+  return t(key)
 }
 
 /** How a row reached this machine, as its provenance line names it. */
@@ -240,26 +246,44 @@ export function useSkillLibrary(): SkillLibrary {
   const rows = React.useMemo((): Skill[] => {
     if (store === null) return []
     const held = new Map((workspace?.skills ?? []).map((skill) => [skill.id, skill]))
-    const listed = new Set((page?.items ?? []).map((item) => item.id))
+    /** The workspace's own skills directory, which a linked library row can point into. */
+    const workspaceRoot = workspace?.root ?? null
+    const linkedIn = (row: SkillSummary): boolean =>
+      row.link !== undefined &&
+      workspaceRoot !== null &&
+      row.link.startsWith(workspaceRoot)
+
     const library: Skill[] = (page?.items ?? []).map((item) => {
       const own = held.get(item.id)
+      /*
+       * One skill, whichever place holds the files: the library linked it in
+       * from this workspace, or the hub installed the library's skill into the
+       * workspace. Either way it is one row, and `linkAt` says which side holds
+       * the link — that is the side an action takes back.
+       */
+      const adopted = linkedIn(item)
       const installed = own?.origin === "hub"
+      const both = adopted || installed
       return {
         ...toSkill(item, store, locale),
-        location: installed ? "both" : "library",
-        installed,
+        location: both ? "both" : "library",
+        installed: both,
+        ...(both ? { linkAt: adopted ? ("library" as const) : ("workspace" as const) } : {}),
         /* A same-named skill the project wrote is not this one, and it holds the name. */
-        taken: own !== undefined && !installed,
+        taken: own !== undefined && !installed && !adopted,
       }
     })
     /*
-     * A link the hub made is the library's skill, already on screen; anything
-     * else the workspace holds is its own — including a directory that happens
-     * to share a name with a library skill, which is a different skill.
+     * A link the hub made, or a skill the library already reached through one,
+     * is on screen already; anything else the workspace holds is its own.
      */
     const own = (workspace?.skills ?? [])
       .filter((skill) => skill.origin !== "hub")
-      .map((skill) => ({ ...workspaceRow(skill), inLibrary: listed.has(skill.id) }))
+      .filter((skill) => !(page?.items ?? []).some((item) => linkedIn(item) && item.id === skill.id))
+      .map((skill) => ({
+        ...workspaceRow(skill),
+        inLibrary: (page?.items ?? []).some((item) => item.id === skill.id),
+      }))
     return [...library, ...own]
   }, [store, page, workspace, locale])
 
@@ -276,8 +300,10 @@ export function useSkillLibrary(): SkillLibrary {
   const adopt = React.useCallback(
     async (id: string) => {
       if (store === null) throw new Error("this form has no skill library")
-      await store.importFromWorkspace(id)
+      /* The workspace keeps its files; the library reaches them through a link. */
+      const landed = await store.importFromWorkspace(id)
       await reload()
+      return landed
     },
     [store, reload]
   )
@@ -314,7 +340,7 @@ export function useSkillLibrary(): SkillLibrary {
       tags: [],
       reload: async () => undefined,
       install: async () => "link",
-      adopt: async () => undefined,
+      adopt: async () => "link",
       deleteWorkspaceSkill: async () => undefined,
       remove: async () => undefined,
     }

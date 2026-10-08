@@ -331,7 +331,12 @@ function WorkspaceButton({
     "gap-[5px] px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
   if (skill.stale || skill.installed) {
-    const label = skill.stale ? t("skills.action.cleanup") : t("skills.action.remove")
+    /* The label says which side gives its link back, because they differ. */
+    const label = skill.stale
+      ? t("skills.action.cleanup")
+      : skill.linkAt === "library"
+        ? t("skills.action.removeFromLibrary")
+        : t("skills.action.removeFromWorkspace")
     return (
       <Button
         type="button"
@@ -892,22 +897,32 @@ export function SkillsPage() {
     }
   }
 
+  /** Take back the link that put a skill in both places. */
   const uninstall = async (skill: Skill) => {
     try {
-      await library.remove(skill.id)
+      if (skill.linkAt === "library") {
+        /* The library linked the skill in; removing its entry takes the link. */
+        await (library.store?.remove(skill.id) ?? Promise.resolve())
+        await library.reload()
+      } else {
+        await library.remove(skill.id)
+      }
       setNotice(null)
     } catch (failure) {
       setNotice({ tone: "error", text: reasonOf(failure) })
     }
   }
 
-  /** Copy a skill the workspace wrote into the library. */
+  /** Link a skill the workspace wrote into the library. */
   const adopt = async (skill: Skill) => {
     try {
-      await library.adopt(skill.id)
+      const landed = await library.adopt(skill.id)
       setNotice({
         tone: "info",
-        text: t("skills.notice.adopted").replace("{name}", skill.name),
+        text: t(landed === "copy" ? "skills.notice.adoptedCopy" : "skills.notice.adopted").replace(
+          "{name}",
+          skill.name
+        ),
       })
     } catch (failure) {
       setNotice({ tone: "error", text: reasonOf(failure) })
