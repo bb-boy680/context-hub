@@ -1,4 +1,4 @@
-import { CheckIcon, UploadIcon, XIcon } from "lucide-react"
+import { CheckIcon, DownloadIcon, UploadIcon, XIcon } from "lucide-react"
 import * as React from "react"
 
 import {
@@ -227,11 +227,10 @@ function DiscardBubble({
  * The Add-skill dialog: two ways in, one list.
  *
  * Local reads a folder the browser was handed, one skill per subfolder that
- * carries a SKILL.md. Download asks the `skills` CLI what a package holds and
- * takes the skills a person picked; an empty pick set takes the whole package.
+ * carries a SKILL.md. Download asks the `skills` CLI what a package holds.
  *
  * Whichever tab is open, the picks in the list are the state that matters:
- * Cancel asks before dropping them, and Import sends exactly them.
+ * Cancel asks before dropping them, Import counts them and sends exactly them.
  */
 export function AddSkillDialog({
   open,
@@ -342,7 +341,7 @@ export function AddSkillDialog({
       return
     }
     const chosen = (folder ?? []).filter((skill) => picked.includes(skill.name))
-    if (tab === "local" && chosen.length === 0) return
+    if (picked.length === 0) return
     setBusy("import")
     setError(null)
     setFailed([])
@@ -567,11 +566,14 @@ export function AddSkillDialog({
               </Button>
             </DiscardBubble>
             <Button
-              className="h-9 px-4 text-[13px]"
-              disabled={busy === "import" || (tab === "local" && picked.length === 0)}
+              className="h-9 gap-2 px-4 text-[13px]"
+              disabled={busy === "import" || picked.length === 0}
               onClick={() => void handleImport()}
             >
-              {t("skills.action.import")}
+              <DownloadIcon />
+              {picked.length === 0
+                ? t("skills.action.import")
+                : `${t("skills.action.import")} ${picked.length}`}
             </Button>
           </div>
         </div>

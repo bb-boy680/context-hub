@@ -899,12 +899,15 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
 
 ### 对话框行为
 
-- 两个 tab 共用一套状态：`picked` 就是 chip、就是勾选、就是导入内容；空 `picked` 在 Download 表示"整包"。
-- **失焦即拉列表**：`listed` 记住已列过的 source，同一个 source 不再重复拉（Claude 不会因为点一下别处就重跑 CLI）。
+- 两个 tab 共用一套状态：`picked` 就是 chip、就是勾选、就是导入内容。
+- **失焦即拉列表**：`listed` 记住已列过的 source，同一个 source 不再重复拉（点一下别处不会重跑 CLI）。
 - **粘贴命令直接可用**：`npx skills add … --skill x` → 解析出 source + chip，不点列表也能直接 Import。
-- **Cancel 气泡**：`Popover` 锚在 Cancel 上（`@workspace/ui` 补了 `PopoverArrow`）,
+- **Cancel 气泡**：`Popover` 锚在 Cancel 上（`@workspace/ui` 补了 `PopoverArrow`），
   只有"有东西可丢"时才弹；Esc / 点外部 / 再次点 Cancel 只关气泡。空字段直接关弹窗。
-- 列表限高 `max-h-56`（224px，正好 4 行）
+- 列表限高 `max-h-56`（224px，正好 4 行）。
+- **Import 带图标与计数**（用户 2026-10-08 指出）：按钮 = 下载图标 + `导入`，选中 N 个时显示 `导入 N`、
+  一个没选时只显示 `导入` 且禁用。禁用条件从"只有 Local 需要选中"统一成"两个 tab 都要选中"，
+  于是"空选中 = 装整包"不再是 UI 可达路径（宿主契约仍保留该语义，Select all 是界面上的入口）。
 
 ### 验证
 
@@ -930,5 +933,11 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
 | id 冲突 | 拒绝并提示 |
 | 粘贴命令里的 `-g` / `-a <agent>` | 忽略（我们固定装进 hub） |
 | 已安装标记 | 暂不做 |
+
+### 画布同步（Import 计数）
+
+三块 Add skill 画板的页脚 Import 按钮（`P60pZQ` / `qgrV5` / `U49rL`，组件 `x3lnSj`）从 `Import`
+改成 **`Import 1`**，与各画板里"已选一个"的状态对齐；图标沿用组件里已启用的 `download`。
+改的是实例的 `descendants` 覆盖，图标与配色的覆盖一并写上，避免只改文字把图标覆盖丢掉。
 
 
