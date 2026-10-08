@@ -37,6 +37,7 @@ import { importFolder } from "./folder-import.ts"
 import { walkSkillDir } from "./file-tree.ts"
 import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
 import {
+  importSkillFromWorkspace,
   installSkillIntoWorkspace,
   readWorkspaceSkill,
   readWorkspaceSkills,
@@ -578,6 +579,12 @@ export async function createFsSkillStore(
     async installToWorkspace(id: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
       return installSkillIntoWorkspace(workspace, root, id)
+    },
+
+    async importFromWorkspace(id: string): Promise<void> {
+      const workspace = await requiredWorkspace()
+      await importSkillFromWorkspace(workspace, root, id)
+      await refreshCatalog()
     },
 
     async removeFromWorkspace(id: string): Promise<void> {

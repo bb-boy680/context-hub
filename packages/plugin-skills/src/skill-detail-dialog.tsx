@@ -8,6 +8,7 @@ import {
   FolderIcon,
   FolderOpenIcon,
   ImageIcon,
+  LibraryIcon,
   MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
@@ -890,6 +891,7 @@ function InfoPanel({
   path,
   onDelete,
   onToggle,
+  onAdopt,
   onViewFiles,
   onTagsChange,
 }: {
@@ -901,6 +903,8 @@ function InfoPanel({
   /** `null` when this form has no library to delete from. */
   onDelete: (() => Promise<void>) | null
   onToggle: () => void
+  /** Copy a skill this workspace wrote into the library. */
+  onAdopt: () => void
   onViewFiles: () => void
   onTagsChange: (tags: string[]) => void
 }) {
@@ -969,7 +973,17 @@ function InfoPanel({
           <FileTextIcon />
           {t("skills.detail.files.action")}
         </Button>
-        {!skill.installed && skill.location !== "library" ? null : (
+        {/* A skill the workspace wrote can become a library copy. */}
+        {skill.location === "workspace" && skill.inLibrary !== true ? (
+          <Button
+            variant="outline"
+            className="h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
+            onClick={onAdopt}
+          >
+            <LibraryIcon />
+            {t("skills.action.adopt")}
+          </Button>
+        ) : !skill.installed && skill.location !== "library" ? null : (
           <Button
             variant={skill.installed || skill.stale ? "outline" : "default"}
             className={
@@ -1193,6 +1207,7 @@ function LightboxBody({
   root,
   reason,
   onToggle,
+  onAdopt,
   onDelete,
   onTagsChange,
   onChanged,
@@ -1208,6 +1223,8 @@ function LightboxBody({
   /** Why this skill cannot be installed here, ready to show; `null` when it can. */
   reason: string | null
   onToggle: () => void
+  /** Copy a skill this workspace wrote into the library. */
+  onAdopt: () => void
   onDelete: (() => Promise<void>) | null
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
@@ -1234,6 +1251,7 @@ function LightboxBody({
         path={path}
         onDelete={onDelete}
         onToggle={onToggle}
+        onAdopt={onAdopt}
         onViewFiles={() => setFilesOpen(true)}
         onTagsChange={onTagsChange}
       />
@@ -1260,6 +1278,7 @@ export function SkillDetailDialog({
   root,
   reason,
   onToggle,
+  onAdopt,
   onDelete,
   onTagsChange,
   onChanged,
@@ -1273,6 +1292,8 @@ export function SkillDetailDialog({
   /** Why this skill cannot be installed here, ready to show; `null` when it can. */
   reason: string | null
   onToggle: () => void
+  /** Copy a skill this workspace wrote into the library. */
+  onAdopt: (skill: Skill) => void
   /** Delete the skill and everything the hub stores for it. */
   onDelete: (skill: Skill) => Promise<void>
   onTagsChange: (tags: string[]) => void
@@ -1343,6 +1364,7 @@ export function SkillDetailDialog({
             root={root}
             reason={reason}
             onToggle={onToggle}
+            onAdopt={() => onAdopt(skill)}
             /* The library cannot delete a skill it does not hold. */
             onDelete={
               store === null || skill.location === "workspace" ? null : () => onDelete(skill)

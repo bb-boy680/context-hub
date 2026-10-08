@@ -13,6 +13,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.view.list": "List view",
   "skills.action.import": "Import",
   "skills.action.install": "Install",
+  "skills.action.adopt": "Add to library",
   "skills.action.remove": "Remove",
   "skills.action.cleanup": "Clean up",
   "skills.action.close": "Close",
@@ -46,6 +47,8 @@ export const skillsMessages: Record<string, string> = {
   "skills.workspace.empty": "This workspace has no skills yet.",
   "skills.notice.copied":
     "Copied instead of linked: this filesystem has no links, so the workspace owns its own copy.",
+  "skills.notice.adopted":
+    "Copied {name} into the library; the workspace keeps its own copy.",
   "skills.range": "1–12 of 42 skills",
   "skills.range.long": "1–14 of 42 skills",
   "skills.page": "Page 1 of 4",

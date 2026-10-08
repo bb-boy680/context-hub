@@ -33,6 +33,11 @@ export type Skill = {
   taken?: boolean
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
   stale?: boolean
+  /**
+   * A skill the workspace holds that the library also holds under this id; the
+   * library's copy is the one to manage, so this row offers nothing to do.
+   */
+  inLibrary?: boolean
   /** Token estimate, present once the body has been read. */
   tokens?: string
   /** Matches recorded for the skill; absent for a skill with no history. */

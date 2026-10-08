@@ -14,6 +14,7 @@ import path from "node:path"
 
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import {
+  importSkillFromWorkspace,
   installSkillIntoWorkspace,
   readWorkspaceSkill,
   readWorkspaceSkills,
@@ -166,6 +167,43 @@ check(
     (error: unknown) => (error as Error).message.includes("unusable skill name")
   )
 )
+
+/* The library can take a copy of a skill the workspace wrote. */
+const adopted = path.join(library, "adopted-one")
+await writeSkill(path.join(workspaceSkillRoot(workspace), "own-two"), "Own two", "Copied from here")
+await step("copying a workspace skill into the library", () =>
+  importSkillFromWorkspace(workspace, library, "own-two")
+)
+check(
+  "the library now holds it",
+  (await fs.readFile(path.join(library, "own-two", "SKILL.md"), "utf8")).includes("Own two")
+)
+check(
+  "and the workspace keeps its own copy",
+  (await fs.readFile(path.join(workspaceSkillRoot(workspace), "own-two", "SKILL.md"), "utf8")).includes("Own two")
+)
+refused = ""
+try {
+  await importSkillFromWorkspace(workspace, library, "own-two")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("copying the same name twice is refused", refused.includes("already in the library"), refused)
+refused = ""
+try {
+  await importSkillFromWorkspace(workspace, library, "not-here")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("copying a skill the workspace lacks is refused", refused.includes("not a skill in this workspace"), refused)
+refused = ""
+try {
+  await importSkillFromWorkspace(workspace, library, "..")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a name that would write outside the library is refused", refused.includes("unusable skill name"), refused)
+check("the library did not gain a stray entry", (await fs.stat(adopted).catch(() => null)) === null)
 
 /* Installing twice is a mistake, not a second entry. */
 refused = ""

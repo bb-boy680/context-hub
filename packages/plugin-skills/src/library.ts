@@ -42,6 +42,8 @@ export interface SkillLibrary {
   reload(): Promise<void>
   /** Put one library skill into the current workspace; answers how it landed. */
   install(id: string): Promise<WorkspaceInstall>
+  /** Copy one skill the current workspace holds into the library. */
+  adopt(id: string): Promise<void>
   /** Take one skill the hub installed back out of the current workspace. */
   remove(id: string): Promise<void>
 }
@@ -236,6 +238,7 @@ export function useSkillLibrary(): SkillLibrary {
   const rows = React.useMemo((): Skill[] => {
     if (store === null) return []
     const held = new Map((workspace?.skills ?? []).map((skill) => [skill.id, skill]))
+    const listed = new Set((page?.items ?? []).map((item) => item.id))
     const library: Skill[] = (page?.items ?? []).map((item) => {
       const own = held.get(item.id)
       const installed = own?.origin === "hub"
@@ -254,7 +257,7 @@ export function useSkillLibrary(): SkillLibrary {
      */
     const own = (workspace?.skills ?? [])
       .filter((skill) => skill.origin !== "hub")
-      .map(workspaceRow)
+      .map((skill) => ({ ...workspaceRow(skill), inLibrary: listed.has(skill.id) }))
     return [...library, ...own]
   }, [store, page, workspace, locale])
 
@@ -264,6 +267,15 @@ export function useSkillLibrary(): SkillLibrary {
       const landed = await store.installToWorkspace(id)
       await reload()
       return landed
+    },
+    [store, reload]
+  )
+
+  const adopt = React.useCallback(
+    async (id: string) => {
+      if (store === null) throw new Error("this form has no skill library")
+      await store.importFromWorkspace(id)
+      await reload()
     },
     [store, reload]
   )
@@ -291,6 +303,7 @@ export function useSkillLibrary(): SkillLibrary {
       tags: [],
       reload: async () => undefined,
       install: async () => "link",
+      adopt: async () => undefined,
       remove: async () => undefined,
     }
   }
@@ -310,6 +323,7 @@ export function useSkillLibrary(): SkillLibrary {
     tags,
     reload,
     install,
+    adopt,
     remove,
   }
 }

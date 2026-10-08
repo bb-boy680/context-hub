@@ -241,6 +241,11 @@ export interface SkillStore {
   workspaceSkill(id: string): Promise<WorkspaceSkillDetail | null>
   /** Put one library skill into the current workspace; answers how it landed. */
   installToWorkspace(id: string): Promise<WorkspaceInstall>
+  /**
+   * Copy one skill the current workspace holds into the library; the workspace
+   * keeps its own directory.
+   */
+  importFromWorkspace(id: string): Promise<void>
   /** Take one library-installed skill out of the current workspace. */
   removeFromWorkspace(id: string): Promise<void>
   /** Change notifications from directory watching; returns an unsubscribe. */

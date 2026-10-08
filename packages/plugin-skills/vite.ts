@@ -119,6 +119,24 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
               return
             }
 
+            /* POST /hub/skills?action=import-workspace — copy one into the library */
+            if (
+              rest === "" &&
+              method === "POST" &&
+              url.searchParams.get("action") === "import-workspace"
+            ) {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                id?: unknown
+              }
+              if (typeof body.id !== "string" || body.id === "") {
+                sendError(response, new Error("missing skill id"))
+                return
+              }
+              await api.importFromWorkspace(body.id)
+              sendJson(response, 200, { ok: true })
+              return
+            }
+
             /* POST /hub/skills?action=remove-workspace — take one back out */
             if (
               rest === "" &&

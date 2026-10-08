@@ -1403,3 +1403,27 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 `deepseek-harness`（无路径）没有 title。`apps/web` tsc + eslint 干净。
 截图 `designs/check-web/workspace-menu-panel.png`。
 
+### 新功能：把工作区技能收进技能库（2026-10-08，用户要求）
+
+用户：「工作区的 skill，我需要也能同步到我的 Context Hub 里面」。
+
+之前只做了 **库 → 工作区**（安装 = 建链接），**工作区 → 库**被按"只读不复制"砍掉了；这次补上**手动**反向：
+
+- `host/workspace-skills.ts` 新增 `importSkillFromWorkspace(workspace, libraryRoot, id)`：
+  把 `<ws>/.agents/skills/<id>` **复制**进 `<home>/skills/<id>`（`fs.cp`，`dereference: true` ——
+  库里的副本必须自洽，不能带着指回工作区的链接），失败清理目标。**工作区保留自己那份**：
+  那是项目的目录，项目才读它，库拿的是副本。
+- 库中已有同名 → 拒绝（`a skill with this name is already in the library`）：库那份可能被人编辑过，不能悄悄覆盖。
+- 契约 `SkillStore.importFromWorkspace(id)`；桥 `POST /hub/skills?action=import-workspace {id}`；
+  `SkillLibrary.adopt(id)`（写完 reload）。
+- UI：工作区自带的技能（`location === "workspace"`）行上出现「加入技能库」（`LibraryIcon`，outline）；
+  灯箱同一动作。库里已有同名时该行动作**消失**（`Skill.inLibrary`，由已加载的库列表推导），
+  避免重复导入的无效点击。成功后在列表上方显示「已把 X 复制进技能库；工作区仍保留自己那份。」
+
+**验证**（真机）：工作区页签三个技能各出现「加入技能库」；点 `grill-me` → 库中出现
+`skills\grill-me\{SKILL.md 164, agents\openai.yaml 142}`（与源逐字节同尺寸）、工作区原目录未变、
+该行按钮消失、其它两行仍在、顶部提示正确；页签 `全部 4 → 6`（库 +1，工作区那行也变成"两处都有"的独立行）。
+`check-workspace-skills.ts` 增 6 项（复制成功 / 工作区保留 / 同名拒绝 / 源不存在拒绝 / `..` 名字拒绝 /
+不留残留目录）共 43 项全过；其余脚本无回归；四个包 tsc + eslint 全绿。
+截图 `designs/check-web/skills-workspace-adopt.png`。**测试产生的库副本已删除，用户状态已还原。**
+

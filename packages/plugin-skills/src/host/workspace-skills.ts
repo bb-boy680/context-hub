@@ -171,7 +171,43 @@ export async function installSkillIntoWorkspace(
 }
 
 /**
- * Take one installed skill out of a workspace.
+ * Copy one skill a workspace holds into the hub's library. The workspace keeps
+ * its own directory: it is the project's, and the project is what reads it, so
+ * the library takes a copy rather than taking it over.
+ *
+ * @param workspace — the workspace folder, absolute.
+ * @param libraryRoot — the hub's own library, where the copy lands.
+ * @param id — the skill's directory name under the workspace's skills root.
+ * @returns nothing; a name the library already holds is refused, because the
+ *   library's copy is the one a person may have edited.
+ */
+export async function importSkillFromWorkspace(
+  workspace: string,
+  libraryRoot: string,
+  id: string
+): Promise<void> {
+  const name = assertSkillName(id)
+  const source = path.join(workspaceSkillRoot(workspace), name)
+  const listed = await fs.stat(source).catch(() => null)
+  if (listed?.isDirectory() !== true) {
+    throw new Error(`not a skill in this workspace: ${id}`)
+  }
+  const target = path.join(libraryRoot, name)
+  if ((await fs.stat(target).catch(() => null)) !== null) {
+    throw new Error(`a skill with this name is already in the library: ${id}`)
+  }
+  try {
+    /* Links inside the skill become the files they point at: a library copy
+       has to stand on its own, and a link out of it would not. */
+    await fs.cp(source, target, { recursive: true, dereference: true })
+  } catch (failure) {
+    await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
+    throw failure
+  }
+}
+
+/**
+ * Take one library skill out of a workspace.
  *
  * @param workspace — the workspace folder, absolute.
  * @param libraryRoot — the hub's own library, which decides what the hub may remove.

@@ -1,6 +1,7 @@
 import {
   DownloadIcon,
   LayoutGridIcon,
+  LibraryIcon,
   ListIcon,
   PowerIcon,
   Trash2Icon,
@@ -307,20 +308,22 @@ function TagPill({ tag }: { tag: string }) {
 
 /**
  * What the page can do with one row: put a library skill into the workspace,
- * take back one the workspaces holds as the hub's link, or clean up a link the
- * library no longer answers for. A skill the workspace owns has no action —
- * the hub did not put it there and will not take it away.
+ * take back one the workspace holds as the hub's link, copy a skill the
+ * workspace wrote into the library, or clean up a link the library no longer
+ * answers for. Nothing here deletes a skill the project owns.
  */
 function WorkspaceButton({
   skill,
   blocked,
   onInstall,
+  onAdopt,
   onRemove,
 }: {
   skill: Skill
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: () => void
+  onAdopt: () => void
   onRemove: () => void
 }) {
   const { t } = useI18n()
@@ -347,7 +350,26 @@ function WorkspaceButton({
     )
   }
 
-  if (skill.location !== "library") return null
+  /* A skill the project wrote: the library can take a copy of it. */
+  if (skill.location === "workspace") {
+    if (skill.inLibrary === true) return null
+    return (
+      <Button
+        type="button"
+        size="xs"
+        variant="outline"
+        aria-label={`${t("skills.action.adopt")} ${skill.name}`}
+        onClick={(event) => {
+          event.stopPropagation()
+          onAdopt()
+        }}
+        className={`${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
+      >
+        <LibraryIcon className="size-3.5" />
+        {t("skills.action.adopt")}
+      </Button>
+    )
+  }
 
   /* A skill the workspace wrote itself already holds the name. */
   const reason = blocked ?? (skill.taken === true ? t("skills.workspace.taken") : null)
@@ -435,6 +457,7 @@ function SkillCard({
   skill,
   blocked,
   onInstall,
+  onAdopt,
   onRemove,
   onOpen,
 }: {
@@ -442,6 +465,7 @@ function SkillCard({
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: () => void
+  onAdopt: () => void
   onRemove: () => void
   onOpen: () => void
 }) {
@@ -513,6 +537,7 @@ function SkillCard({
             skill={skill}
             blocked={blocked}
             onInstall={onInstall}
+            onAdopt={onAdopt}
             onRemove={onRemove}
           />
         </div>
@@ -525,6 +550,7 @@ function SkillGrid({
   skills,
   blocked,
   onInstall,
+  onAdopt,
   onRemove,
   onOpen,
 }: {
@@ -532,6 +558,7 @@ function SkillGrid({
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: (skill: Skill) => void
+  onAdopt: (skill: Skill) => void
   onRemove: (skill: Skill) => void
   onOpen: (skill: Skill) => void
 }) {
@@ -547,6 +574,7 @@ function SkillGrid({
           skill={skill}
           blocked={blocked}
           onInstall={() => onInstall(skill)}
+          onAdopt={() => onAdopt(skill)}
           onRemove={() => onRemove(skill)}
           onOpen={() => onOpen(skill)}
         />
@@ -592,6 +620,7 @@ function SkillTable({
   pagination,
   blocked,
   onInstall,
+  onAdopt,
   onRemove,
   onOpen,
 }: {
@@ -602,6 +631,7 @@ function SkillTable({
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: (skill: Skill) => void
+  onAdopt: (skill: Skill) => void
   onRemove: (skill: Skill) => void
   onOpen: (skill: Skill) => void
 }) {
@@ -681,6 +711,7 @@ function SkillTable({
                     skill={skill}
                     blocked={blocked}
                     onInstall={() => onInstall(skill)}
+                    onAdopt={() => onAdopt(skill)}
                     onRemove={() => onRemove(skill)}
                   />
                 </TableCell>
@@ -870,6 +901,19 @@ export function SkillsPage() {
     }
   }
 
+  /** Copy a skill the workspace wrote into the library. */
+  const adopt = async (skill: Skill) => {
+    try {
+      await library.adopt(skill.id)
+      setNotice({
+        tone: "info",
+        text: t("skills.notice.adopted").replace("{name}", skill.name),
+      })
+    } catch (failure) {
+      setNotice({ tone: "error", text: reasonOf(failure) })
+    }
+  }
+
   const setTags = (skill: Skill, tags: string[]) =>
     void applyTo(skill, { tags }, () =>
       library.store?.update(skill.id, { tags }) ?? Promise.resolve()
@@ -1004,6 +1048,7 @@ export function SkillsPage() {
                 skills={skills}
                 blocked={blocked}
                 onInstall={install}
+                onAdopt={adopt}
                 onRemove={uninstall}
                 onOpen={openDetail}
               />
@@ -1019,6 +1064,7 @@ export function SkillsPage() {
               pagination={pagination}
               blocked={blocked}
               onInstall={install}
+              onAdopt={adopt}
               onRemove={uninstall}
               onOpen={openDetail}
             />
@@ -1045,6 +1091,7 @@ export function SkillsPage() {
           if (detail.installed || detail.stale) void uninstall(detail)
           else void install(detail)
         }}
+        onAdopt={(skill) => void adopt(skill)}
         onDelete={removeSkill}
         onTagsChange={(tags) => {
           if (detail) setTags(detail, tags)
