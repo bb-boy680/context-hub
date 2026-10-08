@@ -85,7 +85,9 @@ export const skillsMessages: Record<string, string> = {
   "skills.media.add.action": "Add",
   "skills.media.add.file": "Choose a local file",
   "skills.media.add.hint":
-    "A local file only lives in this preview; a URL or data: URL is loaded as given.",
+    "The file at that URL is downloaded and stored with the skill.",
+  "skills.media.add.hintPreview": "Nothing is stored here; these live only in this preview.",
+  "skills.media.add.failed": "That URL could not be read.",
   "skills.detail.category.add": "Add category",
   "skills.detail.category.remove": "Remove",
   "skills.detail.category.placeholder": "New category name",

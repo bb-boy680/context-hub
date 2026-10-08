@@ -130,6 +130,47 @@ function assertSafePath(base: string, relative: string): string {
   return resolved
 }
 
+/** Extension a fetched asset is stored with, from its content type. */
+const EXTENSIONS: Record<string, string> = {
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "image/avif": "avif",
+  "image/svg+xml": "svg",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+  "video/quicktime": "mov",
+}
+
+/** The protocol of a URL, or the reason it is not one. */
+function schemeOf(url: string): string {
+  try {
+    return new URL(url).protocol
+  } catch {
+    throw new Error(`not a URL: ${url}`)
+  }
+}
+
+/** The name a fetched source is stored under: its own file name, else one from the type. */
+function nameForUrl(url: string, contentType: string): string {
+  const extension =
+    EXTENSIONS[contentType.split(";")[0].trim().toLowerCase()] ?? "bin"
+  if (url.startsWith("data:")) return `asset.${extension}`
+  let segment = ""
+  try {
+    segment = decodeURIComponent(new URL(url).pathname)
+      .split("/")
+      .filter(Boolean)
+      .at(-1) ?? ""
+  } catch {
+    /* An undecodable path keeps the generated name. */
+  }
+  const cleaned = segment.replace(/[^A-Za-z0-9._-]/g, "")
+  if (cleaned === "") return `asset.${extension}`
+  return /\.[A-Za-z0-9]{2,5}$/.test(cleaned) ? cleaned : `${cleaned}.${extension}`
+}
+
 /** Make a display name safe to use as a directory name. */
 function toId(name: string): string {
   return name
@@ -294,6 +335,52 @@ export async function createFsSkillStore(
     const skills = { ...current.skills }
     change(skills)
     await saveCatalog({ ...current, skills })
+  }
+
+  /**
+   * Write one asset beside the skill and record it last in the display order.
+   * The name is made unique, and the size limit for its kind is enforced before
+   * anything reaches the disk.
+   */
+  const storeAsset = async (
+    id: string,
+    name: string,
+    bytes: Uint8Array,
+    contentType: string
+  ): Promise<SkillAsset> => {
+    const current = await loadCatalog()
+    if (current.skills[id] === undefined) throw new Error(`unknown skill: ${id}`)
+    const assets = path.join(skillDir(id), "assets")
+    await fs.mkdir(assets, { recursive: true })
+    const original = assertSafeFileName(path.basename(name))
+    const extension = path.extname(original).slice(1).toLowerCase()
+    const type = contentType.split(";")[0].trim() || MIME_TYPES[extension] || ""
+    const kind = assetKind(original, type)
+    const limit = kind === "video" ? MAX_VIDEO : MAX_IMAGE
+    if (bytes.byteLength > limit) {
+      throw new Error(
+        `${kind} exceeds the ${Math.round(limit / 1024 / 1024)} MB limit`
+      )
+    }
+    let file = original
+    let suffix = 1
+    while ((await statOrNull(path.join(assets, file))) !== null) {
+      file = `${path.basename(original, path.extname(original))}-${suffix++}${path.extname(original)}`
+    }
+    /* Write beside the target and rename, so a failed upload leaves no half file. */
+    const temporary = path.join(assets, `${TEMP_PREFIX}${randomUUID()}`)
+    await fs.writeFile(temporary, bytes)
+    await fs.rename(temporary, path.join(assets, file))
+    await mutate((skills) => {
+      const row = skills[id]
+      if (row === undefined) return
+      skills[id] = {
+        ...row,
+        assets: [...row.assets.filter((item) => item !== file), file],
+        updatedAt: new Date().toISOString(),
+      }
+    })
+    return { file, kind, bytes: bytes.byteLength }
   }
 
   const detailOf = async (id: string): Promise<SkillDetail> => {
@@ -480,40 +567,36 @@ export async function createFsSkillStore(
     },
 
     async putAsset(id: string, file: File): Promise<SkillAsset> {
-      const current = await loadCatalog()
-      if (current.skills[id] === undefined)
-        throw new Error(`unknown skill: ${id}`)
-      const assets = path.join(skillDir(id), "assets")
-      await fs.mkdir(assets, { recursive: true })
-      const original = assertSafeFileName(path.basename(file.name))
-      const extension = path.extname(original).slice(1).toLowerCase()
-      const contentType = file.type || MIME_TYPES[extension] || ""
-      const kind = assetKind(original, contentType)
-      const limit = kind === "video" ? MAX_VIDEO : MAX_IMAGE
-      if (file.size > limit) {
+      return storeAsset(
+        id,
+        file.name,
+        new Uint8Array(await file.arrayBuffer()),
+        file.type
+      )
+    },
+
+    async putAssetFromUrl(id: string, url: string): Promise<SkillAsset> {
+      const scheme = schemeOf(url)
+      if (scheme !== "http:" && scheme !== "https:" && scheme !== "data:") {
+        throw new Error(`only http, https, and data sources are read: ${scheme}`)
+      }
+      const response = await fetch(url)
+      if (!response.ok) {
+        throw new Error(`${response.status} ${response.statusText}`.trim())
+      }
+      const declared = Number(response.headers.get("content-length") ?? "0")
+      if (declared > MAX_VIDEO) {
         throw new Error(
-          `${kind} exceeds the ${Math.round(limit / 1024 / 1024)} MB limit`
+          `source exceeds the ${Math.round(MAX_VIDEO / 1024 / 1024)} MB limit`
         )
       }
-      let name = original
-      let suffix = 1
-      while ((await statOrNull(path.join(assets, name))) !== null) {
-        name = `${path.basename(original, path.extname(original))}-${suffix++}${path.extname(original)}`
-      }
-      /* Write beside the target and rename, so a failed upload leaves no half file. */
-      const temporary = path.join(assets, `${TEMP_PREFIX}${randomUUID()}`)
-      await fs.writeFile(temporary, Buffer.from(await file.arrayBuffer()))
-      await fs.rename(temporary, path.join(assets, name))
-      await mutate((skills) => {
-        const row = skills[id]
-        if (row === undefined) return
-        skills[id] = {
-          ...row,
-          assets: [...row.assets.filter((item) => item !== name), name],
-          updatedAt: new Date().toISOString(),
-        }
-      })
-      return { file: name, kind, bytes: file.size }
+      const contentType = response.headers.get("content-type") ?? ""
+      return storeAsset(
+        id,
+        nameForUrl(url, contentType),
+        new Uint8Array(await response.arrayBuffer()),
+        contentType
+      )
     },
 
     async deleteAsset(id: string, file: string): Promise<void> {

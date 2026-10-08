@@ -191,6 +191,19 @@ export function skillLibrary(options: { root?: string } = {}) {
               return
             }
 
+            /* POST /hub/skills/<id>/from-url — fetch a source and store it */
+            if (section === "from-url" && method === "POST") {
+              const body = JSON.parse(
+                (await readBody(request)).toString("utf8")
+              ) as { url?: string }
+              if (typeof body.url !== "string") {
+                sendError(response, new Error("missing url"))
+                return
+              }
+              sendJson(response, 200, await api.putAssetFromUrl(id, body.url))
+              return
+            }
+
             /* /hub/skills/<id>/assets/<file> */
             if (section === "assets" && tail.length > 0) {
               const file = tail.join("/")

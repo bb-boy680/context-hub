@@ -119,6 +119,12 @@ export interface SkillStore {
   writeFile(id: string, path: string, text: string): Promise<void>
   /** Store one uploaded asset; the name is made unique when taken. */
   putAsset(id: string, file: File): Promise<SkillAsset>
+  /**
+   * Fetch one asset from an `http:` or `https:` URL and store it beside the
+   * skill. The implementation performs the fetch, so a source that refuses a
+   * browser read still lands: only the machine's own network rules apply.
+   */
+  putAssetFromUrl(id: string, url: string): Promise<SkillAsset>
   /** Delete one asset and drop it from the recorded order. */
   deleteAsset(id: string, file: string): Promise<void>
   /** A URL that serves one asset; each form resolves it in its own way. */

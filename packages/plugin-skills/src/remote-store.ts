@@ -113,6 +113,18 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       )
     },
 
+    putAssetFromUrl(id: string, url: string): Promise<SkillAsset> {
+      return call<SkillAsset>(
+        base,
+        `/hub/skills/${encodeURIComponent(id)}/from-url`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        }
+      )
+    },
+
     async deleteAsset(id: string, file: string): Promise<void> {
       await call(
         base,

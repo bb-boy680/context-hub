@@ -298,12 +298,13 @@ function seedItems(skill: Skill): MediaItem[] {
 /** What the lightbox can do with its media, depending on where the skill lives. */
 interface MediaSource {
   items: MediaItem[]
-  /** A URL or data: URL is offered only where the media is a preview, not a file. */
-  canAddUrl: boolean
+  /** Whether uploads reach the library; a preview-only form keeps them in memory. */
+  persists: boolean
   /** A library write is in flight. */
   busy: boolean
   addFiles(files: FileList): Promise<void>
-  addUrl(src: string): void
+  /** Store a pasted URL or data: URL; rejects with a displayable message. */
+  addUrl(src: string): Promise<void>
   remove(id: string): Promise<void>
 }
 
@@ -368,12 +369,25 @@ function useMediaItems(
     [store, detail, onChanged]
   )
 
-  const addUrl = React.useCallback((src: string) => {
-    setPreview((current) => [
-      ...current,
-      { id: `media-${nextId.current++}`, kind: mediaKind(src), src },
-    ])
-  }, [])
+  const addUrl = React.useCallback(
+    async (src: string) => {
+      if (store === null || detail === null) {
+        setPreview((current) => [
+          ...current,
+          { id: `media-${nextId.current++}`, kind: mediaKind(src), src },
+        ])
+        return
+      }
+      setBusy(true)
+      try {
+        await store.putAssetFromUrl(detail.id, src)
+        onChanged()
+      } finally {
+        setBusy(false)
+      }
+    },
+    [store, detail, onChanged]
+  )
 
   const remove = React.useCallback(
     async (id: string) => {
@@ -392,7 +406,7 @@ function useMediaItems(
     [store, detail, onChanged]
   )
 
-  return { items, canAddUrl: store === null, busy, addFiles, addUrl, remove }
+  return { items, persists: store !== null, busy, addFiles, addUrl, remove }
 }
 
 /**
@@ -407,12 +421,13 @@ const navigationParams = { prevEl: null, nextEl: null }
  */
 function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
   const { t } = useI18n()
-  const { items, busy, canAddUrl } = source
+  const { items, busy, persists } = source
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [thumbs, setThumbs] = React.useState<SwiperClass | null>(null)
   const [dragOver, setDragOver] = React.useState(false)
   const [addOpen, setAddOpen] = React.useState(false)
   const [link, setLink] = React.useState("")
+  const [addError, setAddError] = React.useState<string | null>(null)
   const mainRef = React.useRef<SwiperClass | null>(null)
   const fileRef = React.useRef<HTMLInputElement | null>(null)
   const prevRef = React.useRef<HTMLButtonElement | null>(null)
@@ -473,9 +488,18 @@ function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
   const addLink = () => {
     const value = link.trim()
     if (value === "") return
-    source.addUrl(value)
-    setLink("")
-    setAddOpen(false)
+    void source.addUrl(value).then(
+      () => {
+        setLink("")
+        setAddError(null)
+        setAddOpen(false)
+      },
+      (failure: unknown) => {
+        /* A refused fetch is a TypeError; the store's own refusals carry a reason. */
+        if (failure instanceof TypeError) setAddError(t("skills.media.add.failed"))
+        else setAddError(failure instanceof Error ? failure.message : String(failure))
+      }
+    )
   }
 
   return (
@@ -601,7 +625,13 @@ function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
           </Swiper>
         ) : null}
 
-        <Popover open={addOpen} onOpenChange={setAddOpen}>
+        <Popover
+          open={addOpen}
+          onOpenChange={(next) => {
+            setAddOpen(next)
+            if (!next) setAddError(null)
+          }}
+        >
           <PopoverTrigger
             render={
               <button
@@ -617,22 +647,23 @@ function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
             <span className="text-xs font-semibold text-muted-foreground">
               {t("skills.media.add.title")}
             </span>
-            {canAddUrl ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={link}
-                  onChange={(event) => setLink(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") addLink()
-                  }}
-                  placeholder={t("skills.media.add.placeholder")}
-                  aria-label={t("skills.media.add.placeholder")}
-                  className="h-8 flex-1"
-                />
-                <Button size="sm" className="h-8 px-3" onClick={addLink}>
-                  {t("skills.media.add.action")}
-                </Button>
-              </div>
+            <div className="flex items-center gap-2">
+              <Input
+                value={link}
+                onChange={(event) => setLink(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") addLink()
+                }}
+                placeholder={t("skills.media.add.placeholder")}
+                aria-label={t("skills.media.add.placeholder")}
+                className="h-8 flex-1"
+              />
+              <Button size="sm" className="h-8 px-3" disabled={busy} onClick={addLink}>
+                {t("skills.media.add.action")}
+              </Button>
+            </div>
+            {addError !== null ? (
+              <p className="text-[11px] leading-[15px] text-destructive">{addError}</p>
             ) : null}
             <Button
               variant="outline"
@@ -645,7 +676,7 @@ function MediaPane({ skill, source }: { skill: Skill; source: MediaSource }) {
               {t("skills.media.add.file")}
             </Button>
             <p className="text-[11px] leading-[15px] text-muted-foreground">
-              {t("skills.media.add.hint")}
+              {persists ? t("skills.media.add.hint") : t("skills.media.add.hintPreview")}
             </p>
           </PopoverContent>
         </Popover>
@@ -1031,6 +1062,7 @@ function LightboxBody({
   store: SkillStore | null
   onToggle: () => void
   onTagsChange: (tags: string[]) => void
+  /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)

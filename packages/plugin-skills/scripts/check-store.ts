@@ -7,6 +7,7 @@
  * Run from the package: `node scripts/check-store.ts`
  */
 import { promises as fs } from "node:fs"
+import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -152,6 +153,50 @@ try {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("oversize upload is refused with a reason", refused.includes("5 MB"), refused)
+
+/* A fetched source lands like an upload, named after the URL's own file. */
+const source = createServer((_, response) => {
+  response.writeHead(200, { "Content-Type": "video/mp4" })
+  response.end(Buffer.from([0, 0, 0, 24]))
+})
+await new Promise<void>((resolve) => source.listen(0, "127.0.0.1", resolve))
+const address = source.address()
+const port = typeof address === "object" && address !== null ? address.port : 0
+const fetched = await store.putAssetFromUrl(
+  "pdf-extract",
+  `http://127.0.0.1:${port}/clips/take one.mp4`
+)
+await new Promise<void>((resolve) => source.close(() => resolve()))
+check("a fetched source is stored under its URL name", fetched.file === "takeone.mp4", fetched.file)
+check("a fetched source reports the kind its type names", fetched.kind === "video", fetched.kind)
+check("a fetched source reaches the record", (await store.get("pdf-extract")).assets.includes("takeone.mp4"))
+
+let scheme = ""
+try {
+  await store.putAssetFromUrl("pdf-extract", "file:///etc/passwd")
+} catch (error) {
+  scheme = error instanceof Error ? error.message : String(error)
+}
+check("a non-http source is refused", scheme.includes("http"), scheme)
+
+/* A data: URL carries its own bytes, so it needs no server. */
+const inline = await store.putAssetFromUrl(
+  "pdf-extract",
+  `data:image/png;base64,${Buffer.from(png).toString("base64")}`
+)
+check("a data: URL is stored from its own bytes", inline.file === "asset.png", inline.file)
+check("a data: URL reports the kind its type names", inline.kind === "image", inline.kind)
+check("a data: URL writes the decoded bytes", (await fs.stat(path.join(root, "pdf-extract", "assets", "asset.png"))).size === png.byteLength)
+await store.deleteAsset("pdf-extract", inline.file)
+
+let dead = ""
+try {
+  await store.putAssetFromUrl("pdf-extract", `http://127.0.0.1:${port}/gone.png`)
+} catch (error) {
+  dead = error instanceof Error ? error.message : String(error)
+}
+check("an unreachable source is refused", dead.includes("1") || dead.includes("fetch"), dead)
+await store.deleteAsset("pdf-extract", fetched.file)
 
 /* Deleting an asset drops it from the record. */
 await store.deleteAsset("pdf-extract", "cover.png")
