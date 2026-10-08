@@ -561,25 +561,23 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 
 ### 由此定下的设计
 
-1. **输入的是"来源"，不是"名字"**：所以字段叫 `Package`，hint 明写可接受 `owner/repo, owner/repo@skill, a Git URL, or a SKILL.md link`。
-2. **第二个字段是必需的**（不是可选装饰）：不给技能名就会把整个仓库装进来（实测 9 个），
-   所以 `Skill` 字段的占位文案要如实写 `Empty takes every skill in the package`。
-3. **执行在宿主侧、且必须沙箱化**：CLI 只能由有盘的进程跑，且它只会往 agent 目录写 →
+1. **输入的是"来源"，不是"名字"**：字段叫 `Package`，hint 明写可接受 `owner/repo, owner/repo@skill, a Git URL, or a SKILL.md link`。
+2. **执行在宿主侧、且必须沙箱化**：CLI 只能由有盘的进程跑，且它只会往 agent 目录写 →
    在临时目录里 `cwd` 运行（`-a universal --copy -y --json`），再把 `.agents/skills/<name>` 收编进
    `~/.context-hub/skills/<name>`；全程**不碰用户自己的 `~/.claude/skills` 等目录**。
-4. **要记的来源信息已经现成**：`skills-lock.json` 的 `source / skillPath / computedHash` + 报告里的
+3. **要记的来源信息已经现成**：`skills-lock.json` 的 `source / skillPath / computedHash` + 报告里的
    `source/hash`，直接进我们 catalog 的安装记录（更新=同 spec 重跑并比 hash；卸载=删目录+记录）。
-5. **反馈状态要齐**：下载中（clone 可能几十秒）、成功（列出装了哪几个）、`skipped`（名字对不上，
+4. **反馈状态要齐**：下载中（clone 可能几十秒）、成功（列出装了哪几个）、`skipped`（名字对不上，
    当作失败报出）、`failed`（把 CLI 的 error 原文带 SSH/gh 提示一起显示）。
-6. **浏览/搜索体验留给插件**（用户既定路线）：本期下载 tab 只做"按来源下载"，
-   skills.sh 的搜索 API（含 installs 计数）留给后续插件化的浏览器。
+5. **浏览/搜索体验留给插件**（用户既定路线）：skills.sh 的搜索 API（含 installs 计数）留给后续插件化的浏览器。
+
+（列表选择与多选下载的实测见下一节。）
 
 ### 画布改动（本轮）
 
 - `Y2fjK1`（Add skill — Download）随实测调整：Package 字段下新增 11px hint 列出可接受的来源形态；
-  Skill 字段占位改为 `Empty takes every skill in the package`；
   body hint 改为 `Runs the skills CLI (npx skills add); private repositories use your git credentials.`；
-  弹窗 384 → **405** 并重新居中（y=337）。
+  弹窗随下一节改为列表选择版（640×570）。
 
 ### 仍待确认
 
@@ -587,5 +585,89 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 2. 装完要不要显示 CLI 报告里的安全信息（`security.gen/socket/snyk`）？
 3. 是否默认加 `DISABLE_TELEMETRY=1`（我们只借用 CLI 的拉取能力）？
 4. 目标 id 已存在时：拒绝，还是覆盖/加后缀？
+
+## 能否"贴仓库 → 拉列表 → 勾选 → 下载"？能，已实测（2026-10-08）
+
+用户问：能否直接填仓库、拉取列表、用户选择后再下载。用 `mattpocock/skills` 等三个仓库实测，
+答案是**能**，两个环节都跑通了。
+
+### 一、列列表：`skills add <source> --list`
+
+**不能用 `--json`**（CLI 直接拒绝：`The --json flag cannot be combined with --list.`），
+但文本输出是稳定的三层结构，剥掉 ANSI 与 spinner 光标控制后可以可靠解析：
+
+```
+● Available Skills
+<分组标题>                     ← 可省略（vercel-labs 就没有）；对应仓库目录，如 skills/<category>/
+│
+│   <skill-id>                 ← 框线 + 4 空格
+│
+│     <完整描述，不截断>         ← 框线 + 6 空格
+│
+│   <skill-id>
+…
+ Use --skill <name> to install specific skills
+● Found 38 skills               ← 自报数量，可用于校验解析结果
+```
+
+三个仓库的解析结果（`cli said` vs `parsed` 完全一致）：
+
+| 仓库 | CLI 自报 | 解析出 | 分组 |
+| --- | --- | --- | --- |
+| `mattpocock/skills` | 38 | **38** | Mattpocock Skills 27 + General 11 |
+| `vercel-labs/agent-skills` | 9 | **9** | 无标题 → 回退为仓库名一组 |
+| `anthropics/skills` | 20 | **20** | Academy Guide 1 / Claude Api 1 / Discernment Nudge 1 / Document Skills 4 / Example Skills 12 / General 1 |
+
+- 解析规则：剥 ANSI → 找 `Available Skills` → 之后的行里，非框线行是分组标题，
+  `│`+4 空格是 id，`│`+6 空格是描述；没有标题时用仓库名兜底。
+- 描述是**完整原文**（实测最长 1069 字符），所以列表摘要要在 UI 侧截断。
+- 耗时：~2.6–3.1 秒（克隆仓库）；卸载/错误路径见上表。
+
+### 二、只下载选中的：多个 `--skill`
+
+`--skill` 可重复；实测 `mattpocock/skills` 选 3 个（code-review / diagnosing-bugs / tdd）：
+
+```
+skills add https://github.com/mattpocock/skills \
+  --skill code-review --skill diagnosing-bugs --skill tdd \
+  -a universal --copy -y --json
+→ exit 0，2644ms；报告 3 条全部 installed；磁盘上**只有**这 3 个目录（无多余）
+```
+
+锁文件同时给出每个技能的来源细节，可直接进我们的安装记录：
+`{source:"mattpocock/skills", sourceType:"github", skillPath:"skills/engineering/code-review/SKILL.md", computedHash:"1846…"}`。
+`skillPath` 还顺带暴露了真实目录层级（分组标题就来自它）。
+
+### 三、因此下载 tab 的设计（画布已改）
+
+`Y2fjK1`（Add skill — Download）从"Package + Skill 两个输入"改为**列表选择**：
+
+```
+[Local | Download]
+Package  [ https://github.com/mattpocock/skills      ] [ List ]
+         owner/repo, owner/repo@skill, a Git URL, or a SKILL.md link
+────────────────────────────────────────────────────────────
+Found 38 skills in this package                  Select all
+ ☑ code-review        Review the changes since a fixed point along Standards and Spec
+ ☑ diagnosing-bugs    Diagnosis loop for hard bugs and performance regressions
+ ☐ tdd                Test-driven development: build features and fix bugs test-first
+ ☐ wayfinder          Plan a huge chunk of work as a shared map of decisions
+────────────────────────────────────────────────────────────
+Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Download 2]
+```
+
+- 弹窗 640×**570**，y=255（居中）；Body 374 = 字段 78 + 分隔 1 + 标题行 15 + 列表 208（4×52）。
+- 行 = 复选框（选中=$primary 填充+白色勾）+ 等宽技能名 13/600 + 描述 11.5 muted（实现里截一行）。
+- 按钮带选中数量（`Download 2`），未选中时禁用。
+- 需要一起实现的三个状态（尚未画）：**列表加载中**（"Fetching skills…"）、**空结果**、
+  **失败**（把 CLI 的 error 原文连同 SSH/gh 提示显示出来，例如私有库的 Authentication failed）。
+
+### 仍待确认
+
+1. 需要"已安装"标记吗（列表里某技能已在 `~/.context-hub/skills` 时）？
+2. 分组标题要不要在列表里显示（现在只显示不带分组的平铺清单）？
+3. 装完显示 CLI 的安全信息（`security.snyk: medium` 等）吗？
+4. 默认加 `DISABLE_TELEMETRY=1`？
+5. 目标 id 已存在：拒绝 / 覆盖 / 加后缀？
 
 
