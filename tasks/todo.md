@@ -844,4 +844,13 @@ Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
 3. 文案区分动作：标题说清丢什么（`Discard this import?`），说明说清代价
    （`The package and the skills you picked are not saved.`），主按钮用动词 `Discard` 而不是 `OK`。
 
+## 对齐修复：拖拽区说明文字还残留居中（2026-10-08，用户："文字没有对齐"）
+
+`MS8Ea` 拖拽区从"大居中版"改成"横排紧凑版"时，说明文字 `ElA6m` 的 `textAlign: center` 忘了清掉：
+标题左对齐、说明居中，两行左边缘差一截（截图为证）。已改回 `left`，与标题同一左边界。
+
+顺带全文档扫了一遍 `textAlign: center` 的文本，只剩 Plugins「Install — From path」的
+`Dropzone Hint`（`pPF3z`）——那块是**整块居中的大拖拽区**（标题也居中、420 宽的说明框在 592 里居中），
+属预期，不动。
+
 
