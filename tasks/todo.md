@@ -989,4 +989,52 @@ Claude Code 装到 `<项目>/.claude/skills/<name>`，排除点目录等于把�
   `浏览文件` 现在优先走 `showDirectoryPicker()` + 我们自己的有界遍历，连这段枚举成本都省掉。
 - `check-store.ts` 全绿；`plugin-skills` typecheck+lint、`web` typecheck 通过。
 
+### 修复：大文件夹把页面卡死（2026-10-08，用户："扫描一个很大磁盘的 skills 会容易直接卡死了"）
+
+`DataTransferItem.webkitGetAsEntry()` 的递归**没有任何边界**：深度、条目数、字节数都不设限，
+每个目录还要一直 `readEntries` 到空数组；用户指 `deepseek-harness` 那座仓库时主线程被占满。
+
+**改法**（对照 DSH 的做法，全在 `packages/plugin-skills/src/folder-scan.ts`）
+
+- 条目预算 `maxEntries` 20000 + 噪声目录名单（`node_modules` / `.git` / `dist` / `build` / `.venv` / `__pycache__` …，
+  取自 DSH 的 `DEFAULT_FILE_SEARCH_EXCLUDED_DIRECTORIES`）；走到预算就停并把 `truncated` 交给界面提示。
+- **深度优先**：两段队列（`skills` / `.agents` / `.claude` / `.codex` / `.cursor` 先走），一条分支走完再走兄弟。
+  先写成先入先出时，200 个 `pkg*` 兄弟目录会把预算吃光，`.agents/skills/<name>` 反而够不着。
+- 遍历只做目录枚举，**字节到导入时才读**；导入前先按 `file.size` 求和，超过 `maxImportBytes`（64 MiB）报错。
+- `AbortSignal` 贯穿整条链：重新选择、关闭弹窗、组件卸载都会取消（新一次拾取先 abort 上一次）。
+- 兜底 `<input webkitdirectory>` 路径同样先丢噪声、把技能目录提前，再按预算切片。
+
+**验证**
+
+- 合成 200×300 = 60_000 文件：103 ms 完成，主线程最大卡顿 **0 ms**，显示截断提示，技能仍然找到。
+- `check-package.ts` 新增断言：条目预算与 `truncated`、遍历期间不打开任何文件、`.agents` 先于兄弟目录、abort 生效。
+
+### 修复：两个页签的已选互相串（2026-10-08，用户："本地导入的没有 skill 的那个 tag，跑到下载里面去了"）
+
+Local 与 Download 原本共用一个 `picked`，切页签时上一页的已选跟着过来 —— 下载页签会把本地挑的技能当成 chip。
+
+**改法**：`folderPicked` / `packagePicked` 两份状态，当前页签按 `tab === "local" ? folderPicked : packagePicked` 取；
+两页各自保留（切回来还在），关闭弹窗一起清空。
+
+**验证**：本地挑两个 → 切到下载：chip 行为空、`Import` 仍禁用且列表没被预勾选；切回本地 chip 还在。
+
+### 修复：本地页签的已选也显示 chip（2026-10-08，用户："本地已选择的也需要这个组件"）
+
+把下载页签里的 chip 行提成两个页签共用的 `PickedChips`（21 高胶囊 + `×` 移除，空则不渲染），
+本地页签放在拖拽区与分隔线之间（`pt-2`）。
+
+**验证**：两页签 chip 的 DOM 与样式完全一致（h 21、胶囊圆角、`bg-muted`、JetBrains Mono 11.5px、左右内边距 8px），
+点 `×` 取消该行的勾选并回到按钮禁用态；`check-package.ts`、typecheck、lint 全绿。
+画布 `DzRqf` 同步加了 `Picked Chips` 行（弹窗 623 → 660）。
+
+### 修复：已选 chip 区限高、超出可滚动（2026-10-08，用户："这里我也需要有一个最大高度，然后有滚动条"）
+
+`PickedChips` 容器加 `max-h-[68px] overflow-y-auto pr-1.5`：68px = 两行完整（21 + 6 + 21）再加第三行的 2/3，
+看得出下面还有；`pr-1.5` 给经典滚动条留位，不压住胶囊。
+
+**验证**：浏览器（本地页签 12 个技能全选）—— `clientHeight 68 / scrollHeight 75`，三行胶囊 top = 0 / 27 / 54，
+滚到底（`scrollTop 7.2`）第三行完整可见，弹窗总高从 636 到 650 后不再增长。
+
+**画布没改**：设计稿上这一行只有一颗胶囊，限高是"多选时才出现"的运行时行为，静态画板表达不了。
+
 
