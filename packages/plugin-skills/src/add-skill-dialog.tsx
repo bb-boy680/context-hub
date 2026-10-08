@@ -108,8 +108,9 @@ function SkillRow({
         )}
       </div>
       {installed ? (
+        /* Same metrics as the pick button, so the two states line up row to row. */
         <span className="flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium text-muted-foreground">
-          <CheckIcon className="text-chart-2" />
+          <CheckIcon className="size-4 text-chart-2" />
           {t("skills.add.imported")}
         </span>
       ) : (
