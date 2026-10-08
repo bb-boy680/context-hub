@@ -159,6 +159,7 @@ export const messages: Record<string, string> = {
   "skills.detail.delete": "删除技能",
   "skills.delete.title": "删除 {name}？",
   "skills.delete.text": "它的文件夹和 hub 为它保存的资源都会被删除，且无法撤销。",
+  "skills.delete.workspaceText": "它在这个工作区里的文件夹会被删除，且无法撤销。",
   "skills.delete.confirm": "删除",
   "skills.media.play": "播放",
   "skills.media.pause": "暂停",

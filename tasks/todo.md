@@ -1427,3 +1427,27 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 不留残留目录）共 43 项全过；其余脚本无回归；四个包 tsc + eslint 全绿。
 截图 `designs/check-web/skills-workspace-adopt.png`。**测试产生的库副本已删除，用户状态已还原。**
 
+### 修正：工作区技能也能删除（2026-10-08，用户反馈）
+
+用户：「工作区的 skill 也是可以删除的呀，但是我发现是没有删除的按钮的」。是我上一轮把工作区行的
+`onDelete` 直接置空（`skill.location === "workspace" ? null : …`）—— 当时只想到"库删不掉它不持有的技能"，
+却漏了"它本来就该能从工作区里删掉"。
+
+- `host/workspace-skills.ts` 新增 `deleteSkillFromWorkspace(workspace, id)`：删除
+  `<ws>/.agents/skills/<id>` 整个目录（`fs.rm(recursive)`）；链接按条目删（不会穿到库）；
+  目录里没有 `SKILL.md` 则拒绝（`not a skill in this workspace`），`assertSkillName` 挡住越界名字。
+- 与既有的 `removeSkillFromWorkspace`（只回收 hub 自己建的链接）**分工明确**：一个是"移除我的链接"，
+  一个是"删掉这个目录"，两者的确认气泡文案也不同。
+- 契约 `SkillStore.deleteWorkspaceSkill(id)`；桥 `POST /hub/skills?action=delete-workspace {id}`；
+  `SkillLibrary.deleteWorkspaceSkill(id)`。
+- 灯箱：`onDelete` 按位置分派 —— 库行删库记录，工作区行删工作区目录；删除气泡里的**路径按位置取**
+  （库行显示库路径，工作区行显示 `<ws>/.agents/skills/<id>`），文案也分两套
+  （`skills.delete.text` / 新增 `skills.delete.workspaceText`）。
+
+**验证**（真机）：在仓库里建临时技能 `zz-demo-delete` → 工作区页签打开 → 按钮为
+「查看文件 / 加入技能库 / 删除技能」→ 点删除弹出气泡，标题「删除 zz-demo-delete？」、正文
+「它在这个工作区里的文件夹会被删除，且无法撤销。」、路径 `D:/work-space/dsh-context-hub/.agents/skills/zz-demo-delete`
+→ 确认后目录消失、灯箱关闭、页签回到 `工作区 3`、`.agents` 无 git 残留。另外三个技能未受影响。
+`check-workspace-skills.ts` 增 5 项（删除目录 / 不存在拒绝 / 无 manifest 拒绝 / 被拒目录仍在 / `..` 拒绝）共 48 项全过；
+其余脚本无回归；四个包 tsc + eslint 全绿。
+

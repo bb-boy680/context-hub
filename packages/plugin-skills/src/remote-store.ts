@@ -201,6 +201,14 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       })
     },
 
+    async deleteWorkspaceSkill(id: string): Promise<void> {
+      await call(base, "/hub/skills?action=delete-workspace", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+    },
+
     async removeFromWorkspace(id: string): Promise<void> {
       await call(base, "/hub/skills?action=remove-workspace", {
         method: "POST",

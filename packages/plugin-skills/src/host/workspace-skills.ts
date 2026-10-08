@@ -229,3 +229,31 @@ export async function removeSkillFromWorkspace(
   /* No `recursive`: this removes the entry, and a link has nothing under it. */
   await fs.rm(target, { force: true })
 }
+
+/**
+ * Delete one skill from a workspace folder. This is the destructive one: the
+ * skill's own directory goes, so a stored link goes with it and so does
+ * everything beside the manifest.
+ *
+ * @param workspace — the workspace folder, absolute.
+ * @param id — the skill's directory name under the workspace's skills root.
+ * @returns nothing; a name that is not a skill there is refused, not removed.
+ */
+export async function deleteSkillFromWorkspace(
+  workspace: string,
+  id: string
+): Promise<void> {
+  const target = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
+  const stat = await fs.lstat(target).catch(() => null)
+  if (stat === null) throw new Error(`not in this workspace: ${id}`)
+  /* A link is deleted as the entry it is; only a directory can be a skill. */
+  if (stat.isSymbolicLink()) {
+    await fs.rm(target, { force: true })
+    return
+  }
+  if (!stat.isDirectory()) throw new Error(`not a skill in this workspace: ${id}`)
+  if ((await fs.stat(path.join(target, MANIFEST)).catch(() => null))?.isFile() !== true) {
+    throw new Error(`not a skill in this workspace: ${id}`)
+  }
+  await fs.rm(target, { recursive: true, force: true })
+}

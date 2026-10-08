@@ -44,6 +44,8 @@ export interface SkillLibrary {
   install(id: string): Promise<WorkspaceInstall>
   /** Copy one skill the current workspace holds into the library. */
   adopt(id: string): Promise<void>
+  /** Delete one skill from the current workspace folder, its directory included. */
+  deleteWorkspaceSkill(id: string): Promise<void>
   /** Take one skill the hub installed back out of the current workspace. */
   remove(id: string): Promise<void>
 }
@@ -280,6 +282,15 @@ export function useSkillLibrary(): SkillLibrary {
     [store, reload]
   )
 
+  const deleteWorkspaceSkill = React.useCallback(
+    async (id: string) => {
+      if (store === null) throw new Error("this form has no skill library")
+      await store.deleteWorkspaceSkill(id)
+      await reload()
+    },
+    [store, reload]
+  )
+
   const remove = React.useCallback(
     async (id: string) => {
       if (store === null) throw new Error("this form has no skill library")
@@ -304,6 +315,7 @@ export function useSkillLibrary(): SkillLibrary {
       reload: async () => undefined,
       install: async () => "link",
       adopt: async () => undefined,
+      deleteWorkspaceSkill: async () => undefined,
       remove: async () => undefined,
     }
   }
@@ -324,6 +336,7 @@ export function useSkillLibrary(): SkillLibrary {
     reload,
     install,
     adopt,
+    deleteWorkspaceSkill,
     remove,
   }
 }

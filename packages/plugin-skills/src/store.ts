@@ -246,6 +246,11 @@ export interface SkillStore {
    * keeps its own directory.
    */
   importFromWorkspace(id: string): Promise<void>
+  /**
+   * Delete one skill from the current workspace folder, its directory included.
+   * This is the destructive one; `removeFromWorkspace` only takes back a link.
+   */
+  deleteWorkspaceSkill(id: string): Promise<void>
   /** Take one library-installed skill out of the current workspace. */
   removeFromWorkspace(id: string): Promise<void>
   /** Change notifications from directory watching; returns an unsubscribe. */

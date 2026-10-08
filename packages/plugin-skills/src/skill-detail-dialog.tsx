@@ -31,7 +31,7 @@ import { skillKey } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { seedTags, tagTone } from "./tags.ts"
-import type { MediaItem, Skill } from "./types.ts"
+import type { MediaItem, Skill, SkillLocation } from "./types.ts"
 import type { SkillDetail, SkillStore, WorkspaceSkillDetail } from "./store.ts"
 
 import { useI18n } from "@workspace/extensions/react"
@@ -807,12 +807,15 @@ function CategoryEditor({
 function DeleteBubble({
   name,
   path,
+  where,
   onDelete,
   children,
 }: {
   name: string
   /** Where the skill's directory sits, or `null` when this form has no library. */
   path: string | null
+  /** Which copy this question is about: the hub's own, or the workspace's. */
+  where: SkillLocation
   onDelete: () => Promise<void>
   children: React.ReactElement
 }) {
@@ -849,7 +852,7 @@ function DeleteBubble({
           {t("skills.delete.title").replace("{name}", name)}
         </span>
         <span className="text-xs leading-[15px] text-muted-foreground">
-          {t("skills.delete.text")}
+          {t(where === "workspace" ? "skills.delete.workspaceText" : "skills.delete.text")}
         </span>
         {path !== null && (
           <span className="truncate font-mono text-[11.5px] leading-[14px] text-secondary-foreground">
@@ -900,7 +903,7 @@ function InfoPanel({
   reason: string | null
   /** The skill's directory, spelled as a person would write it. */
   path: string | null
-  /** `null` when this form has no library to delete from. */
+  /** `null` when this skill cannot be deleted from here. */
   onDelete: (() => Promise<void>) | null
   onToggle: () => void
   /** Copy a skill this workspace wrote into the library. */
@@ -1010,7 +1013,7 @@ function InfoPanel({
       </div>
 
       {onDelete !== null && (
-        <DeleteBubble name={skill.name} path={path} onDelete={onDelete}>
+        <DeleteBubble name={skill.name} path={path} where={skill.location} onDelete={onDelete}>
           <Button
             variant="outline"
             className="h-9 w-full gap-[7px] border-destructive/35 bg-transparent px-2.5 text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
@@ -1205,6 +1208,7 @@ function LightboxBody({
   held,
   store,
   root,
+  workspacePath,
   reason,
   onToggle,
   onAdopt,
@@ -1220,6 +1224,8 @@ function LightboxBody({
   store: SkillStore | null
   /** The skills root as the library spells it, for the delete question. */
   root: string | null
+  /** The workspace's own skills root, as it reads; for a skill kept there. */
+  workspacePath: string | null
   /** Why this skill cannot be installed here, ready to show; `null` when it can. */
   reason: string | null
   onToggle: () => void
@@ -1233,8 +1239,10 @@ function LightboxBody({
   const [filesOpen, setFilesOpen] = React.useState(false)
   const media = useMediaItems(skill, store, detail, onChanged)
   const files = useFileRows(skill, detail, held, store === null)
-  const path =
-    root === null ? null : `${root.replaceAll("\\", "/")}/${skill.id}`
+  /* Each skill's directory: the library's for a library skill, the workspace's
+     for one kept there. */
+  const base = skill.location === "workspace" ? workspacePath : root
+  const path = base === null ? null : `${base.replaceAll("\\", "/")}/${skill.id}`
 
   /* The catalog stays mounted behind the dialog; stop its previews decoding. */
   React.useEffect(() => {
@@ -1276,10 +1284,12 @@ export function SkillDetailDialog({
   skill,
   store,
   root,
+  workspacePath,
   reason,
   onToggle,
   onAdopt,
   onDelete,
+  onDeleteWorkspace,
   onTagsChange,
   onChanged,
   onOpenChange,
@@ -1289,6 +1299,8 @@ export function SkillDetailDialog({
   store: SkillStore | null
   /** Where the library keeps its skills, as it spells the path. */
   root: string | null
+  /** Where the workspace keeps its skills, for a skill kept there. */
+  workspacePath: string | null
   /** Why this skill cannot be installed here, ready to show; `null` when it can. */
   reason: string | null
   onToggle: () => void
@@ -1296,6 +1308,8 @@ export function SkillDetailDialog({
   onAdopt: (skill: Skill) => void
   /** Delete the skill and everything the hub stores for it. */
   onDelete: (skill: Skill) => Promise<void>
+  /** Delete a skill's directory from the workspace. */
+  onDeleteWorkspace: (skill: Skill) => Promise<void>
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
@@ -1362,12 +1376,20 @@ export function SkillDetailDialog({
             held={workspace}
             store={store}
             root={root}
+            workspacePath={workspacePath}
             reason={reason}
             onToggle={onToggle}
             onAdopt={() => onAdopt(skill)}
-            /* The library cannot delete a skill it does not hold. */
+            /* Each place deletes what it owns: the library its record, the
+               workspace its directory. */
             onDelete={
-              store === null || skill.location === "workspace" ? null : () => onDelete(skill)
+              skill.location === "workspace"
+                ? store === null
+                  ? null
+                  : () => onDeleteWorkspace(skill)
+                : store === null
+                  ? null
+                  : () => onDelete(skill)
             }
             onTagsChange={onTagsChange}
             onChanged={onChanged}

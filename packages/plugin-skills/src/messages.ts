@@ -99,6 +99,8 @@ export const skillsMessages: Record<string, string> = {
   "skills.delete.title": "Delete {name}?",
   "skills.delete.text":
     "Its folder and the files the hub stores for it are removed. This cannot be undone.",
+  "skills.delete.workspaceText":
+    "Its folder in this workspace is removed. This cannot be undone.",
   "skills.delete.confirm": "Delete",
   "skills.media.play": "Play",
   "skills.media.pause": "Pause",

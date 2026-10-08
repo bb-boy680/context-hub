@@ -926,6 +926,12 @@ export function SkillsPage() {
     setDetailKey(null)
   }
 
+  /** Delete a skill from the workspace folder, then close the lightbox. */
+  const removeWorkspaceSkill = async (skill: Skill) => {
+    await library.deleteWorkspaceSkill(skill.id)
+    setDetailKey(null)
+  }
+
   const openDetail = (skill: Skill) => setDetailKey(skillKey(skill))
 
   const total = matching.length
@@ -1085,6 +1091,7 @@ export function SkillsPage() {
         skill={detail}
         store={library.store}
         root={library.root}
+        workspacePath={library.workspaceRoot}
         reason={blocked ?? (detail?.taken === true ? t("skills.workspace.taken") : null)}
         onToggle={() => {
           if (detail === null) return
@@ -1093,6 +1100,7 @@ export function SkillsPage() {
         }}
         onAdopt={(skill) => void adopt(skill)}
         onDelete={removeSkill}
+        onDeleteWorkspace={removeWorkspaceSkill}
         onTagsChange={(tags) => {
           if (detail) setTags(detail, tags)
         }}

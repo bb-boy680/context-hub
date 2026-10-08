@@ -14,6 +14,7 @@ import path from "node:path"
 
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import {
+  deleteSkillFromWorkspace,
   importSkillFromWorkspace,
   installSkillIntoWorkspace,
   readWorkspaceSkill,
@@ -204,6 +205,41 @@ try {
 }
 check("a name that would write outside the library is refused", refused.includes("unusable skill name"), refused)
 check("the library did not gain a stray entry", (await fs.stat(adopted).catch(() => null)) === null)
+
+/* Deleting takes the directory, which is what the row's delete offers. */
+await writeSkill(path.join(workspaceSkillRoot(workspace), "doomed"), "Doomed", "About to go")
+await fs.writeFile(path.join(workspaceSkillRoot(workspace), "doomed", "extra.md"), "x")
+await step("deleting a workspace skill", () => deleteSkillFromWorkspace(workspace, "doomed"))
+check(
+  "the directory is gone",
+  (await fs.stat(path.join(workspaceSkillRoot(workspace), "doomed")).catch(() => null)) === null
+)
+refused = ""
+try {
+  await deleteSkillFromWorkspace(workspace, "doomed")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("deleting what is not there is refused", refused.includes("not in this workspace"), refused)
+await fs.mkdir(path.join(workspaceSkillRoot(workspace), "not-a-skill"), { recursive: true })
+refused = ""
+try {
+  await deleteSkillFromWorkspace(workspace, "not-a-skill")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a directory with no manifest is refused", refused.includes("not a skill in this workspace"), refused)
+check(
+  "the refused directory is still there",
+  (await fs.stat(path.join(workspaceSkillRoot(workspace), "not-a-skill"))).isDirectory()
+)
+refused = ""
+try {
+  await deleteSkillFromWorkspace(workspace, "../escape")
+} catch (error) {
+  refused = error instanceof Error ? error.message : String(error)
+}
+check("a name that would delete outside the root is refused", refused.includes("unusable skill name"), refused)
 
 /* Installing twice is a mistake, not a second entry. */
 refused = ""
