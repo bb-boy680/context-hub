@@ -277,7 +277,15 @@ export function AddSkillDialog({
   const [listed, setListed] = React.useState("")
   /** The pins that listing seeded, so a new pin re-seeds without re-running the CLI. */
   const [seeded, setSeeded] = React.useState("")
-  const [picked, setPicked] = React.useState<string[]>([])
+  /*
+   * Picks belong to the tab that made them. A folder's skills and a package's
+   * skills are different sets that may share names, so one tab's picks must not
+   * render as the other's, nor count toward its Import.
+   */
+  const [folderPicked, setFolderPicked] = React.useState<string[]>([])
+  const [packagePicked, setPackagePicked] = React.useState<string[]>([])
+  const picked = tab === "local" ? folderPicked : packagePicked
+  const setPicked = tab === "local" ? setFolderPicked : setPackagePicked
   const [packaged, setPackaged] = React.useState<PackageSkill[]>([])
   const [folder, setFolder] = React.useState<FolderSkill[] | null>(null)
   /** True when a bound stopped the read before the folder ran out. */
@@ -323,7 +331,8 @@ export function AddSkillDialog({
     setSource("")
     setListed("")
     setSeeded("")
-    setPicked([])
+    setFolderPicked([])
+    setPackagePicked([])
     setPackaged([])
     setFolder(null)
     setCapped(false)
@@ -357,7 +366,9 @@ export function AddSkillDialog({
     setListed(request.source)
     setSeeded(seed)
     /* A pasted command's `--skill` flags are picks, minus what is already in. */
-    setPicked(request.skills.filter((name) => !installed.includes(name.toLowerCase())))
+    setPackagePicked(
+      request.skills.filter((name) => !installed.includes(name.toLowerCase()))
+    )
     setFailed([])
     if (alreadyListed) return
     if (store === null) {
@@ -394,7 +405,7 @@ export function AddSkillDialog({
     folderRead.current = controller
     setError(null)
     setFailed([])
-    setPicked([])
+    setFolderPicked([])
     setCapped(false)
     setBusy("list")
     try {
@@ -405,7 +416,7 @@ export function AddSkillDialog({
       setCapped(truncated)
       setFolder(found)
       const first = found.find((skill) => !installed.includes(skill.name.toLowerCase()))
-      setPicked(first === undefined ? [] : [first.name])
+      setFolderPicked(first === undefined ? [] : [first.name])
     } catch (failure) {
       if (controller.signal.aborted) return
       setFolder(null)
