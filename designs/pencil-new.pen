@@ -24009,7 +24009,7 @@
         {
           "type": "frame",
           "id": "Bn0cT",
-          "x": 7928,
+          "x": 6369,
           "y": 48,
           "name": "Context Hub — Skills — Add skill — Discard confirm",
           "clip": true,
@@ -28423,25 +28423,28 @@
             },
             {
               "type": "rectangle",
-              "id": "FG5e7",
+              "id": "Wr4tO",
               "layoutPosition": "absolute",
-              "x": 0,
-              "y": 0,
-              "name": "Confirm Scrim",
-              "fill": "#0F172A4D",
-              "width": 1440,
-              "height": 1080
+              "x": 862,
+              "y": 782,
+              "name": "Bubble Caret",
+              "rotation": 45,
+              "fill": "$dialog",
+              "width": 12,
+              "height": 12,
+              "stroke": "$glass-border",
+              "strokeWidth": 1,
+              "strokeAlignment": "inner"
             },
             {
               "type": "frame",
               "id": "M4emk",
               "layoutPosition": "absolute",
-              "x": 510,
-              "y": 471,
-              "name": "Confirm Dialog",
-              "clip": true,
-              "width": 420,
-              "height": 138,
+              "x": 588,
+              "y": 654,
+              "name": "Discard Bubble",
+              "width": 320,
+              "height": 134,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -28455,76 +28458,60 @@
                 {
                   "type": "shadow",
                   "shadowType": "outer",
-                  "color": "#0F172A3D",
+                  "color": "#0F172A29",
                   "offset": {
                     "x": 0,
-                    "y": 24
+                    "y": 8
                   },
-                  "blur": 56
+                  "blur": 24
                 }
               ],
               "layout": "vertical",
+              "gap": 10,
+              "padding": [
+                14,
+                16
+              ],
               "children": [
                 {
-                  "type": "frame",
-                  "id": "ZzUY8",
-                  "name": "Confirm Body",
+                  "type": "text",
+                  "id": "BsLef",
+                  "name": "Bubble Title",
+                  "fill": "$foreground",
+                  "content": "Discard this import?",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13.5,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "cAm0h",
+                  "name": "Bubble Text",
+                  "fill": "$muted-foreground",
+                  "textGrowth": "fixed-width",
                   "width": "fill_container",
-                  "layout": "vertical",
-                  "gap": 8,
-                  "padding": [
-                    20,
-                    24,
-                    12,
-                    24
-                  ],
-                  "children": [
-                    {
-                      "type": "text",
-                      "id": "ZpITW",
-                      "name": "Confirm Title",
-                      "fill": "$foreground",
-                      "content": "Discard this import?",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 15,
-                      "fontWeight": "600"
-                    },
-                    {
-                      "type": "text",
-                      "id": "wzGcE",
-                      "name": "Confirm Text",
-                      "fill": "$muted-foreground",
-                      "textGrowth": "fixed-width",
-                      "width": "fill_container",
-                      "content": "The package and the skills you picked are not saved.",
-                      "fontFamily": "$font-sans",
-                      "fontSize": 13,
-                      "fontWeight": "normal"
-                    }
-                  ]
+                  "content": "The package and the skills you picked are not saved.",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
                 },
                 {
                   "type": "frame",
-                  "id": "bphux",
-                  "name": "Confirm Footer",
+                  "id": "u2oOl",
+                  "name": "Bubble Actions",
                   "width": "fill_container",
-                  "height": 64,
                   "gap": 8,
-                  "padding": [
-                    0,
-                    24
-                  ],
                   "justifyContent": "end",
                   "alignItems": "center",
                   "children": [
                     {
-                      "id": "oI4r4",
+                      "id": "w9mIz",
                       "type": "ref",
                       "ref": "x3lnSj",
                       "name": "Button Keep editing",
-                      "width": 116,
+                      "height": 28,
+                      "width": 108,
                       "stroke": "$border",
-                      "height": 32,
                       "fill": "#00000000",
                       "descendants": {
                         "PXvdy": {
@@ -28534,19 +28521,20 @@
                         },
                         "xFfMZ": {
                           "content": "Keep editing",
+                          "fontSize": 12,
                           "fill": "$foreground"
                         }
                       }
                     },
                     {
-                      "id": "h06pF",
+                      "id": "UQ2FX",
                       "type": "ref",
                       "ref": "x3lnSj",
                       "name": "Button Discard",
-                      "width": 104,
+                      "height": 28,
+                      "width": 88,
                       "fill": "$destructive",
                       "stroke": "#00000000",
-                      "height": 32,
                       "descendants": {
                         "PXvdy": {
                           "enabled": false,
@@ -28555,7 +28543,8 @@
                         },
                         "xFfMZ": {
                           "content": "Discard",
-                          "fill": "$destructive-foreground"
+                          "fill": "$destructive-foreground",
+                          "fontSize": 12
                         }
                       }
                     }
@@ -28568,7 +28557,7 @@
         {
           "type": "frame",
           "id": "L9tdZp",
-          "x": 9488,
+          "x": 7929,
           "y": 48,
           "name": "Context Hub — Skills — Detail Lightbox",
           "clip": true,
@@ -33289,7 +33278,7 @@
         {
           "type": "frame",
           "id": "Mnwzp",
-          "x": 11048,
+          "x": 9489,
           "y": 48,
           "name": "Context Hub — Skills — Detail Lightbox — Files",
           "clip": true,
