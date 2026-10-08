@@ -1037,4 +1037,34 @@ Local 与 Download 原本共用一个 `picked`，切页签时上一页的已选�
 
 **画布没改**：设计稿上这一行只有一颗胶囊，限高是"多选时才出现"的运行时行为，静态画板表达不了。
 
+### 设计稿：删除 skill（2026-10-08，用户："skills 还差一个删除功能，先出 UI 设计稿"）
+
+只改画布，未改代码 —— 先给用户看效果。技能库其实**已经有** `store.remove(id)`（删目录 + hub 为它保存的资源），
+缺的只是入口和确认。
+
+**入口**：详情灯箱（`L9tdZp`）的 Info Panel 底部多一行 `Delete skill`：整宽 36 高、透明底、
+1px `#EF444459` 红描边、`delete` 垃圾桶图标 + 13/500 红字。它与上面 [View files][Uninstall] 那一行隔 16px，
+读作"另一类动作"；Spacer 吸收 52px，面板总高不变（仍是 740）。
+
+**确认**：沿用产品里唯一的确认样式 —— 锚在按钮上方的气泡（和"Discard this import?"同一套），
+不做第二个模态（灯箱本身已是模态，再叠一层会变成双遮罩）。气泡 320 宽，左缘与按钮左缘对齐（948），
+底边 842 = 按钮顶 854 上方 12px，小三角（12x12 旋转 45°）中心在底边下 6px —— 与 discard 气泡同一套关系。
+内容 = 标题 `Delete pdf-extract?` + 说明"文件夹与 hub 存的资源都会被删除，无法撤销" + 等宽路径
+`~/.context-hub/skills/pdf-extract`（把"删的是什么"落到具体路径）+ 按钮 `Cancel` / 红色 `Delete`。
+
+**顺带定的图标语义（待用户确认）**：垃圾桶 = 删除。`Uninstall` 只是把技能关掉（清 `enabled`），
+原来也用垃圾桶，于是同一面板里会出现两个一模一样的垃圾桶。已把 46 个 `Button Uninstall` 实例改成
+`power`（卡片、列表、两处 Info Panel）。坑：`UI / Button` 实例里的图标是 **lucide**（`power`），
+bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 "not found in the 'lucide' icon set"。
+
+**画布**：`eddWl` 扩到 14048，新板 `Context Hub — Skills — Delete skill`（`Km85R`）在 x=11049。
+核对图 `designs/check-skills-delete/`（临时，不提交）。
+
+**还等用户拍板的三件事**
+
+1. 入口是否只放在详情灯箱？卡片/列表行也要（hover 垃圾桶 / 行内多一个按钮）会更快，但会与行内
+   `Uninstall` 挤在一起。
+2. 确认用气泡还是居中模态（删本地目录更重，模态更强调"不可撤销"，但会多一层遮罩与一个组件）。
+3. 列表页的复选框目前是空的 —— 批量删除（勾选 → 删除选中）要不要一起做。
+
 
