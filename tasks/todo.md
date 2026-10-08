@@ -1141,3 +1141,26 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
 **画板与实现的一处差异（有意）**：画板里"创建工作区"行点了直接弹对话框，实现里对话框弹出期间该行文字变
 「等待选择文件夹…」且不可再点（避免叠两个对话框）。
 
+### 修正：创建行撑满 + 改用浏览器自带的文件夹对话框（2026-10-08，用户反馈）
+
+用户指出两件事：① 面板里「创建工作区」行只有 123 宽（图层面板实测），应撑满；② 打开文件夹的方式不对，
+应该是**浏览器自己的目录对话框**（就是 Skills 导入用的那一个）。
+
+**① 宽度**：原因是我把这一行包在 `<span>` 里（为了加 pending 的半透明），行是 flex item，外面套了 inline
+容器后不再拉伸。改成把 `disabled` 直接给按钮（`disabled:pointer-events-none disabled:opacity-50`），
+按钮加 `w-full`。实测 284 = 300 − 2×8，与其它行一致。
+
+**② 对话框**：删掉宿主侧的 `host/folder-picker.ts`（PowerShell/osascript/zenity 那套）。
+**目录对话框属于形态，不属于宿主**：页面自己调 `window.showDirectoryPicker()`（无该 API 的浏览器如实报错），
+拿到文件夹后把**名字**交给 hub。契约随之改成 `WorkspaceFolder{name, path?}` + `folderId()`：
+- `path` 是形态能给才有的字段 —— 浏览器出于隐私只给文件夹名，**不给绝对路径**，所以 web 形态下第二行没有
+  路径可显示（`display: null`，行内只显示名字并垂直居中）；桌面/宿主形态能拿到路径时，第二行仍是 `~` 缩写路径。
+- 身份 = `path ?? name`（存储的 `current` 存这个 id）；`add` 去重、`select` 拒绝未知 id。
+- 桥接路由：`POST /hub/workspaces/add {name}` 取代原来的 `pick`。
+- 文案键删掉 `workspace.creating` / `workspace.picker.prompt`（对话框文案由浏览器决定）。
+
+**验证**：`check-workspaces.ts` 扩到 31 项（含"只有名字的文件夹没有路径行""重复 id 只留一条"）全过；
+浏览器里用桩替换 `showDirectoryPicker` 走完整链路 —— 返回 `{name:'dsh-context-hub'}` → 行出现、当前行打勾、
+侧栏第二行同步、`workspaces.json` 写入 `{"folders":[{"name":"dsh-context-hub"}],"current":"dsh-context-hub"}`；
+桩改为抛 `AbortError`（取消）→ 不写盘、不报错、列表不变。core/web/extensions/locale 的类型检查与 lint 干净。
+

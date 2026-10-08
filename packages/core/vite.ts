@@ -281,10 +281,9 @@ export function pluginFiles(options: { home?: string } = {}) {
 }
 
 /**
- * Vite plugin that keeps the workspace list over the dev server. Picking opens
- * a folder dialog on this machine and holds the request for as long as the
- * dialog is up, so the browser form shows the folder only once somebody chose
- * one. A product form mounts the same store itself.
+ * Vite plugin that keeps the workspace list over the dev server. The folder
+ * dialog belongs to the form, so the page reports the folder it picked and this
+ * keeps it; a product form mounts the same store itself.
  */
 export function workspaceList(options: { home?: string } = {}) {
   const store = createFsWorkspaceStore(resolveHubHome(options.home))
@@ -312,22 +311,22 @@ export function workspaceList(options: { home?: string } = {}) {
               sendJson(response, 200, await store.page())
               return
             }
-            if (action === "select" && method === "POST") {
-              const body = JSON.parse((await readBody(request)).toString("utf8")) as { path?: unknown }
-              if (typeof body.path !== "string") {
-                sendJson(response, 400, { error: "select needs a folder path" })
+            if (action === "add" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { name?: unknown }
+              if (typeof body.name !== "string" || body.name === "") {
+                sendJson(response, 400, { error: "add needs the folder's name" })
                 return
               }
-              sendJson(response, 200, await store.select(body.path))
+              sendJson(response, 200, await store.add({ name: body.name }))
               return
             }
-            if (action === "pick" && method === "POST") {
-              const body = JSON.parse((await readBody(request)).toString("utf8")) as { prompt?: unknown }
-              if (typeof body.prompt !== "string" || body.prompt === "") {
-                sendJson(response, 400, { error: "pick needs the dialog prompt" })
+            if (action === "select" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { id?: unknown }
+              if (typeof body.id !== "string" || body.id === "") {
+                sendJson(response, 400, { error: "select needs a workspace id" })
                 return
               }
-              sendJson(response, 200, await store.pick(body.prompt))
+              sendJson(response, 200, await store.select(body.id))
               return
             }
             response.writeHead(405).end()

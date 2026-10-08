@@ -2,14 +2,13 @@
  * Disk-backed workspace list: the folders a person has pointed the hub at, kept
  * in the hub home's state directory so the list travels with the hub instead of
  * with one browser profile. This module runs in the process that owns the disk,
- * which is also the only process that can open a folder dialog.
+ * which is where a folder's path becomes a path a person reads.
  */
 import { displayPath } from "./home.ts"
-import { pickFolder } from "./folder-picker.ts"
 import { createFsStateStore } from "./state-fs.ts"
-import { readWorkspaceState, WORKSPACE_DOCUMENT, workspaceName } from "../workspace.ts"
+import { folderId, readWorkspaceState, WORKSPACE_DOCUMENT } from "../workspace.ts"
 import type {
-  PickedWorkspace,
+  WorkspaceFolder,
   WorkspacePage,
   WorkspaceStore,
   WorkspaceState,
@@ -20,10 +19,10 @@ import type {
 export function createFsWorkspaceStore(home: string): WorkspaceStore {
   const documents = createFsStateStore(home)
 
-  const view = (path: string): WorkspaceView => ({
-    path,
-    name: workspaceName(path),
-    display: displayPath(path),
+  const view = (folder: WorkspaceFolder): WorkspaceView => ({
+    id: folderId(folder),
+    name: folder.name,
+    display: folder.path === undefined ? null : displayPath(folder.path),
   })
 
   const read = async (): Promise<WorkspaceState> =>
@@ -37,22 +36,25 @@ export function createFsWorkspaceStore(home: string): WorkspaceStore {
   return {
     page,
 
-    async select(path) {
+    async add(folder) {
       const state = await read()
-      if (!state.folders.includes(path)) throw new Error(`not a known workspace: ${path}`)
-      if (state.current !== path) {
-        await documents.write(WORKSPACE_DOCUMENT, { ...state, current: path })
-      }
+      const id = folderId(folder)
+      const folders = state.folders.some((known) => folderId(known) === id)
+        ? state.folders
+        : [...state.folders, folder]
+      await documents.write(WORKSPACE_DOCUMENT, { folders, current: id })
       return page()
     },
 
-    async pick(prompt) {
-      const chosen = await pickFolder(prompt)
-      if (chosen === null) return { cancelled: true, page: await page() } satisfies PickedWorkspace
+    async select(id) {
       const state = await read()
-      const folders = state.folders.includes(chosen) ? state.folders : [...state.folders, chosen]
-      await documents.write(WORKSPACE_DOCUMENT, { folders, current: chosen })
-      return { cancelled: false, page: await page(), picked: view(chosen) } satisfies PickedWorkspace
+      if (!state.folders.some((folder) => folderId(folder) === id)) {
+        throw new Error(`not a known workspace: ${id}`)
+      }
+      if (state.current !== id) {
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, current: id })
+      }
+      return page()
     },
   }
 }

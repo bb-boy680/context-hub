@@ -28,21 +28,25 @@ function MenuRow({
   display,
   state,
   trailing,
+  disabled,
   onClick,
 }: {
   icon: React.ReactNode
   name: string
-  display?: string
+  /** The folder's path; `null` when this form cannot know one. */
+  display?: string | null
   state: RowState
   trailing?: React.ReactNode
+  disabled?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type="button"
+      disabled={disabled}
       onClick={onClick}
       className={cn(
-        "flex h-11 cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left",
+        "flex h-11 w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 text-left disabled:pointer-events-none disabled:opacity-50",
         state === "current" ? "bg-primary/10" : "hover:bg-muted"
       )}
     >
@@ -58,7 +62,12 @@ function MenuRow({
       >
         {icon}
       </span>
-      <span className="flex min-w-0 flex-1 flex-col">
+      <span
+        className={cn(
+          "flex min-w-0 flex-1 flex-col",
+          display === undefined || display === null ? "justify-center" : null
+        )}
+      >
         <span
           className={cn(
             "truncate text-[13px] leading-[17px] font-medium",
@@ -67,7 +76,7 @@ function MenuRow({
         >
           {name}
         </span>
-        {display === undefined ? null : (
+        {display === undefined || display === null ? null : (
           <span className="truncate font-mono text-[11px] leading-[14px] text-muted-foreground">
             {display}
           </span>
@@ -80,10 +89,10 @@ function MenuRow({
 
 export function WorkspaceMenu() {
   const { t } = useI18n()
-  const { page, failure, pending, select, pick } = useWorkspaces()
+  const { page, failure, pending, select, add } = useWorkspaces()
   const [open, setOpen] = React.useState(false)
   const current = page?.current ?? null
-  const currentName = page?.folders.find((folder) => folder.path === current)?.name ?? null
+  const currentName = page?.folders.find((folder) => folder.id === current)?.name ?? null
 
   return (
     <SidebarMenu>
@@ -116,18 +125,18 @@ export function WorkspaceMenu() {
             </span>
             {(page?.folders ?? []).map((folder) => (
               <MenuRow
-                key={folder.path}
+                key={folder.id}
                 icon={<FolderIcon className="size-[15px]" />}
                 name={folder.name}
                 display={folder.display}
-                state={folder.path === current ? "current" : "idle"}
+                state={folder.id === current ? "current" : "idle"}
                 trailing={
-                  folder.path === current ? (
+                  folder.id === current ? (
                     <CheckIcon className="size-[15px] shrink-0 text-primary" />
                   ) : null
                 }
                 onClick={() => {
-                  select(folder.path)
+                  select(folder.id)
                   setOpen(false)
                 }}
               />
@@ -135,14 +144,13 @@ export function WorkspaceMenu() {
             <span className="flex h-[13px] items-center py-1.5">
               <span className="h-px w-full bg-border" />
             </span>
-            <span className={cn(pending && "pointer-events-none opacity-50")}>
-              <MenuRow
-                icon={<PlusIcon className="size-[15px]" />}
-                name={pending ? t("workspace.creating") : t("workspace.create")}
-                state="action"
-                onClick={() => pick(t("workspace.picker.prompt"))}
-              />
-            </span>
+            <MenuRow
+              icon={<PlusIcon className="size-[15px]" />}
+              name={t("workspace.create")}
+              state="action"
+              disabled={pending}
+              onClick={() => add()}
+            />
             {failure === null ? null : (
               <span className="px-2.5 pb-1 text-xs leading-[15px] text-destructive">{failure}</span>
             )}
