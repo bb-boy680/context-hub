@@ -3,25 +3,18 @@
  * path like `assets/cover.png` resolves the same way in every form: `<home>`
  * plus the path.
  *
- * Writes replace files atomically (a sibling temp file renamed into place, with
- * a bounded retry for Windows sharing errors), so a reader never sees a partial
- * file. This module runs in the process that owns the disk.
+ * Writes replace files atomically (see `atomic.ts`), so a reader never sees a
+ * partial file. This module runs in the process that owns the disk.
  */
-import { randomUUID } from "node:crypto"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
 import { ASSET_DIR, assetKind, assetLimit, limitMessage } from "../assets.ts"
 import type { AssetLibrary } from "../assets.ts"
-
-/** Prefix for in-flight replacements; readers skip it. */
-const TEMP_PREFIX = ".tmp-"
+import { writeFileAtomic } from "./atomic.ts"
 
 /** Characters no file name may carry: path separators plus the Windows reserved set. */
 const RESERVED_IN_NAME = /[\\/:*?"<>|]/
-
-/** Windows reports transient sharing failures while another handle closes. */
-const RETRYABLE = new Set(["EACCES", "EBUSY", "EPERM"])
 
 /** Reject a name that would escape, hide, or fail to write. */
 function assertSafeName(value: string): string {
@@ -77,23 +70,7 @@ export function createFsAssetLibrary(home: string): AssetLibrary {
         file = `${path.basename(original, path.extname(original))}-${suffix++}${path.extname(original)}`
       }
       /* Write beside the target and rename, so a failed write leaves no half file. */
-      const temporary = path.join(dir, `${TEMP_PREFIX}${randomUUID()}`)
-      await fs.writeFile(temporary, bytes)
-      try {
-        for (let attempt = 0; ; attempt += 1) {
-          try {
-            await fs.rename(temporary, path.join(dir, file))
-            break
-          } catch (error) {
-            const code = (error as NodeJS.ErrnoException).code ?? ""
-            if (!RETRYABLE.has(code) || attempt >= 4) throw error
-            await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
-          }
-        }
-      } catch (error) {
-        await fs.rm(temporary, { force: true })
-        throw error
-      }
+      await writeFileAtomic(path.join(dir, file), bytes)
       return `${ASSET_DIR}/${file}`
     },
 

@@ -18,8 +18,8 @@ import {
   type ExtensionScope,
 } from "./types.ts"
 
-/** Persisted enablement: one boolean per extension id. */
-const STATE_KEY = "hub/extensions/state"
+/** State document holding one boolean per extension id, under the hub home's state space. */
+const STATE_DOCUMENT = "extensions"
 
 /** Unregister one contribution. */
 type Disposer = () => void
@@ -320,25 +320,21 @@ export class ExtensionService extends Service {
   private persist(): void {
     const state: Record<string, boolean> = {}
     for (const [id, entry] of this.entries) state[id] = entry.enabled
-    this.host.storage.write(STATE_KEY, JSON.stringify(state))
+    this.host.storage.write(STATE_DOCUMENT, state)
   }
 
   private readState(): Record<string, boolean> {
-    const raw = this.host.storage.read(STATE_KEY)
-    if (raw === null) return {}
-    try {
-      const parsed: unknown = JSON.parse(raw)
-      if (typeof parsed !== "object" || parsed === null) return {}
-      const state: Record<string, boolean> = {}
-      for (const [id, enabled] of Object.entries(parsed)) {
-        if (typeof enabled === "boolean") state[id] = enabled
-      }
-      return state
-    } catch (error) {
-      // Corrupt state falls back to manifest defaults instead of blocking boot.
-      this.host.log("warn", `extensions: ignoring unreadable state: ${String(error)}`)
+    const parsed = this.host.storage.read(STATE_DOCUMENT)
+    if (parsed === null) return {}
+    if (typeof parsed !== "object") {
+      this.host.log("warn", "extensions: ignoring stored state that is not an object")
       return {}
     }
+    const state: Record<string, boolean> = {}
+    for (const [id, enabled] of Object.entries(parsed)) {
+      if (typeof enabled === "boolean") state[id] = enabled
+    }
+    return state
   }
 
   private buildSnapshot(): ExtensionSnapshot {

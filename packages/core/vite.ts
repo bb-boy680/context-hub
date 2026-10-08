@@ -1,18 +1,23 @@
 /**
- * Development bridge for the asset library: it serves the files the hub owns so
- * the browser form can show them during development. Product forms serve the
- * same files from the process that owns the disk, so nothing here is a service
- * the app depends on.
+ * Development bridge for the hub's own directory: it serves the files the hub
+ * owns and keeps its state documents, so the browser form works against real
+ * files during development. Product forms mount the same stores themselves, so
+ * nothing here is a service the app depends on.
  *
- * Only reads are routed: files are created and deleted through the store that
- * records them, which is what keeps a reference and its file in step.
+ * Assets are read-only: files are created and deleted through the store that
+ * records them, which is what keeps a reference and its file in step. State
+ * documents are read and written, because they are what a browser form cannot
+ * keep anywhere else.
  */
 import { createReadStream, promises as fs } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
+import { STATE_ROUTE } from "./src/state.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
 import { resolveHubHome } from "./src/host/home.ts"
+import { createFsStateStore } from "./src/host/state-fs.ts"
+import type { StateStore } from "./src/state.ts"
 
 /** One `Content-Type` for a stored file, from its extension. */
 const MIME_TYPES: Record<string, string> = {
@@ -104,6 +109,83 @@ export function assetLibrary(options: { home?: string } = {}) {
             await sendFile(home, relative, request.headers.range, response)
           } catch {
             response.writeHead(404).end()
+          }
+        }
+      )
+    },
+  }
+}
+
+/** Read a whole request body into one buffer. */
+async function readBody(request: NodeJS.ReadableStream): Promise<Buffer> {
+  const chunks: Buffer[] = []
+  for await (const chunk of request) chunks.push(chunk as Buffer)
+  return Buffer.concat(chunks)
+}
+
+function sendJson(response: ServerResponse, status: number, value: unknown) {
+  const body = JSON.stringify(value)
+  response.writeHead(status, {
+    "Content-Type": "application/json",
+    "Content-Length": Buffer.byteLength(body),
+  })
+  response.end(body)
+}
+
+/** Every stored document, keyed by name; a file that is not JSON is reported and skipped. */
+async function readDocuments(
+  store: StateStore,
+  warn: (message: string) => void
+): Promise<Record<string, unknown>> {
+  const documents: Record<string, unknown> = {}
+  for (const name of await store.names()) {
+    try {
+      documents[name] = await store.read(name)
+    } catch (error) {
+      warn(`context hub: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return documents
+}
+
+/** Vite plugin that keeps the hub's state documents over the dev server. */
+export function stateStore(options: { home?: string } = {}) {
+  const store = createFsStateStore(resolveHubHome(options.home))
+
+  return {
+    name: "context-hub-state-store",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+      config: { logger: { warn: (message: string) => void } }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(STATE_ROUTE)) {
+            next()
+            return
+          }
+          const name = url.pathname.slice(STATE_ROUTE.length).replace(/^\//, "")
+          const method = request.method ?? "GET"
+          try {
+            if (name === "" && method === "GET") {
+              sendJson(response, 200, await readDocuments(store, server.config.logger.warn))
+              return
+            }
+            if (name !== "" && method === "PUT") {
+              const body = (await readBody(request)).toString("utf8")
+              await store.write(decodeURIComponent(name), JSON.parse(body) as unknown)
+              sendJson(response, 200, { ok: true })
+              return
+            }
+            response.writeHead(405).end()
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            sendJson(response, 400, { error: message })
           }
         }
       )

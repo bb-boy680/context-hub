@@ -10,8 +10,8 @@ import type { PlatformHost } from "./host.ts"
 import type { ExtensionService } from "./service.ts"
 import type { LocaleContribution } from "./types.ts"
 
-/** Persisted active locale id. */
-const LOCALE_KEY = "hub/locale"
+/** State document holding the active locale id, under the hub home's state space. */
+const LOCALE_DOCUMENT = "locale"
 
 /** Fallback locale id; the kernel locks this pack so the lookup chain always terminates. */
 const FALLBACK_LOCALE = "en"
@@ -57,7 +57,8 @@ export class I18nService extends Service {
     if (extensions === undefined) throw new Error("i18n: extension service unavailable")
     this.host = host
     this.extensions = extensions
-    this.active = host.storage.read(LOCALE_KEY) ?? FALLBACK_LOCALE
+    const stored = host.storage.read(LOCALE_DOCUMENT)
+    this.active = typeof stored === "string" ? stored : FALLBACK_LOCALE
     ctx.on("extensions/changed", () => this.refresh())
     this.refresh()
   }
@@ -77,7 +78,7 @@ export class I18nService extends Service {
     if (id === this.active) return
     if (!this.cached.locales.some((locale) => locale.id === id)) return
     this.active = id
-    this.host.storage.write(LOCALE_KEY, id)
+    this.host.storage.write(LOCALE_DOCUMENT, id)
     this.refresh()
   }
 
@@ -90,7 +91,7 @@ export class I18nService extends Service {
     }
     if (!locales.some((locale) => locale.id === this.active)) {
       this.active = FALLBACK_LOCALE
-      this.host.storage.write(LOCALE_KEY, this.active)
+      this.host.storage.write(LOCALE_DOCUMENT, this.active)
     }
     this.table = this.buildTable(packs)
     this.revision += 1

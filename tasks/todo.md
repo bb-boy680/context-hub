@@ -307,4 +307,41 @@ Import `DzRqf`、Lightbox `L9tdZp`、Lightbox Files `Mnwzp`；`eddWl` 宽度 141
 - 核对图本轮已按新约定删除（`designs/` 下的截图不进仓库）：本地导出 `libo0`（瀑布流网格）与 `L9tdZp`
   （lightbox + 新背景）逐块看过，确认封面比例、列高与折线位置正确。
 
+## 插件状态改存 hub home（2026-10-08，用户："插件系统用浏览器本地缓存是不对的"）
+
+### 问题
+
+内核把状态写进了 `window.localStorage`（键 `hub/extensions/state`、`hub/locale`）：换一台机器、换浏览器、
+清一次站点数据，扩展的启用状态和界面语言就没了——产品状态不该由某个浏览器 profile 保管。
+
+### 决策
+
+- **新增 `state/` 空间**：`<home>/state/<name>.json`，一个文档一个文件（`extensions.json` 启停状态、
+  `locale.json` 当前语言）。命名即文件名，所以名字必须是小写字母开头的 `[a-z0-9-]`，其余一律拒绝。
+- **端口从"字符串"改为"JSON 值"**：`StoragePort.read/write` 直接搬 `unknown`，不再 `JSON.stringify`
+  一层套一层；磁盘文件因此就是值本身，读的一方校验（`extensions` 校验对象+布尔，`locale` 校验字符串）。
+- **表单负责异步**：内核接口必须同步（Cordis 服务在构造期读状态），所以由**表单**在启动前把 `state/`
+  全部读进内存，再用一个同步端口对外，写操作直接回写主机（失败只告警，不在点击时抛错）。
+- **一次性搬迁**：盘上没有该文档、浏览器里还有旧键时，先把旧值写进盘再删掉浏览器键；
+  盘上已有文档则直接删掉浏览器里的陈旧副本。用户本次已就地迁移（旧键已从浏览器清除）。
+
+### 接线变化
+
+- `packages/core`：新增 `src/state.ts`（`STATE_ROUTE`/`STATE_DIR`/`assertStateName`/`StateStore`）、
+  `src/host/state-fs.ts`（磁盘实现）、`src/host/atomic.ts`（原子写，从 `assets-fs.ts` 抽出，
+  `plugin-skills` 的第三份 `writeAtomic` 一并合并到这里）；桥新增 `GET/PUT /hub/state[/<name>]`。
+- `packages/extensions`：`StoragePort` 改为 JSON 值；文档名成为 `extensions` / `locale`。
+- `apps/web`：`lib/hub.ts` 启动前 `openState()`（读盘 + 搬迁 + 回写），`vite.config.ts` 注册 `stateStore()`。
+
+### 验证
+
+- `node packages/core/scripts/check-state.ts`：**23 项断言全绿**（文档即文件、重开 store 可读、
+  标量文档、名字拒绝表 `..`/`hub/locale`/`Hub`/`.hidden`/空/空格/带扩展名、越界写入拒绝、
+  坏 JSON 报文件名、外来文件不列表也不动、替换后无临时文件残留）。
+- `node packages/plugin-skills/scripts/check-store.ts`：全绿（共享原子写后回归）。
+- `core` / `extensions` / `plugin-skills` / `web` typecheck 与 lint 全绿。
+- 浏览器：重启 dev server 后 `/extensions` 显示的状态来自磁盘（旧键搬迁成功，盘上出现
+  `extensions.json`、`locale.json`）；点"卸载 简体中文"→ 盘上该键变 `false`、localStorage 不同步变化；
+  刷新后仍为已卸载（读盘生效）；重新安装恢复原值；刷新后 `localStorage` 只剩 `theme`。
+
 

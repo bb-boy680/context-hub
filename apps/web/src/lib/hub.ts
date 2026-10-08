@@ -1,14 +1,18 @@
 /**
- * Web form of the kernel: a localStorage-backed host whose capabilities match
- * what a plain browser can do. The browser cannot read the skill library
- * itself, so `startHub` offers the store only when a host answers for it; the
- * skills plugin falls back to its sample data when nobody does.
+ * Web form of the kernel: the host is the hub's own directory, reached over the
+ * dev server. Everything the kernel remembers is read from there before it
+ * starts and written back on every change, so nothing depends on this browser
+ * profile. The browser cannot read the skill library itself, so `startHub`
+ * offers that store only when a host answers for it; the skills plugin falls
+ * back to its sample data when nobody does.
  */
+import { STATE_ROUTE } from "@workspace/core/state"
 import {
   builtinExtensions,
   createHubKernel,
   type HubKernel,
   type PlatformHost,
+  type StoragePort,
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
@@ -16,16 +20,67 @@ import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skill
 /** Path the active form serves the skill library on, when it serves one at all. */
 const SKILLS_ENDPOINT = "/hub/skills"
 
-const webHost: PlatformHost = {
-  form: "Web",
-  capabilities: { code: true, filesystem: false, network: true },
-  storage: {
-    read: (key) => window.localStorage.getItem(key),
-    write: (key, value) => window.localStorage.setItem(key, value),
-  },
-  log: (level, message) => {
-    console[level](message)
-  },
+/**
+ * Where the build before the host-backed state kept each document, and how it
+ * encoded the value: the state was JSON text, the locale id a bare string.
+ */
+const BROWSER_HELD_STATE: {
+  document: string
+  key: string
+  decode(raw: string): unknown
+}[] = [
+  { document: "extensions", key: "hub/extensions/state", decode: (raw) => JSON.parse(raw) },
+  { document: "locale", key: "hub/locale", decode: (raw) => raw },
+]
+
+/** Send one document to the host; a failure is reported, never thrown at a click. */
+async function storeDocument(document: string, value: unknown): Promise<boolean> {
+  try {
+    const response = await fetch(`${STATE_ROUTE}/${encodeURIComponent(document)}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(value),
+    })
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    return true
+  } catch (error) {
+    console.warn(`context hub: could not store "${document}"`, error)
+    return false
+  }
+}
+
+/**
+ * Read every state document, carrying over anything a previous build left in
+ * this browser. A carried value is written to the host and then dropped from
+ * the browser, which is where it stops being the store.
+ */
+async function openState(): Promise<Record<string, unknown>> {
+  const state: Record<string, unknown> = {}
+  try {
+    const response = await fetch(STATE_ROUTE)
+    if (response.ok) Object.assign(state, (await response.json()) as object)
+  } catch {
+    /* No host behind this origin: the kernel runs on its own defaults. */
+  }
+  for (const held of BROWSER_HELD_STATE) {
+    const raw = window.localStorage.getItem(held.key)
+    if (raw === null) continue
+    if (state[held.document] !== undefined) {
+      /* The host already owns this document, so the browser copy is stale. */
+      window.localStorage.removeItem(held.key)
+      continue
+    }
+    try {
+      state[held.document] = held.decode(raw)
+    } catch {
+      /* A value this build cannot read is left behind, not guessed at. */
+      continue
+    }
+    void storeDocument(held.document, state[held.document]).then((stored) => {
+      if (stored) window.localStorage.removeItem(held.key)
+    })
+  }
+  return state
 }
 
 /** Whether a host answers for the skill library; absence keeps the sample data. */
@@ -41,6 +96,22 @@ async function skillStoreAvailable(): Promise<boolean> {
 
 /** Compose and activate the kernel; the app renders once this settles. */
 export async function startHub(): Promise<HubKernel> {
+  const state = await openState()
+  const storage: StoragePort = {
+    read: (key) => state[key] ?? null,
+    write: (key, value) => {
+      state[key] = value
+      void storeDocument(key, value)
+    },
+  }
+  const webHost: PlatformHost = {
+    form: "Web",
+    capabilities: { code: true, filesystem: false, network: true },
+    storage,
+    log: (level, message) => {
+      console[level](message)
+    },
+  }
   const services: Record<string, unknown> = {}
   if (await skillStoreAvailable()) {
     services["hub.skills"] = createRemoteSkillStore()

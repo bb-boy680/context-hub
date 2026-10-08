@@ -4,11 +4,18 @@
  * runs in.
  */
 
-/** Synchronous string persistence; each form backs it with what it has (localStorage, files). */
+/**
+ * What the kernel and its extensions remember about this hub: one JSON value
+ * per key, kept where the form keeps its state — the hub home's `state`
+ * directory in every form that owns a disk. A form loads its store before the
+ * kernel starts, which is what lets the kernel read synchronously, and writes
+ * every change straight back to it; the value is durable JSON, so a reader
+ * validates what it finds.
+ */
 export interface StoragePort {
-  /** Stored value, or `null` when the key is absent. */
-  read(key: string): string | null
-  write(key: string, value: string): void
+  /** The stored value, or `null` when this key has never been written. */
+  read(key: string): unknown
+  write(key: string, value: unknown): void
 }
 
 /** Platform abilities a form either has or lacks. */

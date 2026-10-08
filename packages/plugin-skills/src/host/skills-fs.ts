@@ -18,12 +18,12 @@
  * partial manifest or catalog. This module runs in the process that owns the
  * disk; no service sits in front of it.
  */
-import { randomUUID } from "node:crypto"
 import { promises as fs, watch } from "node:fs"
 import path from "node:path"
 
 import { assetKind, assetUrl, isLink, readSource } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
+import { TEMP_PREFIX, writeFileAtomic } from "@workspace/core/host/atomic"
 import { displayPath, resolveHubHome } from "@workspace/core/host/home"
 import type { AssetLibrary } from "@workspace/core"
 
@@ -49,8 +49,6 @@ import type {
 const CATALOG_FILE = "index.json"
 const MANIFEST = "SKILL.md"
 const CATALOG_VERSION = 1
-/** Prefix for in-flight replacements; watchers skip it. */
-const TEMP_PREFIX = ".tmp-"
 
 /** One skill as the catalog records it. */
 interface CatalogEntry {
@@ -106,32 +104,6 @@ function toId(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-}
-
-/** Windows reports transient sharing failures while another handle closes. */
-const RETRYABLE = new Set(["EACCES", "EBUSY", "EPERM"])
-
-/** Write a file by renaming a completed temporary file over it. */
-async function writeAtomic(target: string, text: string): Promise<void> {
-  await fs.mkdir(path.dirname(target), { recursive: true })
-  const temporary = path.join(
-    path.dirname(target),
-    `${TEMP_PREFIX}${randomUUID()}`
-  )
-  await fs.writeFile(temporary, text, "utf8")
-  for (let attempt = 0; ; attempt += 1) {
-    try {
-      await fs.rename(temporary, target)
-      return
-    } catch (error) {
-      const code = (error as NodeJS.ErrnoException).code ?? ""
-      if (!RETRYABLE.has(code) || attempt >= 4) {
-        await fs.rm(temporary, { force: true })
-        throw error
-      }
-      await new Promise((resolve) => setTimeout(resolve, 20 * (attempt + 1)))
-    }
-  }
 }
 
 async function readJson<T>(file: string, fallback: T): Promise<T> {
@@ -237,7 +209,7 @@ export async function createFsSkillStore(
   /** Publish the catalog atomically; the revision lets callers skip unchanged pages. */
   const saveCatalog = async (next: CatalogFile): Promise<CatalogFile> => {
     catalog = { ...next, revision: next.revision + 1 }
-    await writeAtomic(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`)
+    await writeFileAtomic(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`)
     return catalog
   }
 
@@ -405,7 +377,7 @@ export async function createFsSkillStore(
       await fs.mkdir(path.join(dir, "references"), { recursive: true })
       await fs.mkdir(path.join(dir, "scripts"), { recursive: true })
       const manifest = path.join(dir, MANIFEST)
-      await writeAtomic(manifest, starterSkillFile(draft))
+      await writeFileAtomic(manifest, starterSkillFile(draft))
       const stat = await statOrNull(manifest)
       await mutate((skills) => {
         skills[id] = {
@@ -430,7 +402,7 @@ export async function createFsSkillStore(
       let mtimeMs = row.mtimeMs
       if (patch.description !== undefined || patch.tags !== undefined) {
         const text = await fs.readFile(manifest, "utf8")
-        await writeAtomic(
+        await writeFileAtomic(
           manifest,
           writeSkillFile(text, {
             description: patch.description,
@@ -469,7 +441,7 @@ export async function createFsSkillStore(
     },
 
     async writeFile(id: string, file: string, text: string): Promise<void> {
-      await writeAtomic(assertSafePath(skillDir(id), file), text)
+      await writeFileAtomic(assertSafePath(skillDir(id), file), text)
       await mutate((skills) => {
         const row = skills[id]
         if (row !== undefined)
