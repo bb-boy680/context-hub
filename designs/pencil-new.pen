@@ -23207,11 +23207,11 @@
               "id": "EHWkL",
               "layoutPosition": "absolute",
               "x": 400,
-              "y": 317,
+              "y": 228,
               "name": "Dialog",
               "clip": true,
               "width": 640,
-              "height": 447,
+              "height": 623,
               "fill": "$dialog",
               "cornerRadius": "$radius-lg",
               "stroke": "$glass-border",
@@ -23394,7 +23394,9 @@
                   "id": "BCHhh",
                   "name": "Dialog Body",
                   "width": "fill_container",
+                  "height": 428,
                   "layout": "vertical",
+                  "gap": 16,
                   "padding": [
                     0,
                     24,
@@ -23407,14 +23409,17 @@
                       "id": "MS8Ea",
                       "name": "Dropzone",
                       "width": "fill_container",
-                      "height": 228,
+                      "height": 92,
                       "fill": "$dropzone",
                       "cornerRadius": "$radius-lg",
                       "stroke": "$primary",
                       "strokeWidth": 2,
                       "strokeAlignment": "inner",
-                      "layout": "vertical",
-                      "gap": 12,
+                      "gap": 14,
+                      "padding": [
+                        0,
+                        20
+                      ],
                       "justifyContent": "center",
                       "alignItems": "center",
                       "children": [
@@ -23422,8 +23427,8 @@
                           "type": "frame",
                           "id": "jkK63",
                           "name": "Icon Ring",
-                          "width": 56,
-                          "height": 56,
+                          "width": 44,
+                          "height": 44,
                           "fill": "$surface-raised",
                           "cornerRadius": 999,
                           "stroke": "$glass-border",
@@ -23436,8 +23441,8 @@
                               "type": "icon",
                               "id": "memvU",
                               "name": "Icon",
-                              "width": 26,
-                              "height": 26,
+                              "width": 20,
+                              "height": 20,
                               "icon": "upload",
                               "library": "lucide",
                               "fill": "$primary"
@@ -23445,27 +23450,37 @@
                           ]
                         },
                         {
-                          "type": "text",
-                          "id": "i7MSd2",
-                          "name": "Dropzone Title",
-                          "fill": "$foreground",
-                          "content": "Drag and drop your skill folder here",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 15,
-                          "fontWeight": "600"
-                        },
-                        {
-                          "type": "text",
-                          "id": "ElA6m",
-                          "name": "Dropzone Hint",
-                          "fill": "$muted-foreground",
-                          "textGrowth": "fixed-width",
-                          "width": 420,
-                          "content": "The folder must contain a SKILL.md manifest. You can also drop a .zip archive.",
-                          "textAlign": "center",
-                          "fontFamily": "$font-sans",
-                          "fontSize": 12,
-                          "fontWeight": "normal"
+                          "type": "frame",
+                          "id": "kv31L",
+                          "name": "Text",
+                          "width": "fill_container",
+                          "layout": "vertical",
+                          "gap": 3,
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "i7MSd2",
+                              "name": "Dropzone Title",
+                              "fill": "$foreground",
+                              "content": "Drag and drop a skill folder here",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "ElA6m",
+                              "name": "Dropzone Hint",
+                              "fill": "$muted-foreground",
+                              "textGrowth": "fixed-width",
+                              "width": "fill_container",
+                              "content": "A folder with SKILL.md, or a repository of skills.",
+                              "textAlign": "center",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 11.5,
+                              "fontWeight": "normal"
+                            }
+                          ]
                         },
                         {
                           "id": "sraFo",
@@ -23486,6 +23501,426 @@
                               "fill": "$foreground"
                             }
                           }
+                        }
+                      ]
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "xGXv0",
+                      "name": "Divider",
+                      "fill": "$border",
+                      "width": "fill_container",
+                      "height": 1
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EAX0K",
+                      "name": "Results Header",
+                      "width": "fill_container",
+                      "gap": 8,
+                      "justifyContent": "space_between",
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "SKFUq",
+                          "name": "Count",
+                          "fill": "$muted-foreground",
+                          "content": "Found 5 skills in this folder",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        },
+                        {
+                          "type": "text",
+                          "id": "gbO5n",
+                          "name": "Select All",
+                          "fill": "$primary",
+                          "content": "Select all",
+                          "fontFamily": "$font-sans",
+                          "fontSize": 12,
+                          "fontWeight": "500"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "gJS2j",
+                      "name": "Skill List",
+                      "clip": true,
+                      "width": "fill_container",
+                      "height": 224,
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "AImPU",
+                          "name": "Skill docs-writer",
+                          "width": "fill_container",
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "KoniP",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ymdv8",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "docs-writer",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13.5,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "D1uVep",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Turn notes and pull requests into documentation",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "u6znZd",
+                              "name": "State Selected",
+                              "gap": 6,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "zgCqp",
+                                  "name": "Check",
+                                  "width": 14,
+                                  "height": 14,
+                                  "icon": "check",
+                                  "library": "lucide",
+                                  "fill": "$chart-2"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "GUr1I",
+                                  "name": "Selected Label",
+                                  "fill": "$chart-2",
+                                  "content": "Selected",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "500"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "wJXL0",
+                          "name": "Skill release-notes",
+                          "width": "fill_container",
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "IDbHh",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "onaYQ",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "release-notes",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13.5,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "HVQlp",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Summarise merged work into release notes",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "Rk2yF",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "j82Puy",
+                          "name": "Skill api-review",
+                          "width": "fill_container",
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "w00pb",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ijELy",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "api-review",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13.5,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "DwdM5",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Review endpoint changes against the public contract",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "jPAL5",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "SD4kN",
+                          "name": "Skill onboarding",
+                          "width": "fill_container",
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "y6JizQ",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "rcNcb",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "onboarding",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13.5,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "a3gEX2",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Walk a new contributor through the codebase",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "gUnQ8",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "iJOb4",
+                          "name": "Skill changelog",
+                          "width": "fill_container",
+                          "height": 56,
+                          "gap": 12,
+                          "padding": [
+                            0,
+                            14,
+                            0,
+                            0
+                          ],
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "DWJgy",
+                              "name": "Text",
+                              "width": "fill_container",
+                              "layout": "vertical",
+                              "gap": 2,
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "gPl2e",
+                                  "name": "Skill Name",
+                                  "fill": "$foreground",
+                                  "content": "changelog",
+                                  "fontFamily": "$font-mono",
+                                  "fontSize": 13.5,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "W3oUgn",
+                                  "name": "Skill Desc",
+                                  "fill": "$muted-foreground",
+                                  "textGrowth": "fixed-width",
+                                  "width": "fill_container",
+                                  "content": "Group commits into a readable changelog",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 11.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "NqTCC",
+                              "type": "ref",
+                              "ref": "x3lnSj",
+                              "name": "Button Select",
+                              "height": 32,
+                              "stroke": "#00000000",
+                              "fill": "$primary",
+                              "width": 84,
+                              "descendants": {
+                                "PXvdy": {
+                                  "enabled": false,
+                                  "icon": "download",
+                                  "fill": "$primary-foreground"
+                                },
+                                "xFfMZ": {
+                                  "content": "Select",
+                                  "fill": "$primary-foreground"
+                                }
+                              }
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "zACDX",
+                          "layoutPosition": "absolute",
+                          "x": 584,
+                          "y": 4,
+                          "name": "Scrollbar",
+                          "width": 4,
+                          "height": 186,
+                          "fill": "#0F172A40",
+                          "cornerRadius": 999
                         }
                       ]
                     }

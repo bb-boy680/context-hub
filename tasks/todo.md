@@ -765,4 +765,43 @@ Downloaded into ~/.context-hub/skills and enabled right away.   [Cancel] [Downlo
 工具栏的 `Import` 目前仍是**描边（次要）**样式——它过去是次级入口（主按钮是已删除的 Browse skill.sh）。
 现在它是页面唯一入口，是否要提为主按钮（靛蓝实心）？未擅自改动。
 
+## Local 也要列表：拖入的可能是"技能仓库"（2026-10-08，用户要求）
+
+用户指出：本地导入的可能不只是一个技能，而是**一个技能仓库**，所以 Local 同样要列出扫描到的技能。
+
+### 改动
+
+`DzRqf`（Add skill — Local）的弹窗结构从"拖拽区 + 页脚"变成与 Download 同构：
+
+```
+[ Local | Download ]
+┌──────────────────────────────────────────────────────┐
+│ [↑]  Drag and drop a skill folder here   [Browse files] │  ← 拖拽区 92 高（横排紧凑版）
+│      A folder with SKILL.md, or a repository of skills.  │
+└──────────────────────────────────────────────────────┘
+────────────────────────────────────────────
+Found 5 skills in this folder                 Select all
+ docs-writer      Turn notes and pull requests…      ✓ Selected
+ release-notes    Summarise merged work…             [Select]
+ api-review       Review endpoint changes…           [Select]
+ onboarding       Walk a new contributor…            [Select]
+ changelog        Group commits into a…      （滚动区外）
+────────────────────────────────────────────
+Copied into ~/.context-hub/skills and enabled right away.  [Cancel] [Import]
+```
+
+- **拖拽区改为横排紧凑版**（228 高居中版 → **92 高**）：44 方形图标环（20 图标）+ 文字块
+  （标题 14/600 + 说明 11.5）+ `Browse files` 按钮；说明改为
+  `A folder with SKILL.md, or a repository of skills.`
+- **列表复用 Download 的结构与行样式**（Divider → `Found N skills in this folder` + `Select all` →
+  `Skill List` 224 高 + 行内 Select / ✓ Selected + 滚动条），示例数据换成"本地仓库"的一套技能名
+  （docs-writer / release-notes / api-review / onboarding / changelog），首个已选。
+- 弹窗 447 → **623**，重新居中（y=228，与 Download 的 631 基本等高）。
+
+### 待定（新增）
+
+拖入**之前**列表是空的：现在画的是"已拖入"状态。两种实现取舍——
+① 列表区在未拖入时隐藏（弹窗变矮、拖入后长高）；② 始终保留列表区、未拖入时显示空提示（布局稳定但首屏有空洞）。
+倾向前者（拖入是用户的主动动作，长高不突兀），实现时确认。
+
 
