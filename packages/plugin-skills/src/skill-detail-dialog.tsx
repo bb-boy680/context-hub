@@ -2,15 +2,19 @@ import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  ClipboardPasteIcon,
   DownloadIcon,
+  ExternalLinkIcon,
   FileTextIcon,
   ImageIcon,
+  ImagePlusIcon,
   LibraryIcon,
+  LinkIcon,
+  MinusIcon,
   MoreHorizontalIcon,
   PauseIcon,
   PlayIcon,
   PlusIcon,
-  PowerIcon,
   RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
@@ -28,11 +32,11 @@ import "swiper/css/thumbs"
 import { CodeView } from "./code-view.tsx"
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { formatAge, skillKey } from "./library.ts"
+import { formatAge, holdsOf, inLibrary, placeOf, skillKey, type SkillPlaceView } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { seedTags, tagTone } from "./tags.ts"
-import type { MediaItem, Skill, SkillLocation } from "./types.ts"
+import type { MediaItem, Skill } from "./types.ts"
 import type {
   SkillDetail,
   SkillFileEntry,
@@ -41,7 +45,7 @@ import type {
   WorkspaceSkillDetail,
 } from "./store.ts"
 
-import { useI18n } from "@workspace/extensions/react"
+import { useContributions, useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -60,52 +64,6 @@ import {
 } from "@workspace/ui/components/popover"
 import { Spinner } from "@workspace/ui/components/spinner"
 
-/** Frontmatter lines a preview shows: the fields the skill actually carries. */
-function frontmatterLines(skill: Skill): string[] {
-  const tags = skill.tags.length > 0 ? `tags: [${skill.tags.join(", ")}]` : null
-  return [
-    "---",
-    `name: ${skill.name}`,
-    `description: ${skill.summary}`,
-    ...(tags === null ? [] : [tags]),
-    "---",
-  ]
-}
-
-/** The bundled example's document: frontmatter, a heading, steps, then guardrails. */
-function skillFile(skill: Skill): string {
-  const lowercase = skill.summary.charAt(0).toLowerCase() + skill.summary.slice(1)
-  return [
-    ...frontmatterLines(skill),
-    "",
-    `# ${titleCase(skill.name)}`,
-    "",
-    `Apply this skill to ${lowercase}.`,
-    "",
-    "## Steps",
-    "1. Read the request and the target files",
-    "2. Apply the rules this skill defines",
-    "3. Report what changed and why",
-    "",
-    "## Guardrails",
-    "- Never invent facts that are not in the source",
-  ].join("\n")
-}
-
-/**
- * The bundled example's directory, for the one form that has no library to
- * read: the demo shows a skill's shape, and nothing here is read from disk.
- */
-const sampleFiles: SkillFileEntry[] = [
-  { path: "skill", depth: 0, directory: true, bytes: 0 },
-  { path: "skill/SKILL.md", depth: 1, directory: false, bytes: 0 },
-  { path: "skill/reference.md", depth: 1, directory: false, bytes: 0 },
-  { path: "skill/examples", depth: 1, directory: true, bytes: 0 },
-  { path: "skill/examples/basic.md", depth: 2, directory: false, bytes: 0 },
-  { path: "skill/scripts", depth: 1, directory: true, bytes: 0 },
-  { path: "skill/scripts/extract.py", depth: 2, directory: false, bytes: 0 },
-]
-
 function titleCase(value: string) {
   return value
     .split("-")
@@ -115,12 +73,14 @@ function titleCase(value: string) {
 
 /**
  * A stage with nothing to play or show renders the skill's own document instead.
- * It clips rather than scrolls: the stage is a fixed 16:9 preview, and the whole
- * document is a click away in the files panel.
+ * It scrolls on the vertical axis only: `overflow-y-auto` alone computes
+ * `overflow-x` to `auto` as well, and a wrapped line that is one glyph too wide
+ * then paints a second scrollbar across the stage. The padding sits on the
+ * scroller so the text clears the thumb rather than running under it.
  */
 function DocumentStage({ text }: { text: string }) {
   return (
-    <div className="size-full overflow-hidden bg-surface-raised px-8 py-6">
+    <div className="scroll-thin size-full overflow-x-hidden overflow-y-auto bg-surface-raised px-8 py-6">
       <Markdown className="mx-auto max-w-[640px] text-[13px] leading-[21px] text-secondary-foreground">
         {text}
       </Markdown>
@@ -142,6 +102,9 @@ async function startPlayback(video: HTMLVideoElement) {
   }
 }
 
+/** Ratio a slide takes before its media reports its own. */
+const FALLBACK_MEDIA_RATIO = 16 / 9
+
 /** One slide: the image itself, or a video carrying its own play control. */
 function MediaSlide({
   item,
@@ -158,6 +121,9 @@ function MediaSlide({
   const [playing, setPlaying] = React.useState(false)
   const [muted, setMuted] = React.useState(false)
   const [progress, setProgress] = React.useState(0)
+  /* Media arrives in any shape — the skills here ship portrait videos — so the
+     stage takes the frame's own ratio and grows until one axis runs out. */
+  const [ratio, setRatio] = React.useState(FALLBACK_MEDIA_RATIO)
   const { t } = useI18n()
 
   /* Play the active slide and pause the rest; `playing` follows the video's own events. */
@@ -190,32 +156,63 @@ function MediaSlide({
   }
 
   return (
-    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-[#0f172a]">
-      {!item ? (
-        <DocumentStage text={doc} />
-      ) : item.kind === "video" ? (
-        <video
-          ref={videoRef}
-          src={item.src}
-          playsInline
-          onClick={togglePlay}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
-          onVolumeChange={() => setMuted(videoRef.current?.muted ?? false)}
-          onTimeUpdate={(event) =>
-            setProgress(
-              event.currentTarget.currentTime / (event.currentTarget.duration || 1)
-            )
-          }
-          className="size-full object-cover"
-        />
-      ) : (
-        <img src={item.src} alt="" className="size-full object-cover" />
-      )}
-      {item?.kind === "video" ? (
-        /* Control bar sits over a scrim so the video itself stays unobstructed. */
-        <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-[#0f172ad9] to-transparent px-4 pt-8 pb-3">
+    <div className="flex size-full items-center justify-center">
+      <div
+        /* `100cqh` is the stage area, which the media pane marks as a size
+           container: the frame keeps its ratio and stops at whichever axis runs
+           out, so a portrait video fills the height and a landscape one the
+           width. A document has no ratio to keep, so it takes the whole stage. */
+        className={`relative overflow-hidden rounded-md ${
+          item === undefined ? "size-full" : "max-h-full"
+        }`}
+        style={
+          item === undefined
+            ? undefined
+            : {
+                aspectRatio: String(ratio),
+                width: `min(100%, calc(100cqh * ${ratio}))`,
+              }
+        }
+      >
+        {!item ? (
+          <DocumentStage text={doc} />
+        ) : item.kind === "video" ? (
+          <video
+            ref={videoRef}
+            src={item.src}
+            playsInline
+            onLoadedMetadata={(event) => {
+              const media = event.currentTarget
+              if (media.videoHeight > 0) setRatio(media.videoWidth / media.videoHeight)
+            }}
+            onClick={togglePlay}
+            onPlay={() => setPlaying(true)}
+            onPause={() => setPlaying(false)}
+            onEnded={() => setPlaying(false)}
+            onVolumeChange={() => setMuted(videoRef.current?.muted ?? false)}
+            onTimeUpdate={(event) =>
+              setProgress(
+                event.currentTarget.currentTime / (event.currentTarget.duration || 1)
+              )
+            }
+            className="size-full object-cover"
+          />
+        ) : (
+          <img
+            src={item.src}
+            alt=""
+            onLoad={(event) => {
+              const media = event.currentTarget
+              if (media.naturalHeight > 0) {
+                setRatio(media.naturalWidth / media.naturalHeight)
+              }
+            }}
+            className="size-full object-cover"
+          />
+        )}
+        {item?.kind === "video" ? (
+          /* Control bar sits over a scrim so the video itself stays unobstructed. */
+          <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-[#0f172ad9] to-transparent px-4 pt-8 pb-3">
           <button
             type="button"
             aria-label={playing ? t("skills.media.pause") : t("skills.media.play")}
@@ -252,6 +249,7 @@ function MediaSlide({
           </button>
         </div>
       ) : null}
+      </div>
     </div>
   )
 }
@@ -306,19 +304,18 @@ function seedItems(skill: Skill): MediaItem[] {
 /** What the lightbox can do with its media, depending on where the skill lives. */
 interface MediaSource {
   items: MediaItem[]
-  /** Whether uploads reach the library; a preview-only form keeps them in memory. */
-  persists: boolean
   /** A library write is in flight. */
   busy: boolean
-  addFiles(files: FileList): Promise<void>
+  /** Files to upload, from a file picker, a drop, or the clipboard. */
+  addFiles(files: ArrayLike<File>): Promise<void>
   /** Store a pasted URL or data: URL; rejects with a displayable message. */
   addUrl(src: string): Promise<void>
   remove(id: string): Promise<void>
 }
 
 /**
- * Library assets when a store answers, the bundled gallery otherwise. Uploads
- * and deletions go through the store, so what the user sees is what is on disk.
+ * The assets the library holds for a skill, with uploads and deletions going
+ * through the store, so what the user sees is what is on disk.
  */
 function useMediaItems(
   skill: Skill,
@@ -348,7 +345,7 @@ function useMediaItems(
   }, [store, detail, preview])
 
   const addFiles = React.useCallback(
-    async (files: FileList) => {
+    async (files: ArrayLike<File>) => {
       const list = Array.from(files)
       if (store !== null && detail !== null) {
         setBusy(true)
@@ -414,7 +411,7 @@ function useMediaItems(
     [store, detail, onChanged]
   )
 
-  return { items, persists: store !== null, busy, addFiles, addUrl, remove }
+  return { items, busy, addFiles, addUrl, remove }
 }
 
 /**
@@ -436,11 +433,15 @@ function MediaPane({
   source: MediaSource
 }) {
   const { t } = useI18n()
-  const { items, busy, persists } = source
+  const { items, busy } = source
   const [activeIndex, setActiveIndex] = React.useState(0)
   const [thumbs, setThumbs] = React.useState<SwiperClass | null>(null)
   const [dragOver, setDragOver] = React.useState(false)
   const [addOpen, setAddOpen] = React.useState(false)
+  /* The second entry of the upload menu opens its link field in place, rather
+     than stacking a second surface on top of the first. */
+  const [addFace, setAddFace] = React.useState<"menu" | "link">("menu")
+  const [notice, setNotice] = React.useState<string | null>(null)
   const [link, setLink] = React.useState("")
   const [addError, setAddError] = React.useState<string | null>(null)
   const mainRef = React.useRef<SwiperClass | null>(null)
@@ -495,7 +496,53 @@ function MediaPane({
     return () => document.removeEventListener("keydown", handle, true)
   }, [])
 
-  const addFiles = (files: FileList) => {
+  /* A screenshot should not have to be saved as a file first, so the paste
+     listener is document-wide while this pane is mounted. A file copied in a
+     file manager arrives the same way, video included.
+     A paste into a field is that field's business: the link box takes a URL, and
+     running the listener there would answer a pasted URL with "that is text,
+     not an image". */
+  React.useEffect(() => {
+    const onPaste = (event: ClipboardEvent) => {
+      const target = event.target
+      if (
+        target instanceof HTMLElement &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      const data = event.clipboardData
+      if (data === null) return
+      const picked: File[] = []
+      for (const item of Array.from(data.items)) {
+        if (item.kind !== "file") continue
+        if (!item.type.startsWith("image/") && !item.type.startsWith("video/")) continue
+        const file = item.getAsFile()
+        if (file !== null) picked.push(file)
+      }
+      if (picked.length === 0) {
+        if (data.getData("text") !== "") setNotice(t("skills.media.paste.text"))
+        return
+      }
+      event.preventDefault()
+      setNotice(t("skills.media.paste.done").replace("{count}", String(picked.length)))
+      void source.addFiles(picked)
+    }
+
+    document.addEventListener("paste", onPaste)
+    return () => document.removeEventListener("paste", onPaste)
+  }, [source, t])
+
+  /* Whatever the upload just said stops saying it on its own. */
+  React.useEffect(() => {
+    if (notice === null) return
+    const timer = window.setTimeout(() => setNotice(null), 4000)
+    return () => window.clearTimeout(timer)
+  }, [notice])
+
+  const addFiles = (files: ArrayLike<File>) => {
     void source.addFiles(files)
     setAddOpen(false)
   }
@@ -519,21 +566,49 @@ function MediaPane({
 
   return (
     <div
-      onDragOver={(event) => {
+      onDragEnter={(event) => {
         event.preventDefault()
         setDragOver(true)
       }}
-      onDragLeave={() => setDragOver(false)}
+      onDragOver={(event) => event.preventDefault()}
+      onDragLeave={(event) => {
+        /* `dragleave` also fires when the pointer moves onto a child — and the
+           overlay is a child, so acting on those would switch the target off the
+           moment it appears. Only a leave that leaves the pane counts. */
+        const next = event.relatedTarget
+        if (next instanceof Node && event.currentTarget.contains(next)) return
+        setDragOver(false)
+      }}
       onDrop={(event) => {
         event.preventDefault()
         setDragOver(false)
         addFiles(event.dataTransfer.files)
       }}
-      className={`flex min-w-0 flex-1 flex-col items-center justify-center gap-4 bg-secondary px-4 py-6 ${
+      className={`relative flex min-w-0 flex-1 flex-col items-center gap-3.5 bg-surface-raised px-7 py-6 ${
         dragOver ? "ring-2 ring-primary ring-inset" : ""
       }`}
     >
-      <div className="relative w-full max-w-[720px]">
+      {/* Dropping is a gesture on the whole media area: it does not go through
+          the menu, and it does not need the + to be pressed first. */}
+      {dragOver ? (
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2.5 bg-primary/8">
+          <ImagePlusIcon className="size-7 text-primary" aria-hidden />
+          <span className="text-[15px] font-semibold">{t("skills.media.drop.title")}</span>
+          <span className="text-[13px] text-muted-foreground">
+            {t("skills.media.drop.formats")}
+          </span>
+        </div>
+      ) : null}
+      {notice === null ? null : (
+        <span className="pointer-events-none absolute bottom-4 left-1/2 z-20 -translate-x-1/2 rounded-full bg-foreground px-3.5 py-1.5 text-[12px] font-medium text-background">
+          {notice}
+        </span>
+      )}
+      {/* The stage takes every pixel the strip and the hint leave behind: a
+          fixed 16:9 box in this column left a band of empty panel above and
+          below it. A slide keeps its own ratio inside the stage, so the frames
+          here — portrait videos, mostly — use the full height. */}
+      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]">
         <Swiper
           modules={[Navigation, Thumbs]}
           onSwiper={(instance) => {
@@ -551,7 +626,7 @@ function MediaPane({
           thumbs={{ swiper: thumbs !== null && !thumbs.destroyed ? thumbs : null }}
           slidesPerView={1}
           onSlideChange={(instance) => setActiveIndex(instance.activeIndex)}
-          className="w-full outline-none"
+          className="size-full outline-none"
         >
           {(count > 0 ? items : [undefined]).map((item, index) => (
             <SwiperSlide key={item?.id ?? "empty"}>
@@ -648,7 +723,10 @@ function MediaPane({
           open={addOpen}
           onOpenChange={(next) => {
             setAddOpen(next)
-            if (!next) setAddError(null)
+            if (!next) {
+              setAddError(null)
+              setAddFace("menu")
+            }
           }}
         >
           <PopoverTrigger
@@ -662,41 +740,107 @@ function MediaPane({
           >
             <PlusIcon className="size-[18px]" />
           </PopoverTrigger>
-          <PopoverContent align="start" side="top" className="w-80 gap-2.5 p-3">
-            <span className="text-xs font-semibold text-muted-foreground">
-              {t("skills.media.add.title")}
-            </span>
-            <div className="flex items-center gap-2">
-              <Input
-                value={link}
-                onChange={(event) => setLink(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") addLink()
-                }}
-                placeholder={t("skills.media.add.placeholder")}
-                aria-label={t("skills.media.add.placeholder")}
-                className="h-8 flex-1"
-              />
-              <Button size="sm" className="h-8 px-3" disabled={busy} onClick={addLink}>
-                {t("skills.media.add.action")}
-              </Button>
-            </div>
-            {addError !== null ? (
-              <p className="text-[11px] leading-[15px] text-destructive">{addError}</p>
-            ) : null}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 justify-start gap-2 border-input bg-transparent dark:bg-transparent"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-            >
-              {busy ? <Spinner className="size-3.5" /> : <UploadIcon className="size-3.5" />}
-              {t("skills.media.add.file")}
-            </Button>
-            <p className="text-[11px] leading-[15px] text-muted-foreground">
-              {persists ? t("skills.media.add.hint") : t("skills.media.add.hintPreview")}
-            </p>
+          <PopoverContent
+            align="start"
+            side="top"
+            className={
+              addFace === "menu"
+                ? "w-[240px] gap-0 overflow-hidden rounded-md bg-card p-0 shadow-soft ring-1 ring-border"
+                : "w-[240px] gap-2.5 rounded-md bg-card p-3 shadow-soft ring-1 ring-border"
+            }
+          >
+            {addFace === "menu" ? (
+              /* Each entry is its own row, divided by the same hairline the rest
+                 of the app uses; the menu carries no padding, so the dividers
+                 run the full width. */
+              <>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => fileRef.current?.click()}
+                  className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  <UploadIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                  <span className="flex min-w-0 flex-1 flex-col gap-px">
+                    <span className="truncate text-[13px] leading-[17px] font-medium">
+                      {t("skills.media.add.file")}
+                    </span>
+                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                      {t("skills.media.add.fileHint")}
+                    </span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAddFace("link")}
+                  className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
+                >
+                  <LinkIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                  <span className="flex min-w-0 flex-1 flex-col gap-px">
+                    <span className="truncate text-[13px] leading-[17px] font-medium">
+                      {t("skills.media.add.link")}
+                    </span>
+                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                      {t("skills.media.add.linkHint")}
+                    </span>
+                  </span>
+                </button>
+                {/* Paste is a gesture, not an entry: it says what to press and
+                    takes no click, so it is a row rather than a button. */}
+                <span className="flex h-12 w-full items-center gap-2.5 px-3">
+                  <ClipboardPasteIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                  <span className="flex min-w-0 flex-1 flex-col gap-px">
+                    <span className="truncate text-[13px] leading-[17px] font-medium">
+                      {t("skills.media.add.paste")}
+                    </span>
+                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                      {t("skills.media.add.pasteHint")}
+                    </span>
+                  </span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-[12px] font-semibold">
+                  {t("skills.media.add.linkLabel")}
+                </span>
+                <div className="flex h-[34px] items-center gap-2 rounded-md border-2 border-primary px-2.5">
+                  <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                  <input
+                    autoFocus
+                    value={link}
+                    onChange={(event) => setLink(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") addLink()
+                    }}
+                    placeholder={t("skills.media.add.placeholder")}
+                    aria-label={t("skills.media.add.linkLabel")}
+                    className="min-w-0 flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-muted-soft"
+                  />
+                </div>
+                <div className="flex items-center justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-7 rounded-full border-border bg-transparent px-3 text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
+                    onClick={() => setAddFace("menu")}
+                  >
+                    {t("skills.action.cancel")}
+                  </Button>
+                  <Button
+                    className="h-7 rounded-full px-3 text-[12.5px] font-semibold"
+                    disabled={busy}
+                    onClick={addLink}
+                  >
+                    {t("skills.media.add.action")}
+                  </Button>
+                </div>
+                {addError === null ? null : (
+                  <span className="text-[11px] leading-[15px] text-destructive">
+                    {addError}
+                  </span>
+                )}
+              </>
+            )}
           </PopoverContent>
         </Popover>
         <input
@@ -719,16 +863,7 @@ function MediaPane({
   )
 }
 
-function MetaRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex h-[30px] items-center justify-between border-b border-border last:border-b-0">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-xs font-medium">{value}</dd>
-    </div>
-  )
-}
-
-/** Category chips with inline add and remove; new names join the tint set by hash. */
+/** Category chips with inline add and remove; a new name joins the same set. */
 function CategoryEditor({
   tags,
   onChange,
@@ -749,68 +884,64 @@ function CategoryEditor({
   }
 
   return (
-    <section className="flex flex-col gap-2">
-      <span className="text-xs font-semibold text-muted-foreground">
-        {t("skills.detail.category")}
-      </span>
-      <div className="flex flex-wrap items-center gap-1.5">
-        {tags.map((tag) => (
-          <span
-            key={tag}
-            className={`group/tag flex h-5 shrink-0 items-center gap-0.5 rounded-full pr-1.5 pl-2 text-xs font-medium ${tagTone(tag).chip} ${tagTone(tag).label}`}
+    <div className="flex flex-wrap items-center gap-1.5">
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className={`group/tag flex h-6 shrink-0 items-center gap-1 rounded-full pr-[5px] pl-2.5 text-[12px] font-medium ${tagTone().chip} ${tagTone().label}`}
+        >
+          {tag}
+          <button
+            type="button"
+            aria-label={`${t("skills.detail.category.remove")} ${tag}`}
+            onClick={() => onChange(tags.filter((item) => item !== tag))}
+            className="flex size-[15px] items-center justify-center rounded-full bg-foreground/8 text-muted-foreground transition-colors hover:bg-foreground/12 hover:text-foreground"
           >
-            {tag}
+            <XIcon className="size-[11px]" />
+          </button>
+        </span>
+      ))}
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          render={
             <button
               type="button"
-              aria-label={`${t("skills.detail.category.remove")} ${tag}`}
-              onClick={() => onChange(tags.filter((item) => item !== tag))}
-              className="flex size-3.5 items-center justify-center rounded-full opacity-50 transition-opacity hover:opacity-100"
-            >
-              <XIcon className="size-2.5" />
-            </button>
-          </span>
-        ))}
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger
-            render={
-              <button
-                type="button"
-                aria-label={t("skills.detail.category.add")}
-                className="flex size-5 shrink-0 items-center justify-center rounded-full border border-dashed border-input text-muted-foreground transition-colors hover:border-primary hover:text-foreground"
-              />
-            }
-          >
-            <PlusIcon className="size-3" />
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-60 gap-2 p-2">
-            <Input
-              value={value}
-              onChange={(event) => setValue(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") add(value)
-              }}
-              placeholder={t("skills.detail.category.placeholder")}
-              aria-label={t("skills.detail.category.placeholder")}
-              className="h-8"
+              aria-label={t("skills.detail.category.add")}
+              className="flex h-6 shrink-0 items-center gap-[5px] rounded-full px-2.5 text-[12px] font-medium text-muted-foreground ring-1 ring-muted-soft transition-colors hover:text-foreground hover:ring-foreground/40"
             />
-            {available.length > 0 ? (
-              <div className="flex flex-wrap gap-1.5">
-                {available.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => add(tag)}
-                    className={`flex h-5 shrink-0 items-center rounded-full px-2 text-xs font-medium transition-opacity hover:opacity-80 ${tagTone(tag).chip} ${tagTone(tag).label}`}
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </PopoverContent>
-        </Popover>
-      </div>
-    </section>
+          }
+        >
+          <PlusIcon className="size-3" />
+          {t("skills.detail.category.add")}
+        </PopoverTrigger>
+        <PopoverContent align="start" className="w-60 gap-2 p-2">
+          <Input
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") add(value)
+            }}
+            placeholder={t("skills.detail.category.placeholder")}
+            aria-label={t("skills.detail.category.placeholder")}
+            className="h-8"
+          />
+          {available.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {available.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => add(tag)}
+                  className={`flex h-6 shrink-0 items-center rounded-full px-2.5 text-[12px] font-medium transition-opacity hover:opacity-80 ${tagTone().chip} ${tagTone().label}`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          ) : null}
+        </PopoverContent>
+      </Popover>
+    </div>
   )
 }
 
@@ -822,15 +953,15 @@ function CategoryEditor({
 function DeleteBubble({
   name,
   path,
-  where,
+  inPlace,
   onDelete,
   children,
 }: {
   name: string
   /** Where the skill's directory sits, or `null` when this form has no library. */
   path: string | null
-  /** Which copy this question is about: the hub's own, or the workspace's. */
-  where: SkillLocation
+  /** Whether this question is about a place's directory rather than the library's. */
+  inPlace: boolean
   onDelete: () => Promise<void>
   children: React.ReactElement
 }) {
@@ -860,38 +991,39 @@ function DeleteBubble({
         side="top"
         align="end"
         sideOffset={7}
-        className="w-80 gap-2.5 rounded-lg bg-dialog px-4 py-3.5 shadow-[0_8px_24px_#0F172A29] ring-glass-border backdrop-blur-xl"
+        className="w-80 gap-3 rounded-md bg-popover p-4 shadow-none ring-1 ring-border"
       >
-        <PopoverArrow className="size-3 rotate-45 border-b border-l border-glass-border bg-dialog" />
-        <span className="text-[13.5px] leading-[17px] font-semibold">
+        <PopoverArrow className="size-[17px] rotate-45 border-b border-l border-border bg-popover" />
+        <span className="text-[14px] leading-[18px] font-semibold">
           {t("skills.delete.title").replace("{name}", name)}
         </span>
-        <span className="text-xs leading-[15px] text-muted-foreground">
-          {t(where === "workspace" ? "skills.delete.workspaceText" : "skills.delete.text")}
+        <span className="text-[12.5px] leading-[17px] text-copy">
+          {t(inPlace ? "skills.delete.workspaceText" : "skills.delete.text")}
         </span>
-        {path !== null && (
-          <span className="truncate font-mono text-[11.5px] leading-[14px] text-secondary-foreground">
+        {path === null ? null : (
+          /* The directory reads as data, so it sits on its own quiet surface
+             rather than in the running text. */
+          <span className="rounded-md bg-surface-raised px-2.5 py-2 font-mono text-[11px] leading-[15px] text-copy">
             {path}
           </span>
         )}
         {failure !== null && (
-          <span className="text-xs leading-[15px] text-destructive">
-            {failure}
-          </span>
+          <span className="text-[12px] leading-[16px] text-destructive">{failure}</span>
         )}
-        <div className="flex items-center justify-end gap-2 pt-0.5">
+        <div className="flex items-center justify-end gap-2">
           <Button
             variant="outline"
-            size="sm"
-            className="border-border bg-transparent px-3 text-xs dark:border-input dark:bg-transparent"
+            className="h-8 rounded-full border-border bg-transparent px-[14px] text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
             disabled={busy}
             onClick={() => setOpen(false)}
           >
             {t("skills.action.cancel")}
           </Button>
+          {/* Red stays a text and outline colour here: the destructive button is
+              outlined, so nothing in the panel is a red block. */}
           <Button
-            size="sm"
-            className="bg-destructive px-3 text-xs text-white hover:bg-destructive/90"
+            variant="outline"
+            className="h-8 rounded-full border-destructive/35 bg-transparent px-[14px] text-[12.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive dark:border-destructive/35 dark:bg-transparent"
             disabled={busy}
             onClick={confirm}
           >
@@ -904,13 +1036,28 @@ function DeleteBubble({
 }
 
 /**
- * The update line for a library skill: the source its files were installed
- * from, and the one action that follows from it. Reading the source means a
- * clone of the whole package, so nothing runs on its own — a person asks, and
- * the last answer a check left on the row seeds what this row shows until the
- * next one.
+ * Where a browser can read the recorded source, when the record names
+ * something public: an `owner/repo` the CLI installed from, or a URL as given.
+ * A local path or an ssh remote stays plain text — there is nothing to open.
  */
-function UpdateRow({
+function sourceHref(skill: Skill): string | null {
+  const upstream = skill.upstream
+  if (upstream === undefined) return null
+  if (/^https?:\/\//.test(upstream.source)) return upstream.source
+  if (upstream.sourceType !== "github" || !/^[\w.-]+\/[\w.-]+$/.test(upstream.source)) {
+    return null
+  }
+  const path = upstream.skillPath
+  return path === "" ? `https://github.com/${upstream.source}` : `https://github.com/${upstream.source}/tree/HEAD/${path}`
+}
+
+/**
+ * The source line for a library skill: the package its files came from, and the
+ * one action that follows from it. Reading the source means a clone of the
+ * whole package, so nothing runs on its own — a person asks, and the last
+ * answer a check left on the row seeds what this row shows until the next one.
+ */
+function SourceSection({
   skill,
   onCheck,
   onUpdate,
@@ -969,7 +1116,7 @@ function UpdateRow({
   /* Nothing recorded where these files came from — a skill written here, or
      copied in by hand — so there is no line to show rather than an empty one;
      the provenance line above already says it is local. */
-  if (skill.location === "workspace" || upstream === undefined) return null
+  if (!inLibrary(skill) || upstream === undefined) return null
 
   const busy = state.kind === "checking" || state.kind === "applying"
   const outdated = state.kind === "checked" && state.result.outdated
@@ -987,50 +1134,195 @@ function UpdateRow({
             : upstream.source
   const label = outdated ? t("skills.update.apply") : t("skills.update.check")
   const checkedAt = skill.checked?.at ?? null
+  const href = sourceHref(skill)
 
   return (
-    <>
-      <div className="h-px shrink-0 bg-border" />
-      <div className="flex flex-col gap-1.5">
-        <div className="flex items-center justify-between gap-2">
-          <span
-            className="min-w-0 truncate text-xs text-muted-foreground"
-            title={upstream.source}
-          >
-            {text}
-          </span>
-          <Button
-            type="button"
-            size="xs"
-            variant="outline"
-            disabled={busy}
-            aria-label={`${label} ${skill.name}`}
-            onClick={() => void (outdated ? apply() : check())}
-            className="gap-[5px] px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent"
-          >
-            {outdated ? (
-              <DownloadIcon className="size-3.5" />
-            ) : (
-              <RefreshCwIcon className="size-3.5" />
-            )}
-            {label}
-          </Button>
-        </div>
-        {/* Only a newer revision makes the loss real, so only then is it said. */}
-        {state.kind === "checked" && state.result.outdated && state.result.modified ? (
-          <span className="text-[11px] text-amber-600 dark:text-amber-400">
-            {t("skills.update.modified")}
-          </span>
-        ) : null}
-        {/* With no newer answer at hand, the age of the last one is the fact
-            worth showing; a fresh check replaces this line with its result. */}
-        {state.kind === "idle" && checkedAt !== null ? (
-          <span className="text-[11px] text-muted-foreground">
-            {t("skills.update.lastChecked").replace("{age}", formatAge(checkedAt, locale.active))}
-          </span>
-        ) : null}
+    <div className="flex flex-col gap-1.5 border-b border-border py-2.5">
+      <div className="flex h-[30px] items-center justify-between gap-2">
+        <span className="text-[12.5px] text-muted-foreground">
+          {t("skills.detail.source")}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          aria-label={`${label} ${skill.name}`}
+          onClick={() => void (outdated ? apply() : check())}
+          className="h-[30px] shrink-0 gap-1.5 rounded-full border-border bg-transparent px-3 text-[12.5px] font-semibold text-foreground hover:bg-muted dark:border-input dark:bg-transparent"
+        >
+          {outdated ? (
+            <DownloadIcon className="size-[13px]" />
+          ) : (
+            <RefreshCwIcon className="size-[13px]" />
+          )}
+          {label}
+        </Button>
       </div>
-    </>
+      {href === null ? (
+        <span className="truncate font-mono text-[12.5px] text-muted-foreground">
+          {upstream.source}
+        </span>
+      ) : (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-[17px] min-w-0 items-center gap-1.5 text-[12.5px] text-primary hover:underline"
+        >
+          <span className="truncate">{upstream.source}</span>
+          <ExternalLinkIcon className="size-[13px] shrink-0" />
+        </a>
+      )}
+      {/* Only a newer revision makes the loss real, so only then is it said. */}
+      {state.kind === "checked" && state.result.outdated && state.result.modified ? (
+        <span className="text-[12px] text-amber-600 dark:text-amber-400">
+          {t("skills.update.modified")}
+        </span>
+      ) : null}
+      {/* With no newer answer at hand, the age of the last one is the fact
+          worth showing; a fresh check replaces this line with its result. */}
+      {state.kind === "checked" || state.kind === "checking" ? (
+        <span className="text-[12px] text-muted-soft">{text}</span>
+      ) : state.kind === "failed" ? (
+        <span className="text-[12px] text-destructive">{text}</span>
+      ) : checkedAt !== null ? (
+        <span className="text-[12px] text-muted-soft">
+          {t("skills.update.lastChecked").replace("{age}", formatAge(checkedAt, locale.active))}
+        </span>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Every place this skill could live, with the row's own action on each: the way
+ * into a place that does not hold it yet is here, not only the way out of the
+ * ones that do. A place is a property of the skill — the card reads how many
+ * hold it, and this section is what that count means.
+ */
+function PlacesSection({
+  skill,
+  path,
+  places,
+  reason,
+  onAdopt,
+  onInstall,
+  onRemove,
+}: {
+  skill: Skill
+  /** The skill's directory, spelled as a person would write it; `null` when unknown. */
+  path: string | null
+  /** Every place a workspace keeps skills in, as the contributions describe them. */
+  places: readonly SkillPlaceView[]
+  /** Why this skill cannot be installed right now, ready to show. */
+  reason: string | null
+  onAdopt: () => void
+  onInstall: (dir: string) => void
+  onRemove: (dir: string) => void
+}) {
+  const { t } = useI18n()
+  const holds = holdsOf(skill)
+  const own = inLibrary(skill)
+  /* The library is one of the rows, so it is one of the count: a skill the hub
+     holds is installed in one place even when no workspace link exists yet. */
+  const installed = holds.length + (own ? 1 : 0)
+  /* The icon and the label are the contribution's, since only the extension
+     that knows a place can draw it. */
+  const contributed = useContributions("skillLocation")
+  const icons = React.useMemo(
+    () => new Map(contributed.map((place) => [place.id, place.icon])),
+    [contributed]
+  )
+
+  const row = "flex h-14 items-center gap-2.5 border-b border-border pb-0"
+  const plate =
+    "flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-surface-raised ring-1 ring-border ring-inset"
+  const label = "truncate text-[12.5px] leading-[15px] font-semibold"
+  const where = "truncate font-mono text-[10.5px] leading-[14px] text-muted-foreground"
+  /* Installing is the row's own action, so it reads as a soft fill; undoing it
+     is what the row offers once the place holds the skill, and reads as one. */
+  const pill = "h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
+  const soft = `${pill} bg-secondary text-foreground hover:bg-accent`
+  const outlinePill = `${pill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`
+
+  return (
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[13px] leading-[16px] font-semibold">
+          {t("skills.detail.places")}
+        </span>
+        <span className="text-[12.5px] text-muted-foreground">
+          {t("skills.detail.places.held").replace("{count}", String(installed))}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-2.5">
+        <li className={row}>
+          <span className={plate}>
+            <LibraryIcon className="size-[15px] text-copy" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className={label}>{t("skills.location.library")}</span>
+            {path === null ? null : <span className={where}>{path}</span>}
+          </span>
+          {own ? (
+            <span className="flex h-[22px] shrink-0 items-center rounded-full px-[9px] text-[11px] font-medium text-copy ring-1 ring-border">
+              {t(skill.linkAt === "library" ? "skills.place.link" : "skills.place.body")}
+            </span>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              aria-label={`${t("skills.action.adopt")} ${skill.name}`}
+              onClick={onAdopt}
+              className={soft}
+            >
+              <PlusIcon className="size-[13px]" />
+              {t("skills.action.adopt")}
+            </Button>
+          )}
+        </li>
+        {places.map((place) => {
+          const held = holds.some((hold) => hold.id === place.id)
+          const Icon = icons.get(place.id) ?? LibraryIcon
+          const taken = !held && skill.takenAt?.includes(place.id) === true
+          return (
+            <li key={place.id} className={row}>
+              <span className={plate}>
+                <Icon className="size-[15px]" aria-hidden />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <span className={label}>{t(place.labelKey)}</span>
+                <span className={where}>{place.view?.display ?? place.dir}</span>
+              </span>
+              {held ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  aria-label={`${t("skills.action.remove")} ${skill.name}`}
+                  onClick={() => onRemove(place.dir)}
+                  className={outlinePill}
+                >
+                  <MinusIcon className="size-[13px]" />
+                  {t("skills.action.remove")}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  aria-label={`${t("skills.action.install")} ${skill.name}`}
+                  disabled={reason !== null || taken}
+                  title={taken ? t("skills.workspace.taken") : (reason ?? undefined)}
+                  onClick={() => onInstall(place.dir)}
+                  className={soft}
+                >
+                  <PlusIcon className="size-[13px]" />
+                  {t("skills.action.install")}
+                </Button>              )}
+            </li>
+          )
+        })}
+      </ul>
+    </section>
   )
 }
 
@@ -1038,9 +1330,12 @@ function InfoPanel({
   skill,
   reason,
   path,
+  inPlace,
+  places,
   onDelete,
-  onToggle,
   onAdopt,
+  onInstallPlace,
+  onRemovePlace,
   onCheckUpdate,
   onUpdate,
   onViewFiles,
@@ -1051,11 +1346,18 @@ function InfoPanel({
   reason: string | null
   /** The skill's directory, spelled as a person would write it. */
   path: string | null
+  /** Whether the directory above is a place's rather than the library's. */
+  inPlace: boolean
+  /** Every place a workspace keeps skills in, with what each holds. */
+  places: readonly SkillPlaceView[]
   /** `null` when this skill cannot be deleted from here. */
   onDelete: (() => Promise<void>) | null
-  onToggle: () => void
   /** Copy a skill this workspace wrote into the library. */
   onAdopt: () => void
+  /** Link this skill into a place that does not hold it yet. */
+  onInstallPlace: (dir: string) => void
+  /** Take back the link that put it there. */
+  onRemovePlace: (dir: string) => void
   /** Measure this skill against the source it was installed from; `undefined`
       on a form with no library, where there is nothing to compare. */
   onCheckUpdate?: () => Promise<SkillUpdateCheck>
@@ -1067,123 +1369,91 @@ function InfoPanel({
   const { t } = useI18n()
 
   return (
-    <div className="flex w-[360px] min-h-0 shrink-0 flex-col gap-4 border-l border-border p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <DialogTitle className="truncate text-base leading-[19px] font-semibold">
+    <div className="flex w-[360px] min-h-0 shrink-0 flex-col border-l border-border">
+      <div className="flex h-[84px] shrink-0 items-start gap-3 border-b border-border px-5 pt-[22px]">
+        <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
+          <DialogTitle className="truncate text-[16px] leading-[21px] font-semibold">
             {skill.name}
           </DialogTitle>
-          <div className="flex items-center gap-2">
+          <DialogDescription className="flex min-w-0 items-center gap-2">
             <ProvenanceLine skill={skill} />
-            {/* The line above already names the place; this adds only the age. */}
-            {skill.updated === "" ? null : (
-              <DialogDescription className="truncate text-xs text-muted-foreground">
-                {`${t("skills.detail.updated")} ${skill.updated}`}
-              </DialogDescription>
-            )}
-          </div>
+          </DialogDescription>
         </div>
         <DialogClose
           render={
             <Button
               variant="ghost"
               size="icon"
+              className="mt-1 size-8 rounded-full"
               aria-label={t("skills.action.close")}
             />
           }
         >
-          <XIcon className="text-muted-foreground" />
+          <XIcon className="size-4 text-copy" />
         </DialogClose>
       </div>
 
-      <div className="h-px shrink-0 bg-border" />
+      {/* Everything between the heading and the footer scrolls: seven places
+          alone outrun the panel, and the actions have to stay put. The bottom
+          padding is what keeps the last line clear of the footer. */}
+      <div className="scroll-thin flex min-h-0 min-w-0 flex-1 flex-col gap-[18px] overflow-y-auto px-5 pt-5 pb-5">
+        {/* Description, then the categories, then where it lives, then where it
+            came from — the order the panel is read in. */}
+        <p className="text-[13px] leading-[1.5] text-copy">{skill.description}</p>
 
-      {/* A description can outrun the panel; it scrolls so the actions stay put. */}
-      <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pr-2">
         <CategoryEditor tags={skill.tags} onChange={onTagsChange} />
 
-        <section className="flex flex-col gap-2">
-          <span className="text-xs font-semibold text-muted-foreground">
-            {t("skills.detail.description")}
-          </span>
-          <p className="text-[13px] leading-[1.5]">{skill.description}</p>
-        </section>
+        <PlacesSection
+          skill={skill}
+          path={path}
+          places={places}
+          reason={reason}
+          onAdopt={onAdopt}
+          onInstall={onInstallPlace}
+          onRemove={onRemovePlace}
+        />
 
-        <div className="h-px shrink-0 bg-border" />
-
-        <dl className="flex flex-col">
-          <MetaRow label={t("skills.detail.tokens")} value={skill.tokens ?? "—"} />
-          <MetaRow
-            label={t("skills.detail.triggers")}
-            value={skill.triggers === undefined ? "—" : String(skill.triggers)}
-          />
-          {/* The hub records no age for a skill it does not hold, so none is shown. */}
-          {skill.updated === "" ? null : (
-            <MetaRow label={t("skills.detail.updatedShort")} value={skill.updated} />
+        {/* Where it came from, then when it last changed: the age answers the
+            same question the source block asks, so it sits with it. */}
+        <div className="flex flex-col">
+          {onCheckUpdate === undefined || onUpdate === undefined ? null : (
+            <SourceSection skill={skill} onCheck={onCheckUpdate} onUpdate={onUpdate} />
           )}
-        </dl>
+          {skill.updated === "" ? null : (
+            <div className="flex h-[30px] items-center justify-between gap-2">
+              <span className="text-[12.5px] text-muted-foreground">
+                {t("skills.detail.updated")}
+              </span>
+              <span className="text-[12.5px] text-foreground">{skill.updated}</span>
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="h-px shrink-0 bg-border" />
-
-      {onCheckUpdate === undefined || onUpdate === undefined ? null : (
-        <UpdateRow skill={skill} onCheck={onCheckUpdate} onUpdate={onUpdate} />
-      )}
-
-      <div className="flex items-center gap-2">
-        <Button className="h-9 w-[156px] gap-[7px]" onClick={onViewFiles}>
-          <FileTextIcon />
+      <div className="flex h-16 shrink-0 items-center gap-2.5 border-t border-border px-5">
+        <Button className="h-10 flex-1 gap-[7px] rounded-full text-[13.5px] font-semibold" onClick={onViewFiles}>
+          <FileTextIcon className="size-[15px]" />
           {t("skills.detail.files.action")}
         </Button>
-        {/* A skill the workspace wrote can become a library copy. */}
-        {skill.location === "workspace" && skill.inLibrary !== true ? (
-          <Button
-            variant="outline"
-            className="h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
-            onClick={onAdopt}
+        {/* Deleting is another class of action, so it sits apart from the main
+            one rather than in the same visual slot. */}
+        {onDelete === null ? null : (
+          <DeleteBubble
+            name={skill.name}
+            path={path}
+            inPlace={inPlace}
+            onDelete={onDelete}
           >
-            <LibraryIcon />
-            {t("skills.action.adopt")}
-          </Button>
-        ) : !skill.installed && skill.location !== "library" ? null : (
-          <Button
-            variant={skill.installed || skill.stale ? "outline" : "default"}
-            className={
-              skill.installed || skill.stale
-                ? "h-9 flex-1 gap-[7px] border-border bg-transparent px-2.5 text-secondary-foreground"
-                : "h-9 flex-1 gap-[7px] px-2.5"
-            }
-            /* Installing is unavailable when there is no folder, or when the
-               workspace already wrote a skill of its own under this name. */
-            disabled={!skill.installed && !skill.stale && reason !== null}
-            title={!skill.installed && !skill.stale ? (reason ?? undefined) : undefined}
-            onClick={onToggle}
-          >
-            {skill.stale ? <Trash2Icon /> : skill.installed ? <PowerIcon /> : <DownloadIcon />}
-            {t(
-              skill.stale
-                ? "skills.action.cleanup"
-                : skill.installed
-                  ? skill.linkAt === "library"
-                    ? "skills.action.remove"
-                    : "skills.action.uninstall"
-                  : "skills.action.install"
-            )}
-          </Button>
+            <Button
+              variant="outline"
+              className="h-10 shrink-0 gap-[7px] rounded-full border-destructive/35 bg-transparent px-4 text-[13.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
+            >
+              <Trash2Icon className="size-[15px]" />
+              {t("skills.detail.delete")}
+            </Button>
+          </DeleteBubble>
         )}
       </div>
-
-      {onDelete !== null && (
-        <DeleteBubble name={skill.name} path={path} where={skill.location} onDelete={onDelete}>
-          <Button
-            variant="outline"
-            className="h-9 w-full gap-[7px] border-destructive/35 bg-transparent px-2.5 text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
-          >
-            <Trash2Icon />
-            {t("skills.detail.delete")}
-          </Button>
-        </DeleteBubble>
-      )}
     </div>
   )
 }
@@ -1242,7 +1512,7 @@ function FilesPanel({
   return (
     <div
       aria-hidden={!open}
-      className={`absolute inset-y-0 right-0 z-20 flex w-[880px] max-w-full flex-col bg-dialog shadow-[-20px_0_48px_#0F172A47] transition-transform duration-300 ease-out ${
+      className={`absolute inset-y-0 right-0 z-20 flex w-[880px] max-w-full flex-col border-l border-border bg-dialog transition-transform duration-300 ease-out ${
         open ? "translate-x-0" : "translate-x-full"
       }`}
     >
@@ -1310,7 +1580,7 @@ function FilesPanel({
   )
 }
 
-/** One row of the files panel, from either the library's tree or the bundle's sample. */
+/** One row of the files panel, from either the library's tree or a place's. */
 /** The files a skill holds, and the way to read any one of them. */
 interface SkillFiles {
   files: SkillFileEntry[]
@@ -1323,7 +1593,7 @@ const NO_FILES: SkillFiles = {
   read: () => Promise.reject(new Error("this form has no skill library")),
 }
 
-/** The files the panel lists: the library's own tree, the workspace's, or the bundled example. */
+/** The files the panel lists: the library's own tree, or the place's. */
 function useSkillFiles(
   skill: Skill,
   store: SkillStore | null,
@@ -1331,27 +1601,22 @@ function useSkillFiles(
   held: WorkspaceSkillDetail | null
 ): SkillFiles {
   const attached = store !== null && (detail !== null || held !== null)
+  const dir = holdsOf(skill)[0]?.dir
   const read = React.useCallback(
     (path: string): Promise<string> => {
       if (store === null) return Promise.reject(new Error("this form has no skill library"))
-      /* A workspace skill is read where it lives; the library holds its own
-         files, which is also where a linked skill's files end up. */
-      return skill.location === "workspace"
-        ? store.workspaceFile(skill.id, path)
-        : store.readFile(skill.id, path)
+      /* A skill no library record holds is read where its place keeps it; the
+         library's own files are also where a linked skill's files end up. */
+      return dir === undefined || inLibrary(skill)
+        ? store.readFile(skill.id, path)
+        : store.workspaceFile(skill.id, path, dir)
     },
-    [store, skill.id, skill.location]
+    [store, skill, dir]
   )
   return React.useMemo(() => {
     if (!attached) return NO_FILES
-    if (detail !== null) return { files: detail.files, read }
-    if (held !== null) return { files: held.files, read }
-    /* Only a form with no library carries the bundled example's own files. */
-    return {
-      files: sampleFiles,
-      read: () => Promise.resolve(skillFile(skill)),
-    }
-  }, [attached, detail, held, skill, read])
+    return { files: detail?.files ?? held?.files ?? [], read }
+  }, [attached, detail, held, read])
 }
 
 function LightboxBody({
@@ -1360,9 +1625,12 @@ function LightboxBody({
   held,
   store,
   root,
-  workspacePath,
+  placePath,
+  inPlace,
   reason,
-  onToggle,
+  places,
+  onInstallPlace,
+  onRemovePlace,
   onAdopt,
   onDelete,
   onCheckUpdate,
@@ -1373,16 +1641,23 @@ function LightboxBody({
   skill: Skill
   /** The stored record, present when a library answered. */
   detail: SkillDetail | null
-  /** The workspace's own record, present when the skill lives there. */
+  /** The place's own record, present when the skill lives in one. */
   held: WorkspaceSkillDetail | null
   store: SkillStore | null
   /** The skills root as the library spells it, for the delete question. */
   root: string | null
-  /** The workspace's own skills root, as it reads; for a skill kept there. */
-  workspacePath: string | null
+  /** The place's skills root, as it reads; for a skill kept there. */
+  placePath: string | null
+  /** Whether the skill lives in a place rather than only in the library. */
+  inPlace: boolean
   /** Why this skill cannot be installed here, ready to show; `null` when it can. */
   reason: string | null
-  onToggle: () => void
+  /** Every place a workspace keeps skills in, with what each holds. */
+  places: readonly SkillPlaceView[]
+  /** Link this skill into a place that does not hold it yet. */
+  onInstallPlace: (dir: string) => void
+  /** Take back the link that put it there. */
+  onRemovePlace: (dir: string) => void
   /** Copy a skill this workspace wrote into the library. */
   onAdopt: () => void
   onDelete: (() => Promise<void>) | null
@@ -1411,9 +1686,9 @@ function LightboxBody({
       ? `# ${titleCase(skill.name)}\n\n${skill.description}`
       : body
   }, [detail, held, skill])
-  /* Each skill's directory: the library's for a library skill, the workspace's
-     for one kept there. */
-  const base = skill.location === "workspace" ? workspacePath : root
+  /* Each skill's directory: the library's for a library skill, the place's for
+     one kept there. */
+  const base = inPlace ? placePath : root
   const path = base === null ? null : `${base.replaceAll("\\", "/")}/${skill.id}`
 
   /* The catalog stays mounted behind the dialog; stop its previews decoding. */
@@ -1429,9 +1704,12 @@ function LightboxBody({
         skill={skill}
         reason={reason}
         path={path}
+        inPlace={inPlace}
+        places={places}
         onDelete={onDelete}
-        onToggle={onToggle}
         onAdopt={onAdopt}
+        onInstallPlace={onInstallPlace}
+        onRemovePlace={onRemovePlace}
         onCheckUpdate={onCheckUpdate}
         onUpdate={onUpdate}
         onViewFiles={() => setFilesOpen(true)}
@@ -1458,9 +1736,10 @@ export function SkillDetailDialog({
   skill,
   store,
   root,
-  workspacePath,
+  places,
   reason,
-  onToggle,
+  onInstallPlace,
+  onRemovePlace,
   onAdopt,
   onDelete,
   onDeleteWorkspace,
@@ -1475,17 +1754,20 @@ export function SkillDetailDialog({
   store: SkillStore | null
   /** Where the library keeps its skills, as it spells the path. */
   root: string | null
-  /** Where the workspace keeps its skills, for a skill kept there. */
-  workspacePath: string | null
+  /** The places in use, which carry each one's directory and display path. */
+  places: readonly SkillPlaceView[]
   /** Why this skill cannot be installed here, ready to show; `null` when it can. */
   reason: string | null
-  onToggle: () => void
-  /** Copy a skill this workspace wrote into the library. */
+  /** Link this skill into a place that does not hold it yet. */
+  onInstallPlace: (skill: Skill, dir: string) => void
+  /** Take back the link that put it there. */
+  onRemovePlace: (skill: Skill, dir: string) => void
+  /** Copy a skill a place wrote into the library. */
   onAdopt: (skill: Skill) => void
   /** Delete the skill and everything the hub stores for it. */
   onDelete: (skill: Skill) => Promise<void>
-  /** Delete a skill's directory from the workspace. */
-  onDeleteWorkspace: (skill: Skill) => Promise<void>
+  /** Delete a skill's directory from the place holding it. */
+  onDeleteWorkspace: (skill: Skill, dir: string) => Promise<void>
   /** Measure one skill against the source its files came from. */
   onCheckUpdate?: (skill: Skill) => Promise<SkillUpdateCheck>
   /** Install that source's current revision over this copy. */
@@ -1498,13 +1780,17 @@ export function SkillDetailDialog({
   const [loaded, setLoaded] = React.useState<{ id: string; detail: SkillDetail } | null>(null)
   const [held, setHeld] = React.useState<{ id: string; detail: WorkspaceSkillDetail } | null>(null)
   const id = skill?.id ?? null
-  const at = skill?.location ?? null
+  /* Where the row's files live, and whether the library holds it too. */
+  const place = skill === null ? null : placeOf(skill, places)
+  const inLib = skill !== null && inLibrary(skill)
+  const placeOnly = skill !== null && !inLib && place !== null
+  const placeDir = place?.dir ?? null
 
   /* Load the stored record whenever the lightbox opens on a library skill, and
-     again after a write moves its timestamp. A skill the workspace holds has no
-     library record, and asking for one is a request that can only fail. */
+     again after a write moves its timestamp. A skill no library record holds
+     has none, and asking for one is a request that can only fail. */
   React.useEffect(() => {
-    if (store === null || id === null || at === "workspace" || at === null) return
+    if (store === null || id === null || !inLib) return
     let live = true
     void (async () => {
       try {
@@ -1517,19 +1803,19 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, id, at, skill?.stamp])
+  }, [store, id, inLib, skill?.stamp])
 
   /* Only the record for the skill on screen counts; a stale one is ignored. */
   const detail = loaded !== null && loaded.id === id ? loaded.detail : null
 
-  /* A skill the workspace holds lives outside the library, so its own manifest
-     and files are read from the folder the hub is pointed at. */
+  /* A skill no library record holds lives outside the library, so its own
+     manifest and files are read from the place that keeps them. */
   React.useEffect(() => {
-    if (store === null || id === null || at !== "workspace") return
+    if (store === null || id === null || !placeOnly || placeDir === null) return
     let live = true
     void (async () => {
       try {
-        const found = await store.workspaceSkill(id)
+        const found = await store.workspaceSkill(id, placeDir)
         if (live && found !== null) setHeld({ id, detail: found })
       } catch {
         /* An unreadable skill leaves the panel on the catalog row it came from. */
@@ -1538,7 +1824,7 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, id, at])
+  }, [store, id, placeOnly, placeDir])
 
   const workspace = held !== null && held.id === id ? held.detail : null
 
@@ -1546,7 +1832,7 @@ export function SkillDetailDialog({
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>
       <DialogContent
         showCloseButton={false}
-        className="flex h-[min(740px,calc(100vh-48px))] w-[min(1136px,calc(100vw-48px))] flex-col gap-0 overflow-hidden rounded-xl bg-dialog p-0 shadow-[0_24px_56px_#0F172A3D] ring-glass-border backdrop-blur-xl sm:max-w-none"
+        className="flex h-[min(740px,calc(100vh-48px))] w-[min(1136px,calc(100vw-48px))] flex-col gap-0 overflow-hidden rounded-xl bg-dialog p-0 shadow-soft ring-1 ring-border sm:max-w-none"
       >
         {skill ? (
           <LightboxBody
@@ -1556,19 +1842,20 @@ export function SkillDetailDialog({
             held={workspace}
             store={store}
             root={root}
-            workspacePath={workspacePath}
+            placePath={place?.display ?? null}
+            inPlace={placeOnly}
             reason={reason}
-            onToggle={onToggle}
+            places={places}
+            onInstallPlace={(dir) => onInstallPlace(skill, dir)}
+            onRemovePlace={(dir) => onRemovePlace(skill, dir)}
             onAdopt={() => onAdopt(skill)}
-            /* Each place deletes what it owns: the library its record, the
-               workspace its directory. */
+            /* Each side deletes what it owns: the library its record, the place
+               its directory. */
             onDelete={
-              skill.location === "workspace"
-                ? store === null
-                  ? null
-                  : () => onDeleteWorkspace(skill)
-                : store === null
-                  ? null
+              store === null
+                ? null
+                : placeOnly && placeDir !== null
+                  ? () => onDeleteWorkspace(skill, placeDir)
                   : () => onDelete(skill)
             }
             {...(onCheckUpdate === undefined || onUpdate === undefined

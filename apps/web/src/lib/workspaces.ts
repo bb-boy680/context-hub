@@ -91,6 +91,14 @@ export function createRemoteWorkspaceService(): WorkspaceService {
         return refuse(error)
       }
     },
+
+    async selectAgent(id) {
+      try {
+        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/agent`, "POST", { id }))
+      } catch (error) {
+        return refuse(error)
+      }
+    },
   }
 }
 
@@ -102,6 +110,8 @@ export function useWorkspaces(): {
   page: WorkspacePage | null
   failure: string | null
   select(id: string): void
+  /** Choose the agent this hub delivers to; `null` clears the choice. */
+  selectAgent(id: string | null): void
   /** Add a folder and make it current; answers why the hub refused it, or `null`. */
   add(path: string): Promise<string | null>
 } {
@@ -123,6 +133,12 @@ export function useWorkspaces(): {
     },
     [service]
   )
+  const selectAgent = React.useCallback(
+    (id: string | null) => {
+      void service?.selectAgent(id)
+    },
+    [service]
+  )
   const add = React.useCallback(
     async (path: string) => {
       if (service === null) return "this form has no workspace list"
@@ -131,5 +147,5 @@ export function useWorkspaces(): {
     [service]
   )
 
-  return { page, failure, select, add }
+  return { page, failure, select, selectAgent, add }
 }

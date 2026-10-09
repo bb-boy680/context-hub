@@ -1,24 +1,22 @@
 import {
-  ActivityIcon,
   BlocksIcon,
   GitBranchIcon,
   LayoutDashboardIcon,
   PlugIcon,
   ServerIcon,
   SettingsIcon,
-  ShieldIcon,
-  type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
 
-import type { NavGroupId } from "@workspace/extensions"
+import type { ExtensionIcon, NavGroupId } from "@workspace/extensions"
 import { useContributions } from "@workspace/extensions/react"
 
 export type NavItem = {
   /** Message key resolved through `ctx.i18n` where the item renders. */
   labelKey: string
   path: string
-  icon: LucideIcon
+  /** The shell's own entries use lucide icons; a contribution may use any. */
+  icon: ExtensionIcon
   /**
    * Sort rank inside the group. Built-in entries keep gaps between them (10,
    * 20, 30 …), so a contributed entry can be inserted between two of them.
@@ -47,11 +45,9 @@ export const navGroups: NavGroup[] = [
     id: "operate",
     labelKey: "nav.group.operate",
     items: [
-      { labelKey: "nav.activity", path: "/activity", icon: ActivityIcon, order: 10 },
-      { labelKey: "nav.policies", path: "/policies", icon: ShieldIcon, order: 20 },
-      { labelKey: "nav.repository", path: "/repository", icon: GitBranchIcon, order: 30 },
-      { labelKey: "nav.settings", path: "/settings", icon: SettingsIcon, order: 40 },
-      { labelKey: "nav.extensions", path: "/extensions", icon: BlocksIcon, order: 50 },
+      { labelKey: "nav.repository", path: "/repository", icon: GitBranchIcon, order: 10 },
+      { labelKey: "nav.settings", path: "/settings", icon: SettingsIcon, order: 20 },
+      { labelKey: "nav.extensions", path: "/extensions", icon: BlocksIcon, order: 30 },
     ],
   },
 ]
@@ -62,20 +58,22 @@ export function useNavGroups(): NavGroup[] {
 
   return React.useMemo(
     () =>
-      navGroups.map((group) => ({
-        ...group,
-        items: [
-          ...group.items,
-          ...contributed
-            .filter((item) => item.group === group.id)
-            .map((item) => ({
-              labelKey: item.labelKey,
-              path: item.path,
-              icon: item.icon,
-              order: item.order,
-            })),
-        ].sort((a, b) => a.order - b.order),
-      })),
+      navGroups
+        .map((group) => ({
+          ...group,
+          items: [
+            ...group.items,
+            ...contributed
+              .filter((item) => item.group === group.id)
+              .map((item) => ({
+                labelKey: item.labelKey,
+                path: item.path,
+                icon: item.icon,
+                order: item.order,
+              })),
+          ].sort((a, b) => a.order - b.order),
+        }))
+        .filter((group) => group.items.length > 0),
     [contributed]
   )
 }

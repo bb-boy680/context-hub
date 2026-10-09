@@ -453,6 +453,16 @@ export function workspaceList(options: { home?: string; folder?: string } = {}) 
               sendJson(response, 200, await store.select(body.id))
               return
             }
+            if (action === "agent" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { id?: unknown }
+              /* Clearing the choice is a real value, so `null` is accepted here. */
+              if (body.id !== null && typeof body.id !== "string") {
+                sendJson(response, 400, { error: "agent needs an id, or null to clear it" })
+                return
+              }
+              sendJson(response, 200, await store.selectAgent(body.id))
+              return
+            }
             response.writeHead(405).end()
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)

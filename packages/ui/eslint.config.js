@@ -19,4 +19,15 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    /* The shadcn-derived primitives export their variant maps and hooks beside
+       the components they belong to, which is how the upstream files are
+       written; editing them into separate modules would be a fork. Fast Refresh
+       is a development convenience, and these files are not the app's screens. */
+    files: ['src/components/**/*.tsx', 'src/hooks/**/*.ts'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+    },
+  },
 ])

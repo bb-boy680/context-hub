@@ -376,6 +376,51 @@ check(
   )
 )
 
+/* A place an agent contributes is a directory of its own: reads, installs and
+   removals there leave the shared `.agents/skills` directory alone. */
+const agentDir = path.join(".claude", "skills")
+const agentRoot = path.join(workspace, agentDir)
+check(
+  "a place reads its own directory",
+  (await readWorkspaceSkills(workspace, library, agentDir)).root === agentRoot,
+  (await readWorkspaceSkills(workspace, library, agentDir)).root
+)
+check(
+  "which is empty until something is installed there",
+  (await readWorkspaceSkills(workspace, library, agentDir)).skills.length === 0
+)
+check(
+  "installing into a place answers how it landed",
+  (await installSkillIntoWorkspace(workspace, library, "alpha", agentDir)) === "link"
+)
+const shared = path.join(workspace, ".agents", "skills")
+check(
+  "and the shared directory is untouched",
+  (await fs.lstat(path.join(shared, "alpha")).catch(() => null)) === null
+)
+check(
+  "the place holds it",
+  (await readWorkspaceSkills(workspace, library, agentDir)).skills.some((skill) => skill.id === "alpha")
+)
+check(
+  "reading it back by hand goes through the same directory",
+  (await readWorkspaceSkill(workspace, "alpha", agentDir))?.name === "Alpha"
+)
+await removeSkillFromWorkspace(workspace, library, "alpha", agentDir)
+check(
+  "taking it back out leaves the place empty again",
+  (await readWorkspaceSkills(workspace, library, agentDir)).skills.length === 0
+)
+for (const bad of ["", "..", path.join("..", "outside"), path.resolve(workspace)]) {
+  let rejected = ""
+  try {
+    await readWorkspaceSkills(workspace, library, bad)
+  } catch (error) {
+    rejected = error instanceof Error ? error.message : String(error)
+  }
+  check(`a directory outside the workspace is refused: "${bad}"`, rejected.includes("not a directory inside a workspace"), rejected)
+}
+
 await store.dispose()
 await fs.rm(home, { recursive: true, force: true })
 console.log(failures === 0 ? "all checks passed" : `${failures} check(s) failed`)

@@ -14,25 +14,32 @@
     --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
     --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
 
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --radius-lg: 8px;
-    --radius-xl: 12px;
-    --radius-2xl: 16px;
-    --radius-3xl: 20px;
-    --radius-4xl: 24px;
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-2xl: 24px;
+    --radius-3xl: 32px;
+    --radius-4xl: 40px;
+    --radius-pill: 100px;
 
     --text-caption: 12px;
     --text-body: 13px;
+    --text-body-lg: 14px;
     --text-title: 16px;
+    --text-title-lg: 18px;
     --text-heading: 22px;
-    --text-display: 29px;
+    --text-display: 36px;
+    --text-display--line-height: 1.11;
+    --text-display--letter-spacing: -0.5px;
 
     --blur-glass: 18px;
     --blur-header: 12px;
-    --blur-blob: 90px;
 
-    --shadow-glass: 0 8px 24px var(--glass-shadow);
+    /* One shadow tier for the whole app. */
+    --shadow-soft: 0 4px 12px rgb(0 0 0 / 0.04);
+    --shadow-glass: 0 4px 12px rgb(0 0 0 / 0.04);
 }
 
 /* Colour tokens are `var()` references so one class on <html> re-themes the app. */
@@ -59,6 +66,8 @@
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
     --color-muted: var(--muted);
+    --color-muted-soft: var(--muted-soft);
+    --color-copy: var(--copy);
     --color-secondary-foreground: var(--secondary-foreground);
     --color-secondary: var(--secondary);
     --color-primary-foreground: var(--primary-foreground);
@@ -111,181 +120,170 @@
     --color-marketplace-official: var(--marketplace-official);
     --color-marketplace-internal: var(--marketplace-internal);
     --color-marketplace-local: var(--marketplace-local);
-    --color-blob-blue: var(--blob-blue);
-    --color-blob-violet: var(--blob-violet);
-    --color-blob-pink: var(--blob-pink);
 }
 
 :root {
-    --radius: 8px;
+    --radius: 12px;
 
-    --background: #edf1f8;
-    --foreground: #18181b;
-    --card: #ffffff99;
-    --card-foreground: #18181b;
-    --popover: #fffffff2;
-    --popover-foreground: #18181b;
-    --primary: #4f46e5;
+    --background: #ffffff;
+    --foreground: #0a0b0d;
+    --card: #ffffff;
+    --card-foreground: #0a0b0d;
+    --popover: #ffffff;
+    --popover-foreground: #0a0b0d;
+    --primary: #0052ff;
     --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #334155;
-    --muted: #e2e8f0;
-    --muted-foreground: #64748b;
-    --accent: #ffffffcc;
-    --accent-foreground: #18181b;
-    --destructive: #ef4444;
+    --secondary: #eef0f3;
+    --secondary-foreground: #0a0b0d;
+    /* Running text, one step lighter than ink, and the line below it. */
+    --copy: #5b616e;
+    --muted-soft: #a8acb3;
+    --muted: #f7f7f7;
+    --muted-foreground: #7c828a;
+    --accent: #eef0f3;
+    --accent-foreground: #0a0b0d;
+    --destructive: #cf202f;
     --destructive-foreground: #ffffff;
-    --border: #e2e8f0;
-    --input: #cbd5e1;
-    --ring: #4f46e5;
-    --chart-1: #4f46e5;
-    --chart-2: #059669;
-    --chart-3: #ea580c;
-    --chart-4: #9333ea;
-    --chart-5: #e11d48;
-    --sidebar: #ffffff66;
-    --sidebar-foreground: #18181b;
-    --sidebar-primary: #4f46e5;
+    --border: #dee1e6;
+    --input: #dee1e6;
+    --ring: #0052ff;
+    --chart-1: #0052ff;
+    --chart-2: #05b169;
+    --chart-3: #f4b000;
+    --chart-4: #7c828a;
+    --chart-5: #cf202f;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #0a0b0d;
+    --sidebar-primary: #0052ff;
     --sidebar-primary-foreground: #ffffff;
-    --sidebar-accent: #ffffffcc;
-    --sidebar-accent-foreground: #18181b;
-    --sidebar-border: #ffffffb3;
-    --sidebar-ring: #4f46e5;
+    --sidebar-accent: #eef0f3;
+    --sidebar-accent-foreground: #0a0b0d;
+    --sidebar-border: #dee1e6;
+    --sidebar-ring: #0052ff;
 
-    --glass-border: #ffffffb3;
-    --glass-shadow: #1e293b14;
-    --header: #ffffff73;
-    --accent-strong: #ffffff66;
-    --surface-raised: #ffffffcc;
-    --surface-image-tile: #ffffff99;
-    --dialog: #fffffff7;
-    --notice-bg: #4f46e51a;
-    --notice-border: #4f46e533;
-    --dropzone: #eef2ffb3;
-    --scrim: #0f172a73;
-    --success: #059669;
-    --warning: #ea580c;
-    --marketplace-official: #6366f1;
-    --marketplace-internal: #14b8a6;
-    --marketplace-local: #64748b;
-    --blob-blue: #93c5fd66;
-    --blob-violet: #c4b5fd66;
-    --blob-pink: #fbcfe866;
+    --glass-border: #dee1e6;
+    --glass-shadow: #0000000a;
+    --header: #ffffff;
+    --accent-strong: #eef0f3;
+    --surface-raised: #f7f7f7;
+    --surface-image-tile: #f7f7f7;
+    --dialog: #ffffff;
+    --notice-bg: #0052ff14;
+    --notice-border: #0052ff33;
+    --dropzone: #0052ff14;
+    --scrim: #0a0b0d73;
+    --success: #05b169;
+    --warning: #f4b000;
+    --marketplace-official: #0052ff;
+    --marketplace-internal: #05b169;
+    --marketplace-local: #7c828a;
 
-    --tag-documents: #60a5fa;
-    --tag-engineering: #a78bfa;
-    --tag-docs: #f472b6;
-    --tag-data: #34d399;
-    --tag-design: #fbbf24;
-    --tag-integrations: #38bdf8;
-    --tag-reliability: #f87171;
-    --tag-marketing: #f0abfc;
-    --tag-quality: #a3e635;
+    /* One accent and two semantic colours; category tags stay neutral. */
+    --tag-documents: #0a0b0d;
+    --tag-engineering: #0a0b0d;
+    --tag-docs: #0a0b0d;
+    --tag-data: #0a0b0d;
+    --tag-design: #0a0b0d;
+    --tag-integrations: #0a0b0d;
+    --tag-reliability: #0a0b0d;
+    --tag-marketing: #0a0b0d;
+    --tag-quality: #0a0b0d;
 
-    --chip-documents: #60a5fa2e;
-    --chip-engineering: #a78bfa2e;
-    --chip-docs: #f472b62e;
-    --chip-data: #34d3992e;
-    --chip-ask: #f59e0b2e;
-    --chip-deny: #e11d482e;
-    --chip-chart-4: #9333ea2e;
-    --chip-design: #fbbf242e;
-    --chip-integrations: #38bdf82e;
-    --chip-reliability: #f871712e;
-    --chip-marketing: #f0abfc2e;
-    --chip-quality: #a3e6352e;
-    --chip-official: #6366f126;
-    --chip-internal: #14b8a626;
-    --chip-local: #64748b26;
-
-    --app-gradient-1: #e9f0fb;
-    --app-gradient-2: #f1edfb;
-    --app-gradient-3: #fbf0f2;
+    --chip-documents: #f7f7f7;
+    --chip-engineering: #f7f7f7;
+    --chip-docs: #f7f7f7;
+    --chip-data: #f7f7f7;
+    --chip-ask: #f7f7f7;
+    --chip-deny: #f7f7f7;
+    --chip-chart-4: #f7f7f7;
+    --chip-design: #f7f7f7;
+    --chip-integrations: #f7f7f7;
+    --chip-reliability: #f7f7f7;
+    --chip-marketing: #f7f7f7;
+    --chip-quality: #f7f7f7;
+    --chip-official: #f7f7f7;
+    --chip-internal: #f7f7f7;
+    --chip-local: #f7f7f7;
 }
 
 .dark {
-    --background: #0b0f1a;
-    --foreground: #f8fafc;
-    --card: #ffffff0f;
-    --card-foreground: #f8fafc;
-    --popover: #0e1422f2;
-    --popover-foreground: #f8fafc;
-    --primary: #6366f1;
+    --background: #0a0b0d;
+    --foreground: #ffffff;
+    --card: #16181c;
+    --card-foreground: #ffffff;
+    --popover: #16181c;
+    --popover-foreground: #ffffff;
+    --primary: #0052ff;
     --primary-foreground: #ffffff;
     --secondary: #ffffff14;
-    --secondary-foreground: #e2e8f0;
-    --muted: #ffffff14;
-    --muted-foreground: #94a3b8;
+    --secondary-foreground: #ffffff;
+    --muted: #ffffff0f;
+    --muted-foreground: #a8acb3;
+    --copy: #a8acb3;
+    --muted-soft: #7c828a;
     --accent: #ffffff1f;
-    --accent-foreground: #f8fafc;
-    --destructive: #ef4444;
+    --accent-foreground: #ffffff;
+    --destructive: #cf202f;
     --destructive-foreground: #ffffff;
     --border: #ffffff1f;
-    --input: #ffffff29;
-    --ring: #818cf8;
-    --chart-1: #818cf8;
-    --chart-2: #34d399;
-    --chart-3: #fb923c;
-    --chart-4: #c084fc;
-    --chart-5: #fb7185;
-    --sidebar: #ffffff08;
-    --sidebar-foreground: #f8fafc;
-    --sidebar-primary: #6366f1;
+    --input: #ffffff1f;
+    --ring: #0052ff;
+    --chart-1: #0052ff;
+    --chart-2: #05b169;
+    --chart-3: #f4b000;
+    --chart-4: #a8acb3;
+    --chart-5: #cf202f;
+    --sidebar: #0a0b0d;
+    --sidebar-foreground: #ffffff;
+    --sidebar-primary: #0052ff;
     --sidebar-primary-foreground: #ffffff;
     --sidebar-accent: #ffffff1f;
-    --sidebar-accent-foreground: #f8fafc;
-    --sidebar-border: #ffffff24;
-    --sidebar-ring: #818cf8;
+    --sidebar-accent-foreground: #ffffff;
+    --sidebar-border: #ffffff1f;
+    --sidebar-ring: #0052ff;
 
-    --glass-border: #ffffff24;
+    --glass-border: #ffffff1f;
     --glass-shadow: #00000059;
-    --header: #ffffff0d;
+    --header: #0a0b0d;
     --accent-strong: #ffffff0f;
-    --surface-raised: #ffffff1a;
+    --surface-raised: #ffffff0f;
     --surface-image-tile: #ffffff14;
-    --dialog: #0e1422f7;
-    --notice-bg: #6366f11f;
-    --notice-border: #6366f133;
-    --dropzone: #312e81b3;
+    --dialog: #16181c;
+    --notice-bg: #0052ff1f;
+    --notice-border: #0052ff33;
+    --dropzone: #0052ff1f;
     --scrim: #000000a6;
-    --success: #34d399;
-    --warning: #fb923c;
-    --marketplace-official: #818cf8;
-    --marketplace-internal: #2dd4bf;
-    --marketplace-local: #94a3b8;
-    --blob-blue: #1d4ed859;
-    --blob-violet: #6d28d959;
-    --blob-pink: #9d174d4d;
+    --success: #05b169;
+    --warning: #f4b000;
+    --marketplace-official: #0052ff;
+    --marketplace-internal: #05b169;
+    --marketplace-local: #a8acb3;
 
-    --tag-documents: #93c5fd;
-    --tag-engineering: #c4b5fd;
-    --tag-docs: #f9a8d4;
-    --tag-data: #6ee7b7;
-    --tag-design: #fcd34d;
-    --tag-integrations: #7dd3fc;
-    --tag-reliability: #fca5a5;
-    --tag-marketing: #f5d0fe;
-    --tag-quality: #bef264;
+    --tag-documents: #ffffff;
+    --tag-engineering: #ffffff;
+    --tag-docs: #ffffff;
+    --tag-data: #ffffff;
+    --tag-design: #ffffff;
+    --tag-integrations: #ffffff;
+    --tag-reliability: #ffffff;
+    --tag-marketing: #ffffff;
+    --tag-quality: #ffffff;
 
-    --chip-documents: #93c5fd33;
-    --chip-engineering: #c4b5fd33;
-    --chip-docs: #f9a8d433;
-    --chip-data: #6ee7b733;
-    --chip-ask: #fcd34d33;
-    --chip-deny: #fda4af33;
-    --chip-chart-4: #c084fc33;
-    --chip-design: #fcd34d33;
-    --chip-integrations: #7dd3fc33;
-    --chip-reliability: #fca5a533;
-    --chip-marketing: #f5d0fe33;
-    --chip-quality: #bef26433;
-    --chip-official: #818cf833;
-    --chip-internal: #2dd4bf33;
-    --chip-local: #94a3b833;
-
-    --app-gradient-1: #0b0f1a;
-    --app-gradient-2: #101426;
-    --app-gradient-3: #1a1226;
+    --chip-documents: #ffffff14;
+    --chip-engineering: #ffffff14;
+    --chip-docs: #ffffff14;
+    --chip-data: #ffffff14;
+    --chip-ask: #ffffff14;
+    --chip-deny: #ffffff14;
+    --chip-chart-4: #ffffff14;
+    --chip-design: #ffffff14;
+    --chip-integrations: #ffffff14;
+    --chip-reliability: #ffffff14;
+    --chip-marketing: #ffffff14;
+    --chip-quality: #ffffff14;
+    --chip-official: #ffffff14;
+    --chip-internal: #ffffff14;
+    --chip-local: #ffffff14;
 }
 
 @layer base {
@@ -322,14 +320,47 @@
     }
 }
 
-/* Page gradient behind the glass surfaces; the blobs sit on top of it. */
-@utility app-background {
-    background-image: linear-gradient(
-        225deg,
-        var(--app-gradient-1),
-        var(--app-gradient-2) 55%,
-        var(--app-gradient-3)
-    );
+/* The design's scrollbar: 5px, pill, a 6% track under an 18% thumb. The gutter
+   is reserved so a panel does not shift sideways the moment it starts to scroll. */
+@utility scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(10 11 13 / 0.18) rgb(10 11 13 / 0.06);
+    scrollbar-gutter: stable;
+
+    &::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+    }
+
+    &::-webkit-scrollbar-track {
+        background: rgb(10 11 13 / 0.06);
+        border-radius: 999px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+        background: rgb(10 11 13 / 0.18);
+        border-radius: 999px;
+    }
+
+    &::-webkit-scrollbar-thumb:hover {
+        background: rgb(10 11 13 / 0.3);
+    }
+
+    .dark & {
+        scrollbar-color: rgb(255 255 255 / 0.24) rgb(255 255 255 / 0.08);
+
+        &::-webkit-scrollbar-track {
+            background: rgb(255 255 255 / 0.08);
+        }
+
+        &::-webkit-scrollbar-thumb {
+            background: rgb(255 255 255 / 0.24);
+        }
+
+        &::-webkit-scrollbar-thumb:hover {
+            background: rgb(255 255 255 / 0.36);
+        }
+    }
 }
 
 /* Photo covers soften downward. One masked backdrop blur replaces the design's four discrete

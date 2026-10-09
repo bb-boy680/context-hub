@@ -1,9 +1,21 @@
 /**
  * Where one skill lives, as the row and the lightbox show it: only in the hub's
- * library, only in the workspace folder, or in both — a library skill the hub
- * installed into the workspace is one skill in two places, not two skills.
+ * library, only in a place a workspace keeps skills in, or in both — a library
+ * skill the hub installed into a place is one skill in two places, not two
+ * skills. `"both"` and `"library"` are the hub's own two cases; everything else
+ * is the id of a place, the way the extension that contributed it named it.
  */
-export type SkillLocation = "library" | "workspace" | "both"
+export type SkillLocation = "library" | "both" | SkillPlace
+
+/** One place a workspace keeps skills in, named by the extension that contributed it. */
+export type SkillPlace = string
+
+/** One place holding a row's files, with the directory it reads them from. */
+export interface SkillHold {
+  id: SkillPlace
+  /** The place's directory inside the workspace, `/`-separated. */
+  dir: string
+}
 
 /** How a skill reached this machine; the first half of a row's provenance line. */
 export type { SkillOrigin as SkillSource } from "./store.ts"
@@ -27,19 +39,22 @@ export type Skill = {
   source: SkillSource
   /** Location, which is what the row's provenance line names. */
   location: SkillLocation
+  /** The places holding this row's files; absent when only the library does. */
+  places?: SkillHold[]
   /** The workspace holds this library skill, installed by the hub as a link. */
   installed: boolean
   /**
-   * Which side holds the link when a skill is in both places: the workspace,
-   * for one the hub installed; the library, for one linked in from a workspace.
-   * Taking the link back is what an action on such a row does.
+   * Which side holds the link when the library and a place both reach the same
+   * files: the library, for one linked in from a workspace; otherwise the place
+   * that holds a link into the library. Taking the link back is what an action
+   * on such a row does.
    */
-  linkAt?: "library" | "workspace"
+  linkAt?: "library" | SkillPlace
   /**
-   * The workspace holds a skill of its own under this id, so the name is taken:
-   * installing the library's copy under it is not possible.
+   * The places holding a skill of their own under this id, so the name is taken
+   * there: installing the library's copy into one of them is not possible.
    */
-  taken?: boolean
+  takenAt?: SkillPlace[]
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
   stale?: boolean
   /**
@@ -56,8 +71,6 @@ export type Skill = {
   inLibrary?: boolean
   /** Token estimate, present once the body has been read. */
   tokens?: string
-  /** Matches recorded for the skill; absent for a skill with no history. */
-  triggers?: number
   /** Display-ready age, e.g. "2 hours ago"; empty for a row with no record. */
   updated: string
   /** The stored record's own timestamp; moves on every write, so the lightbox

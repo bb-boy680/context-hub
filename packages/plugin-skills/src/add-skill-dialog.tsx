@@ -1,4 +1,14 @@
-import { CheckIcon, DownloadIcon, UploadIcon, XIcon } from "lucide-react"
+import {
+  CheckIcon,
+  FolderIcon,
+  FolderOpenIcon,
+  FolderUpIcon,
+  ListIcon,
+  PackageIcon,
+  PlusIcon,
+  ScrollTextIcon,
+  XIcon,
+} from "lucide-react"
 import * as React from "react"
 
 import {
@@ -22,13 +32,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
-import {
-  Popover,
-  PopoverArrow,
-  PopoverContent,
-  PopoverTrigger,
-} from "@workspace/ui/components/popover"
 import { Spinner } from "@workspace/ui/components/spinner"
 
 import { useI18n } from "@workspace/extensions/react"
@@ -48,6 +51,11 @@ function messageOf(failure: unknown): string {
   return failure instanceof Error ? failure.message : String(failure)
 }
 
+/**
+ * The two ways in, as one trough with a raised chip on it. The chip is the
+ * canvas colour, not ink: this control selects, it does not act, and the page's
+ * own tab row spends the ink fill on the one place being read.
+ */
 function SegmentRow({
   tab,
   onTabChange,
@@ -58,8 +66,8 @@ function SegmentRow({
   const { t } = useI18n()
 
   return (
-    <div className="px-6 pb-4">
-      <div className="flex h-9 gap-1 rounded-lg bg-muted p-1">
+    <div className="px-5 pb-4">
+      <div className="flex h-9 gap-1 rounded-full bg-surface-raised p-[3px]">
         {segments.map((segment) => (
           <button
             key={segment.value}
@@ -67,10 +75,10 @@ function SegmentRow({
             role="tab"
             aria-selected={tab === segment.value}
             onClick={() => onTabChange(segment.value)}
-            className={`h-7 flex-1 rounded-md text-[13px] transition-colors ${
+            className={`h-[30px] flex-1 rounded-full text-[13px] transition-colors ${
               tab === segment.value
-                ? "bg-accent font-semibold text-foreground"
-                : "font-medium text-muted-foreground hover:text-foreground"
+                ? "bg-card font-semibold text-foreground ring-1 ring-border"
+                : "font-medium text-copy hover:text-foreground"
             }`}
           >
             {t(segment.labelKey)}
@@ -81,195 +89,73 @@ function SegmentRow({
   )
 }
 
-/** One candidate: what it is called, what it does, and whether this import takes it. */
-function SkillRow({
+/**
+ * One candidate: what it is called, what it is, and its own install action. The
+ * same row shape serves both segments, because both ask the same question.
+ */
+function InstallRow({
   name,
-  description,
-  selected,
+  detail,
   installed,
-  onToggle,
+  pending,
+  onInstall,
 }: {
   name: string
-  description: string
-  selected: boolean
-  /** Already in this library: it cannot be picked again, and says so. */
+  /** The row's second line: a folder skill's own file, or a package skill's description. */
+  detail: string
+  /** Already in this library: there is nothing left to do with this row. */
   installed: boolean
-  onToggle: () => void
+  /** This row's own install is in flight; the other rows stay live. */
+  pending: boolean
+  onInstall: () => void
 }) {
   const { t } = useI18n()
 
   return (
-    <li className="flex h-14 items-center gap-3 pr-3.5 pl-6">
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="truncate font-mono text-[13.5px] leading-[17px] font-semibold">
+    <li className="flex h-[68px] items-center gap-3.5 border-b border-border px-5 last:border-b-0">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-raised ring-1 ring-border ring-inset">
+        <ScrollTextIcon className="size-[17px] text-copy" aria-hidden />
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+        <span className="truncate font-mono text-[13.5px] leading-[18px] font-semibold">
           {name}
         </span>
-        {description !== "" && (
-          <span className="truncate text-[11.5px] leading-[15px] text-muted-foreground">
-            {description}
+        {detail !== "" && (
+          <span className="truncate text-[12px] leading-[15px] text-muted-foreground">
+            {detail}
           </span>
         )}
       </div>
       {installed ? (
-        /* Same metrics as the pick button, so the two states line up row to row. */
-        <span className="flex h-8 shrink-0 items-center gap-1.5 px-2.5 text-xs font-medium text-muted-foreground">
-          <CheckIcon className="size-4 text-chart-2" />
+        <span className="flex h-[26px] shrink-0 items-center gap-1.5 rounded-full px-3 text-[12px] font-semibold text-muted-foreground ring-1 ring-border">
+          <CheckIcon className="size-[13px]" />
           {t("skills.add.imported")}
         </span>
       ) : (
         <Button
-          variant={selected ? "ghost" : "default"}
-          aria-pressed={selected}
-          aria-label={`${t(selected ? "skills.add.selected" : "skills.add.select")} ${name}`}
-          onClick={onToggle}
-          className={
-            selected
-              ? "h-8 shrink-0 gap-1.5 px-2.5 text-xs font-medium"
-              : "h-8 shrink-0 px-3.5 text-xs font-medium"
-          }
+          type="button"
+          variant="outline"
+          disabled={pending}
+          aria-busy={pending}
+          aria-label={`${t("skills.action.install")} ${name}`}
+          onClick={onInstall}
+          className="h-[30px] shrink-0 gap-1.5 rounded-full bg-secondary px-3.5 text-[12.5px] font-semibold text-foreground hover:bg-accent"
         >
-          {selected && <CheckIcon className="text-chart-2" />}
-          {t(selected ? "skills.add.selected" : "skills.add.select")}
+          {pending ? <Spinner className="size-[13px]" /> : <PlusIcon className="size-[13px]" />}
+          {t("skills.action.install")}
         </Button>
       )}
     </li>
   )
 }
 
-/** The line above a list: how many arrived, and one control for all of them. */
-function ListHeader({
-  summary,
-  allSelected,
-  canToggleAll,
-  onToggleAll,
-}: {
-  summary: string
-  allSelected: boolean
-  /** False when every row is already in the library, so there is nothing to take. */
-  canToggleAll: boolean
-  onToggleAll: () => void
-}) {
-  const { t } = useI18n()
-
-  return (
-    <div className="flex h-[38px] shrink-0 items-center justify-between gap-3 px-6">
-      <span className="truncate text-xs leading-[15px] text-muted-foreground">
-        {summary}
-      </span>
-      <button
-        type="button"
-        disabled={!canToggleAll}
-        onClick={onToggleAll}
-        className="shrink-0 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-      >
-        {t(allSelected ? "skills.add.clearAll" : "skills.add.selectAll")}
-      </button>
-    </div>
-  )
-}
-
 /** The one line a list shows instead of rows: a wait, or a refusal. */
 function ListState({ text, busy }: { text: string; busy: boolean }) {
   return (
-    <div className="flex items-center gap-2 px-6 py-7 text-xs">
+    <div className="flex items-center gap-2 px-5 py-7 text-[12px]">
       {busy && <Spinner className="size-3.5" />}
       <span className={busy ? "text-muted-foreground" : "text-destructive"}>{text}</span>
     </div>
-  )
-}
-
-/** What the current tab has picked, each one removable where it is named. */
-function PickedChips({
-  picked,
-  onRemove,
-}: {
-  picked: string[]
-  onRemove: (name: string) => void
-}) {
-  const { t } = useI18n()
-  if (picked.length === 0) return null
-
-  return (
-    <div className="flex max-h-[68px] flex-wrap items-center gap-1.5 overflow-y-auto pr-1.5">
-      {picked.map((skill) => (
-        <span
-          key={skill}
-          className="flex h-[21px] items-center gap-1.5 rounded-full bg-muted px-2 font-mono text-[11.5px]"
-        >
-          {skill}
-          <button
-            type="button"
-            aria-label={`${t("skills.media.remove")} ${skill}`}
-            onClick={() => onRemove(skill)}
-          >
-            <XIcon className="size-3 text-muted-foreground" />
-          </button>
-        </span>
-      ))}
-    </div>
-  )
-}
-
-/**
- * The discard question, anchored to the Cancel button it belongs to. Cancel
- * only asks when the dialog holds something a close would drop: with an empty
- * field and no picks, the same click just closes.
- */
-function DiscardBubble({
-  open,
-  dirty,
-  onOpenChange,
-  onDiscard,
-  children,
-}: {
-  open: boolean
-  dirty: boolean
-  onOpenChange: (open: boolean) => void
-  onDiscard: () => void
-  children: React.ReactElement
-}) {
-  const { t } = useI18n()
-
-  return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        onOpenChange(next && dirty)
-      }}
-    >
-      <PopoverTrigger render={children} />
-      <PopoverContent
-        side="top"
-        align="end"
-        sideOffset={7}
-        className="w-80 gap-2.5 rounded-lg bg-dialog px-4 py-3.5 shadow-[0_8px_24px_#0F172A29] ring-glass-border backdrop-blur-xl"
-      >
-        <PopoverArrow className="size-3 rotate-45 border-b border-l border-glass-border bg-dialog" />
-        <span className="text-[13.5px] leading-[17px] font-semibold">
-          {t("skills.add.discard.title")}
-        </span>
-        <span className="text-xs leading-[15px] text-muted-foreground">
-          {t("skills.add.discard.text")}
-        </span>
-        <div className="flex items-center justify-end gap-2 pt-0.5">
-          <Button
-            variant="outline"
-            size="sm"
-            className={`px-3 text-xs ${outline}`}
-            onClick={() => onOpenChange(false)}
-          >
-            {t("skills.add.discard.keep")}
-          </Button>
-          <Button
-            size="sm"
-            className="bg-destructive px-3 text-xs text-white hover:bg-destructive/90"
-            onClick={onDiscard}
-          >
-            {t("skills.add.discard.confirm")}
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
   )
 }
 
@@ -310,16 +196,14 @@ export function AddSkillDialog({
   /** The pins that listing seeded, so a new pin re-seeds without re-running the CLI. */
   const [seeded, setSeeded] = React.useState("")
   /*
-   * Picks belong to the tab that made them. A folder's skills and a package's
-   * skills are different sets that may share names, so one tab's picks must not
-   * render as the other's, nor count toward its Import.
+   * Each row installs on its own, so what is in flight is a set of names: a
+   * row's button waits for that row alone, and the rest stay live.
    */
-  const [folderPicked, setFolderPicked] = React.useState<string[]>([])
-  const [packagePicked, setPackagePicked] = React.useState<string[]>([])
-  const picked = tab === "local" ? folderPicked : packagePicked
-  const setPicked = tab === "local" ? setFolderPicked : setPackagePicked
+  const [pending, setPending] = React.useState<string[]>([])
   const [packaged, setPackaged] = React.useState<PackageSkill[]>([])
   const [folder, setFolder] = React.useState<FolderSkill[] | null>(null)
+  /** The folder the last read came from, as the person picked it. */
+  const [folderName, setFolderName] = React.useState("")
   /** True when a bound stopped the read before the folder ran out. */
   const [capped, setCapped] = React.useState(false)
   /** Ids this library already holds, lower-cased for comparison. */
@@ -327,7 +211,6 @@ export function AddSkillDialog({
   const [busy, setBusy] = React.useState<"list" | "import" | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [failed, setFailed] = React.useState<{ name: string; reason: string }[]>([])
-  const [confirming, setConfirming] = React.useState(false)
 
   /** What the library holds now, so a row can say it is already in. */
   const readInstalled = React.useCallback(async (): Promise<string[]> => {
@@ -354,24 +237,20 @@ export function AddSkillDialog({
     }
   }, [open, readInstalled])
 
-  const dirty =
-    tab === "local" ? folder !== null : source.trim() !== "" || picked.length > 0
-
   const reset = () => {
     folderRead.current?.abort()
     folderRead.current = null
     setSource("")
     setListed("")
     setSeeded("")
-    setFolderPicked([])
-    setPackagePicked([])
+    setPending([])
     setPackaged([])
     setFolder(null)
+    setFolderName("")
     setCapped(false)
     setBusy(null)
     setError(null)
     setFailed([])
-    setConfirming(false)
   }
 
   /* Closing always clears the dialog, so the next open starts from nothing. */
@@ -380,27 +259,15 @@ export function AddSkillDialog({
     onOpenChange(next)
   }
 
-  const toggle = (name: string) =>
-    setPicked((current) =>
-      current.includes(name)
-        ? current.filter((item) => item !== name)
-        : [...current, name]
-    )
-
   /** Ask the CLI what the package holds, unless that list is already on screen. */
   const handleList = async () => {
     const request = parsePackageRequest(source)
     if (request.source === "") return
-    /* The pinned skills are part of the request: changing them re-seeds the picks. */
     const seed = request.skills.join(",")
     if (request.source === listed && seed === seeded) return
     const alreadyListed = request.source === listed
     setListed(request.source)
     setSeeded(seed)
-    /* A pasted command's `--skill` flags are picks, minus what is already in. */
-    setPackagePicked(
-      request.skills.filter((name) => !installed.includes(name.toLowerCase()))
-    )
     setFailed([])
     if (alreadyListed) return
     if (store === null) {
@@ -437,8 +304,6 @@ export function AddSkillDialog({
     folderRead.current = controller
     setError(null)
     setFailed([])
-    setFolderPicked([])
-    setCapped(false)
     setBusy("list")
     try {
       const { files, truncated } = await read(controller.signal)
@@ -447,8 +312,9 @@ export function AddSkillDialog({
       if (controller.signal.aborted) return
       setCapped(truncated)
       setFolder(found)
-      const first = found.find((skill) => !installed.includes(skill.name.toLowerCase()))
-      setFolderPicked(first === undefined ? [] : [first.name])
+      /* Every path starts with the folder it was read from, which is the name
+         the person picked; a single file has none. */
+      setFolderName(files[0]?.path.split("/")[0] ?? "")
     } catch (failure) {
       if (controller.signal.aborted) return
       setFolder(null)
@@ -461,36 +327,36 @@ export function AddSkillDialog({
     }
   }
 
-  const handleImport = async () => {
+  /** Put one row into the library, and leave the list up for the next one. */
+  const installOne = async (name: string) => {
     if (store === null) {
       setError(t("skills.add.offline"))
       return
     }
-    const chosen = (folder ?? []).filter((skill) => picked.includes(skill.name))
-    if (picked.length === 0) return
-    setBusy("import")
+    const found = (folder ?? []).find((skill) => skill.name === name)
+    if (tab === "local" && found === undefined) return
+    setPending((current) => [...current, name])
     setError(null)
-    setFailed([])
     try {
       const result: SkillImport =
         tab === "local"
-          ? await store.importFolder(await readFolderFiles(chosen))
+          ? await store.importFolder(await readFolderFiles([found as FolderSkill]))
           : await store.installPackage(
               listed === "" ? parsePackageRequest(source).source : listed,
-              picked
+              [name]
             )
       if (result.installed.length > 0) onImported()
       if (result.failed.length > 0) {
-        /* Say what was refused, and let a second press retry what was not. */
-        setFailed(result.failed)
-        void readInstalled().then(setInstalled)
-        return
+        setFailed((current) => [
+          ...current.filter((entry) => entry.name !== name),
+          ...result.failed,
+        ])
       }
-      close(false)
+      void readInstalled().then(setInstalled)
     } catch (failure) {
       setError(messageOf(failure))
     } finally {
-      setBusy(null)
+      setPending((current) => current.filter((item) => item !== name))
     }
   }
 
@@ -499,17 +365,9 @@ export function AddSkillDialog({
 
   const inLibrary = (name: string) => installed.includes(name.toLowerCase())
 
-  /* Only what the library does not hold yet can be picked, so a second import
-     can never be attempted for a skill already in. */
-  const selectable = candidates.filter((skill) => !inLibrary(skill.name))
-
   /* A listing is on screen once it has been asked for, even when it found nothing. */
   const hasList = tab === "local" ? folder !== null : listed !== ""
   const showList = hasList || busy === "list" || error !== null
-
-  const allSelected =
-    selectable.length > 0 &&
-    selectable.every((skill) => picked.includes(skill.name))
 
   const summary = (tab === "local"
     ? t("skills.add.foundFolder")
@@ -542,62 +400,106 @@ export function AddSkillDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent
         showCloseButton={false}
-        className="gap-0 rounded-lg bg-dialog p-0 shadow-[0_24px_56px_#0F172A3D] ring-glass-border backdrop-blur-xl sm:max-w-[640px]"
+        className="gap-0 rounded-xl bg-dialog p-0 shadow-soft ring-1 ring-border sm:max-w-[640px]"
       >
-        <div className="flex items-start gap-4 px-6 pt-[22px] pb-4">
-          <div className="flex flex-col gap-[5px]">
-            <DialogTitle className="text-base leading-[19px] font-semibold">
+        <div className="flex min-h-24 items-start gap-3 px-5 pt-5 pb-4">
+          <div className="flex flex-1 flex-col gap-1.5">
+            <DialogTitle className="text-[16px] leading-[19px] font-semibold">
               {t("skills.add.title")}
             </DialogTitle>
-            <DialogDescription className="text-sm leading-[17px]">
+            <DialogDescription className="text-[12.5px] leading-[19px] text-muted-foreground">
               {t("skills.add.description")}
             </DialogDescription>
           </div>
           <Button
             variant="ghost"
-            size="icon-sm"
-            className="ml-auto shrink-0"
+            className="size-[30px] shrink-0 rounded-full"
             aria-label={t("skills.action.close")}
             onClick={() => close(false)}
           >
-            <XIcon className="text-muted-foreground" />
+            <XIcon className="size-4 text-copy" />
           </Button>
         </div>
 
         <SegmentRow tab={tab} onTabChange={onTabChange} />
 
         {tab === "local" ? (
-          <div className="px-6 pb-6">
-            <div
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault()
-                void acceptFolder((signal) => {
-                  const transfer = event.dataTransfer
-                  return readDrop(transfer, { signal, limits })
-                })
-              }}
-              className="flex h-[92px] items-center gap-3.5 rounded-lg bg-dropzone px-5 ring-2 ring-primary"
-            >
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-surface-raised">
-                <UploadIcon className="size-5 text-primary" />
-              </span>
-              <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
-                <span className="text-sm leading-[17px] font-semibold">
+          folder === null && busy !== "list" && error === null ? (
+            /* Nothing chosen yet, so the drop target is the whole screen and
+               browsing is its one button. */
+            <div className="px-5 pb-5">
+              <div
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault()
+                  void acceptFolder((signal) => {
+                    const transfer = event.dataTransfer
+                    return readDrop(transfer, { signal, limits })
+                  })
+                }}
+                className="flex h-56 flex-col items-center justify-center gap-3 rounded-md bg-surface-raised px-6 text-center ring-1 ring-border ring-inset"
+              >
+                <FolderUpIcon className="size-7 text-muted-soft" aria-hidden />
+                <span className="text-[15.5px] leading-[20px] font-semibold">
                   {t("skills.add.dropTitle")}
                 </span>
-                <span className="text-[11.5px] leading-[14px] text-muted-foreground">
+                <span className="text-[13px] leading-[17px] text-copy">
                   {t("skills.add.dropHint")}
                 </span>
+                <Button
+                  className="mt-1 h-10 gap-2 rounded-full px-[18px] text-[13.5px] font-semibold"
+                  onClick={() => void browse()}
+                >
+                  <FolderOpenIcon className="size-[15px]" />
+                  {t("skills.add.browseFiles")}
+                </Button>
+                <span className="mt-0.5 font-mono text-[12px] leading-[16px] text-muted-soft">
+                  {t("skills.add.limitNote").replace("{count}", String(DEFAULT_LIMITS.maxEntries))}
+                </span>
+                <input
+                  ref={pickerRef}
+                  type="file"
+                  multiple
+                  aria-label={t("skills.add.browseFiles")}
+                  className="sr-only"
+                  {...{ webkitdirectory: "", directory: "" }}
+                  onChange={(event) => {
+                    const input = event.target
+                    void acceptFolder(async () => filesFromPicker(input, limits))
+                    input.value = ""
+                  }}
+                />
               </div>
-              <Button
-                variant="outline"
-                className={`h-9 shrink-0 px-4 ${outline}`}
-                onClick={() => void browse()}
-              >
-                <UploadIcon />
-                {t("skills.add.browseFiles")}
-              </Button>
+            </div>
+          ) : (
+            <>
+              {/* Where this list came from, and the one way to change it. The
+                  strip is a raised card, so its tile is the canvas colour. */}
+              <div className="px-5 py-4">
+                <div className="flex h-16 items-center gap-3 rounded-lg bg-surface-raised px-4 ring-1 ring-border">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-card ring-1 ring-border ring-inset">
+                    <FolderIcon className="size-[17px] text-copy" aria-hidden />
+                  </span>
+                  <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                    {folderName === "" ? null : (
+                      <span className="truncate font-mono text-[13.5px] leading-[18px] font-semibold">
+                        {folderName}
+                      </span>
+                    )}
+                    <span className="truncate text-[12px] leading-[15px] text-muted-foreground">
+                      {busy === "list" ? t("skills.add.listing") : summary}
+                    </span>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className={`h-8 shrink-0 gap-1.5 rounded-full px-3.5 text-[13px] font-medium ${outline}`}
+                    onClick={() => void browse()}
+                  >
+                    <FolderOpenIcon className="size-3.5" />
+                    {t("skills.add.repick")}
+                  </Button>
+                </div>
+              </div>
               <input
                 ref={pickerRef}
                 type="file"
@@ -611,60 +513,52 @@ export function AddSkillDialog({
                   input.value = ""
                 }}
               />
-            </div>
-            {capped && (
-              <p className="pt-2 text-[11px] leading-[14px] text-muted-foreground">
-                {t("skills.add.capped").replace(
-                  "{count}",
-                  String(DEFAULT_LIMITS.maxEntries)
-                )}
-              </p>
-            )}
-            {picked.length > 0 && (
-              <div className="pt-2">
-                <PickedChips picked={picked} onRemove={toggle} />
-              </div>
-            )}
-          </div>
+              {capped ? (
+                <p className="px-5 pb-3 text-[12px] leading-[16px] text-muted-foreground">
+                  {t("skills.add.capped").replace("{count}", String(DEFAULT_LIMITS.maxEntries))}
+                </p>
+              ) : null}
+            </>
+          )
         ) : (
-          <div className="flex flex-col gap-2 px-6 pb-6">
-            <label
-              htmlFor="skill-package"
-              className="text-[13px] leading-[15px] font-medium"
-            >
-              {t("skills.add.package")}
-            </label>
-            <Input
-              id="skill-package"
-              value={source}
-              onChange={(event) => setSource(event.target.value)}
-              onBlur={() => void handleList()}
-              placeholder={t("skills.add.packagePlaceholder")}
-              className="h-[38px]"
-            />
-            <span className="text-[11px] leading-[14px] text-muted-foreground">
-              {t("skills.add.packageHint")}
-            </span>
-            <span className="text-[11px] leading-[14px] text-muted-foreground">
-              {t("skills.add.packageNote")}
-            </span>
-            <PickedChips picked={picked} onRemove={toggle} />
+          <div className="px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-12 min-w-0 flex-1 items-center gap-2.5 rounded-md border border-input px-4 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                <PackageIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+                <input
+                  id="skill-package"
+                  value={source}
+                  onChange={(event) => setSource(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") void handleList()
+                  }}
+                  placeholder={t("skills.add.packagePlaceholder")}
+                  aria-label={t("skills.add.package")}
+                  className="min-w-0 flex-1 bg-transparent text-[13.5px] outline-none placeholder:text-muted-soft"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={busy === "list" || source.trim() === ""}
+                aria-label={t("skills.add.list")}
+                onClick={() => void handleList()}
+                className="h-12 shrink-0 gap-2 rounded-full bg-secondary px-5 text-[13.5px] font-semibold text-foreground hover:bg-accent"
+              >
+                {busy === "list" ? (
+                  <Spinner className="size-[15px]" />
+                ) : (
+                  <ListIcon className="size-[15px]" />
+                )}
+                {t("skills.add.list")}
+              </Button>
+            </div>
           </div>
         )}
 
         {showList && (
           <>
             <div className="h-px shrink-0 bg-border" />
-            {error === null && (
-              <ListHeader
-                summary={summary}
-                allSelected={allSelected}
-                canToggleAll={selectable.length > 0}
-                onToggleAll={() =>
-                  setPicked(allSelected ? [] : selectable.map((skill) => skill.name))
-                }
-              />
-            )}
             {busy === "list" ? (
               <ListState text={t("skills.add.listing")} busy />
             ) : error !== null ? (
@@ -672,21 +566,24 @@ export function AddSkillDialog({
             ) : candidates.length === 0 ? (
               <ListState text={t("skills.add.none")} busy={false} />
             ) : (
-              <ul className="max-h-56 shrink-0 overflow-y-auto">
+              /* Installing one row is the whole interaction: the row says which
+                 skill, and the button installs that one. No selection to carry,
+                 so no footer to submit it with. */
+              <ul className="scroll-thin max-h-[360px] shrink-0 overflow-y-auto">
                 {candidates.map((skill) => (
-                  <SkillRow
+                  <InstallRow
                     key={skill.name}
                     name={skill.name}
-                    description={skill.description}
-                    selected={picked.includes(skill.name)}
+                    detail={skill.description}
                     installed={inLibrary(skill.name)}
-                    onToggle={() => toggle(skill.name)}
+                    pending={pending.includes(skill.name)}
+                    onInstall={() => void installOne(skill.name)}
                   />
                 ))}
               </ul>
             )}
             {failed.length > 0 && (
-              <div className="flex flex-col gap-0.5 px-6 pt-2 text-[11px] text-destructive">
+              <div className="flex shrink-0 flex-col gap-0.5 px-6 py-2 text-[12px] text-destructive">
                 {failed.map((entry) => (
                   <span key={entry.name}>
                     {entry.name} — {entry.reason}
@@ -696,43 +593,6 @@ export function AddSkillDialog({
             )}
           </>
         )}
-
-        <div className="flex h-16 items-center justify-between gap-3 border-t border-border px-6">
-          <span className="truncate text-xs text-muted-foreground">
-            {t(tab === "local" ? "skills.add.copiedHint" : "skills.add.downloadedHint")}
-          </span>
-          <div className="flex shrink-0 items-center gap-2">
-            <DiscardBubble
-              open={confirming}
-              dirty={dirty}
-              onOpenChange={setConfirming}
-              onDiscard={() => {
-                setConfirming(false)
-                close(false)
-              }}
-            >
-              <Button
-                variant="ghost"
-                className="h-9 px-4 text-[13px]"
-                onClick={() => {
-                  if (!dirty) close(false)
-                }}
-              >
-                {t("skills.action.cancel")}
-              </Button>
-            </DiscardBubble>
-            <Button
-              className="h-9 gap-2 px-4 text-[13px]"
-              disabled={busy === "import" || picked.length === 0}
-              onClick={() => void handleImport()}
-            >
-              <DownloadIcon />
-              {picked.length === 0
-                ? t("skills.action.import")
-                : `${t("skills.action.import")} ${picked.length}`}
-            </Button>
-          </div>
-        </div>
       </DialogContent>
     </Dialog>
   )

@@ -36,8 +36,9 @@ const project = path.join(home, "projects", "marketing-site")
 console.log(`home: ${home}`)
 
 check(
-  "a fresh hub lists no workspace",
-  JSON.stringify(await store.page()) === JSON.stringify({ folders: [], current: null })
+  "a fresh hub lists no workspace and no agent",
+  JSON.stringify(await store.page()) === JSON.stringify({ folders: [], current: null, agent: null }),
+  await store.page()
 )
 
 /* The form reports a folder it walked to: the row carries the name and the path. */
@@ -140,14 +141,31 @@ check(
   refused
 )
 
+/* The agent this hub delivers to is remembered beside the folder, and an id
+   nothing answers for is not a choice — it clears the one that was made. */
+const folderCount = (await store.page()).folders.length
+check("the agent a hub delivers to is a choice", (await store.page()).agent === null)
+check("choosing one records it", (await store.selectAgent("hub.target.claude-code")).agent === "hub.target.claude-code")
+check("it survives a folder switch", (await store.select(inside)).agent === "hub.target.claude-code")
+check("clearing the choice is a value, not a wipe", (await store.selectAgent(null)).agent === null)
+check(
+  "and every folder is still there",
+  (await store.page()).folders.length === folderCount,
+  (await store.page()).folders.length
+)
+
 /* A hand-edited document is durable JSON, so its values are checked, not trusted. */
 check(
   "a document that is not an object is empty",
-  JSON.stringify(readWorkspaceState("nope")) === JSON.stringify({ folders: [], current: null })
+  JSON.stringify(readWorkspaceState("nope")) === JSON.stringify({ folders: [], current: null, agent: null })
 )
 check(
   "an absent document is empty",
-  JSON.stringify(readWorkspaceState(null)) === JSON.stringify({ folders: [], current: null })
+  JSON.stringify(readWorkspaceState(null)) === JSON.stringify({ folders: [], current: null, agent: null })
+)
+check(
+  "an agent that is not a name is dropped",
+  readWorkspaceState({ folders: [], agent: 7 }).agent === null
 )
 const edited = readWorkspaceState({
   folders: [{ name: "skills" }, { name: "" }, { path: project }, 7, { name: "docs", path: "" }],

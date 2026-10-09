@@ -467,7 +467,8 @@ export async function createFsSkillStore(
           needle !== undefined &&
           needle !== "" &&
           !row.name.toLowerCase().includes(needle) &&
-          !row.description.toLowerCase().includes(needle)
+          !row.description.toLowerCase().includes(needle) &&
+          !row.tags.some((tag) => tag.toLowerCase().includes(needle))
         ) {
           continue
         }
@@ -705,33 +706,33 @@ export async function createFsSkillStore(
       return isLink(ref) ? ref : assetUrl(ref)
     },
 
-    async workspaceSkills(): Promise<WorkspaceSkills | null> {
+    async workspaceSkills(dir?: string): Promise<WorkspaceSkills | null> {
       const workspace = await currentWorkspace()
-      return workspace === null ? null : readWorkspaceSkills(workspace, root)
+      return workspace === null ? null : readWorkspaceSkills(workspace, root, dir)
     },
 
-    async workspaceSkill(id: string): Promise<WorkspaceSkillRecord | null> {
+    async workspaceSkill(id: string, dir?: string): Promise<WorkspaceSkillRecord | null> {
       const workspace = await currentWorkspace()
-      return workspace === null ? null : readWorkspaceSkill(workspace, id)
+      return workspace === null ? null : readWorkspaceSkill(workspace, id, dir)
     },
 
-    async workspaceFile(id: string, file: string): Promise<string> {
+    async workspaceFile(id: string, file: string, dir?: string): Promise<string> {
       const workspace = await requiredWorkspace()
-      const text = await readWorkspaceSkillFile(workspace, id, file)
+      const text = await readWorkspaceSkillFile(workspace, id, file, dir)
       if (text === null) {
         throw new Error(`the workspace holds no such file: ${id}/${file}`)
       }
       return text
     },
 
-    async installToWorkspace(id: string): Promise<WorkspaceInstall> {
+    async installToWorkspace(id: string, dir?: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
-      return installSkillIntoWorkspace(workspace, root, id)
+      return installSkillIntoWorkspace(workspace, root, id, dir)
     },
 
-    async importFromWorkspace(id: string): Promise<WorkspaceInstall> {
+    async importFromWorkspace(id: string, dir?: string): Promise<WorkspaceInstall> {
       const workspace = await requiredWorkspace()
-      const landed = await linkSkillIntoLibrary(workspace, root, id)
+      const landed = await linkSkillIntoLibrary(workspace, root, id, dir)
       /* What the skills CLI installed this from, if it did: the lock beside
          the workspace's skills is the record, and its hash is what an update
          check compares against. Without it the skill is still listed, but
@@ -841,14 +842,14 @@ export async function createFsSkillStore(
       await refreshCatalog()
     },
 
-    async deleteWorkspaceSkill(id: string): Promise<void> {
+    async deleteWorkspaceSkill(id: string, dir?: string): Promise<void> {
       const workspace = await requiredWorkspace()
-      await deleteSkillFromWorkspace(workspace, id)
+      await deleteSkillFromWorkspace(workspace, id, dir)
     },
 
-    async removeFromWorkspace(id: string): Promise<void> {
+    async removeFromWorkspace(id: string, dir?: string): Promise<void> {
       const workspace = await requiredWorkspace()
-      await removeSkillFromWorkspace(workspace, root, id)
+      await removeSkillFromWorkspace(workspace, root, id, dir)
     },
 
     subscribe(listener: () => void): () => void {

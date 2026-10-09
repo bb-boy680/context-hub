@@ -2,13 +2,15 @@
  * Catalog data for the skills UI. The page asks this hook for one page of
  * skills; the hook reads the form-owned store when one exists, follows its
  * change notifications, and hands back rows the components already understand.
- * Without a store the page keeps rendering its bundled samples.
+ * A form with no store has no catalog, and the page says so instead of
+ * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
 import { useHub, useI18n } from "@workspace/extensions/react"
 
 import { parseSkillFile } from "./frontmatter.ts"
 import type {
+  SkillFileEntry,
   SkillPage,
   SkillStore,
   SkillSummary,
@@ -18,22 +20,42 @@ import type {
   WorkspaceSkill,
   WorkspaceSkillsView,
 } from "./store.ts"
-import type { Skill, SkillLocation, SkillSource } from "./types.ts"
+import type {
+  Skill,
+  SkillHold,
+  SkillLocation,
+  SkillPlace,
+  SkillSource,
+} from "./types.ts"
+
+/** One place a workspace keeps skills in, with what it holds right now. */
+export interface SkillPlaceView {
+  id: SkillPlace
+  /** Message key the tab and the provenance line resolve for this place. */
+  labelKey: string
+  /** The place's directory inside the workspace, `/`-separated. */
+  dir: string
+  /** The place's own skills directory, as it reads; `null` when it has none. */
+  view: WorkspaceSkillsView | null
+}
 
 /** One page of the catalog, plus what the UI needs to render around it. */
 export interface SkillLibrary {
   /** The form-owned library, or `null` when this form has none. */
   store: SkillStore | null
-  /** Every skill the hub knows here: the library's own, then the workspace's. */
+  /** Every skill in reach: the library's own, then each place's. */
   rows: Skill[]
-  /** Rows each location tab shows: everything, the library's, the workspace's. */
-  counts: { all: number; library: number; workspace: number }
-  /** The current workspace's skills; `null` when no folder is selected. */
-  workspace: WorkspaceSkillsView | null
+  /** Rows each tab shows, keyed by tab value: "all", "library", or a place id. */
+  counts: Record<string, number>
+  /** The places a workspace keeps skills in, in tab order. */
+  places: SkillPlaceView[]
   /** The workspace in use, or `null` when this form has none selected. */
   workspaceId: string | null
-  /** Where the current workspace keeps its skills, as it reads; `null` when there is no folder. */
-  workspaceRoot: string | null
+  /**
+   * The agent this hub delivers to, by integration id; `null` when none is
+   * chosen. It names a place, so the page can open on the chosen agent's tab.
+   */
+  agent: string | null
   loading: boolean
   /** Display-ready failure from the last load, if any. */
   error: string | null
@@ -41,16 +63,16 @@ export interface SkillLibrary {
   root: string | null
   /** Every category in use across the library. */
   tags: string[]
-  /** Re-read the library and the workspace. */
+  /** Re-read the library and every place. */
   reload(): Promise<void>
-  /** Put one library skill into the current workspace; answers how it landed. */
-  install(id: string): Promise<WorkspaceInstall>
-  /** Copy one skill the current workspace holds into the library. */
-  adopt(id: string): Promise<WorkspaceInstall>
-  /** Delete one skill from the current workspace folder, its directory included. */
-  deleteWorkspaceSkill(id: string): Promise<void>
-  /** Take one skill the hub installed back out of the current workspace. */
-  remove(id: string): Promise<void>
+  /** Put one library skill into one place; answers how it landed. */
+  install(id: string, dir?: string): Promise<WorkspaceInstall>
+  /** Copy one skill a place holds into the library. */
+  adopt(id: string, dir?: string): Promise<WorkspaceInstall>
+  /** Delete one skill from a place, its directory included. */
+  deleteWorkspaceSkill(id: string, dir?: string): Promise<void>
+  /** Take one skill the hub installed back out of a place. */
+  remove(id: string, dir?: string): Promise<void>
   /** Measure one library skill against the upstream its files came from. */
   checkUpdate(id: string): Promise<SkillUpdateCheck>
   /** Measure every skill that records a source; the rows carry the answers. */
@@ -59,18 +81,71 @@ export interface SkillLibrary {
   update(id: string): Promise<void>
 }
 
-/** Where a row lives, as its provenance line and the lightbox name it. */
+/** Every place holding a row's files. */
+export function holdsOf(skill: Skill): SkillHold[] {
+  return skill.places ?? []
+}
+
+/**
+ * Where one row's files live, and how that directory reads.
+ *
+ * @param skill — the row.
+ * @param places — the places in use, which carry the display path.
+ * @returns the directory and its display form, or `null` for a library-only row.
+ */
+export function placeOf(
+  skill: Skill,
+  places: readonly SkillPlaceView[]
+): { id: SkillPlace; dir: string; display: string } | null {
+  const hold = holdsOf(skill)[0]
+  if (hold === undefined) return null
+  const display = places.find((place) => place.id === hold.id)?.view?.display
+  return { id: hold.id, dir: hold.dir, display: display ?? hold.dir }
+}
+
+/** Whether the hub's own library holds this row, so the row is not only a place's. */
+export function inLibrary(skill: Skill): boolean {
+  return skill.location === "library" || skill.location === "both"
+}
+
+/**
+ * A row's location as its provenance line names it: the hub's own two cases by
+ * key, and a place by the key the extension that contributed it chose.
+ *
+ * @param location — the row's location.
+ * @param t — the active locale's lookup.
+ * @param places — the places in use, which carry their own labels.
+ * @returns the label, or the raw id for a place this build does not know.
+ */
 export function locationLabel(
   location: SkillLocation,
-  t: (key: string) => string
+  t: (key: string) => string,
+  places: readonly { id: SkillPlace; labelKey: string }[]
 ): string {
-  const key =
-    location === "library"
-      ? "skills.location.library"
-      : location === "both"
-        ? "skills.location.both"
-        : "skills.location.workspace"
-  return t(key)
+  if (location === "library") return t("skills.location.library")
+  if (location === "both") return t("skills.location.both")
+  const labelKey = places.find((place) => place.id === location)?.labelKey
+  return labelKey === undefined ? location : t(labelKey)
+}
+
+/**
+ * A row's places as one label. The card reads a count and the detail panel
+ * names which ones: a place is a property of the skill, never its identity.
+ *
+ * @param skill — the row whose places are read.
+ * @param t — the active locale's lookup.
+ * @param places — the places in use, which carry their own labels.
+ * @returns the library's own label, the place's, or how many hold it.
+ */
+export function placeLabel(
+  skill: Skill,
+  t: (key: string) => string,
+  places: readonly { id: SkillPlace; labelKey: string }[]
+): string {
+  const holds = holdsOf(skill)
+  if (holds.length === 0) return t("skills.location.library")
+  if (holds.length === 1) return locationLabel(holds[0].id, t, places)
+  return t("skills.location.count").replace("{count}", String(holds.length))
 }
 
 /** How a row reached this machine, as its provenance line names it. */
@@ -97,11 +172,13 @@ export function sourceLabel(
 
 /**
  * A row's identity for React and for the open lightbox. The same id can be on
- * screen twice — a library skill and a same-named skill the workspace wrote are
- * two rows — so the location is part of it.
+ * screen twice — a library skill and a same-named skill a place wrote are two
+ * rows — so the side a row comes from is part of it. Which places hold it is
+ * not: installing into one changes no identity, so the card behind an open
+ * menu is re-rendered rather than replaced.
  */
 export function skillKey(skill: Skill): string {
-  return `${skill.location}:${skill.id}`
+  return inLibrary(skill) ? `library:${skill.id}` : `${skill.location}:${skill.id}`
 }
 
 /** Token count as a compact label, the way the cards show it. */
@@ -110,47 +187,66 @@ export function tokenLabel(body: string): string {
   return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count)
 }
 
+/** One skill's document as a cover reads it. */
+export interface SkillDocument {
+  /** The SKILL.md body, or `null` until it is read. */
+  body: string | null
+  /** Every file the skill ships, which the same read already answered. */
+  files: readonly SkillFileEntry[]
+}
+
+const NO_FILES: readonly SkillFileEntry[] = []
+
 /** Documents already read, so a re-mounted cover does not refetch. */
-const bodies = new Map<string, string>()
+const documents = new Map<string, SkillDocument>()
 
 /**
- * The skill's own document — the SKILL.md body, read from wherever the skill
- * lives. Only a cover that shows the document calls this, so a card with a
- * picture never pays for the read.
+ * The skill's own document — the SKILL.md body and its file list, read from
+ * wherever the skill lives. Only a cover that shows the document calls this, so
+ * a card with a picture never pays for the read.
  *
  * @param skill — the row whose document is shown.
  * @param store — the form's library, or `null` when this form has none.
- * @returns the body, or `null` until it is read.
+ * @returns the body and files, both empty until the read answers.
  */
-export function useSkillBody(skill: Skill, store: SkillStore | null): string | null {
+export function useSkillDocument(
+  skill: Skill,
+  store: SkillStore | null
+): SkillDocument {
   const key = `${skillKey(skill)}@${skill.stamp ?? ""}`
-  const [body, setBody] = React.useState<string | null>(() => bodies.get(key) ?? null)
+  const [document, setDocument] = React.useState<SkillDocument>(
+    () => documents.get(key) ?? { body: null, files: NO_FILES }
+  )
 
   React.useEffect(() => {
-    if (store === null || bodies.has(key)) return
+    if (store === null || documents.has(key)) return
     let live = true
     void (async () => {
       try {
-        /* A workspace skill has no library record; its manifest is read where it lives. */
-        const text =
-          skill.location === "workspace"
-            ? (await store.workspaceSkill(skill.id))?.text
-            : (await store.get(skill.id)).body
-        if (text === undefined) return
-        const body =
-          skill.location === "workspace" ? parseSkillFile(text).body : text
-        bodies.set(key, body)
-        if (live) setBody(body)
+        /* A skill no library record holds is read where the place keeps it. */
+        const dir = holdsOf(skill)[0]?.dir
+        const record =
+          dir === undefined
+            ? await store.get(skill.id)
+            : await store.workspaceSkill(skill.id, dir)
+        if (record === undefined || record === null) return
+        const text = "body" in record ? record.body : record.text
+        const read: SkillDocument = {
+          body: dir === undefined ? text : parseSkillFile(text).body,
+          files: record.files,
+        }
+        documents.set(key, read)
+        if (live) setDocument(read)
       } catch {
-        /* An unreadable skill leaves the cover on its heading and description. */
+        /* An unreadable skill leaves the cover on its file-less placeholder. */
       }
     })()
     return () => {
       live = false
     }
-  }, [key, store, skill.id, skill.location])
+  }, [key, store, skill])
 
-  return body
+  return document
 }
 
 /** A past timestamp as an age the list can print, localized to the active locale. */
@@ -200,8 +296,8 @@ export function toSkill(
 /** Nothing to follow when this form provides no workspace list. */
 const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
 
-/** One skill's row for a skill the workspace holds and the library does not. */
-function workspaceRow(skill: WorkspaceSkill): Skill {
+/** One skill's row for a skill a place holds and the library does not. */
+function placeRow(skill: WorkspaceSkill, place: SkillHold): Skill {
   return {
     id: skill.id,
     name: skill.name,
@@ -211,23 +307,46 @@ function workspaceRow(skill: WorkspaceSkill): Skill {
     /* A folder in the project is a skill somebody put there, on this machine. */
     source: "local",
     updated: "",
-    location: "workspace",
+    location: place.id,
+    places: [{ id: place.id, dir: place.dir }],
     installed: false,
     stale: skill.origin === "stale",
   }
 }
 
+/** One place as a contribution describes it, which is all the loader needs. */
+export interface SkillPlaceSpec {
+  id: SkillPlace
+  labelKey: string
+  /** The place's directory inside the workspace, `/`-separated. */
+  dir: string
+}
+
 /**
- * Load the whole catalog and the current workspace's skills, and follow the
- * library's change notifications. The page filters and pages what it gets, so a
- * row that lives in either place is in one list with one meaning.
+ * Load the whole catalog and what every place holds, and follow the library's
+ * change notifications. The page filters and pages what it gets, so a row that
+ * lives in more than one of them is still one list with one meaning.
+ *
+ * @param specs — the places to read, as the contributions describe them.
+ * @param query — the filter row's text; the store narrows the catalog with it.
  */
-export function useSkillLibrary(): SkillLibrary {
+export function useSkillLibrary(
+  specs: readonly SkillPlaceSpec[],
+  query = ""
+): SkillLibrary {
   const ctx = useHub()
   const { state } = useI18n()
   const locale = state.active
   const store = React.useMemo(() => ctx.get("hub.skills") ?? null, [ctx])
   const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
+
+  /* A contribution list is rebuilt on every render, so the loads follow the
+     places it names rather than the array that carried them. */
+  const specKey = JSON.stringify(specs.map((spec) => [spec.id, spec.dir]))
+  const targets = React.useMemo(
+    () => JSON.parse(specKey) as [SkillPlace, string][],
+    [specKey]
+  )
 
   const subscribeWorkspaces = React.useCallback(
     (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
@@ -237,15 +356,24 @@ export function useSkillLibrary(): SkillLibrary {
     () => workspaces?.current()?.current ?? null,
     [workspaces]
   )
+  /* The chosen agent decides which place the page opens on. */
+  const readAgent = React.useCallback(
+    () => workspaces?.current()?.agent ?? null,
+    [workspaces]
+  )
   /* The workspace in use decides which skills are in reach, so it is a reload key. */
   const workspaceId = React.useSyncExternalStore(subscribeWorkspaces, readWorkspaceId)
+  const agent = React.useSyncExternalStore(subscribeWorkspaces, readAgent)
 
   const [page, setPage] = React.useState<SkillPage | null>(null)
-  const [workspace, setWorkspace] = React.useState<WorkspaceSkillsView | null>(null)
+  /* What each place holds, keyed by its id; a place that could not be read is absent. */
+  const [held, setHeld] = React.useState<Record<string, WorkspaceSkillsView | null>>({})
   const [loading, setLoading] = React.useState(store !== null)
   const [error, setError] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string[]>([])
   const generation = React.useRef(0)
+  /* The store owns what a query matches, so the page hands it over untouched. */
+  const needle = query.trim()
 
   const reload = React.useCallback(async () => {
     if (store === null) return
@@ -253,14 +381,16 @@ export function useSkillLibrary(): SkillLibrary {
     void workspaceId
     const current = ++generation.current
     try {
-      const [catalog, held] = await Promise.all([
-        store.list({ sort: "updated" }),
-        store.workspaceSkills(),
+      const [catalog, ...views] = await Promise.all([
+        store.list(needle === "" ? { sort: "updated" } : { sort: "updated", q: needle }),
+        ...targets.map(([, dir]) => store.workspaceSkills(dir)),
       ])
       /* A slower earlier request must not overwrite a newer one. */
       if (current !== generation.current) return
       setPage(catalog)
-      setWorkspace(held)
+      setHeld(
+        Object.fromEntries(targets.map(([id], at) => [id, views[at] ?? null]))
+      )
       setError(null)
     } catch (failure) {
       if (current !== generation.current) return
@@ -268,7 +398,7 @@ export function useSkillLibrary(): SkillLibrary {
     } finally {
       if (current === generation.current) setLoading(false)
     }
-  }, [store, workspaceId])
+  }, [store, workspaceId, targets, needle])
 
   /* The filter row spans the whole library, not the rows on screen. */
   const loadTags = React.useCallback(async () => {
@@ -297,54 +427,84 @@ export function useSkillLibrary(): SkillLibrary {
     })
   }, [store, reload, loadTags])
 
+  /** Each place with what it holds right now, for the tabs and the rows. */
+  const places = React.useMemo(
+    (): SkillPlaceView[] =>
+      specs.map((spec) => ({ ...spec, view: held[spec.id] ?? null })),
+    [specs, held]
+  )
+
   const rows = React.useMemo((): Skill[] => {
     if (store === null) return []
-    const held = new Map((workspace?.skills ?? []).map((skill) => [skill.id, skill]))
-    /** The workspace's own skills directory, which a linked library row can point into. */
-    const workspaceRoot = workspace?.root ?? null
-    const linkedIn = (row: SkillSummary): boolean =>
-      row.link !== undefined &&
-      workspaceRoot !== null &&
-      row.link.startsWith(workspaceRoot)
+    const items = page?.items ?? []
+    /** Every place, with the directory it reads and the skills it holds. */
+    const roots = targets.map(([id, dir]) => {
+      const view = held[id] ?? null
+      return {
+        id,
+        dir,
+        root: view?.root ?? null,
+        byId: new Map((view?.skills ?? []).map((skill) => [skill.id, skill])),
+      }
+    })
+    /** Whether a library row reaches its files through a link into one place. */
+    const reachedFrom = (row: SkillSummary, root: string | null): boolean =>
+      row.link !== undefined && root !== null && row.link.startsWith(root)
 
-    const library: Skill[] = (page?.items ?? []).map((item) => {
-      const own = held.get(item.id)
+    const library: Skill[] = items.map((item) => {
       /*
-       * One skill, whichever place holds the files: the library linked it in
-       * from this workspace, or the hub installed the library's skill into the
-       * workspace. Either way it is one row, and `linkAt` says which side holds
-       * the link — that is the side an action takes back.
+       * One skill, whichever places hold the files: a place linked it in from
+       * the library, or the hub installed the library's skill into a place.
+       * Either way it is one row, and `linkAt` says which side holds the link —
+       * that is the side an action takes back.
        */
-      const adopted = linkedIn(item)
-      const installed = own?.origin === "hub"
-      const both = adopted || installed
+      const holding: SkillHold[] = []
+      let linkAt: "library" | SkillPlace | undefined
+      const takenAt: SkillPlace[] = []
+      for (const place of roots) {
+        const own = place.byId.get(item.id)
+        const adopted = reachedFrom(item, place.root)
+        const installed = own?.origin === "hub"
+        if (adopted || installed) {
+          holding.push({ id: place.id, dir: place.dir })
+          if (adopted) linkAt = "library"
+          else if (linkAt === undefined) linkAt = place.id
+        } else if (own !== undefined) {
+          /* A same-named skill the project wrote is not this one, and it holds the name. */
+          takenAt.push(place.id)
+        }
+      }
       return {
         ...toSkill(item, store, locale),
-        location: both ? "both" : "library",
-        installed: both,
-        ...(both ? { linkAt: adopted ? ("library" as const) : ("workspace" as const) } : {}),
-        /* A same-named skill the project wrote is not this one, and it holds the name. */
-        taken: own !== undefined && !installed && !adopted,
+        location: holding.length === 0 ? "library" : "both",
+        installed: holding.length > 0,
+        ...(holding.length === 0 ? {} : { places: holding }),
+        ...(linkAt === undefined ? {} : { linkAt }),
+        ...(takenAt.length === 0 ? {} : { takenAt }),
       }
     })
     /*
      * A link the hub made, or a skill the library already reached through one,
-     * is on screen already; anything else the workspace holds is its own.
+     * is on screen already; anything else a place holds is that place's own.
      */
-    const own = (workspace?.skills ?? [])
-      .filter((skill) => skill.origin !== "hub")
-      .filter((skill) => !(page?.items ?? []).some((item) => linkedIn(item) && item.id === skill.id))
-      .map((skill) => ({
-        ...workspaceRow(skill),
-        inLibrary: (page?.items ?? []).some((item) => item.id === skill.id),
-      }))
+    const own: Skill[] = []
+    for (const place of roots) {
+      for (const skill of held[place.id]?.skills ?? []) {
+        if (skill.origin === "hub") continue
+        if (items.some((item) => item.id === skill.id && reachedFrom(item, place.root))) continue
+        own.push({
+          ...placeRow(skill, place),
+          inLibrary: items.some((item) => item.id === skill.id),
+        })
+      }
+    }
     return [...library, ...own]
-  }, [store, page, workspace, locale])
+  }, [store, page, held, targets, locale])
 
   const install = React.useCallback(
-    async (id: string) => {
+    async (id: string, dir?: string) => {
       if (store === null) throw new Error("this form has no skill library")
-      const landed = await store.installToWorkspace(id)
+      const landed = await store.installToWorkspace(id, dir)
       await reload()
       return landed
     },
@@ -352,10 +512,10 @@ export function useSkillLibrary(): SkillLibrary {
   )
 
   const adopt = React.useCallback(
-    async (id: string) => {
+    async (id: string, dir?: string) => {
       if (store === null) throw new Error("this form has no skill library")
-      /* The workspace keeps its files; the library reaches them through a link. */
-      const landed = await store.importFromWorkspace(id)
+      /* The place keeps its files; the library reaches them through a link. */
+      const landed = await store.importFromWorkspace(id, dir)
       await reload()
       return landed
     },
@@ -363,18 +523,18 @@ export function useSkillLibrary(): SkillLibrary {
   )
 
   const deleteWorkspaceSkill = React.useCallback(
-    async (id: string) => {
+    async (id: string, dir?: string) => {
       if (store === null) throw new Error("this form has no skill library")
-      await store.deleteWorkspaceSkill(id)
+      await store.deleteWorkspaceSkill(id, dir)
       await reload()
     },
     [store, reload]
   )
 
   const remove = React.useCallback(
-    async (id: string) => {
+    async (id: string, dir?: string) => {
       if (store === null) throw new Error("this form has no skill library")
-      await store.removeFromWorkspace(id)
+      await store.removeFromWorkspace(id, dir)
       await reload()
     },
     [store, reload]
@@ -414,10 +574,10 @@ export function useSkillLibrary(): SkillLibrary {
     return {
       store: null,
       rows: [],
-      counts: { all: 0, library: 0, workspace: 0 },
-      workspace: null,
+      counts: {},
+      places: [],
       workspaceId,
-      workspaceRoot: null,
+      agent: null,
       loading: false,
       error: null,
       root: null,
@@ -436,19 +596,22 @@ export function useSkillLibrary(): SkillLibrary {
       update: async () => undefined,
     }
   }
+  /* A skill in the library and in a place counts under each tab; only its
+     absence from a side excludes it there. */
+  const counts: Record<string, number> = {
+    all: rows.length,
+    library: rows.filter(inLibrary).length,
+  }
+  for (const [id] of targets) {
+    counts[id] = rows.filter((row) => holdsOf(row).some((hold) => hold.id === id)).length
+  }
   return {
     store,
     rows,
-    counts: {
-      all: rows.length,
-      /* A skill in both places counts under each tab; only its absence from one
-         side excludes it there. */
-      library: rows.filter((row) => row.location !== "workspace").length,
-      workspace: rows.filter((row) => row.location !== "library").length,
-    },
-    workspace,
+    counts,
+    places,
     workspaceId,
-    workspaceRoot: workspace?.display ?? null,
+    agent,
     loading,
     error,
     root: page?.root ?? null,

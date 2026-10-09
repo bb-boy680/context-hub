@@ -1,13 +1,22 @@
 import {
+  CheckIcon,
+  CompassIcon,
+  ChevronDownIcon,
   DownloadIcon,
+  FileTextIcon,
+  FolderOpenIcon,
+  FolderPlusIcon,
   LayoutGridIcon,
   LibraryIcon,
   ListIcon,
-  PowerIcon,
+  PlusIcon,
   RefreshCwIcon,
   SearchIcon,
+  SearchXIcon,
+  TriangleAlertIcon,
   Trash2Icon,
   UploadIcon,
+  XIcon,
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
@@ -15,26 +24,28 @@ import * as React from "react"
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
-import { skillKey, useSkillBody, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, skillKey, tokenLabel, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
-import { seedTags, tagTone } from "./tags.ts"
+import { tagTone } from "./tags.ts"
 import type { SkillStore } from "./store.ts"
-import type { Skill, SkillSource } from "./types.ts"
-
-import { Spinner } from "@workspace/ui/components/spinner"
+import type { Skill, SkillPlace } from "./types.ts"
 
 import { useContributions, useI18n } from "@workspace/extensions/react"
+import type { ExtensionIcon } from "@workspace/extensions"
 import { Button } from "@workspace/ui/components/button"
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@workspace/ui/components/card"
+import { Card } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { Markdown } from "@workspace/ui/components/markdown"
+import { Kbd } from "@workspace/ui/components/kbd"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -52,238 +63,54 @@ import {
 } from "@workspace/ui/components/tabs"
 
 const cardSurface =
-  "[--card-spacing:1.5rem] rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"
+  "[--card-spacing:1.5rem] rounded-xl ring-1 ring-border"
 
-type SkillTag = (typeof seedTags)[number]
-
-/* Card covers keep their own ratio, so the masonry derives its rhythm from real sizes. 390 = 4:3, 292 = 16:9, 347 = 3:2, 520 = 1:1, 693 = 3:4. */
-const cover = (id: string, height: number) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=520&h=${height}&q=70`
-
-/* 16:9 for the lightbox stage, which is larger than the card cover. */
-const shot = (id: string) =>
-  `https://images.unsplash.com/${id}?auto=format&fit=crop&w=1080&h=608&q=80`
-
-/* Sample clip so the video paths (cover preview, lightbox playback) are exercised. */
-const demoVideo =
-  "https://media.prompt-motion.com/stephanlivera-opus-5-5-on-max/video.86605038.mp4"
-
-/** Bundled rows the page renders when this form has no skill library. */
-const sampleSkills: Omit<Skill, "id" | "location" | "installed" | "source">[] = [
-  {
-    name: "pdf-extract",
-    summary: "Extract tables from PDFs",
-    description: "Extract tables from PDFs and scans",
-    tags: ["Documents"],
-    tokens: "1.2k",
-    triggers: 4,
-    updated: "2 hours ago",
-    cover: cover("photo-1761671614144-e8c003fff544", 390),
-    gallery: [
-      shot("photo-1761671614144-e8c003fff544"),
-      shot("photo-1580584126903-c17d41830450"),
-      shot("photo-1599727277643-b0c9cfb7705d"),
-    ],
-  },
-  {
-    name: "code-review",
-    summary: "Review checklists with severity",
-    description: "Repo review checklist with severity rubric",
-    tags: ["Engineering", "Quality"],
-    tokens: "2.4k",
-    triggers: 9,
-    updated: "yesterday",
-    cover: cover("photo-1580584126903-c17d41830450", 292),
-    gallery: [
-      shot("photo-1580584126903-c17d41830450"),
-      shot("photo-1516849841032-87cbac4d88f7"),
-    ],
-  },
-  {
-    name: "doc-audit",
-    summary: "Audit the docs tree",
-    description: "Audit the docs tree for structure and budgets",
-    tags: ["Docs"],
-    tokens: "0.9k",
-    triggers: 3,
-    updated: "2 days ago",
-  },
-  {
-    name: "api-design",
-    summary: "Design REST and JSON contracts",
-    description: "Design REST and JSON contracts from models",
-    tags: ["Engineering"],
-    tokens: "1.8k",
-    triggers: 6,
-    updated: "2 days ago",
-    cover: cover("photo-1618388810903-840bb0d15ea5", 390),
-    gallery: [
-      shot("photo-1618388810903-840bb0d15ea5"),
-      shot("photo-1544383835-bda2bc66a55d"),
-    ],
-  },
-  {
-    name: "test-reliability",
-    summary: "Diagnose flaky tests",
-    description: "Diagnose flaky tests and resource leaks",
-    tags: ["Engineering"],
-    tokens: "1.4k",
-    triggers: 5,
-    updated: "3 days ago",
-    cover: cover("photo-1599727277643-b0c9cfb7705d", 292),
-  },
-  {
-    name: "release-notes",
-    summary: "Draft notes from merged PRs",
-    description: "Draft release notes from merged PR labels",
-    tags: ["Docs"],
-    tokens: "0.6k",
-    triggers: 2,
-    updated: "3 days ago",
-    cover: cover("photo-1516849841032-87cbac4d88f7", 347),
-  },
-  {
-    name: "legacy-jira-sync",
-    summary: "Two-way sync with Jira",
-    description: "Two-way sync with legacy Jira projects",
-    tags: ["Integrations"],
-    tokens: "1.1k",
-    triggers: 4,
-    updated: "5 days ago",
-    cover: cover("photo-1549164330-86c63b6d4195", 390),
-  },
-  {
-    name: "data-migration",
-    summary: "Plan schema migrations",
-    description: "Plan schema migrations with rollback steps",
-    tags: ["Data"],
-    tokens: "1.6k",
-    triggers: 4,
-    updated: "6 days ago",
-  },
-  {
-    name: "onboarding-guide",
-    summary: "Generate onboarding paths",
-    description: "Generate a contributor onboarding path",
-    tags: ["Docs"],
-    tokens: "0.7k",
-    triggers: 3,
-    updated: "8 days ago",
-    cover: cover("photo-1580894908361-967195033215", 693),
-  },
-  {
-    name: "perf-profiling",
-    summary: "Profile hot paths",
-    description: "Profile hot paths and propose measured fixes",
-    tags: ["Engineering"],
-    tokens: "2.1k",
-    triggers: 7,
-    updated: "9 days ago",
-    /* A video as the first asset: the card and the list row preview it muted. */
-    gallery: [demoVideo],
-  },
-  {
-    name: "brand-voice",
-    summary: "Apply brand tone rules",
-    description: "Apply brand tone rules to product copy",
-    tags: ["Marketing"],
-    tokens: "0.5k",
-    triggers: 2,
-    updated: "12 days ago",
-    cover: cover("photo-1611269154421-4e27233ac5c7", 520),
-  },
-  {
-    name: "incident-postmortem",
-    summary: "Structure incident timelines",
-    description: "Structure incident timelines and follow-ups",
-    tags: ["Reliability"],
-    tokens: "1.3k",
-    triggers: 4,
-    updated: "14 days ago",
-    cover: cover("flagged/photo-1551954810-43cd6aef5b1f", 292),
-  },
-  {
-    name: "schema-explorer",
-    summary: "Map tables into summaries",
-    description: "Map database tables into context summaries",
-    tags: ["Data"],
-    tokens: "1.0k",
-    triggers: 3,
-    updated: "18 days ago",
-    cover: cover("photo-1544383835-bda2bc66a55d", 390),
-  },
-  {
-    name: "accessibility-audit",
-    summary: "Check against WCAG",
-    description: "Check interfaces against WCAG criteria",
-    tags: ["Design"],
-    tokens: "1.5k",
-    triggers: 5,
-    updated: "21 days ago",
-    cover: cover("photo-1523289333742-be1143f6b766", 347),
-  },
-]
-
-const filterTags: SkillTag[] = [...seedTags]
-
-/* The demo rows that did not simply arrive from this machine, so the grid shows
-   the range the design authored instead of one repeated label. */
-const SAMPLE_ORIGINS: Record<string, SkillSource> = {
-  "code-review": "builtin",
-  "api-design": "builtin",
-  "data-migration": "builtin",
-  "incident-postmortem": "builtin",
-  "doc-audit": "registry",
-  "release-notes": "registry",
-  "perf-profiling": "registry",
-  "schema-explorer": "registry",
-}
-
-/* A sample row is keyed by its name; samples stand in for library rows. */
-const sampleRows: Skill[] = sampleSkills.map((skill) => ({
-  ...skill,
-  id: skill.name,
-  source: SAMPLE_ORIGINS[skill.name] ?? "local",
-  location: "library",
-  installed: false,
-}))
-
-/* The tab row carries one dimension: where a skill is, not where it came from. */
-const TABS: { value: SkillTab; labelKey: string }[] = [
-  { value: "all", labelKey: "skills.tab.all" },
-  { value: "library", labelKey: "skills.tab.library" },
-  { value: "workspace", labelKey: "skills.tab.workspace" },
+/* The tab row carries one dimension: where a skill is, not where it came from.
+   The shell owns the first two; every place a workspace keeps skills in — the
+   directory the skills CLI shares, and each agent integration's own — is a tab
+   contributed by the extension that knows it, icon and all. */
+const SHELL_TABS: { value: SkillTab; labelKey: string; icon: ExtensionIcon }[] = [
+  { value: "all", labelKey: "skills.tab.all", icon: LayoutGridIcon },
+  { value: "library", labelKey: "skills.tab.library", icon: LibraryIcon },
 ]
 
 /** Which rows a tab shows. */
-type SkillTab = "all" | "library" | "workspace"
+type SkillTab = "all" | "library" | SkillPlace
 
-/* Counts for the bundled demo rows, which have no store behind them. */
-const SAMPLE_COUNTS = { all: 42, library: 30, workspace: 12 }
+/** Which rows one tab holds, before the category filter. */
+function rowsForTab(rows: Skill[], value: SkillTab): Skill[] {
+  if (value === "all") return rows
+  if (value === "library") return rows.filter(inLibrary)
+  return rows.filter((row) => holdsOf(row).some((hold) => hold.id === value))
+}
 
-/* Column widths include the 16px gutter the design leaves between columns.
-   位置 is 154 rather than the design's 136: "本地 · 技能库 + 工作区" measures
-   150 and the location axis introduced that longer label, so it takes 18 from
-   Token 数, whose header is 58 wide and whose values are always short. */
+/**
+ * The three fields the query box reads. The store narrows the catalog with the
+ * same three, but a place's own rows never travel through it, so the page reads
+ * them here as well.
+ */
+function matchesQuery(row: Skill, text: string) {
+  return (
+    row.name.toLowerCase().includes(text) ||
+    row.description.toLowerCase().includes(text) ||
+    row.tags.some((item) => item.toLowerCase().includes(text))
+  )
+}
+
+/* Column widths as shares of the table, not fixed pixels. The table is
+   `table-fixed` inside a panel whose width follows the window, so fixed widths
+   pushed the action column off the right edge — the one column the list exists
+   for. The shares keep the design's proportions at any width. */
 const columns = [
-  { labelKey: "", width: 32 },
-  { labelKey: "skills.column.skill", width: 340 },
-  { labelKey: "skills.column.tags", width: 166 },
-  { labelKey: "skills.column.location", width: 154 },
-  { labelKey: "skills.column.tokens", width: 78 },
-  { labelKey: "skills.column.triggers", width: 96 },
-  { labelKey: "skills.column.updated", width: 120 },
-  { labelKey: "skills.column.action", width: 102 },
+  { labelKey: "", width: "2.9%" },
+  { labelKey: "skills.column.skill", width: "43.1%" },
+  { labelKey: "skills.column.tags", width: "19.3%" },
+  { labelKey: "skills.column.location", width: "16.1%" },
+  { labelKey: "skills.column.updated", width: "10.1%" },
+  { labelKey: "skills.column.action", width: "8.5%" },
 ]
 
-const viewToggleSurface = "flex h-9 gap-1 rounded-lg bg-muted p-1"
-
-function titleCase(name: string) {
-  return name
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
-}
+const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
 
 function TagChip({
   tag,
@@ -295,33 +122,34 @@ function TagChip({
   const box =
     size === "sm"
       ? "h-[18px] px-1.5 text-[11px] leading-[13px]"
-      : "h-5 px-[7px] text-xs leading-[14px]"
+      : "h-[22px] px-[9px] text-[12px] leading-[15px] font-medium"
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full font-medium ${box} ${tagTone(tag).chip} ${tagTone(tag).label}`}
+      className={`inline-flex shrink-0 items-center rounded-full font-medium ${box} ${tagTone().chip} ${tagTone().label}`}
     >
       {tag}
     </span>
   )
 }
 
+/* A quiet chip over a cover: a hairline pill on the canvas colour, so a label
+   never competes with the picture underneath it. */
+const pillSurface =
+  "inline-flex h-5 shrink-0 items-center rounded-full bg-card/95 px-[9px] text-[12px] leading-none font-semibold text-foreground ring-1 ring-border"
+
 function TagPill({ tag }: { tag: string }) {
-  return (
-    <span className="inline-flex h-[22px] shrink-0 items-center gap-1.5 rounded-full bg-white/95 px-2.5 text-[11px] font-semibold shadow-[0_2px_6px_#0F172A1A] ring-1 ring-[#0F172A1F] dark:bg-[#0E1422E6] dark:text-[#F8FAFC] dark:shadow-[0_2px_6px_#00000059] dark:ring-[#FFFFFF24]">
-      <span className={`size-1.5 shrink-0 rounded-full ${tagTone(tag).dot}`} />
-      {tag}
-    </span>
-  )
+  return <span className={pillSurface}>{tag}</span>
 }
 
 /**
- * What the page can do with one row: put a library skill into the workspace,
- * take back one the workspace holds as the hub's link, copy a skill the
- * workspace wrote into the library, or clean up a link the library no longer
- * answers for. Nothing here deletes a skill the project owns.
+ * What the page can do with one row. A row the library holds offers a menu of
+ * the places a workspace keeps skills in, so installing one names its target
+ * instead of assuming it; a row a place wrote on its own gets the one action
+ * that applies to it, which is sending it into the library. Nothing here
+ * deletes a skill the project owns.
  */
-function WorkspaceButton({
+function SkillActionButton({
   skill,
   blocked,
   onInstall,
@@ -331,78 +159,128 @@ function WorkspaceButton({
   skill: Skill
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: () => void
+  onInstall: (dir: string) => void
   onAdopt: () => void
-  onRemove: () => void
+  onRemove: (dir: string) => void
 }) {
   const { t } = useI18n()
+  /* The places are contributions, so this row offers them itself rather than
+     having every list thread them down to it. */
+  const contributed = useContributions("skillLocation")
+  const places = React.useMemo(
+    () => [...contributed].sort((left, right) => left.order - right.order),
+    [contributed]
+  )
+  const holds = holdsOf(skill)
+  /* One size for every row action: the design's 32px pill. */
   const shell =
-    "gap-[5px] px-2.5 text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  /* Installing is the row's own action, so it reads as a soft fill; undoing it
+     is what the menu and the detail panel offer, and those read as outlines. */
+  const fill = `${shell} bg-secondary text-foreground hover:bg-accent`
+  const outline = `${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`
 
-  if (skill.stale || skill.installed) {
-    /* The label says which side gives its link back, because they differ. */
-    const label = skill.stale
-      ? t("skills.action.cleanup")
-      : skill.linkAt === "library"
-        ? t("skills.action.remove")
-        : t("skills.action.uninstall")
+  if (skill.stale) {
     return (
       <Button
         type="button"
-        size="xs"
         variant="outline"
-        aria-label={`${label} ${skill.name}`}
+        aria-label={`${t("skills.action.cleanup")} ${skill.name}`}
         onClick={(event) => {
           event.stopPropagation()
-          onRemove()
+          onRemove(holds[0]?.dir ?? "")
         }}
-        className={`${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
+        className={outline}
       >
-        {skill.stale ? <Trash2Icon className="size-3.5" /> : <PowerIcon className="size-3.5" />}
-        {label}
+        <Trash2Icon className="size-3.5" />
+        {t("skills.action.cleanup")}
       </Button>
     )
   }
 
-  /* A skill the project wrote: the library can take a copy of it. */
-  if (skill.location === "workspace") {
+  /* A skill a place wrote: the library can take it over the same way. */
+  if (!inLibrary(skill)) {
     if (skill.inLibrary === true) return null
     return (
       <Button
         type="button"
-        size="xs"
         variant="outline"
         aria-label={`${t("skills.action.adopt")} ${skill.name}`}
         onClick={(event) => {
           event.stopPropagation()
           onAdopt()
         }}
-        className={`${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
+        className={fill}
       >
-        <LibraryIcon className="size-3.5" />
+        <PlusIcon className="size-3.5" />
         {t("skills.action.adopt")}
       </Button>
     )
   }
 
-  /* A skill the workspace wrote itself already holds the name. */
-  const reason = blocked ?? (skill.taken === true ? t("skills.workspace.taken") : null)
   return (
-    <Button
-      type="button"
-      size="xs"
-      aria-label={`${t("skills.action.install")} ${skill.name}`}
-      disabled={reason !== null}
-      title={reason ?? undefined}
-      onClick={(event) => {
-        event.stopPropagation()
-        onInstall()
-      }}
-      className={shell}
-    >
-      <DownloadIcon className="size-3.5" />
-      {t("skills.action.install")}
-    </Button>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            disabled={blocked !== null || places.length === 0}
+            title={blocked ?? undefined}
+            /* The word does not change with the row's state: installing into a
+               second place is still installing, and the menu says which places
+               are taken. */
+            aria-label={`${t("skills.action.install")} ${skill.name}`}
+            className={fill}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <DownloadIcon className="size-3.5" />
+            {t("skills.action.install")}
+            <ChevronDownIcon className="size-3" />
+          </Button>
+        }
+      />
+      <DropdownMenuContent
+        align="end"
+        sideOffset={6}
+        className="w-[240px]"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <DropdownMenuGroup>
+          <DropdownMenuLabel>{t("skills.action.installInto")}</DropdownMenuLabel>
+          {places.map((place) => {
+            const checked = holds.some((hold) => hold.id === place.id)
+            const Icon = place.icon
+            return (
+              <DropdownMenuItem
+                key={place.id}
+                /* Installing into one place should not dismiss the menu: a card
+                   can go to several, and the row that was just taken shows its
+                   check in place. */
+                closeOnClick={false}
+                /* A place holding its own skill of this name cannot take a second. */
+                disabled={!checked && skill.takenAt?.includes(place.id) === true}
+                onClick={() => (checked ? onRemove(place.dir) : onInstall(place.dir))}
+                className="items-start gap-2.5 py-2"
+              >
+                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary ring-1 ring-border ring-inset">
+                  <Icon className="size-3.5" />
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="text-[13.5px] leading-[18px] font-semibold">
+                    {t(place.labelKey)}
+                  </span>
+                  <span className="truncate font-mono text-[12px] leading-[16px] text-muted-foreground">
+                    {place.dir}
+                  </span>
+                </span>
+                {checked ? <CheckIcon className="mt-1 size-4 shrink-0" /> : null}
+              </DropdownMenuItem>
+            )
+          })}
+        </DropdownMenuGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
@@ -438,35 +316,63 @@ function PhotoCover({
   )
 }
 
-/** Opening of a document a cover renders; the rest of it is never on screen. */
-const COVER_EXCERPT = 800
+/** The opening of a skill's file tree, as many rows as the cover has room for. */
+const COVER_TREE_ROWS = 4
 
-/** A card with no media shows the skill's own document: its SKILL.md body, rendered. */
-function MarkdownCover({
-  skill,
-  store,
-}: {
-  skill: Skill
-  store: SkillStore | null
-}) {
-  const body = useSkillBody(skill, store)
-  const source = React.useMemo(() => {
-    if (body === null) return `# ${titleCase(skill.name)}\n\n${skill.description}`
-    if (body.length <= COVER_EXCERPT) return body
-    const cut = body.lastIndexOf("\n", COVER_EXCERPT)
-    return body.slice(0, cut > 0 ? cut : COVER_EXCERPT)
-  }, [body, skill.name, skill.description])
+/**
+ * A card with no media shows what the skill ships: `SKILL.md`, the folders
+ * beside it, and how much there is. The card body already carries the name and
+ * the description, so this is the one thing left that the card cannot say.
+ */
+function FileTreeCover({ skill, store }: { skill: Skill; store: SkillStore | null }) {
+  const { t } = useI18n()
+  const { body, files } = useSkillDocument(skill, store)
+  const rows = files.slice(0, COVER_TREE_ROWS)
+  const count = t("skills.cover.files").replace("{count}", String(files.length))
+  const tokens =
+    body === null ? "" : t("skills.cover.tokens").replace("{tokens}", tokenLabel(body))
 
   return (
     <div
-      className={`size-full overflow-hidden bg-surface-raised px-3 pb-2.5 ${
+      className={`flex size-full flex-col bg-surface-raised px-[18px] pb-2.5 ${
         /* Room for the tag pills, which sit over this corner; nothing to clear without them. */
-        skill.tags.length > 0 ? "pt-10" : "pt-3"
+        skill.tags.length > 0 ? "pt-10" : "pt-3.5"
       }`}
     >
-      <Markdown className="text-[11px] leading-[16px] text-secondary-foreground">
-        {source}
-      </Markdown>
+      {files.length === 0 ? (
+        /* Nothing read yet, or nothing to read: the icon says which element is
+           empty and the count how much of it there is. A heading and the
+           description would only repeat the card body. */
+        <span className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 text-muted-foreground">
+          <FileTextIcon className="size-[22px]" aria-hidden />
+          {body === null ? null : (
+            <span className="font-mono text-[12px] leading-[18px]">
+              {t("skills.cover.tokens").replace("{tokens}", tokenLabel(body))}
+            </span>
+          )}
+        </span>
+      ) : (
+        <span className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden font-mono text-[12px] leading-[18px]">
+          {rows.map((file) => (
+            <span
+              key={file.path}
+              className={
+                file.directory
+                  ? "truncate text-secondary-foreground"
+                  : "truncate text-muted-foreground"
+              }
+              style={{ paddingLeft: `${file.depth * 2}ch` }}
+            >
+              {`${file.path.slice(file.path.lastIndexOf("/") + 1)}${file.directory ? "/" : ""}`}
+            </span>
+          ))}
+        </span>
+      )}
+      {files.length === 0 ? null : (
+        <span className="shrink-0 border-t border-border pt-1.5 font-mono text-[12px] leading-[18px] text-muted-foreground">
+          {tokens === "" ? count : `${count} · ${tokens}`}
+        </span>
+      )}
     </div>
   )
 }
@@ -505,9 +411,9 @@ function SkillCard({
   store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: () => void
+  onInstall: (dir: string) => void
   onAdopt: () => void
-  onRemove: () => void
+  onRemove: (dir: string) => void
   onOpen: () => void
 }) {
   const shownTags = skill.tags.slice(0, 2)
@@ -530,15 +436,26 @@ function SkillCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label={skill.name}
       onClick={onOpen}
-      className="mb-5 cursor-pointer overflow-hidden rounded-lg bg-card shadow-glass ring-1 ring-glass-border backdrop-blur-glass break-inside-avoid"
+      onKeyDown={(event) => {
+        /* The card holds its own action button, so it cannot be a real button;
+           the two keys a button answers to are handled here instead. */
+        if (event.key !== "Enter" && event.key !== " ") return
+        if (event.target !== event.currentTarget) return
+        event.preventDefault()
+        onOpen()
+      }}
+      className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="relative w-full overflow-hidden bg-surface-raised"
         style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
       >
         {media === undefined ? (
-          <MarkdownCover skill={skill} store={store} />
+          <FileTreeCover skill={skill} store={store} />
         ) : media.kind === "video" ? (
           <AutoplayVideo
             src={media.src}
@@ -553,31 +470,31 @@ function SkillCard({
             <TagPill key={tag} tag={tag} />
           ))}
           {extraTags > 0 && (
-            <span className="inline-flex h-[22px] shrink-0 items-center rounded-full bg-white/95 px-2.5 text-[11px] font-semibold text-muted-foreground shadow-[0_2px_6px_#0F172A1A] ring-1 ring-[#0F172A1F] dark:bg-[#0E1422E6] dark:text-[#94A3B8] dark:shadow-[0_2px_6px_#00000059] dark:ring-[#FFFFFF24]">
-              +{extraTags}
-            </span>
+            <span className={`${pillSurface} text-muted-foreground`}>+{extraTags}</span>
           )}
         </div>
       </div>
-      <div className="flex flex-col gap-1 px-3 py-2.5">
-        <div className="flex h-[18px] items-center justify-between gap-2">
+      <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
+        <div className="flex h-[19px] items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate text-sm font-semibold">{skill.name}</span>
+            <span className="truncate font-mono text-[14px] leading-[19px] font-semibold">
+              {skill.name}
+            </span>
             <UpdateBadge skill={skill} />
           </span>
           {/* A skill the hub does not hold has no recorded age; nothing goes here. */}
           {skill.updated === "" ? null : (
-            <span className="shrink-0 text-[11px] leading-[14px] text-muted-foreground">
+            <span className="shrink-0 text-[12px] leading-[15px] text-muted-soft">
               {skill.updated}
             </span>
           )}
         </div>
-        <p className="line-clamp-2 text-xs text-muted-foreground">
+        <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">
           {skill.description}
         </p>
-        <div className="mt-1 flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-2">
           <ProvenanceLine skill={skill} />
-          <WorkspaceButton
+          <SkillActionButton
             skill={skill}
             blocked={blocked}
             onInstall={onInstall}
@@ -585,6 +502,82 @@ function SkillCard({
             onRemove={onRemove}
           />
         </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * The content area when there is nothing to show. Each case answers a different
+ * question — no skills at all, none in this place, none matching the filters —
+ * so each gets its own words and its own one way forward. The toolbar and the
+ * filters stay where they are; only the content area changes.
+ */
+function EmptyState({
+  icon: Icon,
+  title,
+  hint,
+  note,
+  action,
+  secondary,
+}: {
+  icon: LucideIcon
+  title: string
+  hint: string
+  /** A path or an errno, printed as data rather than as a sentence. */
+  note?: string | null
+  /** The one way forward from this state; omitted by a state that has none. */
+  action?: React.ReactNode
+  secondary?: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-16 text-center">
+      <span className="flex size-12 items-center justify-center rounded-full bg-secondary">
+        <Icon className="size-5 text-muted-foreground" aria-hidden />
+      </span>
+      <span className="text-[15px] leading-[20px] font-semibold">{title}</span>
+      <span className="max-w-[420px] text-[13px] leading-[18px] text-muted-foreground">
+        {hint}
+      </span>
+      {note === undefined || note === null || note === "" ? null : (
+        <span className="max-w-[520px] truncate font-mono text-[12px] text-muted-foreground">
+          {note}
+        </span>
+      )}
+      {action === undefined && secondary === undefined ? null : (
+        <div className="mt-1 flex items-center gap-2">
+          {action}
+          {secondary}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/**
+ * What the grid looks like while the library is being read. Cards, not a
+ * spinner: a spinner is about as tall as its own line, so the content area
+ * jumps from nothing to full height the moment the answer lands.
+ */
+function GridSkeleton() {
+  const covers = [292, 342, 276, 342, 292, 276, 292, 342]
+
+  return (
+    <div className="@container">
+      <div className="columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4">
+        {covers.map((height, index) => (
+          <div
+            key={index}
+            className="mb-5 break-inside-avoid overflow-hidden rounded-xl bg-card ring-1 ring-border"
+          >
+            <div className="w-full animate-pulse bg-muted" style={{ height }} />
+            <div className="flex flex-col gap-2 px-[18px] py-3.5">
+              <span className="h-4 w-1/2 animate-pulse rounded-full bg-muted" />
+              <span className="h-3 w-5/6 animate-pulse rounded-full bg-muted" />
+              <span className="h-3 w-2/3 animate-pulse rounded-full bg-muted" />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -604,9 +597,9 @@ function SkillGrid({
   store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (skill: Skill) => void
+  onInstall: (skill: Skill, dir: string) => void
   onAdopt: (skill: Skill) => void
-  onRemove: (skill: Skill) => void
+  onRemove: (skill: Skill, dir: string) => void
   onOpen: (skill: Skill) => void
 }) {
   /*
@@ -624,9 +617,9 @@ function SkillGrid({
             skill={skill}
             store={store}
             blocked={blocked}
-            onInstall={() => onInstall(skill)}
+            onInstall={(dir) => onInstall(skill, dir)}
             onAdopt={() => onAdopt(skill)}
-            onRemove={() => onRemove(skill)}
+            onRemove={(dir) => onRemove(skill, dir)}
             onOpen={() => onOpen(skill)}
           />
         ))}
@@ -635,6 +628,7 @@ function SkillGrid({
   )
 }
 
+/** The mark a row shows when it has no picture: the document itself. */
 function SkillThumb({ skill }: { skill: Skill }) {
   const media = cardMedia(skill)
 
@@ -642,7 +636,7 @@ function SkillThumb({ skill }: { skill: Skill }) {
     return (
       <AutoplayVideo
         src={media.src}
-        className="size-9 shrink-0 rounded-md object-cover"
+        className="size-9 shrink-0 rounded-[12px] object-cover"
       />
     )
   }
@@ -652,23 +646,125 @@ function SkillThumb({ skill }: { skill: Skill }) {
       <img
         src={media.src}
         alt=""
-        className="size-9 shrink-0 rounded-md object-cover"
+        className="size-9 shrink-0 rounded-[12px] object-cover"
       />
     )
   }
 
   return (
-    <span className="flex size-9 shrink-0 flex-col justify-center gap-[3px] rounded-md bg-surface-raised px-2">
-      <span className="h-[2.5px] w-5 rounded-full bg-secondary-foreground/78" />
-      <span className="h-[2.5px] w-3.5 rounded-full bg-secondary-foreground/56" />
-      <span className="h-[2.5px] w-2 rounded-full bg-secondary-foreground/28" />
+    <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-surface-raised">
+      <FileTextIcon className="size-4 text-foreground" aria-hidden />
     </span>
+  )
+}
+
+/**
+ * The query's own characters, marked in the accent. Only the table marks them:
+ * its rows all look alike, so without the mark there is no way to see which
+ * words matched. A card is big enough to read on its own, and marking twelve
+ * of them at once turns the grid into a pattern.
+ */
+function Highlighted({ text, needle }: { text: string; needle: string }) {
+  const at = needle === "" ? -1 : text.toLowerCase().indexOf(needle.toLowerCase())
+  if (at < 0) return <>{text}</>
+
+  return (
+    <>
+      {text.slice(0, at)}
+      <mark className="bg-transparent font-semibold text-primary">
+        {text.slice(at, at + needle.length)}
+      </mark>
+      {text.slice(at + needle.length)}
+    </>
+  )
+}
+
+/* The batch strip heads the table whether or not a row is ticked: the action
+   has to be visible to be discoverable, and a bar that comes and goes shifts
+   the rows under the pointer that just ticked one. */
+function BulkBar({
+  count,
+  blocked,
+  onInstall,
+  onClear,
+}: {
+  count: number
+  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  blocked: string | null
+  onInstall: (dir: string) => void
+  onClear: () => void
+}) {
+  const { t } = useI18n()
+  const contributed = useContributions("skillLocation")
+  const places = React.useMemo(
+    () => [...contributed].sort((left, right) => left.order - right.order),
+    [contributed]
+  )
+
+  return (
+    <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface-raised px-5">
+      <span className="flex h-7 items-center rounded-full bg-foreground px-3 text-[12.5px] font-semibold text-background">
+        {t("skills.batch.selected").replace("{count}", String(count))}
+      </span>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={count === 0}
+        onClick={onClear}
+        className="ml-auto h-[34px] rounded-full border-border bg-transparent px-4 text-[13px] font-semibold dark:border-input dark:bg-transparent"
+      >
+        {t("skills.batch.clear")}
+      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          render={
+            <Button
+              type="button"
+              disabled={count === 0 || blocked !== null || places.length === 0}
+              title={blocked ?? undefined}
+              className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
+            >
+              {t("skills.action.installInto")}
+              <ChevronDownIcon className="size-3.5" />
+            </Button>
+          }
+        />
+        <DropdownMenuContent align="end" sideOffset={6} className="w-[240px]">
+          <DropdownMenuGroup>
+            {places.map((place) => {
+              const Icon = place.icon
+              return (
+                <DropdownMenuItem
+                  key={place.id}
+                  onClick={() => onInstall(place.dir)}
+                  className="items-start gap-2.5 py-2"
+                >
+                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary ring-1 ring-border ring-inset">
+                    <Icon className="size-3.5" />
+                  </span>
+                  <span className="flex min-w-0 flex-1 flex-col">
+                    <span className="text-[13.5px] leading-[18px] font-semibold">
+                      {t(place.labelKey)}
+                    </span>
+                    <span className="truncate font-mono text-[12px] leading-[16px] text-muted-foreground">
+                      {place.dir}
+                    </span>
+                  </span>
+                </DropdownMenuItem>
+              )
+            })}
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
   )
 }
 
 function SkillTable({
   skills,
-  pagination,
+  needle,
+  checked,
+  onCheck,
   blocked,
   onInstall,
   onAdopt,
@@ -676,114 +772,188 @@ function SkillTable({
   onOpen,
 }: {
   skills: Skill[]
-  pagination: React.ReactNode
+  /** What the filter box holds, marked in the fields it matched. */
+  needle: string
+  /** Keys of the rows ticked for a batch action. */
+  checked: readonly string[]
+  onCheck: (keys: string[]) => void
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (skill: Skill) => void
+  onInstall: (skill: Skill, dir: string) => void
   onAdopt: (skill: Skill) => void
-  onRemove: (skill: Skill) => void
+  onRemove: (skill: Skill, dir: string) => void
   onOpen: (skill: Skill) => void
 }) {
   const { t } = useI18n()
 
+  const keys = skills.map(skillKey)
+  const allChecked = keys.length > 0 && keys.every((key) => checked.includes(key))
+  const someChecked = checked.length > 0 && !allChecked
+
+  const toggle = (skill: Skill, next: boolean) => {
+    const key = skillKey(skill)
+    onCheck(next ? [...checked, key] : checked.filter((item) => item !== key))
+  }
+
   return (
-    <Card className={`${cardSurface} gap-4`}>
-      <CardHeader className="gap-1">
-        <CardTitle className="text-base leading-tight font-semibold">
-          {t("skills.installed.title")}
-        </CardTitle>
-        <CardDescription className="text-sm leading-snug">
-          {t("skills.installed.description")}
-        </CardDescription>
-      </CardHeader>
-      <div className="px-6">
-        <Table className="table-fixed [&_td]:p-0 [&_th]:px-0">
-          <TableHeader>
-            <TableRow className="h-10">
-              {columns.map((column, index) => (
-                <TableHead
-                  key={column.labelKey || index}
-                  style={{ width: column.width }}
-                  className="text-muted-foreground"
-                >
-                  {column.labelKey === "" ? "" : t(column.labelKey)}
-                </TableHead>
-              ))}
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {skills.map((skill) => (
-              <TableRow
-                key={skillKey(skill)}
-                onClick={() => onOpen(skill)}
-                className="h-11 cursor-pointer"
+    <Card className={`${cardSurface} gap-0 overflow-hidden py-0`}>
+      <BulkBar
+        count={checked.length}
+        blocked={blocked}
+        onInstall={(dir) => {
+          for (const skill of skills) {
+            if (checked.includes(skillKey(skill))) onInstall(skill, dir)
+          }
+          onCheck([])
+        }}
+        onClear={() => onCheck([])}
+      />
+      <Table className="table-fixed">
+        <TableHeader>
+          <TableRow className="h-11 border-b border-border hover:bg-transparent">
+            {columns.map((column, index) => (
+              <TableHead
+                key={column.labelKey || index}
+                style={{ width: column.width }}
+                className={
+                  index === 0
+                    ? "p-0 pl-5"
+                    : index === columns.length - 1
+                      ? "p-0 pr-5 pl-3.5 text-[12px] font-semibold text-muted-soft"
+                      : "p-0 pl-3.5 text-[12px] font-semibold text-muted-soft"
+                }
               >
-                <TableCell onClick={(event) => event.stopPropagation()}>
+                {/* The head takes the whole page's rows at once; a page that is
+                    only partly ticked shows the dash rather than a check. */}
+                {index === 0 ? (
                   <Checkbox
-                    aria-label={`${t("skills.table.select")} ${skill.name}`}
+                    checked={allChecked}
+                    indeterminate={someChecked}
+                    onCheckedChange={(next) => onCheck(next === true ? keys : [])}
+                    aria-label={t("skills.table.selectAll")}
+                    className="size-[18px] rounded-[4px]"
                   />
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2.5">
-                    <SkillThumb skill={skill} />
-                    <div className="flex min-w-0 flex-col">
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <span className="truncate text-sm leading-[17px] font-medium">
-                          {skill.name}
-                        </span>
-                        <UpdateBadge skill={skill} />
-                      </span>
-                      <span className="truncate text-xs leading-[15px] text-muted-foreground">
-                        {skill.description}
-                      </span>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {skill.tags.map((tag) => (
-                      <TagChip key={tag} tag={tag} size="md" />
-                    ))}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <ProvenanceLine skill={skill} />
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {skill.tokens ?? "—"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {skill.triggers ?? "—"}
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">
-                  {skill.updated}
-                </TableCell>
-                <TableCell>
-                  <WorkspaceButton
-                    skill={skill}
-                    blocked={blocked}
-                    onInstall={() => onInstall(skill)}
-                    onAdopt={() => onAdopt(skill)}
-                    onRemove={() => onRemove(skill)}
-                  />
-                </TableCell>
-              </TableRow>
+                ) : (
+                  t(column.labelKey)
+                )}
+              </TableHead>
             ))}
-          </TableBody>
-        </Table>
-      </div>
-      <div className="flex items-center justify-end px-6">
-        {pagination}
-      </div>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {skills.map((skill) => (
+            <TableRow
+              key={skillKey(skill)}
+              tabIndex={0}
+              onClick={() => onOpen(skill)}
+              /* A row is not a button, so it answers the two keys a button
+                 would rather than pretending to be one. */
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") return
+                if (event.target !== event.currentTarget) return
+                event.preventDefault()
+                onOpen(skill)
+              }}
+              className="h-[66px] cursor-pointer border-b border-border outline-none last:border-b-0 hover:bg-accent/40 focus-visible:bg-accent/40"
+            >
+              <TableCell onClick={(event) => event.stopPropagation()} className="p-0 pl-5">
+                <Checkbox
+                  checked={checked.includes(skillKey(skill))}
+                  onCheckedChange={(next) => toggle(skill, next === true)}
+                  aria-label={`${t("skills.table.select")} ${skill.name}`}
+                  className="size-[18px] rounded-[4px]"
+                />
+              </TableCell>
+              <TableCell className="p-0 pl-3.5">
+                <div className="flex items-center gap-3">
+                  <SkillThumb skill={skill} />
+                  <div className="flex min-w-0 flex-col gap-1.5">
+                    <span className="flex min-w-0 items-center gap-1.5">
+                      <span className="truncate text-[14px] leading-[18px] font-semibold">
+                        <Highlighted text={skill.name} needle={needle} />
+                      </span>
+                      <UpdateBadge skill={skill} />
+                    </span>
+                    <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
+                      <Highlighted text={skill.description} needle={needle} />
+                    </span>
+                  </div>
+                </div>
+              </TableCell>
+              <TableCell className="p-0 pl-3.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {skill.tags.map((tag) => (
+                    <TagChip key={tag} tag={tag} size="md" />
+                  ))}
+                </div>
+              </TableCell>
+              <TableCell className="p-0 pl-3.5">
+                <ProvenanceLine skill={skill} />
+              </TableCell>
+              <TableCell className="p-0 pl-3.5 text-[13px] text-muted-foreground">
+                {skill.updated}
+              </TableCell>
+              <TableCell className="p-0 pr-5 pl-3.5">
+                <SkillActionButton
+                  skill={skill}
+                  blocked={blocked}
+                  onInstall={(dir) => onInstall(skill, dir)}
+                  onAdopt={() => onAdopt(skill)}
+                  onRemove={(dir) => onRemove(skill, dir)}
+                />
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </Card>
   )
 }
 
-function PageTitleRow({
+/** The page's own heading; the design sets its one display size to weight 400. */
+function PageHeading() {
+  const { t } = useI18n()
+
+  return (
+    <div className="flex flex-col gap-2">
+      <h1 className="text-display font-normal text-foreground">{t("skills.title")}</h1>
+      <p className="text-[length:var(--text-body)] text-muted-foreground">
+        {t("skills.description")}
+      </p>
+    </div>
+  )
+}
+
+/** A value that follows its input once typing stops, not on every keystroke. */
+function useSettled(value: string, delay = 180) {
+  const [settled, setSettled] = React.useState(value)
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => setSettled(value), delay)
+    return () => window.clearTimeout(timer)
+  }, [value, delay])
+
+  return settled
+}
+
+const chipPill =
+  "flex h-8 shrink-0 items-center justify-center rounded-full px-3.5 text-[length:var(--text-caption)] transition-colors"
+
+/**
+ * The query box and the category chips, which narrow the same list and so
+ * share one row. Typing is the page's filter; the toolbar's Explore button is
+ * the other, remote, verb.
+ */
+function FilterRow({
+  query,
+  onQueryChange,
   tag,
   onTagChange,
   options,
 }: {
+  /** What the box holds right now, before the query settles. */
+  query: string
+  onQueryChange: (query: string) => void
   /** Selected category filter, or "All tags". */
   tag: string
   onTagChange: (tag: string) => void
@@ -792,25 +962,67 @@ function PageTitleRow({
 }) {
   const { t } = useI18n()
   const [expanded, setExpanded] = React.useState(false)
+  const field = React.useRef<HTMLInputElement>(null)
   const visible = expanded ? options : options.slice(0, 4)
 
+  /* The shortcut the box prints, so the key it names does focus it. */
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
+      const active = document.activeElement
+      if (
+        active instanceof HTMLElement &&
+        (active.isContentEditable || active.tagName === "INPUT" || active.tagName === "TEXTAREA")
+      ) {
+        return
+      }
+      event.preventDefault()
+      field.current?.focus()
+    }
+
+    window.addEventListener("keydown", onKeyDown)
+    return () => window.removeEventListener("keydown", onKeyDown)
+  }, [])
+
   return (
-    <div className="flex items-start justify-between gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold">{t("skills.title")}</h1>
-        <p className="text-sm text-muted-foreground">
-          {t("skills.description")}
-        </p>
+    <div className="flex flex-wrap items-center gap-3">
+      <div className="flex h-11 w-[300px] shrink-0 items-center gap-2 rounded-md border border-border px-3.5 focus-within:border-primary">
+        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
+        <input
+          ref={field}
+          value={query}
+          aria-label={t("skills.filter.placeholder")}
+          placeholder={t("skills.filter.placeholder")}
+          onChange={(event) => onQueryChange(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || query === "") return
+            event.preventDefault()
+            onQueryChange("")
+          }}
+          className="min-w-0 flex-1 bg-transparent text-[length:var(--text-body)] outline-none placeholder:text-muted-foreground/70"
+        />
+        {query === "" ? (
+          <Kbd className="shrink-0 border-0 bg-transparent text-muted-foreground">/</Kbd>
+        ) : (
+          <button
+            type="button"
+            aria-label={t("skills.filter.clear")}
+            onClick={() => onQueryChange("")}
+            className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            <XIcon className="size-3.5" />
+          </button>
+        )}
       </div>
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           aria-pressed={tag === "All tags"}
           onClick={() => onTagChange("All tags")}
-          className={`flex h-[26px] shrink-0 items-center justify-center rounded-full px-2.5 text-[12.5px] transition-colors ${
+          className={`${chipPill} ${
             tag === "All tags"
-              ? "bg-primary font-semibold text-primary-foreground"
-              : "bg-surface-raised text-muted-foreground"
+              ? "bg-foreground font-semibold text-background"
+              : "bg-secondary text-foreground hover:bg-accent"
           }`}
         >
           {t("skills.allTags")}
@@ -821,24 +1033,24 @@ function PageTitleRow({
             type="button"
             aria-pressed={tag === item}
             onClick={() => onTagChange(item)}
-            className={`flex h-[26px] shrink-0 items-center justify-center rounded-full px-2.5 text-[12.5px] transition-colors ${
+            className={`${chipPill} ${
               tag === item
-                ? `bg-primary font-semibold text-primary-foreground`
-                : `bg-surface-raised font-medium ${tagTone(item).label}`
+                ? "bg-foreground font-semibold text-background"
+                : "bg-secondary text-foreground hover:bg-accent"
             }`}
           >
             {item}
           </button>
         ))}
-        {expanded ? null : options.length > visible.length ? (
+        {expanded || options.length <= visible.length ? null : (
           <button
             type="button"
             onClick={() => setExpanded(true)}
-            className="flex h-[26px] shrink-0 items-center justify-center rounded-full bg-surface-raised px-2.5 text-[12.5px] font-medium text-muted-foreground transition-colors"
+            className={`${chipPill} bg-secondary text-muted-foreground hover:bg-accent`}
           >
             +{options.length - visible.length}
           </button>
-        ) : null}
+        )}
       </div>
     </div>
   )
@@ -861,9 +1073,9 @@ function ViewButton({
       aria-pressed={active}
       aria-label={label}
       onClick={onClick}
-      className={`flex h-7 w-9 items-center justify-center rounded-md transition-colors ${
+      className={`flex h-9 w-11 items-center justify-center rounded-full transition-colors ${
         active
-          ? "bg-accent text-foreground"
+          ? "bg-foreground text-background dark:bg-accent dark:text-foreground"
           : "text-muted-foreground hover:text-foreground"
       }`}
     >
@@ -874,11 +1086,22 @@ function ViewButton({
 
 export function SkillsPage() {
   const { t } = useI18n()
-  const [tab, setTab] = React.useState<SkillTab>("all")
+  /* A tab a person chose, remembered with the agent that was in use when they
+     chose it: switching agents in the sidebar means "work on this one", so the
+     page opens on that agent's place until the next manual switch. */
+  const [picked, setPicked] = React.useState<{ tab: SkillTab; agent: string | null } | null>(
+    null
+  )
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tag, setTag] = React.useState("All tags")
+  /* Typing narrows the same list the category chips do; it is not a new view. */
+  const [query, setQuery] = React.useState("")
+  const needle = useSettled(query)
+  /* Ticked rows, by key. Narrowing the list drops them: a batch action names
+     what the person can still see. */
+  const [checked, setChecked] = React.useState<readonly string[]>([])
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
   /* Why the last action did not go through. A success says nothing: the row it
@@ -888,65 +1111,115 @@ export function SkillsPage() {
   const [checking, setChecking] = React.useState(false)
   /* The open lightbox is a row key, because the same id can be two rows. */
   const [detailKey, setDetailKey] = React.useState<string | null>(null)
-  /* Bundled rows have no library behind them; edits stay in this map. */
-  const [samplePatch, setSamplePatch] = React.useState<
-    Record<string, Partial<Skill>>
-  >({})
 
-  const library = useSkillLibrary()
-  /* A registry plugin answers the search; with none, the dialog previews its own rows. */
+  /* The places a workspace keeps skills in arrive as contributions, so one
+     agent integration adds its own tab and install target without this page
+     knowing it by name. */
+  const locationContributions = useContributions("skillLocation")
+  const places = React.useMemo(
+    () => [...locationContributions].sort((left, right) => left.order - right.order),
+    [locationContributions]
+  )
+  const placeSpecs = React.useMemo(
+    () => places.map((place) => ({ id: place.id, labelKey: place.labelKey, dir: place.dir })),
+    [places]
+  )
+
+  const library = useSkillLibrary(placeSpecs, needle)
+  /* The chosen agent is an integration, and what it names is a place; only a
+     place this build knows is something to open on. */
+  const target = useContributions("target").find((entry) => entry.id === library.agent)
+  const agentPlace =
+    target?.skillLocation !== undefined &&
+    places.some((place) => place.id === target.skillLocation)
+      ? target.skillLocation
+      : null
+  /* A registry plugin answers the search; with none the dialog says so. */
   const registries = useContributions("skillRegistry")
   const registry = registries[0] ?? null
-  const usingStore = library.store !== null
-  const counts = usingStore ? library.counts : SAMPLE_COUNTS
+  const tabs = React.useMemo(
+    () => [
+      ...SHELL_TABS,
+      ...places.map((place) => ({
+        value: place.id,
+        labelKey: place.labelKey,
+        icon: place.icon,
+      })),
+    ],
+    [places]
+  )
+
+  /* The page filters and pages what the hook hands it: rows come from the
+     library and the places both, and only the library has a server page. */
+  const rows = library.rows
+
+  const offered = React.useMemo(() => {
+    if (needle === "") return rows
+    const text = needle.toLowerCase()
+    return rows.filter((row) => matchesQuery(row, text))
+  }, [rows, needle])
+
+  /* An agent's place is the page's landing screen while it holds something;
+     opening on one that holds nothing shows an empty screen and hides every
+     skill behind a tab, which is what a fresh load must not do. The query and
+     the category do not move the landing screen, so typing cannot land the
+     page on a different tab mid-word. */
+  const landing: SkillTab =
+    agentPlace !== null && rowsForTab(rows, agentPlace).length > 0 ? agentPlace : "all"
+  const tab: SkillTab =
+    picked !== null && picked.agent === library.agent ? picked.tab : landing
+  const setTab = (value: SkillTab) => setPicked({ tab: value, agent: library.agent })
+
+  const currentPlace = library.places.find((place) => place.id === tab) ?? null
   /* With no folder to install into, the action says why it is unavailable. */
   const blocked =
     library.workspaceId === null
       ? t("skills.workspace.none")
-      : library.workspaceRoot === null
+      : tab !== "all" && tab !== "library" && currentPlace?.view === null
         ? t("skills.workspace.noPath")
         : null
 
-  /* The page filters and pages what the hook hands it: rows come from the
-     library and the workspace both, and only one of the two has a server page. */
-  const matching = React.useMemo(() => {
-    const rows = usingStore
-      ? library.rows
-      : sampleRows.map((skill) => ({ ...skill, ...samplePatch[skill.id] }))
-    /* A skill in both places answers to both tabs; only a tab's own absence
-       from a row excludes it. */
-    const onTab =
-      tab === "library"
-        ? rows.filter((row) => row.location !== "workspace")
-        : tab === "workspace"
-          ? rows.filter((row) => row.location !== "library")
-          : rows
-    return tag === "All tags" ? onTab : onTab.filter((row) => row.tags.includes(tag))
-  }, [usingStore, library.rows, tab, tag, samplePatch])
+  const onTag = React.useMemo(
+    () => (tag === "All tags" ? offered : offered.filter((row) => row.tags.includes(tag))),
+    [offered, tag]
+  )
+
+  /* Counts describe what the query and the category left behind, so a tab that
+     holds nothing says so before it is opened. */
+  const counts = React.useMemo(
+    () =>
+      Object.fromEntries(
+        tabs.map((item) => [item.value, rowsForTab(onTag, item.value).length])
+      ),
+    [tabs, onTag]
+  )
+
+  const matching = React.useMemo(() => rowsForTab(onTag, tab), [onTag, tab])
+
+  /* A filter, an agent switch, or a shorter list can leave the page past the
+     end; the page shown is clamped rather than an empty stretch of rows. */
+  const pageCount = Math.max(1, Math.ceil(matching.length / pageSize))
+  const shownPage = Math.min(page, pageCount - 1)
 
   const skills = React.useMemo(
-    () => matching.slice(page * pageSize, (page + 1) * pageSize),
-    [matching, page, pageSize]
+    () => matching.slice(shownPage * pageSize, (shownPage + 1) * pageSize),
+    [matching, shownPage, pageSize]
   )
 
   const detail = matching.find((skill) => skillKey(skill) === detailKey) ?? null
 
   /** Apply a change, then re-read the page so the list shows what was stored. */
-  const applyTo = async (skill: Skill, patch: Partial<Skill>, persist: () => Promise<unknown>) => {
-    if (usingStore) {
-      await persist()
-      await library.reload()
-      return
-    }
-    setSamplePatch((current) => ({ ...current, [skill.id]: { ...current[skill.id], ...patch } }))
+  const applyTo = async (persist: () => Promise<unknown>) => {
+    await persist()
+    await library.reload()
   }
 
   /** Why an action did not go through, ready to show. */
   const reasonOf = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure))
 
-  const install = async (skill: Skill) => {
+  const install = async (skill: Skill, dir?: string) => {
     try {
-      await library.install(skill.id)
+      await library.install(skill.id, dir)
       setRefusal(null)
     } catch (failure) {
       setRefusal(reasonOf(failure))
@@ -973,15 +1246,15 @@ export function SkillsPage() {
     }
   }
 
-  /** Take back the link that put a skill in both places. */
-  const uninstall = async (skill: Skill) => {
+  /** Take back the link that put a skill in a place as well as the library. */
+  const uninstall = async (skill: Skill, dir?: string) => {
     try {
       if (skill.linkAt === "library") {
         /* The library linked the skill in; removing its entry takes the link. */
         await (library.store?.remove(skill.id) ?? Promise.resolve())
         await library.reload()
       } else {
-        await library.remove(skill.id)
+        await library.remove(skill.id, dir)
       }
       setRefusal(null)
     } catch (failure) {
@@ -989,10 +1262,10 @@ export function SkillsPage() {
     }
   }
 
-  /** Link a skill the workspace wrote into the library. */
-  const adopt = async (skill: Skill) => {
+  /** Link a skill a place wrote into the library. */
+  const adopt = async (skill: Skill, dir?: string) => {
     try {
-      await library.adopt(skill.id)
+      await library.adopt(skill.id, dir)
       setRefusal(null)
     } catch (failure) {
       setRefusal(reasonOf(failure))
@@ -1000,9 +1273,7 @@ export function SkillsPage() {
   }
 
   const setTags = (skill: Skill, tags: string[]) =>
-    void applyTo(skill, { tags }, () =>
-      library.store?.update(skill.id, { tags }) ?? Promise.resolve()
-    )
+    void applyTo(() => library.store?.update(skill.id, { tags }) ?? Promise.resolve())
 
   /** Delete the skill, then close the lightbox it was open in. */
   const removeSkill = async (skill: Skill) => {
@@ -1011,24 +1282,20 @@ export function SkillsPage() {
     setDetailKey(null)
   }
 
-  /** Delete a skill from the workspace folder, then close the lightbox. */
-  const removeWorkspaceSkill = async (skill: Skill) => {
-    await library.deleteWorkspaceSkill(skill.id)
+  /** Delete a skill from the place that holds it, then close the lightbox. */
+  const removeWorkspaceSkill = async (skill: Skill, dir: string) => {
+    await library.deleteWorkspaceSkill(skill.id, dir)
     setDetailKey(null)
   }
-
   const openDetail = (skill: Skill) => setDetailKey(skillKey(skill))
-
-  const total = matching.length
-  const pageCount = Math.max(1, Math.ceil(total / pageSize))
 
   const pagination = (
     <TablePagination
-      pageText={`${page + 1} / ${pageCount}`}
+      pageText={`${shownPage + 1} / ${pageCount}`}
       label={t("pager.rowsPerPage")}
       pageSize={pageSize}
-      canPrev={page > 0}
-      canNext={page + 1 < pageCount}
+      canPrev={shownPage > 0}
+      canNext={shownPage + 1 < pageCount}
       onPageSizeChange={(size) => {
         setPageSize(size)
         setPage(0)
@@ -1041,30 +1308,38 @@ export function SkillsPage() {
   )
 
   return (
-    <>
-      <PageTitleRow
-        tag={tag}
-        onTagChange={setTag}
-        options={usingStore ? library.tags : filterTags}
-      />
+    <div className="flex flex-1 flex-col gap-8">
+      <PageHeading />
       <Tabs
         value={tab}
         onValueChange={(value) => {
-          setTab(TABS.find((item) => item.value === value)?.value ?? "all")
+          setTab(tabs.find((item) => item.value === value)?.value ?? "all")
           setPage(0)
+          setChecked([])
         }}
-        className="gap-6"
+        className="flex-1 gap-8"
       >
-        <div className="flex items-start justify-between gap-6">
-          <TabsList className="h-9 gap-1 rounded-lg p-1">
-            {TABS.map((item) => (
+        <div className="flex items-center justify-between gap-6">
+          <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
+            {tabs.map((item) => (
               <TabsTrigger
                 key={item.value}
                 value={item.value}
-                className="h-7 flex-none rounded-md px-3 text-[13px] text-muted-foreground data-active:bg-accent data-active:text-foreground dark:data-active:bg-accent dark:data-active:text-foreground"
+                className="h-9 flex-none gap-1.5 rounded-full px-4 text-[length:var(--text-body)] text-muted-foreground data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-accent dark:data-active:text-foreground"
               >
+                <item.icon className="size-3.5 shrink-0" aria-hidden />
                 {t(item.labelKey)}
-                {` ${counts[item.value]}`}
+                <span
+                  className={`text-[13px] ${
+                    library.error !== null
+                      ? "opacity-45"
+                      : (counts[item.value] ?? 0) === 0
+                        ? "opacity-45"
+                        : ""
+                  }`}
+                >
+                  {library.error === null ? (counts[item.value] ?? 0) : "—"}
+                </span>
               </TabsTrigger>
             ))}
           </TabsList>
@@ -1086,8 +1361,7 @@ export function SkillsPage() {
             <Button
               variant="outline"
               disabled={checking}
-              /* The same amber the "有更新" badge uses, so the feature reads as one thing. */
-              className="h-9 gap-2 border-amber-600/40 bg-transparent px-4 text-amber-600 hover:bg-amber-600/10 hover:text-amber-700 dark:border-amber-400/40 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
+              className="h-9 gap-2 rounded-full border-border bg-transparent px-4"
               onClick={() => void checkAll()}
             >
               <RefreshCwIcon className={checking ? "animate-spin" : undefined} />
@@ -1095,77 +1369,171 @@ export function SkillsPage() {
             </Button>
             <Button
               variant="outline"
-              className="h-9 gap-2 border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+              className="h-9 gap-2 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
               onClick={() => setAddTab("local")}
             >
               <UploadIcon />
               {t("skills.action.import")}
             </Button>
-            <Button
-              className="h-9 gap-2 px-4"
-              onClick={() => setSearchOpen(true)}
-            >
-              <SearchIcon />
-              {t("skills.action.search")}
+            <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setSearchOpen(true)}>
+              <CompassIcon />
+              {t("skills.action.explore")}
             </Button>
           </div>
         </div>
+        <FilterRow
+          query={query}
+          onQueryChange={(next) => {
+            setQuery(next)
+            setChecked([])
+          }}
+          tag={tag}
+          onTagChange={(next) => {
+            setTag(next)
+            setChecked([])
+          }}
+          options={library.tags}
+        />
         {refusal === null ? null : (
           <span className="text-xs leading-[15px] text-destructive">{refusal}</span>
         )}
         <TabsContent value={tab} className="flex flex-col gap-6">
-          {library.loading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner />
-              {t("skills.loading")}
-            </div>
+          {library.store === null ? (
+            /* No library at all is a different answer from an empty one: the
+               rows would have to be invented, and an invented catalog is worse
+               than saying where the real one lives. */
+            <EmptyState
+              icon={TriangleAlertIcon}
+              title={t("skills.empty.noLibrary")}
+              hint={t("skills.empty.noLibraryHint")}
+            />
+          ) : library.loading ? (
+            <GridSkeleton />
           ) : library.error !== null ? (
-            <div className="flex flex-col items-start gap-2 text-sm">
-              <span className="text-destructive">{library.error}</span>
-              <Button variant="outline" size="sm" onClick={() => void library.reload()}>
-                {t("skills.retry")}
-              </Button>
-            </div>
+            /* A read that failed says what failed and leaves the last answer
+               standing: an error is not a reason to lose the list. */
+            <EmptyState
+              icon={TriangleAlertIcon}
+              title={t("skills.failed.title")}
+              hint={t("skills.failed.hint")}
+              note={library.error}
+              action={
+                <Button className="h-10 rounded-full px-4" onClick={() => void library.reload()}>
+                  {t("skills.retry")}
+                </Button>
+              }
+            />
           ) : skills.length === 0 ? (
-            <div className="flex flex-col items-start gap-2 py-12 text-sm text-muted-foreground">
-              <span>
-                {tab === "workspace"
-                  ? library.workspaceId === null
+            needle !== "" ? (
+              /* The filters, not the library: saying "no skills yet" here would
+                 be a lie about a library that may hold plenty. */
+              <EmptyState
+                icon={SearchXIcon}
+                title={t("skills.empty.filter")}
+                hint={t("skills.empty.filterHint").replace("{query}", needle)}
+                action={
+                  <Button
+                    className="h-10 rounded-full px-4"
+                    onClick={() => {
+                      setQuery("")
+                      setTag("All tags")
+                    }}
+                  >
+                    {t("skills.filter.reset")}
+                  </Button>
+                }
+                secondary={
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+                    onClick={() => setSearchOpen(true)}
+                  >
+                    <CompassIcon />
+                    {t("skills.action.exploreRemote")}
+                  </Button>
+                }
+              />
+            ) : currentPlace !== null ? (
+              <EmptyState
+                icon={FolderOpenIcon}
+                title={
+                  library.workspaceId === null
                     ? t("skills.workspace.none")
-                    : library.workspaceRoot === null
+                    : currentPlace.view === null
                       ? t("skills.workspace.noPath")
                       : t("skills.workspace.empty")
-                  : t("skills.empty")}
-              </span>
-              <span className="text-xs">
-                {tab === "workspace" ? (library.workspaceRoot ?? "") : library.root}
-              </span>
-            </div>
-          ) : view === "grid" ? (
-            <>
-              <SkillGrid
-                skills={skills}
-                store={library.store}
-                blocked={blocked}
-                onInstall={install}
-                onAdopt={adopt}
-                onRemove={uninstall}
-                onOpen={openDetail}
+                }
+                hint={t("skills.workspace.emptyHint")}
+                note={currentPlace.view?.display ?? null}
+                action={
+                  <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
+                    {t("skills.tab.all")}
+                  </Button>
+                }
               />
-              <div className="flex items-center justify-end">
-                {pagination}
-              </div>
-            </>
-          ) : (
-            <SkillTable
+            ) : (
+              <EmptyState
+                icon={FolderPlusIcon}
+                title={t("skills.empty.library")}
+                hint={t("skills.empty.libraryHint")}
+                note={library.root}
+                action={
+                  <Button
+                    className="h-10 rounded-full px-4"
+                    onClick={() => setAddTab("local")}
+                  >
+                    <FolderPlusIcon />
+                    {t("skills.action.importFolder")}
+                  </Button>
+                }
+                secondary={
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+                    onClick={() => setSearchOpen(true)}
+                  >
+                    <CompassIcon />
+                    {t("skills.action.exploreRemote")}
+                  </Button>
+                }
+              />
+            )
+          ) : view === "grid" ? (
+            <SkillGrid
               skills={skills}
-              pagination={pagination}
+              store={library.store}
               blocked={blocked}
               onInstall={install}
               onAdopt={adopt}
               onRemove={uninstall}
               onOpen={openDetail}
             />
+          ) : (
+            <SkillTable
+              skills={skills}
+              needle={needle}
+              checked={checked}
+              onCheck={setChecked}
+              blocked={blocked}
+              onInstall={install}
+              onAdopt={adopt}
+              onRemove={uninstall}
+              onOpen={openDetail}
+            />
+          )}
+          {/* The page's own footer, not a strip inside whichever view is open:
+              it reads the whole filtered set, so switching views leaves it
+              where it is. `mt-auto` holds it at the foot of the content while
+              the list is short, and lets it follow the list once it is long. */}
+          {skills.length === 0 ? null : (
+            <div className="mt-auto flex h-9 shrink-0 items-center justify-between gap-4">
+              <span className="text-[13px] text-muted-foreground">
+                {t("skills.footer.count")
+                  .replace("{shown}", String(skills.length))
+                  .replace("{total}", String(matching.length))}
+              </span>
+              {pagination}
+            </div>
           )}
         </TabsContent>
       </Tabs>
@@ -1190,14 +1558,16 @@ export function SkillsPage() {
         skill={detail}
         store={library.store}
         root={library.root}
-        workspacePath={library.workspaceRoot}
-        reason={blocked ?? (detail?.taken === true ? t("skills.workspace.taken") : null)}
-        onToggle={() => {
-          if (detail === null) return
-          if (detail.installed || detail.stale) void uninstall(detail)
-          else void install(detail)
-        }}
-        onAdopt={(skill) => void adopt(skill)}
+        places={library.places}
+        reason={
+          blocked ??
+          (detail !== null && (detail.takenAt?.length ?? 0) > 0
+            ? t("skills.workspace.taken")
+            : null)
+        }
+        onInstallPlace={(skill, dir) => void install(skill, dir)}
+        onRemovePlace={(skill, dir) => void uninstall(skill, dir)}
+        onAdopt={(skill) => void adopt(skill, holdsOf(skill)[0]?.dir)}
         onDelete={removeSkill}
         onDeleteWorkspace={removeWorkspaceSkill}
         onCheckUpdate={(skill) => library.checkUpdate(skill.id)}
@@ -1210,6 +1580,6 @@ export function SkillsPage() {
           if (!open) setDetailKey(null)
         }}
       />
-    </>
+    </div>
   )
 }

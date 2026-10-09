@@ -3,8 +3,8 @@
  * dev server. Everything the kernel remembers is read from there before it
  * starts and written back on every change, so nothing depends on this browser
  * profile. The browser cannot read the skill library or the installed plugins
- * itself, so `startHub` offers those only when a host answers for them; the
- * skills plugin falls back to its sample data when nobody does.
+ * itself, so `startHub` offers those only when a host answers for them; without
+ * a host the skills page has no catalog and says so.
  */
 import { STATE_ROUTE } from "@workspace/core/state"
 import { createRemoteNet } from "@workspace/core/net"
@@ -18,6 +18,7 @@ import {
   type StoragePort,
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
+import { claudeCodeExtension } from "@workspace/plugin-claude-code"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import { skillsShExtension } from "@workspace/plugin-skills-sh"
 import * as ui from "./ui-kit.ts"
@@ -89,13 +90,13 @@ async function openState(): Promise<Record<string, unknown>> {
   return state
 }
 
-/** Whether a host answers for the skill library; absence keeps the sample data. */
+/** Whether a host answers for the skill library; without one the page has none. */
 async function skillStoreAvailable(): Promise<boolean> {
   try {
     const response = await fetch(`${SKILLS_ENDPOINT}?limit=0`, { method: "GET" })
     return response.ok
   } catch {
-    /* No host behind this origin: the plugin runs on its bundled data. */
+    /* No host behind this origin: the plugin offers no library. */
     return false
   }
 }
@@ -159,6 +160,7 @@ export async function startHub(): Promise<HubKernel> {
     extensions: [
       ...builtinExtensions,
       skillsExtension,
+      claudeCodeExtension,
       skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),

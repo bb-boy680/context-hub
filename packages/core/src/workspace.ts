@@ -39,16 +39,23 @@ export interface WorkspaceView {
 export interface WorkspacePage {
   folders: WorkspaceView[]
   current: string | null
+  /**
+   * The agent this hub delivers to, by the id of the integration that declared
+   * it. The agent list itself is a UI contribution, so this is an opaque id
+   * here: an id nothing answers for simply selects nothing.
+   */
+  agent: string | null
 }
 
 /** What the hub remembers between runs. */
 export interface WorkspaceState {
   folders: WorkspaceFolder[]
   current: string | null
+  agent: string | null
 }
 
 /** The state before any folder has been picked. */
-export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null }
+export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null, agent: null }
 
 /** The workspace list as the form offers it to whoever renders it. */
 export interface WorkspaceStore {
@@ -63,6 +70,11 @@ export interface WorkspaceStore {
   add(folder: string): Promise<WorkspacePage>
   /** Make one known folder current; an unknown id is an error, not a silent no-op. */
   select(id: string): Promise<WorkspacePage>
+  /**
+   * Remember which agent this hub delivers to, by its integration id; `null`
+   * clears the choice.
+   */
+  selectAgent(id: string | null): Promise<WorkspacePage>
 }
 
 /**
@@ -85,6 +97,8 @@ export interface WorkspaceService {
   /** Add a folder and make it current; `false` when the hub refused it. The
       argument is a path or the name a browser's own dialog reports. */
   add(folder: string): Promise<boolean>
+  /** Remember which agent this hub delivers to; `null` clears the choice. */
+  selectAgent(id: string | null): Promise<boolean>
 }
 
 /**
@@ -113,11 +127,11 @@ export function workspaceName(path: string): string {
  * the file is durable JSON, so a hand-edited value is bad input, not a folder.
  *
  * @param value — the stored value, as the form read it.
- * @returns the folders and current workspace it describes.
+ * @returns the folders, current workspace and agent it describes.
  */
 export function readWorkspaceState(value: unknown): WorkspaceState {
   if (typeof value !== "object" || value === null) return NO_WORKSPACES
-  const stored = value as { folders?: unknown; current?: unknown }
+  const stored = value as { folders?: unknown; current?: unknown; agent?: unknown }
   const folders: WorkspaceFolder[] = []
   if (Array.isArray(stored.folders)) {
     for (const entry of stored.folders) {
@@ -131,5 +145,6 @@ export function readWorkspaceState(value: unknown): WorkspaceState {
   }
   const known = folders.map(folderId)
   const current = typeof stored.current === "string" && known.includes(stored.current) ? stored.current : null
-  return { folders, current }
+  const agent = typeof stored.agent === "string" && stored.agent !== "" ? stored.agent : null
+  return { folders, current, agent }
 }

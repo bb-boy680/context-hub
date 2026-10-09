@@ -1,42 +1,15 @@
 /**
- * Agent target extensions: one per coding agent Context Hub can deliver
- * assets to. Each registers its consumption contract on activation; actually
- * writing those paths needs a form with filesystem capability, so the web
- * form reports that gap instead of pretending to inject.
+ * Agent target extensions the kernel ships: one per coding agent Context Hub
+ * can deliver assets to. Each registers its consumption contract on activation;
+ * actually writing those paths needs a form with filesystem capability, so the
+ * web form reports that gap instead of pretending to inject.
+ *
+ * Claude Code is not here: it ships as its own package, because it brings a page
+ * and a workspace place with it rather than only a descriptor.
  */
-import { PuzzleIcon, SquareTerminalIcon, TerminalIcon } from "lucide-react"
+import { PuzzleIcon, SquareTerminalIcon } from "lucide-react"
 
 import type { ExtensionDefinition } from "../types.ts"
-
-/** Claude Code: skills and memory as files under `~/.claude`, MCP and hooks as JSON. */
-export const claudeCodeTarget: ExtensionDefinition = {
-  manifest: {
-    id: "hub.target.claude-code",
-    name: "Claude Code",
-    version: "0.1.0",
-    apiVersion: "^0.1",
-    kind: "code",
-    category: "integration",
-    description: "Deliver skills, memory and MCP servers to Claude Code.",
-    icon: TerminalIcon,
-    defaultEnabled: true,
-    permissions: ["assets.read", "filesystem"],
-  },
-  activate(scope) {
-    scope.contribute("target", {
-      id: "hub.target.claude-code", 
-      displayName: "Claude Code",
-      supports: ["skill", "mcp", "memory", "hook"],
-      locations: [
-        { label: "Skills", path: "~/.claude/skills/<name>/SKILL.md" },
-        { label: "Memory", path: "~/.claude/CLAUDE.md" },
-        { label: "MCP servers", path: "~/.claude.json" },
-        { label: "Hooks", path: "~/.claude/settings.json" },
-      ],
-      format: "Markdown with YAML frontmatter; JSON for MCP servers and hooks",
-    })
-  },
-}
 
 /** Codex: one instructions file plus a TOML config for MCP. */
 export const codexTarget: ExtensionDefinition = {
@@ -56,6 +29,7 @@ export const codexTarget: ExtensionDefinition = {
     scope.contribute("target", {
       id: "hub.target.codex",
       displayName: "Codex",
+      icon: SquareTerminalIcon,
       supports: ["skill", "mcp", "memory"],
       locations: [
         { label: "Instructions", path: "~/.codex/AGENTS.md" },
@@ -84,6 +58,7 @@ export const copilotTarget: ExtensionDefinition = {
     scope.contribute("target", {
       id: "hub.target.copilot",
       displayName: "GitHub Copilot",
+      icon: PuzzleIcon,
       supports: ["skill", "memory"],
       locations: [
         { label: "Repository instructions", path: ".github/copilot-instructions.md" },

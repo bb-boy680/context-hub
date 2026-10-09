@@ -104,7 +104,7 @@ export type SkillSort = "updated" | "name"
 export interface SkillQuery {
   offset?: number
   limit?: number
-  /** Case-insensitive match against name and description. */
+  /** Case-insensitive match against name, description, or tag. */
   q?: string
   tag?: string
   /** Keep only enabled, or only disabled, skills. */
@@ -301,37 +301,59 @@ export interface SkillStore {
   /** The URL that shows one reference; a remote URL passes through unchanged. */
   assetUrl(ref: string): string
   /**
-   * The skills the current workspace holds, or `null` when none is selected or
-   * the selected one has no folder path to read.
+   * The skills the current workspace holds in one place, or `null` when none is
+   * selected or the selected one has no folder path to read.
+   *
+   * @param dir — the place's directory inside the workspace; omitted reads the
+   *   one the skills CLI and this hub share.
    */
-  workspaceSkills(): Promise<WorkspaceSkillsView | null>
+  workspaceSkills(dir?: string): Promise<WorkspaceSkillsView | null>
   /**
-   * One skill the current workspace holds, read where it lives; `null` when the
-   * folder holds no such skill. A workspace skill is not in the library, so this
-   * is the only way to show its own manifest and files.
+   * One skill in one place of the current workspace, read where it lives;
+   * `null` when the folder holds no such skill. Such a skill is not in the
+   * library, so this is the only way to show its own manifest and files.
+   *
+   * @param id — the skill's directory name under that place.
+   * @param dir — the place's directory; omitted reads the shared one.
    */
-  workspaceSkill(id: string): Promise<WorkspaceSkillDetail | null>
+  workspaceSkill(id: string, dir?: string): Promise<WorkspaceSkillDetail | null>
   /**
-   * One text file of a skill the current workspace holds, read where it lives.
-   * A linked skill's files belong to the library, but they are read through
-   * this too: the path is the one the workspace sees.
+   * One text file of a skill in one place of the current workspace, read where
+   * it lives. A linked skill's files belong to the library, but they are read
+   * through this too: the path is the one the workspace sees.
+   *
+   * @param dir — the place's directory; omitted reads the shared one.
    */
-  workspaceFile(id: string, path: string): Promise<string>
-  /** Put one library skill into the current workspace; answers how it landed. */
-  installToWorkspace(id: string): Promise<WorkspaceInstall>
+  workspaceFile(id: string, path: string, dir?: string): Promise<string>
   /**
-   * Link one skill the current workspace holds into the library; the workspace
-   * keeps its own directory. Answers how it landed: a link, or a copy where the
-   * filesystem cannot hold one.
+   * Put one library skill into one place of the current workspace.
+   *
+   * @param dir — the place's directory; omitted writes into the shared one.
+   * @returns how it landed.
    */
-  importFromWorkspace(id: string): Promise<WorkspaceInstall>
+  installToWorkspace(id: string, dir?: string): Promise<WorkspaceInstall>
   /**
-   * Delete one skill from the current workspace folder, its directory included.
-   * This is the destructive one; `removeFromWorkspace` only takes back a link.
+   * Link one skill of one place in the current workspace into the library; the
+   * workspace keeps its own directory.
+   *
+   * @param dir — the place's directory; omitted reads the shared one.
+   * @returns how it landed: a link, or a copy where the filesystem cannot hold one.
    */
-  deleteWorkspaceSkill(id: string): Promise<void>
-  /** Take one library-installed skill out of the current workspace. */
-  removeFromWorkspace(id: string): Promise<void>
+  importFromWorkspace(id: string, dir?: string): Promise<WorkspaceInstall>
+  /**
+   * Delete one skill from one place of the current workspace folder, its
+   * directory included. This is the destructive one; `removeFromWorkspace` only
+   * takes back a link.
+   *
+   * @param dir — the place's directory; omitted deletes from the shared one.
+   */
+  deleteWorkspaceSkill(id: string, dir?: string): Promise<void>
+  /**
+   * Take one library-installed skill out of one place of the current workspace.
+   *
+   * @param dir — the place's directory; omitted reads the shared one.
+   */
+  removeFromWorkspace(id: string, dir?: string): Promise<void>
   /**
    * Measure one skill against the upstream it was installed from. Reads the
    * source over the network, so it is asked for, never automatic. The answer

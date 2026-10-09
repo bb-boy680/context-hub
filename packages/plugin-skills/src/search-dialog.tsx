@@ -1,15 +1,16 @@
 /**
  * The remote-search dialog: search one registry, install a skill at a time.
  *
- * The registry arrives from a source plugin. Until one is installed the dialog
- * searches its bundled preview instead, whose rows have nothing behind them to
- * fetch. A real install goes through the library's own package path, so what
- * lands is indistinguishable from a skill the Add-skill dialog brought in.
+ * The registry arrives from a source plugin, so with none enabled the dialog
+ * says what is missing rather than listing rows nothing here can fetch. A real
+ * install goes through the library's own package path, so what lands is
+ * indistinguishable from a skill the Add-skill dialog brought in.
  */
 import {
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CompassIcon,
   DownloadIcon,
   ScrollTextIcon,
   SearchIcon,
@@ -20,7 +21,6 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import { previewRegistry } from "./registry.ts"
 import type { RegistryPage, RemoteSkill, SkillRegistry } from "./registry.ts"
 import type { SkillStore } from "./store.ts"
 import { tagTone } from "./tags.ts"
@@ -186,7 +186,7 @@ function ResultRow({
   onInstall: () => void
 }) {
   const { t } = useI18n()
-  const tone = tagTone(skill.tag ?? "")
+  const tone = tagTone()
   /* The row's own provenance: which repository publishes this skill. A registry
      that names no source per row falls back to its own name. */
   const provenance = skill.source ?? skill.package ?? source
@@ -262,14 +262,14 @@ export function SearchSkillsDialog({
   open: boolean
   /** This form's library; without one a row can only be marked, never fetched. */
   store: SkillStore | null
-  /** The registry to search; the bundled preview answers while this is absent. */
-  registry?: SkillRegistry | null
+  /** The registry to search; `null` when no source plugin is enabled. */
+  registry: SkillRegistry | null
   onOpenChange: (open: boolean) => void
   /** Called once a skill landed, so the page can read the catalog again. */
   onInstalled: () => void
 }) {
   const { t, state } = useI18n()
-  const source = registry ?? previewRegistry
+  const source = registry
   const number = React.useMemo(
     () => new Intl.NumberFormat(state.active),
     [state.active]
@@ -304,11 +304,12 @@ export function SearchSkillsDialog({
   const generation = React.useRef(0)
 
   /* A registry states its own shortest query; below it there is nothing to ask. */
-  const minQuery = source.minQuery ?? 1
-  const asking = query.trim().length < minQuery
+  const minQuery = source?.minQuery ?? 1
+  const asking = source === null || query.trim().length < minQuery
 
   const runSearch = React.useCallback(
     async (text: string, index: number) => {
+      if (source === null) return
       const current = ++generation.current
       setError(null)
       setBusy(true)
@@ -345,7 +346,7 @@ export function SearchSkillsDialog({
 
   /* A registry whose search route carries no description reads it per skill. */
   React.useEffect(() => {
-    if (!open || found === null) return
+    if (!open || source === null || found === null) return
     let live = true
     void fillDetails(
       source,
@@ -462,7 +463,7 @@ export function SearchSkillsDialog({
     <Dialog open={open} onOpenChange={close}>
       <DialogContent
         showCloseButton={false}
-        className="gap-0 rounded-lg bg-dialog p-0 shadow-[0_24px_56px_#0F172A3D] ring-glass-border backdrop-blur-xl sm:max-w-[640px]"
+        className="gap-0 rounded-xl bg-dialog p-0 shadow-soft ring-1 ring-border sm:max-w-[640px]"
       >
         <div className="flex items-start gap-4 px-6 pt-[22px] pb-4">
           <div className="flex flex-col gap-[5px]">
@@ -484,29 +485,33 @@ export function SearchSkillsDialog({
           </Button>
         </div>
 
-        <div className="px-6 pb-3.5">
-          <div className="relative">
-            <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-primary" />
-            <Input
-              autoFocus
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value)
-                setPage(0)
-              }}
-              onKeyDown={(event) => {
-                if (event.key !== "Enter") return
-                setPage(0)
-                void runSearch(query, 0)
-              }}
-              className="h-10 border-primary pl-9"
-              placeholder={t("skills.search.field").replace("{source}", source.name)}
-              aria-label={t("skills.search.field").replace("{source}", source.name)}
-            />
-          </div>
-        </div>
+        {source === null ? null : (
+          <>
+            <div className="px-6 pb-3.5">
+              <div className="relative">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={query}
+                  onChange={(event) => {
+                    setQuery(event.target.value)
+                    setPage(0)
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== "Enter") return
+                    setPage(0)
+                    void runSearch(query, 0)
+                  }}
+                  className="h-12 pl-10 focus-visible:border-2 focus-visible:border-primary"
+                  placeholder={t("skills.search.field").replace("{source}", source.name)}
+                  aria-label={t("skills.search.field").replace("{source}", source.name)}
+                />
+              </div>
+            </div>
 
-        <div className="h-px shrink-0 bg-border" />
+            <div className="h-px shrink-0 bg-border" />
+          </>
+        )}
 
         {/* The list area keeps one height once there is a query, so paging and
             loading never resize the dialog; before that it stays compact.
@@ -516,7 +521,13 @@ export function SearchSkillsDialog({
           className={`flex min-w-0 shrink-0 flex-col ${asking ? "h-[248px]" : "h-[408px]"}`}
           aria-busy={busy}
         >
-          {asking ? (
+          {source === null ? (
+            <ListNotice
+              icon={CompassIcon}
+              title={t("skills.search.nosource.title")}
+              hint={t("skills.search.nosource.hint")}
+            />
+          ) : asking ? (
             <ListNotice
               icon={SearchIcon}
               title={t("skills.search.start.title")}
@@ -541,7 +552,7 @@ export function SearchSkillsDialog({
               hint={t("skills.search.empty.hint")}
             />
           ) : (
-            <ul className="h-full overflow-y-auto">
+            <ul className="scroll-thin h-full overflow-y-auto">
               {rows.map((skill) => (
                 <ResultRow
                   key={rowKey(skill)}
@@ -558,7 +569,7 @@ export function SearchSkillsDialog({
         </div>
 
         {failure === null ? null : (
-          <p className="shrink-0 px-6 pb-3 text-[11px] leading-[15px] text-destructive">
+          <p className="shrink-0 px-6 pb-3 text-[12px] leading-[16px] text-destructive">
             {failure}
           </p>
         )}

@@ -1,7 +1,8 @@
 /**
- * The skills one workspace folder holds. A workspace keeps its skills in
+ * The skills one place in a workspace folder holds. The default place is
  * `.agents/skills`, the directory the skills CLI installs into and the one this
- * hub installs into as well, so both ends of the chain meet in the same place.
+ * hub installs into as well, so both ends of the chain meet in the same place;
+ * an agent integration contributes its own directory, e.g. `.claude/skills`.
  *
  * The hub installs by LINK, not by copy: a link needs no second copy and no
  * record of its own — the entry itself says where it came from, so anyone
@@ -24,11 +25,26 @@ import type {
   WorkspaceSkillsView,
 } from "../store.ts"
 
-/** Where a workspace keeps the skills its agents read. */
+/** Where a workspace keeps the skills its agents read, when no place says otherwise. */
 export const WORKSPACE_SKILL_DIR = path.join(".agents", "skills")
 
 /** The file that makes a directory a skill. */
 const MANIFEST = "SKILL.md"
+
+/**
+ * Validate one place's skills directory, which arrives from a contribution.
+ *
+ * @param dir — the directory inside a workspace, `/`-separated.
+ * @returns the same path in this platform's separator form.
+ * @throws when the value is absolute, empty, or climbs out of the workspace.
+ */
+export function assertSkillDir(dir: string): string {
+  const parts = dir.split(/[\\/]+/).filter((part) => part !== "" && part !== ".")
+  if (path.isAbsolute(dir) || parts.length === 0 || parts.includes("..")) {
+    throw new Error(`not a directory inside a workspace: ${dir}`)
+  }
+  return path.join(...parts)
+}
 
 /**
  * Codes a link can fail with when the filesystem does not support one — an
@@ -49,24 +65,27 @@ function targetOf(link: string, at: string): string {
   return path.isAbsolute(link) ? link : path.resolve(path.dirname(at), link)
 }
 
-/** The skills directory of one workspace; nothing is created by reading it. */
-export function workspaceSkillRoot(workspace: string): string {
-  return path.join(workspace, WORKSPACE_SKILL_DIR)
+/** The skills directory of one place in a workspace; nothing is created by reading it. */
+export function workspaceSkillRoot(workspace: string, dir?: string): string {
+  return path.join(workspace, dir === undefined ? WORKSPACE_SKILL_DIR : assertSkillDir(dir))
 }
 
 /**
- * Read the skills a workspace holds.
+ * Read the skills a workspace holds in one place.
  *
  * @param workspace — the workspace folder, absolute.
  * @param libraryRoot — the hub's own library, which tells an installed skill
  *   from one the project wrote.
- * @returns every skill the workspace holds, and where it came from.
+ * @param dir — the place's directory inside the workspace; omitted reads the
+ *   one the skills CLI and this hub share.
+ * @returns every skill the workspace holds there, and where it came from.
  */
 export async function readWorkspaceSkills(
   workspace: string,
-  libraryRoot: string
+  libraryRoot: string,
+  dir?: string
 ): Promise<WorkspaceSkillsView> {
-  const root = workspaceSkillRoot(workspace)
+  const root = workspaceSkillRoot(workspace, dir)
   const view = { root, display: displayPath(root) }
   const dirents = await fs.readdir(root, { withFileTypes: true }).catch(() => null)
   if (dirents === null) return { ...view, skills: [] }
@@ -111,16 +130,19 @@ export async function readWorkspaceSkills(
  * Read one skill a workspace holds, where it lives.
  *
  * @param workspace — the workspace folder, absolute.
- * @param id — the skill's directory name under the workspace's skills root.
+ * @param id — the skill's directory name under the place's skills root.
+ * @param dir — the place's directory inside the workspace; omitted reads the
+ *   one the skills CLI and this hub share.
  * @returns the manifest as written and the files beside it, or `null` when the
  *   folder holds no such skill.
  */
 export async function readWorkspaceSkill(
   workspace: string,
-  id: string
+  id: string,
+  dir?: string
 ): Promise<WorkspaceSkillDetail | null> {
-  const dir = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
-  const text = await fs.readFile(path.join(dir, MANIFEST), "utf8").catch(() => null)
+  const dirPath = path.join(workspaceSkillRoot(workspace, dir), assertSkillName(id))
+  const text = await fs.readFile(path.join(dirPath, MANIFEST), "utf8").catch(() => null)
   if (text === null) return null
   const frontmatter = parseSkillFile(text).frontmatter
   return {
@@ -128,7 +150,7 @@ export async function readWorkspaceSkill(
     name: frontmatter.name ?? id,
     description: frontmatter.description ?? "",
     text,
-    files: await walkSkillDir(dir),
+    files: await walkSkillDir(dirPath),
   }
 }
 
@@ -136,19 +158,22 @@ export async function readWorkspaceSkill(
  * Read one text file of a skill a workspace holds.
  *
  * @param workspace — the workspace folder, absolute.
- * @param id — the skill's directory name under the workspace's skills root.
+ * @param id — the skill's directory name under the place's skills root.
  * @param file — the file's path inside that directory, `/`-separated.
+ * @param dir — the place's directory inside the workspace; omitted reads the
+ *   one the skills CLI and this hub share.
  * @returns the file's text, or `null` when it is not there or not readable.
  * @throws when the path climbs out of the skill's own directory.
  */
 export async function readWorkspaceSkillFile(
   workspace: string,
   id: string,
-  file: string
+  file: string,
+  dir?: string
 ): Promise<string | null> {
-  const dir = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
-  const target = path.resolve(dir, file)
-  const prefix = dir.endsWith(path.sep) ? dir : dir + path.sep
+  const skillRoot = path.join(workspaceSkillRoot(workspace, dir), assertSkillName(id))
+  const target = path.resolve(skillRoot, file)
+  const prefix = skillRoot.endsWith(path.sep) ? skillRoot : skillRoot + path.sep
   if (!target.startsWith(prefix)) {
     throw new Error(`path escapes the skill directory: ${file}`)
   }
@@ -161,19 +186,22 @@ export async function readWorkspaceSkillFile(
  * @param workspace — the workspace folder, absolute.
  * @param libraryRoot — the hub's own library, where the skill lives.
  * @param id — the skill's directory name in the library.
+ * @param dir — the place's directory inside the workspace; omitted writes into
+ *   the one the skills CLI and this hub share.
  * @returns how it landed: `link` where the filesystem allows one, else `copy`.
  */
 export async function installSkillIntoWorkspace(
   workspace: string,
   libraryRoot: string,
-  id: string
+  id: string,
+  dir?: string
 ): Promise<"link" | "copy"> {
   const name = assertSkillName(id)
   const source = path.join(libraryRoot, name)
   if (!(await fs.stat(source).then((stat) => stat.isDirectory(), () => false))) {
     throw new Error(`not a skill in the library: ${id}`)
   }
-  const root = workspaceSkillRoot(workspace)
+  const root = workspaceSkillRoot(workspace, dir)
   await fs.mkdir(root, { recursive: true })
   const target = path.join(root, name)
   const existing = await fs.lstat(target).catch(() => null)
@@ -204,7 +232,9 @@ export async function installSkillIntoWorkspace(
  *
  * @param workspace — the workspace folder, absolute.
  * @param libraryRoot — the hub's own library, where the link is made.
- * @param id — the skill's directory name under the workspace's skills root.
+ * @param id — the skill's directory name under the place's skills root.
+ * @param dir — the place's directory inside the workspace; omitted reads the
+ *   one the skills CLI and this hub share.
  * @returns how it landed: `link` where the filesystem allows one, else `copy`.
  *   A copy is the only option on a filesystem with no links, and then the
  *   library owns its own set of files.
@@ -212,10 +242,11 @@ export async function installSkillIntoWorkspace(
 export async function linkSkillIntoLibrary(
   workspace: string,
   libraryRoot: string,
-  id: string
+  id: string,
+  dir?: string
 ): Promise<WorkspaceInstall> {
   const name = assertSkillName(id)
-  const source = path.join(workspaceSkillRoot(workspace), name)
+  const source = path.join(workspaceSkillRoot(workspace, dir), name)
   const listed = await fs.stat(source).catch(() => null)
   if (listed?.isDirectory() !== true) {
     throw new Error(`not a skill in this workspace: ${id}`)
@@ -249,14 +280,17 @@ export async function linkSkillIntoLibrary(
  * @param workspace — the workspace folder, absolute.
  * @param libraryRoot — the hub's own library, which decides what the hub may remove.
  * @param id — the skill's directory name.
+ * @param dir — the place's directory inside the workspace; omitted reads the
+ *   one the skills CLI and this hub share.
  * @returns nothing; a skill this hub did not install is refused, not deleted.
  */
 export async function removeSkillFromWorkspace(
   workspace: string,
   libraryRoot: string,
-  id: string
+  id: string,
+  dir?: string
 ): Promise<void> {
-  const target = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
+  const target = path.join(workspaceSkillRoot(workspace, dir), assertSkillName(id))
   const stat = await fs.lstat(target).catch(() => null)
   if (stat === null) throw new Error(`not in this workspace: ${id}`)
   const link = stat.isSymbolicLink() ? await fs.readlink(target).catch(() => null) : null
@@ -273,14 +307,17 @@ export async function removeSkillFromWorkspace(
  * everything beside the manifest.
  *
  * @param workspace — the workspace folder, absolute.
- * @param id — the skill's directory name under the workspace's skills root.
+ * @param id — the skill's directory name under the place's skills root.
+ * @param dir — the place's directory inside the workspace; omitted deletes from
+ *   the one the skills CLI and this hub share.
  * @returns nothing; a name that is not a skill there is refused, not removed.
  */
 export async function deleteSkillFromWorkspace(
   workspace: string,
-  id: string
+  id: string,
+  dir?: string
 ): Promise<void> {
-  const target = path.join(workspaceSkillRoot(workspace), assertSkillName(id))
+  const target = path.join(workspaceSkillRoot(workspace, dir), assertSkillName(id))
   const stat = await fs.lstat(target).catch(() => null)
   if (stat === null) throw new Error(`not in this workspace: ${id}`)
   /* A link is deleted as the entry it is; only a directory can be a skill. */

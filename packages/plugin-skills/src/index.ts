@@ -5,7 +5,7 @@
  * extend this module the same way — they contribute a `target` descriptor
  * instead of being compiled into it.
  */
-import { SparklesIcon } from "lucide-react"
+import { FolderIcon, SparklesIcon } from "lucide-react"
 
 import type { WorkspaceService } from "@workspace/core/workspace"
 import type { ExtensionDefinition } from "@workspace/extensions"
@@ -53,6 +53,16 @@ export const skillsExtension: ExtensionDefinition = {
     scope.contribute("route", {
       path: "/skills",
       Component: SkillsPage,
+    })
+    /* The directory the skills CLI and this hub share is a place like any
+       other, so an agent integration adds its own beside it rather than
+       replacing it. */
+    scope.contribute("skillLocation", {
+      id: "workspace",
+      labelKey: "skills.tab.workspace",
+      icon: FolderIcon,
+      dir: ".agents/skills",
+      order: 10,
     })
     scope.contribute("locale", {
       id: "en",

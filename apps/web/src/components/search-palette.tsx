@@ -110,7 +110,7 @@ export function SearchPalette({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-label="Search context"
         onClick={(event) => event.stopPropagation()}
-        className="flex max-h-[calc(100vh-2rem)] w-[640px] max-w-full flex-col overflow-hidden rounded-lg bg-dialog shadow-[0_24px_56px_#0F172A3D] ring-1 ring-glass-border backdrop-blur-xl"
+        className="flex max-h-[calc(100vh-2rem)] w-[640px] max-w-full flex-col overflow-hidden rounded-xl bg-popover shadow-soft ring-1 ring-border"
       >
         <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-border px-4">
           <SearchIcon className="size-[17px] shrink-0 text-primary" />

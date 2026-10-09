@@ -4,7 +4,6 @@
  * executable) shares these types, and nothing here reaches a platform API.
  */
 import type { Context } from "@deepseek-ai/cordis"
-import type { LucideIcon } from "lucide-react"
 import type { ComponentType } from "react"
 
 import type { PlatformHost } from "./host.ts"
@@ -13,6 +12,20 @@ import type { SkillRegistry } from "./skill-registry.ts"
 
 /** Extension API this kernel implements; manifests declare the range they were built for. */
 export const EXTENSION_API_VERSION = "0.1"
+
+/**
+ * An icon an extension contributes. It is a component rather than a name, so a
+ * contributor decides what a mark is: a lucide icon, a brand mark from another
+ * package, an `<img>` of its own, or an inline `<svg>`. The shell renders one
+ * with a class and no other props, inside a box it sizes — so a mark should
+ * take `className`, and one that ignores it should fill its box instead. The
+ * `aria-hidden` is here because a brand mark carries its own title, which would
+ * otherwise be read twice beside the label naming the same thing.
+ */
+export type ExtensionIcon = ComponentType<{
+  className?: string
+  "aria-hidden"?: boolean
+}>
 
 /** Whether loading the extension requires running its code. */
 export type ExtensionKind = "builtin" | "declarative" | "code"
@@ -59,12 +72,19 @@ export interface AgentTargetDescriptor {
   /** Stable id, matched against the contributing manifest id. */
   id: string
   displayName: string
+  icon: ExtensionIcon
   /** Asset kinds this target accepts. */
   supports: AgentAssetKind[]
   /** Paths the target reads. */
   locations: AgentTargetLocation[]
   /** Serialized format the target expects, as a display-ready note. */
   format: string
+  /**
+   * The `skillLocation` contribution this agent reads a workspace's skills
+   * from. An agent without one cannot take skills yet, so the workspace menu
+   * leaves it out rather than offering a choice that does nothing.
+   */
+  skillLocation?: string
 }
 
 /** Sidebar groups the shell renders, in order. */
@@ -76,12 +96,30 @@ export interface NavContribution {
   path: string
   /** Message key resolved through `ctx.i18n` where the entry renders. */
   labelKey: string
-  icon: LucideIcon
+  icon: ExtensionIcon
   group: NavGroupId
   /**
    * Sort rank inside the group; the shell leaves gaps between its own entries
    * (10, 20, 30 …) so a contributed entry can be inserted between them.
    */
+  order: number
+}
+
+/**
+ * One place a workspace keeps skills for an agent: the directory itself, plus
+ * how the skills module names it. The module reads that directory, lists it as
+ * its own tab, and offers it as an install target, so an agent integration is a
+ * contribution rather than code inside the skills module.
+ */
+export interface SkillLocationContribution {
+  /** Stable id; the tab value and the target a row's install names. */
+  id: string
+  /** Message key for the entry's label. */
+  labelKey: string
+  icon: ExtensionIcon
+  /** The directory inside a workspace, `/`-separated, e.g. ".claude/skills". */
+  dir: string
+  /** Sort rank in the tab row, after the shell's own "all" and "library". */
   order: number
 }
 
@@ -98,6 +136,8 @@ export interface ContributionMap {
   locale: LocaleContribution
   /** One coding agent's consumption contract. */
   target: AgentTargetDescriptor
+  /** One place a workspace keeps skills for an agent. */
+  skillLocation: SkillLocationContribution
   /** One searchable remote skill catalog. */
   skillRegistry: SkillRegistry
   /** A sidebar entry. */
@@ -142,7 +182,7 @@ export interface ExtensionManifest {
   kind: ExtensionKind
   category: ExtensionCategoryId
   description: string
-  icon: LucideIcon
+  icon: ExtensionIcon
   /** The kernel enables this extension on first launch. */
   defaultEnabled?: boolean
   /** The kernel never disables this extension, so the UI offers no switch. */

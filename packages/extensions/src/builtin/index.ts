@@ -2,10 +2,9 @@
 import type { ExtensionDefinition } from "../types.ts"
 
 import { englishLocale } from "./locale-en.ts"
-import { claudeCodeTarget, codexTarget, copilotTarget } from "./targets.ts"
+import { codexTarget, copilotTarget } from "./targets.ts"
 
 export const builtinExtensions: ExtensionDefinition[] = [
-  claudeCodeTarget,
   codexTarget,
   copilotTarget,
   englishLocale,

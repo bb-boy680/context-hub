@@ -15,6 +15,7 @@
     "@workspace/core": "workspace:*",
     "@workspace/extensions": "workspace:*",
     "@workspace/locale-zh-cn": "workspace:*",
+    "@workspace/plugin-claude-code": "workspace:*",
     "@workspace/plugin-skills": "workspace:*",
     "@workspace/plugin-skills-sh": "workspace:*",
     "@workspace/ui": "workspace:*",

@@ -72,6 +72,7 @@ export function createFsWorkspaceStore(
           : state.folders.map((known) => (known === named ? host : known)),
       /* The row that pointed at nothing by name pointed at this folder. */
       current: state.current === null || state.current === nameId ? id : state.current,
+      agent: state.agent,
     }
     await documents.write(WORKSPACE_DOCUMENT, next)
     return next
@@ -158,7 +159,7 @@ export function createFsWorkspaceStore(
       changed = true
     }
     if (!changed) return state
-    const next: WorkspaceState = { folders, current }
+    const next: WorkspaceState = { folders, current, agent: state.agent }
     await documents.write(WORKSPACE_DOCUMENT, next)
     return next
   }
@@ -170,7 +171,7 @@ export function createFsWorkspaceStore(
 
   const page = async (): Promise<WorkspacePage> => {
     const state = await read()
-    return { folders: state.folders.map(view), current: state.current }
+    return { folders: state.folders.map(view), current: state.current, agent: state.agent }
   }
 
   return {
@@ -184,7 +185,7 @@ export function createFsWorkspaceStore(
       const folders = state.folders.some((known) => folderId(known) === id)
         ? state.folders
         : [...state.folders, folder]
-      await documents.write(WORKSPACE_DOCUMENT, { folders, current: id })
+      await documents.write(WORKSPACE_DOCUMENT, { folders, current: id, agent: state.agent })
       return page()
     },
 
@@ -195,6 +196,14 @@ export function createFsWorkspaceStore(
       }
       if (state.current !== id) {
         await documents.write(WORKSPACE_DOCUMENT, { ...state, current: id })
+      }
+      return page()
+    },
+
+    async selectAgent(id) {
+      const state = await read()
+      if ((state.agent ?? null) !== id) {
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, agent: id })
       }
       return page()
     },

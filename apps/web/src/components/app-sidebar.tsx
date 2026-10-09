@@ -22,21 +22,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navGroups = useNavGroups()
 
   return (
-    <Sidebar className="border-sidebar-border backdrop-blur-glass" {...props}>
+    <Sidebar className="border-sidebar-border" {...props}>
       <SidebarHeader>
         <WorkspaceMenu />
       </SidebarHeader>
-      <SidebarContent className="gap-4 p-2">
+      <SidebarContent className="gap-6 px-3 pb-3">
         {navGroups.map((group) => (
-          <SidebarGroup key={group.id} className="gap-0.5 p-0">
-            <SidebarGroupLabel className="text-[length:var(--text-body)] font-semibold text-foreground">
+          <SidebarGroup key={group.id} className="gap-1 p-0">
+            <SidebarGroupLabel className="h-auto px-3 pb-1 text-[length:var(--text-caption)] font-semibold text-muted-foreground">
               {t(group.labelKey)}
             </SidebarGroupLabel>
-            <SidebarMenu className="ml-4 w-auto gap-0.5 border-l border-border pl-2.5">
+            <SidebarMenu className="gap-0.5">
               {group.items.map((item) => (
                 <SidebarMenuItem key={item.path}>
                   <SidebarMenuButton
                     isActive={pathname === item.path}
+                    className="h-9 rounded-full px-3 text-[length:var(--text-body)]"
                     render={<Link to={item.path} />}
                   >
                     <item.icon />

@@ -73,6 +73,11 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
           }
           const rest = url.pathname.slice(PREFIX.length).replace(/^\//, "")
           const [id, section, ...tail] = rest.split("/").map(decodeURIComponent)
+          /* The place a workspace action names; absent means the default one. */
+          const dir = url.searchParams.get("dir") ?? undefined
+          /* A write names it in the body, because its id travels there too. */
+          const bodyDir = (body: { dir?: unknown }): string | undefined =>
+            typeof body.dir === "string" && body.dir !== "" ? body.dir : undefined
           try {
             const api = await getStore()
             const method = request.method ?? "GET"
@@ -83,7 +88,7 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
               method === "GET" &&
               url.searchParams.get("action") === "workspace"
             ) {
-              sendJson(response, 200, await api.workspaceSkills())
+              sendJson(response, 200, await api.workspaceSkills(dir))
               return
             }
 
@@ -98,7 +103,7 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              sendJson(response, 200, await api.workspaceSkill(id))
+              sendJson(response, 200, await api.workspaceSkill(id, dir))
               return
             }
 
@@ -114,7 +119,7 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
                 sendError(response, new Error("missing workspace file"))
                 return
               }
-              sendJson(response, 200, { text: await api.workspaceFile(id, file) })
+              sendJson(response, 200, { text: await api.workspaceFile(id, file, dir) })
               return
             }
 
@@ -126,12 +131,15 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              sendJson(response, 200, { mode: await api.installToWorkspace(body.id) })
+              sendJson(response, 200, {
+                mode: await api.installToWorkspace(body.id, bodyDir(body)),
+              })
               return
             }
 
@@ -143,12 +151,15 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              sendJson(response, 200, { mode: await api.importFromWorkspace(body.id) })
+              sendJson(response, 200, {
+                mode: await api.importFromWorkspace(body.id, bodyDir(body)),
+              })
               return
             }
 
@@ -160,12 +171,13 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              await api.deleteWorkspaceSkill(body.id)
+              await api.deleteWorkspaceSkill(body.id, bodyDir(body))
               sendJson(response, 200, { ok: true })
               return
             }
@@ -178,12 +190,13 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              await api.removeFromWorkspace(body.id)
+              await api.removeFromWorkspace(body.id, bodyDir(body))
               sendJson(response, 200, { ok: true })
               return
             }
