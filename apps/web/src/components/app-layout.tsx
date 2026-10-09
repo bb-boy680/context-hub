@@ -24,7 +24,9 @@ export function AppLayout() {
   }, [])
 
   return (
-    <SidebarProvider>
+    /* The design fixes the rail at 248px, which is what every page's 1192px
+       content column is measured against. */
+    <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}>
       <AppSidebar />
       <SidebarInset className="min-w-0">
         <AppHeader onOpenSearch={() => setSearchOpen(true)} />

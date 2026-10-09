@@ -44,7 +44,8 @@ export function createFsWorkspaceStore(
 
   const view = (folder: WorkspaceFolder): WorkspaceView => ({
     id: folderId(folder),
-    name: folder.name,
+    /* A name a person gave the workspace reads in place of the folder's own. */
+    name: folder.alias ?? folder.name,
     path: folder.path ?? null,
     display: folder.path === undefined ? null : displayPath(folder.path),
   })
@@ -153,7 +154,7 @@ export function createFsWorkspaceStore(
         folders.push(row)
         continue
       }
-      folders.push({ name: row.name, path: only })
+      folders.push({ ...row, path: only })
       taken.add(only)
       if (current === folderId(row)) current = only
       changed = true
@@ -197,6 +198,40 @@ export function createFsWorkspaceStore(
       if (state.current !== id) {
         await documents.write(WORKSPACE_DOCUMENT, { ...state, current: id })
       }
+      return page()
+    },
+
+    async rename(id, name) {
+      const state = await read()
+      const folder = state.folders.find((known) => folderId(known) === id)
+      if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
+      const alias = name.trim()
+      /* Naming a workspace after its own folder stores nothing and drops any
+         earlier name, so the row and the folder cannot disagree. */
+      const folders = state.folders.map((known) => {
+        if (folderId(known) !== id) return known
+        if (alias === "" || alias === known.name) {
+          const plain: WorkspaceFolder = { name: known.name }
+          if (known.path !== undefined) plain.path = known.path
+          return plain
+        }
+        return { ...known, alias }
+      })
+      await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
+      return page()
+    },
+
+    async remove(id) {
+      const state = await read()
+      const folder = state.folders.find((known) => folderId(known) === id)
+      if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
+      if (state.current === id) {
+        throw new Error(
+          "this workspace is in use; switch to another one before removing it"
+        )
+      }
+      const folders = state.folders.filter((known) => folderId(known) !== id)
+      await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
       return page()
     },
 

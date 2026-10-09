@@ -22,6 +22,12 @@ export const WORKSPACE_DOCUMENT = "workspaces"
 export interface WorkspaceFolder {
   name: string
   path?: string
+  /**
+   * The name a person gave this workspace, shown instead of the folder's own
+   * name. Renaming a workspace renames the row, never the folder: the hub only
+   * reads and writes a folder it was pointed at.
+   */
+  alias?: string
 }
 
 /** One workspace, described the way a list row needs it. */
@@ -71,6 +77,17 @@ export interface WorkspaceStore {
   /** Make one known folder current; an unknown id is an error, not a silent no-op. */
   select(id: string): Promise<WorkspacePage>
   /**
+   * Give one known workspace the name a person chose, shown instead of the
+   * folder's own name; an empty name drops it and the row reads the folder's
+   * name again. The folder itself is never moved.
+   */
+  rename(id: string, name: string): Promise<WorkspacePage>
+  /**
+   * Drop one workspace from the list. The folder on disk is untouched, and the
+   * current workspace is refused: the hub would have nothing to read.
+   */
+  remove(id: string): Promise<WorkspacePage>
+  /**
    * Remember which agent this hub delivers to, by its integration id; `null`
    * clears the choice.
    */
@@ -97,6 +114,10 @@ export interface WorkspaceService {
   /** Add a folder and make it current; `false` when the hub refused it. The
       argument is a path or the name a browser's own dialog reports. */
   add(folder: string): Promise<boolean>
+  /** Give one workspace a name of its own; `false` when the hub refused it. */
+  rename(id: string, name: string): Promise<boolean>
+  /** Drop one workspace from the list; `false` when the hub refused it. */
+  remove(id: string): Promise<boolean>
   /** Remember which agent this hub delivers to; `null` clears the choice. */
   selectAgent(id: string | null): Promise<boolean>
 }
@@ -136,10 +157,15 @@ export function readWorkspaceState(value: unknown): WorkspaceState {
   if (Array.isArray(stored.folders)) {
     for (const entry of stored.folders) {
       if (typeof entry !== "object" || entry === null) continue
-      const { name, path } = entry as { name?: unknown; path?: unknown }
+      const { name, path, alias } = entry as {
+        name?: unknown
+        path?: unknown
+        alias?: unknown
+      }
       if (typeof name !== "string" || name === "") continue
       if (path !== undefined && (typeof path !== "string" || path === "")) continue
       const folder: WorkspaceFolder = path === undefined ? { name } : { name, path }
+      if (typeof alias === "string" && alias !== "") folder.alias = alias
       if (!folders.some((known) => folderId(known) === folderId(folder))) folders.push(folder)
     }
   }

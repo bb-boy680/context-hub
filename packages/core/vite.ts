@@ -463,6 +463,31 @@ export function workspaceList(options: { home?: string; folder?: string } = {}) 
               sendJson(response, 200, await store.selectAgent(body.id))
               return
             }
+            if (action === "rename" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                id?: unknown
+                name?: unknown
+              }
+              if (typeof body.id !== "string" || body.id === "") {
+                sendJson(response, 400, { error: "rename needs a workspace id" })
+                return
+              }
+              if (typeof body.name !== "string") {
+                sendJson(response, 400, { error: "rename needs the name to give it" })
+                return
+              }
+              sendJson(response, 200, await store.rename(body.id, body.name))
+              return
+            }
+            if (action === "remove" && method === "POST") {
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as { id?: unknown }
+              if (typeof body.id !== "string" || body.id === "") {
+                sendJson(response, 400, { error: "remove needs a workspace id" })
+                return
+              }
+              sendJson(response, 200, await store.remove(body.id))
+              return
+            }
             response.writeHead(405).end()
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)

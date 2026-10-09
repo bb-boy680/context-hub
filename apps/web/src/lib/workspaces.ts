@@ -99,6 +99,22 @@ export function createRemoteWorkspaceService(): WorkspaceService {
         return refuse(error)
       }
     },
+
+    async rename(id, name) {
+      try {
+        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/rename`, "POST", { id, name }))
+      } catch (error) {
+        return refuse(error)
+      }
+    },
+
+    async remove(id) {
+      try {
+        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/remove`, "POST", { id }))
+      } catch (error) {
+        return refuse(error)
+      }
+    },
   }
 }
 
@@ -114,6 +130,10 @@ export function useWorkspaces(): {
   selectAgent(id: string | null): void
   /** Add a folder and make it current; answers why the hub refused it, or `null`. */
   add(path: string): Promise<string | null>
+  /** Give one workspace a name of its own; answers why the hub refused it, or `null`. */
+  rename(id: string, name: string): Promise<string | null>
+  /** Drop one workspace from the list; answers why the hub refused it, or `null`. */
+  remove(id: string): Promise<string | null>
 } {
   const ctx = useHub()
   const service = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
@@ -146,6 +166,20 @@ export function useWorkspaces(): {
     },
     [service]
   )
+  const rename = React.useCallback(
+    async (id: string, name: string) => {
+      if (service === null) return "this form has no workspace list"
+      return (await service.rename(id, name)) ? null : (service.failure() ?? "the hub refused it")
+    },
+    [service]
+  )
+  const remove = React.useCallback(
+    async (id: string) => {
+      if (service === null) return "this form has no workspace list"
+      return (await service.remove(id)) ? null : (service.failure() ?? "the hub refused it")
+    },
+    [service]
+  )
 
-  return { page, failure, select, selectAgent, add }
+  return { page, failure, select, selectAgent, add, rename, remove }
 }
