@@ -37,3 +37,5 @@ designs/**/*.png
 designs/**/*.jpg
 designs/**/*.jpeg
 designs/**/*.webp
+
+.agents
