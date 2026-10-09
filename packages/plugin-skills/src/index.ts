@@ -56,11 +56,13 @@ export const skillsExtension: ExtensionDefinition = {
     })
     /* The directory the skills CLI and this hub share is a place like any
        other, so an agent integration adds its own beside it rather than
-       replacing it. */
+       replacing it. It is in every workspace, so no agent has to be chosen
+       for it to be read. */
     scope.contribute("skillLocation", {
       id: "workspace",
       labelKey: "skills.tab.workspace",
       icon: FolderIcon,
+      scope: "workspace",
       dir: ".agents/skills",
       order: 10,
     })

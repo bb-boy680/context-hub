@@ -454,13 +454,21 @@ export function workspaceList(options: { home?: string; folder?: string } = {}) 
               return
             }
             if (action === "agent" && method === "POST") {
-              const body = JSON.parse((await readBody(request)).toString("utf8")) as { id?: unknown }
-              /* Clearing the choice is a real value, so `null` is accepted here. */
-              if (body.id !== null && typeof body.id !== "string") {
-                sendJson(response, 400, { error: "agent needs an id, or null to clear it" })
+              const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                id?: unknown
+                on?: unknown
+              }
+              /* Both halves are required: an agent is chosen or given up, and a
+                 call naming only one of them would have to guess the other. */
+              if (typeof body.id !== "string" || body.id === "") {
+                sendJson(response, 400, { error: "agent needs an id" })
                 return
               }
-              sendJson(response, 200, await store.selectAgent(body.id))
+              if (typeof body.on !== "boolean") {
+                sendJson(response, 400, { error: "agent needs whether it is chosen" })
+                return
+              }
+              sendJson(response, 200, await store.setAgent(body.id, body.on))
               return
             }
             if (action === "rename" && method === "POST") {

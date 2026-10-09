@@ -25,9 +25,10 @@ import path from "node:path"
 import { assetKind, assetUrl, isLink, readSource } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
 import { TEMP_PREFIX, writeFileAtomic } from "@workspace/core/host/atomic"
-import { displayPath, resolveHubHome } from "@workspace/core/host/home"
+import { displayPath, resolveHubHome, userHome } from "@workspace/core/host/home"
 import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
 import type { AssetLibrary } from "@workspace/core"
+import type { SkillScope } from "@workspace/extensions"
 
 import {
   parseSkillFile,
@@ -39,18 +40,19 @@ import { walkSkillDir } from "./file-tree.ts"
 import { downloadPackageSkills, fetchUpstreamRecords, listPackageSkills } from "./skills-cli.ts"
 import { readLockedUpstream, skillFolderHash } from "./upstream.ts"
 import {
-  deleteSkillFromWorkspace,
-  installSkillIntoWorkspace,
+  deleteSkillIn,
+  installSkillInto,
   linkSkillIntoLibrary,
-  readWorkspaceSkill,
-  readWorkspaceSkillFile,
-  readWorkspaceSkills,
-  removeSkillFromWorkspace,
-} from "./workspace-skills.ts"
+  readPlaceSkill,
+  readPlaceSkillFile,
+  readPlaceSkills,
+  removeSkillFrom,
+} from "./place-skills.ts"
 import type {
-  WorkspaceInstall,
-  WorkspaceSkillDetail as WorkspaceSkillRecord,
-  WorkspaceSkillsView as WorkspaceSkills,
+  PlaceSkillDetail as PlaceSkillRecord,
+  PlaceSkillsView as PlaceSkills,
+  SkillInstall,
+  SkillPlaceRef,
 } from "../store.ts"
 import type {
   ImportedSkill,
@@ -181,6 +183,12 @@ export interface SkillStoreOptions {
    * and its `.agents/skills` is what the workspace half of the page reads.
    */
   folder?: string
+  /**
+   * The directory a global place reads under, which is the person's home by
+   * default. A deployment that puts the hub somewhere of its own says so here
+   * rather than inheriting whichever account the process runs as.
+   */
+  userHome?: string
   /** An already-built library, for a form that shares one across features. */
   library?: AssetLibrary
 }
@@ -191,6 +199,7 @@ export async function createFsSkillStore(
 ): Promise<SkillStore> {
   const home = resolveHubHome(options.home)
   const root = skillsRoot(home)
+  const homeDir = options.userHome ?? userHome()
   const library = options.library ?? createFsAssetLibrary(home)
   await fs.mkdir(root, { recursive: true })
   const catalogPath = path.join(root, CATALOG_FILE)
@@ -207,11 +216,19 @@ export async function createFsSkillStore(
     return folder?.path ?? null
   }
 
-  /** The current workspace, refused when there is no folder to install into. */
-  const requiredWorkspace = async (): Promise<string> => {
-    const workspace = await currentWorkspace()
-    if (workspace === null) throw new Error("no workspace is selected")
-    return workspace
+  /**
+   * The directory a place's `dir` is relative to, or `null` when a workspace
+   * place has no workspace to read. A global place is always readable: the home
+   * directory is the same one whatever workspace is in use.
+   */
+  const placeBase = async (scope: SkillScope): Promise<string | null> =>
+    scope === "global" ? homeDir : currentWorkspace()
+
+  /** The same base, refused when there is nothing under it to read. */
+  const requiredBase = async (scope: SkillScope): Promise<string> => {
+    const base = await placeBase(scope)
+    if (base === null) throw new Error("no workspace is selected")
+    return base
   }
 
   const skillDir = (id: string) =>
@@ -706,38 +723,38 @@ export async function createFsSkillStore(
       return isLink(ref) ? ref : assetUrl(ref)
     },
 
-    async workspaceSkills(dir?: string): Promise<WorkspaceSkills | null> {
-      const workspace = await currentWorkspace()
-      return workspace === null ? null : readWorkspaceSkills(workspace, root, dir)
+    async placeSkills(ref: SkillPlaceRef): Promise<PlaceSkills | null> {
+      const base = await placeBase(ref.scope)
+      return base === null ? null : readPlaceSkills(base, root, ref.dir)
     },
 
-    async workspaceSkill(id: string, dir?: string): Promise<WorkspaceSkillRecord | null> {
-      const workspace = await currentWorkspace()
-      return workspace === null ? null : readWorkspaceSkill(workspace, id, dir)
+    async placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
+      const base = await placeBase(ref.scope)
+      return base === null ? null : readPlaceSkill(base, id, ref.dir)
     },
 
-    async workspaceFile(id: string, file: string, dir?: string): Promise<string> {
-      const workspace = await requiredWorkspace()
-      const text = await readWorkspaceSkillFile(workspace, id, file, dir)
+    async placeFile(id: string, file: string, ref: SkillPlaceRef): Promise<string> {
+      const base = await requiredBase(ref.scope)
+      const text = await readPlaceSkillFile(base, id, file, ref.dir)
       if (text === null) {
-        throw new Error(`the workspace holds no such file: ${id}/${file}`)
+        throw new Error(`the place holds no such file: ${id}/${file}`)
       }
       return text
     },
 
-    async installToWorkspace(id: string, dir?: string): Promise<WorkspaceInstall> {
-      const workspace = await requiredWorkspace()
-      return installSkillIntoWorkspace(workspace, root, id, dir)
+    async installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+      const base = await requiredBase(ref.scope)
+      return installSkillInto(base, root, id, ref.dir)
     },
 
-    async importFromWorkspace(id: string, dir?: string): Promise<WorkspaceInstall> {
-      const workspace = await requiredWorkspace()
-      const landed = await linkSkillIntoLibrary(workspace, root, id, dir)
+    async adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+      const base = await requiredBase(ref.scope)
+      const landed = await linkSkillIntoLibrary(base, root, id, ref.dir)
       /* What the skills CLI installed this from, if it did: the lock beside
-         the workspace's skills is the record, and its hash is what an update
+         the place's skills is the record, and its hash is what an update
          check compares against. Without it the skill is still listed, but
          nothing can tell whether the upstream moved. */
-      const upstream = await readLockedUpstream(workspace, id)
+      const upstream = await readLockedUpstream(base, id)
       await refreshCatalog()
       if (upstream !== null) {
         await mutate((skills) => {
@@ -842,14 +859,14 @@ export async function createFsSkillStore(
       await refreshCatalog()
     },
 
-    async deleteWorkspaceSkill(id: string, dir?: string): Promise<void> {
-      const workspace = await requiredWorkspace()
-      await deleteSkillFromWorkspace(workspace, id, dir)
+    async deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void> {
+      const base = await requiredBase(ref.scope)
+      await deleteSkillIn(base, id, ref.dir)
     },
 
-    async removeFromWorkspace(id: string, dir?: string): Promise<void> {
-      const workspace = await requiredWorkspace()
-      await removeSkillFromWorkspace(workspace, root, id, dir)
+    async removeFrom(id: string, ref: SkillPlaceRef): Promise<void> {
+      const base = await requiredBase(ref.scope)
+      await removeSkillFrom(base, root, id, ref.dir)
     },
 
     subscribe(listener: () => void): () => void {

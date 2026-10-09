@@ -15,21 +15,27 @@ import type {
   SkillImport,
   SkillPage,
   SkillPatch,
+  SkillPlaceRef,
   SkillQuery,
   SkillStore,
   SkillUpdateCheck,
   SkillUpdateSummary,
-  WorkspaceInstall,
-  WorkspaceSkillDetail as WorkspaceSkillRecord,
-  WorkspaceSkillsView as WorkspaceSkills,
+  PlaceSkillDetail as PlaceSkillRecord,
+  PlaceSkillsView as PlaceSkills,
+  SkillInstall,
 } from "./store.ts"
 
 /** One page of the catalog as the bridge returns it. */
 type ErrorBody = { error?: string }
 
-/** The place a read or a write names, as a query fragment; empty means the default place. */
-function place(dir: string | undefined): string {
-  return dir === undefined ? "" : `&dir=${encodeURIComponent(dir)}`
+/** The place a read names, as a query fragment: both halves are always sent. */
+function placeQuery(ref: SkillPlaceRef): string {
+  return `&scope=${encodeURIComponent(ref.scope)}&dir=${encodeURIComponent(ref.dir)}`
+}
+
+/** The place a write names; the shape the bridge's body reader expects. */
+function placeBody(ref: SkillPlaceRef): Pick<SkillPlaceRef, "scope" | "dir"> {
+  return { scope: ref.scope, dir: ref.dir }
 }
 
 async function call<T>(
@@ -176,64 +182,64 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       return isLink(ref) ? ref : assetUrl(ref, base)
     },
 
-    workspaceSkills(dir?: string): Promise<WorkspaceSkills | null> {
-      return call<WorkspaceSkills | null>(base, `/hub/skills?action=workspace${place(dir)}`)
+    placeSkills(ref: SkillPlaceRef): Promise<PlaceSkills | null> {
+      return call<PlaceSkills | null>(base, `/hub/skills?action=place${placeQuery(ref)}`)
     },
 
-    workspaceSkill(id: string, dir?: string): Promise<WorkspaceSkillRecord | null> {
-      return call<WorkspaceSkillRecord | null>(
+    placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
+      return call<PlaceSkillRecord | null>(
         base,
-        `/hub/skills?action=workspace-skill&id=${encodeURIComponent(id)}${place(dir)}`
+        `/hub/skills?action=place-skill&id=${encodeURIComponent(id)}${placeQuery(ref)}`
       )
     },
 
-    async workspaceFile(id: string, file: string, dir?: string): Promise<string> {
+    async placeFile(id: string, file: string, ref: SkillPlaceRef): Promise<string> {
       const body = await call<{ text: string }>(
         base,
-        `/hub/skills?action=workspace-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${place(dir)}`
+        `/hub/skills?action=place-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
       )
       return body.text
     },
 
-    async installToWorkspace(id: string, dir?: string): Promise<WorkspaceInstall> {
-      const body = await call<{ mode: WorkspaceInstall }>(
+    async installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+      const body = await call<{ mode: SkillInstall }>(
         base,
-        "/hub/skills?action=install-workspace",
+        "/hub/skills?action=install-place",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, dir }),
+          body: JSON.stringify({ id, ...placeBody(ref) }),
         }
       )
       return body.mode
     },
 
-    async importFromWorkspace(id: string, dir?: string): Promise<WorkspaceInstall> {
-      const body = await call<{ mode: WorkspaceInstall }>(
+    async adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+      const body = await call<{ mode: SkillInstall }>(
         base,
-        "/hub/skills?action=import-workspace",
+        "/hub/skills?action=adopt-place",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, dir }),
+          body: JSON.stringify({ id, ...placeBody(ref) }),
         }
       )
       return body.mode
     },
 
-    async deleteWorkspaceSkill(id: string, dir?: string): Promise<void> {
-      await call(base, "/hub/skills?action=delete-workspace", {
+    async deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void> {
+      await call(base, "/hub/skills?action=delete-place", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, dir }),
+        body: JSON.stringify({ id, ...placeBody(ref) }),
       })
     },
 
-    async removeFromWorkspace(id: string, dir?: string): Promise<void> {
-      await call(base, "/hub/skills?action=remove-workspace", {
+    async removeFrom(id: string, ref: SkillPlaceRef): Promise<void> {
+      await call(base, "/hub/skills?action=remove-place", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, dir }),
+        body: JSON.stringify({ id, ...placeBody(ref) }),
       })
     },
 

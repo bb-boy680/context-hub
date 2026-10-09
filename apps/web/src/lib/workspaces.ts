@@ -92,9 +92,9 @@ export function createRemoteWorkspaceService(): WorkspaceService {
       }
     },
 
-    async selectAgent(id) {
+    async setAgent(id, on) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/agent`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/agent`, "POST", { id, on }))
       } catch (error) {
         return refuse(error)
       }
@@ -126,8 +126,8 @@ export function useWorkspaces(): {
   page: WorkspacePage | null
   failure: string | null
   select(id: string): void
-  /** Choose the agent this hub delivers to; `null` clears the choice. */
-  selectAgent(id: string | null): void
+  /** Choose or give up one agent this hub delivers to. */
+  setAgent(id: string, on: boolean): void
   /** Add a folder and make it current; answers why the hub refused it, or `null`. */
   add(path: string): Promise<string | null>
   /** Give one workspace a name of its own; answers why the hub refused it, or `null`. */
@@ -153,9 +153,9 @@ export function useWorkspaces(): {
     },
     [service]
   )
-  const selectAgent = React.useCallback(
-    (id: string | null) => {
-      void service?.selectAgent(id)
+  const setAgent = React.useCallback(
+    (id: string, on: boolean) => {
+      void service?.setAgent(id, on)
     },
     [service]
   )
@@ -181,5 +181,5 @@ export function useWorkspaces(): {
     [service]
   )
 
-  return { page, failure, select, selectAgent, add, rename, remove }
+  return { page, failure, select, setAgent, add, rename, remove }
 }

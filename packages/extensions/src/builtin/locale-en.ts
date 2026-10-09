@@ -23,6 +23,8 @@ const en: Record<string, string> = {
   "header.syncRepo": "Sync repo",
   "workspace.group.title": "Workspaces",
   "agents.group.title": "Agents",
+  "agents.group.expand": "Show {count} more",
+  "agents.group.collapse": "Show fewer",
   "workspace.create": "Create workspace",
   "workspace.create.unsupported": "This browser has no system folder dialog.",
   "workspace.action.more": "More",

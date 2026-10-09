@@ -11,7 +11,11 @@
 /** This integration's id; the kernel matches it against the manifest. */
 export const CLAUDE_CODE_ID = "hub.target.claude-code"
 
-/** The project directory Claude Code reads skills from; the global one uses the same name. */
+/**
+ * The skills directory Claude Code reads, relative to the workspace and to the
+ * home directory alike: `.claude/skills` under a project, `~/.claude/skills`
+ * outside one.
+ */
 export const CLAUDE_CODE_SKILL_DIR = ".claude/skills"
 
 /** One place either scope reads assets from. */

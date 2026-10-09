@@ -37,7 +37,8 @@ console.log(`home: ${home}`)
 
 check(
   "a fresh hub lists no workspace and no agent",
-  JSON.stringify(await store.page()) === JSON.stringify({ folders: [], current: null, agent: null }),
+  JSON.stringify(await store.page()) ===
+    JSON.stringify({ folders: [], current: null, agents: [] }),
   await store.page()
 )
 
@@ -141,13 +142,61 @@ check(
   refused
 )
 
-/* The agent this hub delivers to is remembered beside the folder, and an id
-   nothing answers for is not a choice — it clears the one that was made. */
+/* The agents this hub delivers to are remembered beside the folder. Several
+   can be chosen at once, because each one is a directory of its own, and
+   choosing one twice is not a second choice. */
 const folderCount = (await store.page()).folders.length
-check("the agent a hub delivers to is a choice", (await store.page()).agent === null)
-check("choosing one records it", (await store.selectAgent("hub.target.claude-code")).agent === "hub.target.claude-code")
-check("it survives a folder switch", (await store.select(inside)).agent === "hub.target.claude-code")
-check("clearing the choice is a value, not a wipe", (await store.selectAgent(null)).agent === null)
+check("no agent is chosen to begin with", (await store.page()).agents.length === 0)
+check(
+  "choosing one records it",
+  JSON.stringify((await store.setAgent("hub.target.claude-code", true)).agents) ===
+    JSON.stringify(["hub.target.claude-code"])
+)
+check(
+  "choosing a second keeps the first",
+  JSON.stringify((await store.setAgent("hub.target.sample", true)).agents) ===
+    JSON.stringify(["hub.target.claude-code", "hub.target.sample"]),
+  (await store.page()).agents
+)
+check(
+  "choosing one that is already chosen changes nothing",
+  (await store.setAgent("hub.target.sample", true)).agents.length === 2
+)
+check(
+  "it survives a folder switch",
+  JSON.stringify((await store.select(inside)).agents) ===
+    JSON.stringify(["hub.target.claude-code", "hub.target.sample"])
+)
+check(
+  "giving one up keeps the rest",
+  JSON.stringify((await store.setAgent("hub.target.claude-code", false)).agents) ===
+    JSON.stringify(["hub.target.sample"]),
+  (await store.page()).agents
+)
+check(
+  "giving up one that was not chosen changes nothing",
+  (await store.setAgent("hub.target.codex", false)).agents.length === 1
+)
+check("giving up the last one leaves none", (await store.setAgent("hub.target.sample", false)).agents.length === 0)
+
+/* Two choices made at once both land: each is a read-modify-write of one
+   document, so an unserialized store would let the later write undo the first. */
+await Promise.all([
+  store.setAgent("hub.target.alpha", true),
+  store.setAgent("hub.target.beta", true),
+])
+check(
+  "two choices made at once both land",
+  JSON.stringify((await store.page()).agents) === JSON.stringify(["hub.target.alpha", "hub.target.beta"]),
+  (await store.page()).agents
+)
+check(
+  "and the folders are untouched by either",
+  (await store.page()).folders.length === folderCount
+)
+await store.setAgent("hub.target.alpha", false)
+await store.setAgent("hub.target.beta", false)
+check("clearing both leaves none", (await store.page()).agents.length === 0)
 check(
   "and every folder is still there",
   (await store.page()).folders.length === folderCount,
@@ -157,15 +206,27 @@ check(
 /* A hand-edited document is durable JSON, so its values are checked, not trusted. */
 check(
   "a document that is not an object is empty",
-  JSON.stringify(readWorkspaceState("nope")) === JSON.stringify({ folders: [], current: null, agent: null })
+  JSON.stringify(readWorkspaceState("nope")) ===
+    JSON.stringify({ folders: [], current: null, agents: [] })
 )
 check(
   "an absent document is empty",
-  JSON.stringify(readWorkspaceState(null)) === JSON.stringify({ folders: [], current: null, agent: null })
+  JSON.stringify(readWorkspaceState(null)) ===
+    JSON.stringify({ folders: [], current: null, agents: [] })
 )
 check(
   "an agent that is not a name is dropped",
-  readWorkspaceState({ folders: [], agent: 7 }).agent === null
+  readWorkspaceState({ folders: [], agents: [7] }).agents.length === 0
+)
+check(
+  "a document written before agents were multiple reads as its one choice",
+  JSON.stringify(readWorkspaceState({ folders: [], agent: "hub.target.codex" }).agents) ===
+    JSON.stringify(["hub.target.codex"])
+)
+check(
+  "and a repeated name is one choice",
+  JSON.stringify(readWorkspaceState({ folders: [], agents: ["a", "a", ""] }).agents) ===
+    JSON.stringify(["a"])
 )
 const edited = readWorkspaceState({
   folders: [{ name: "skills" }, { name: "" }, { path: project }, 7, { name: "docs", path: "" }],

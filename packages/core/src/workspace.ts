@@ -46,22 +46,22 @@ export interface WorkspacePage {
   folders: WorkspaceView[]
   current: string | null
   /**
-   * The agent this hub delivers to, by the id of the integration that declared
-   * it. The agent list itself is a UI contribution, so this is an opaque id
-   * here: an id nothing answers for simply selects nothing.
+   * The agents this hub delivers to, by the id of the integration that declared
+   * each one. The agent list itself is a UI contribution, so these are opaque
+   * ids here: an id nothing answers for simply chooses nothing.
    */
-  agent: string | null
+  agents: string[]
 }
 
 /** What the hub remembers between runs. */
 export interface WorkspaceState {
   folders: WorkspaceFolder[]
   current: string | null
-  agent: string | null
+  agents: string[]
 }
 
 /** The state before any folder has been picked. */
-export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null, agent: null }
+export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null, agents: [] }
 
 /** The workspace list as the form offers it to whoever renders it. */
 export interface WorkspaceStore {
@@ -88,10 +88,11 @@ export interface WorkspaceStore {
    */
   remove(id: string): Promise<WorkspacePage>
   /**
-   * Remember which agent this hub delivers to, by its integration id; `null`
-   * clears the choice.
+   * Remember whether this hub delivers to one agent, by its integration id.
+   * Choosing several is how a person reads the machine-wide places they care
+   * about; choosing none is an empty list, not a different state.
    */
-  selectAgent(id: string | null): Promise<WorkspacePage>
+  setAgent(id: string, on: boolean): Promise<WorkspacePage>
 }
 
 /**
@@ -118,8 +119,8 @@ export interface WorkspaceService {
   rename(id: string, name: string): Promise<boolean>
   /** Drop one workspace from the list; `false` when the hub refused it. */
   remove(id: string): Promise<boolean>
-  /** Remember which agent this hub delivers to; `null` clears the choice. */
-  selectAgent(id: string | null): Promise<boolean>
+  /** Remember whether one agent is delivered to; `false` when the hub refused it. */
+  setAgent(id: string, on: boolean): Promise<boolean>
 }
 
 /**
@@ -146,13 +147,20 @@ export function workspaceName(path: string): string {
 /**
  * Read a stored workspace document. Entries the hub did not write are dropped:
  * the file is durable JSON, so a hand-edited value is bad input, not a folder.
+ * A document written before agents could be chosen more than one at a time
+ * carries a single `agent`, which reads as the one-element list it meant.
  *
  * @param value — the stored value, as the form read it.
- * @returns the folders, current workspace and agent it describes.
+ * @returns the folders, current workspace and agents it describes.
  */
 export function readWorkspaceState(value: unknown): WorkspaceState {
   if (typeof value !== "object" || value === null) return NO_WORKSPACES
-  const stored = value as { folders?: unknown; current?: unknown; agent?: unknown }
+  const stored = value as {
+    folders?: unknown
+    current?: unknown
+    agents?: unknown
+    agent?: unknown
+  }
   const folders: WorkspaceFolder[] = []
   if (Array.isArray(stored.folders)) {
     for (const entry of stored.folders) {
@@ -171,6 +179,11 @@ export function readWorkspaceState(value: unknown): WorkspaceState {
   }
   const known = folders.map(folderId)
   const current = typeof stored.current === "string" && known.includes(stored.current) ? stored.current : null
-  const agent = typeof stored.agent === "string" && stored.agent !== "" ? stored.agent : null
-  return { folders, current, agent }
+  const agents: string[] = []
+  const chosen = Array.isArray(stored.agents) ? stored.agents : [stored.agent]
+  for (const entry of chosen) {
+    if (typeof entry !== "string" || entry === "" || agents.includes(entry)) continue
+    agents.push(entry)
+  }
+  return { folders, current, agents }
 }

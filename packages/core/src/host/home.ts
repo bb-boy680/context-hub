@@ -20,3 +20,12 @@ export function displayPath(target: string): string {
   const home = homedir()
   return target.startsWith(home) ? `~${target.slice(home.length)}` : target
 }
+
+/**
+ * The directory a person's own files live under, which is what an agent reads
+ * outside any project. Distinct from {@link resolveHubHome}, which is where the
+ * hub keeps its own files.
+ */
+export function userHome(): string {
+  return homedir()
+}

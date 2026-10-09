@@ -1,19 +1,26 @@
+import type { SkillScope } from "@workspace/extensions"
+
+import type { SkillOrigin as SkillSource } from "./store.ts"
+import type { SkillUpstream, SkillCheck } from "./store.ts"
+
 /**
  * Where one skill lives, as the row and the lightbox show it: only in the hub's
- * library, only in a place a workspace keeps skills in, or in both — a library
+ * library, only in a place an agent keeps skills in, or in both — a library
  * skill the hub installed into a place is one skill in two places, not two
  * skills. `"both"` and `"library"` are the hub's own two cases; everything else
  * is the id of a place, the way the extension that contributed it named it.
  */
 export type SkillLocation = "library" | "both" | SkillPlace
 
-/** One place a workspace keeps skills in, named by the extension that contributed it. */
+/** One place an agent keeps skills in, named by the extension that contributed it. */
 export type SkillPlace = string
 
-/** One place holding a row's files, with the directory it reads them from. */
+/** One place holding a row's files, with where to find them. */
 export interface SkillHold {
   id: SkillPlace
-  /** The place's directory inside the workspace, `/`-separated. */
+  /** Which root the directory sits under. */
+  scope: SkillScope
+  /** The place's directory inside that root, `/`-separated. */
   dir: string
 }
 
@@ -21,9 +28,6 @@ export interface SkillHold {
 export type { SkillOrigin as SkillSource } from "./store.ts"
 /** Where a skill's files were installed from, when anything recorded it. */
 export type { SkillUpstream, SkillCheck } from "./store.ts"
-
-import type { SkillOrigin as SkillSource } from "./store.ts"
-import type { SkillUpstream, SkillCheck } from "./store.ts"
 
 /** One skill row, shared by the catalog page and the detail lightbox. */
 export type Skill = {

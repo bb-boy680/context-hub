@@ -13,13 +13,30 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import { hostFolder } from "@workspace/core/host/fs-browse"
 
 import { createFsSkillStore } from "./src/host/skills-fs.ts"
-import type { SkillOrigin, SkillStore } from "./src/store.ts"
+import type { SkillOrigin, SkillPlaceRef, SkillStore } from "./src/store.ts"
 
 /** Route prefix this bridge answers on. */
 const PREFIX = "/hub/skills"
 
 /** Origins a page may filter by; a query naming anything else reads as unfiltered. */
 const ORIGINS: readonly SkillOrigin[] = ["local", "builtin", "registry"]
+
+/**
+ * The place an action names, from the scope and directory it carried. Both are
+ * required: a place is a directory under one of two roots, so a call that names
+ * neither has nothing to read.
+ *
+ * @throws when the scope is neither of the two, or no directory was sent.
+ */
+function placeRef(scope: unknown, dir: unknown): SkillPlaceRef {
+  if (scope !== "workspace" && scope !== "global") {
+    throw new Error(`not a skill scope: ${String(scope)}`)
+  }
+  if (typeof dir !== "string" || dir === "") {
+    throw new Error("missing place directory")
+  }
+  return { scope, dir }
+}
 
 /** Read a whole request body into one buffer. */
 async function readBody(request: NodeJS.ReadableStream): Promise<Buffer> {
@@ -73,64 +90,68 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
           }
           const rest = url.pathname.slice(PREFIX.length).replace(/^\//, "")
           const [id, section, ...tail] = rest.split("/").map(decodeURIComponent)
-          /* The place a workspace action names; absent means the default one. */
-          const dir = url.searchParams.get("dir") ?? undefined
-          /* A write names it in the body, because its id travels there too. */
-          const bodyDir = (body: { dir?: unknown }): string | undefined =>
-            typeof body.dir === "string" && body.dir !== "" ? body.dir : undefined
+          /* A read names the place in its query; a write names it in its body,
+             because the id it acts on travels there too. */
+          const queryRef = () =>
+            placeRef(url.searchParams.get("scope"), url.searchParams.get("dir"))
+          const bodyRef = (body: { scope?: unknown; dir?: unknown }) =>
+            placeRef(body.scope, body.dir)
           try {
             const api = await getStore()
             const method = request.method ?? "GET"
 
-            /* GET /hub/skills?action=workspace — what the current workspace holds */
+            /* GET /hub/skills?action=place&scope=&dir= — what one place holds */
             if (
               rest === "" &&
               method === "GET" &&
-              url.searchParams.get("action") === "workspace"
+              url.searchParams.get("action") === "place"
             ) {
-              sendJson(response, 200, await api.workspaceSkills(dir))
+              sendJson(response, 200, await api.placeSkills(queryRef()))
               return
             }
 
-            /* GET /hub/skills?action=workspace-skill&id=… — one, read in place */
+            /* GET /hub/skills?action=place-skill&id=… — one, read in place */
             if (
               rest === "" &&
               method === "GET" &&
-              url.searchParams.get("action") === "workspace-skill"
+              url.searchParams.get("action") === "place-skill"
             ) {
-              const id = url.searchParams.get("id")
-              if (id === null || id === "") {
+              const skill = url.searchParams.get("id")
+              if (skill === null || skill === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              sendJson(response, 200, await api.workspaceSkill(id, dir))
+              sendJson(response, 200, await api.placeSkill(skill, queryRef()))
               return
             }
 
-            /* GET /hub/skills?action=workspace-file&id=…&path=… — one file, read in place */
+            /* GET /hub/skills?action=place-file&id=…&path=… — one file, read in place */
             if (
               rest === "" &&
               method === "GET" &&
-              url.searchParams.get("action") === "workspace-file"
+              url.searchParams.get("action") === "place-file"
             ) {
-              const id = url.searchParams.get("id")
+              const skill = url.searchParams.get("id")
               const file = url.searchParams.get("path")
-              if (id === null || id === "" || file === null || file === "") {
-                sendError(response, new Error("missing workspace file"))
+              if (skill === null || skill === "" || file === null || file === "") {
+                sendError(response, new Error("missing place file"))
                 return
               }
-              sendJson(response, 200, { text: await api.workspaceFile(id, file, dir) })
+              sendJson(response, 200, {
+                text: await api.placeFile(skill, file, queryRef()),
+              })
               return
             }
 
-            /* POST /hub/skills?action=install-workspace — link one skill into it */
+            /* POST /hub/skills?action=install-place — link one skill into it */
             if (
               rest === "" &&
               method === "POST" &&
-              url.searchParams.get("action") === "install-workspace"
+              url.searchParams.get("action") === "install-place"
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                scope?: unknown
                 dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
@@ -138,19 +159,20 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
                 return
               }
               sendJson(response, 200, {
-                mode: await api.installToWorkspace(body.id, bodyDir(body)),
+                mode: await api.installInto(body.id, bodyRef(body)),
               })
               return
             }
 
-            /* POST /hub/skills?action=import-workspace — link one into the library */
+            /* POST /hub/skills?action=adopt-place — link one into the library */
             if (
               rest === "" &&
               method === "POST" &&
-              url.searchParams.get("action") === "import-workspace"
+              url.searchParams.get("action") === "adopt-place"
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                scope?: unknown
                 dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
@@ -158,45 +180,47 @@ export function skillLibrary(options: { home?: string; folder?: string } = {}) {
                 return
               }
               sendJson(response, 200, {
-                mode: await api.importFromWorkspace(body.id, bodyDir(body)),
+                mode: await api.adoptFrom(body.id, bodyRef(body)),
               })
               return
             }
 
-            /* POST /hub/skills?action=delete-workspace — delete its directory */
+            /* POST /hub/skills?action=delete-place — delete its directory */
             if (
               rest === "" &&
               method === "POST" &&
-              url.searchParams.get("action") === "delete-workspace"
+              url.searchParams.get("action") === "delete-place"
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                scope?: unknown
                 dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              await api.deleteWorkspaceSkill(body.id, bodyDir(body))
+              await api.deleteInPlace(body.id, bodyRef(body))
               sendJson(response, 200, { ok: true })
               return
             }
 
-            /* POST /hub/skills?action=remove-workspace — take one back out */
+            /* POST /hub/skills?action=remove-place — take one back out */
             if (
               rest === "" &&
               method === "POST" &&
-              url.searchParams.get("action") === "remove-workspace"
+              url.searchParams.get("action") === "remove-place"
             ) {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
                 id?: unknown
+                scope?: unknown
                 dir?: unknown
               }
               if (typeof body.id !== "string" || body.id === "") {
                 sendError(response, new Error("missing skill id"))
                 return
               }
-              await api.removeFromWorkspace(body.id, bodyDir(body))
+              await api.removeFrom(body.id, bodyRef(body))
               sendJson(response, 200, { ok: true })
               return
             }

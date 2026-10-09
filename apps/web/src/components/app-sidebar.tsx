@@ -3,7 +3,7 @@
  * the agents it delivers to. Every group is a list of the same row, so the
  * column reads as one thing rather than three widgets stacked together.
  */
-import { CheckIcon, WaypointsIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon, WaypointsIcon } from "lucide-react"
 import * as React from "react"
 import { useLocation } from "react-router"
 
@@ -37,35 +37,50 @@ function NavGroup({ group }: { group: NavGroupData }) {
 }
 
 /**
- * The agents this hub delivers to: an integration that reads a workspace's
- * skills is one. The list is a contribution, so it exists exactly while such an
- * integration is enabled, and each row wears the mark that integration ships.
+ * How many agents the group lists before it offers the rest. How many
+ * integrations a person enables is their own business, so the group cannot let
+ * that number push everything below it off the column.
+ */
+const AGENTS_VISIBLE = 8
+
+/**
+ * The agents this hub delivers to: an integration that reads a machine's or a
+ * workspace's skills is one. The list is a contribution, so it exists exactly
+ * while such an integration is enabled, and each row wears the mark that
+ * integration ships. Choosing one is what puts its skills place on the skills
+ * page, so several can be chosen at once.
  */
 function AgentGroup() {
   const { t } = useI18n()
-  const { page, selectAgent } = useWorkspaces()
-  const agent = page?.agent ?? null
+  const { page, setAgent } = useWorkspaces()
+  const [expanded, setExpanded] = React.useState(false)
+  const chosen = page?.agents ?? []
   const targets = useContributions("target").filter(
-    (entry) => entry.skillLocation !== undefined
+    (entry) =>
+      entry.skillLocation !== undefined || entry.globalSkillLocation !== undefined
   )
 
   if (targets.length === 0) return null
 
+  const rest = targets.length - AGENTS_VISIBLE
+  const shown = expanded || rest <= 0 ? targets : targets.slice(0, AGENTS_VISIBLE)
+
   return (
     <SidebarGroup label={t("agents.group.title")}>
-      {targets.map((target) => {
+      {shown.map((target) => {
         const Mark = target.icon
+        const on = chosen.includes(target.id)
         return (
           <SidebarRow
             key={target.id}
             label={target.displayName}
             hint={target.format}
-            active={target.id === agent}
+            active={on}
             iconWrap="rounded-xs bg-muted ring-1 ring-border"
             icon={<Mark className="size-3" aria-hidden />}
-            onClick={() => selectAgent(target.id === agent ? null : target.id)}
+            onClick={() => setAgent(target.id, !on)}
             trailing={
-              target.id === agent ? (
+              on ? (
                 <span className="flex size-6 shrink-0 items-center justify-center">
                   <CheckIcon className="size-[15px] text-foreground" aria-hidden />
                 </span>
@@ -74,6 +89,26 @@ function AgentGroup() {
           />
         )
       })}
+      {rest <= 0 ? null : (
+        <SidebarRow
+          label={
+            expanded
+              ? t("agents.group.collapse")
+              : t("agents.group.expand").replace("{count}", String(rest))
+          }
+          active={false}
+          expanded={expanded}
+          icon={
+            <ChevronDownIcon
+              className={`size-[18px] shrink-0 transition-transform ${
+                expanded ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            />
+          }
+          onClick={() => setExpanded(!expanded)}
+        />
+      )}
     </SidebarGroup>
   )
 }

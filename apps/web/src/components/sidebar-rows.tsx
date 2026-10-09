@@ -42,6 +42,7 @@ export function SidebarRow({
   icon,
   iconWrap,
   trailing,
+  expanded,
   href,
   onClick,
 }: {
@@ -53,6 +54,8 @@ export function SidebarRow({
   /** Extra classes for the icon's 18px box — an agent mark sits on a plate. */
   iconWrap?: string
   trailing?: React.ReactNode
+  /** Set on a row that reveals and hides the rows under it. */
+  expanded?: boolean
   href?: string
   onClick?: () => void
 }) {
@@ -101,6 +104,7 @@ export function SidebarRow({
         role="button"
         tabIndex={0}
         title={title}
+        aria-expanded={expanded}
         className={className}
         onClick={onClick}
         onKeyDown={(event) => {

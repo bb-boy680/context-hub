@@ -6,19 +6,21 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useHub, useI18n } from "@workspace/extensions/react"
+import { useContributions, useHub, useI18n } from "@workspace/extensions/react"
+import type { SkillLocationContribution, SkillScope } from "@workspace/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
 import type {
+  PlaceSkill,
+  PlaceSkillsView,
   SkillFileEntry,
+  SkillInstall,
   SkillPage,
+  SkillPlaceRef,
   SkillStore,
   SkillSummary,
   SkillUpdateCheck,
   SkillUpdateSummary,
-  WorkspaceInstall,
-  WorkspaceSkill,
-  WorkspaceSkillsView,
 } from "./store.ts"
 import type {
   Skill,
@@ -28,15 +30,20 @@ import type {
   SkillSource,
 } from "./types.ts"
 
-/** One place a workspace keeps skills in, with what it holds right now. */
+/** Nothing chosen, as a stable value: a reload key must not change identity. */
+const NO_AGENTS: string[] = []
+
+/** One place an agent keeps skills in, with what it holds right now. */
 export interface SkillPlaceView {
   id: SkillPlace
-  /** Message key the tab and the provenance line resolve for this place. */
+  /** Message key the provenance line resolves for this place. */
   labelKey: string
-  /** The place's directory inside the workspace, `/`-separated. */
+  /** Which root the place's directory sits under. */
+  scope: SkillScope
+  /** The place's directory inside that root, `/`-separated. */
   dir: string
   /** The place's own skills directory, as it reads; `null` when it has none. */
-  view: WorkspaceSkillsView | null
+  view: PlaceSkillsView | null
 }
 
 /** One page of the catalog, plus what the UI needs to render around it. */
@@ -51,11 +58,6 @@ export interface SkillLibrary {
   places: SkillPlaceView[]
   /** The workspace in use, or `null` when this form has none selected. */
   workspaceId: string | null
-  /**
-   * The agent this hub delivers to, by integration id; `null` when none is
-   * chosen. It names a place, so the page can open on the chosen agent's tab.
-   */
-  agent: string | null
   loading: boolean
   /** Display-ready failure from the last load, if any. */
   error: string | null
@@ -66,13 +68,13 @@ export interface SkillLibrary {
   /** Re-read the library and every place. */
   reload(): Promise<void>
   /** Put one library skill into one place; answers how it landed. */
-  install(id: string, dir?: string): Promise<WorkspaceInstall>
+  install(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /** Copy one skill a place holds into the library. */
-  adopt(id: string, dir?: string): Promise<WorkspaceInstall>
+  adopt(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /** Delete one skill from a place, its directory included. */
-  deleteWorkspaceSkill(id: string, dir?: string): Promise<void>
+  deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void>
   /** Take one skill the hub installed back out of a place. */
-  remove(id: string, dir?: string): Promise<void>
+  remove(id: string, ref: SkillPlaceRef): Promise<void>
   /** Measure one library skill against the upstream its files came from. */
   checkUpdate(id: string): Promise<SkillUpdateCheck>
   /** Measure every skill that records a source; the rows carry the answers. */
@@ -87,6 +89,57 @@ export function holdsOf(skill: Skill): SkillHold[] {
 }
 
 /**
+ * The agents the sidebar has chosen, re-read whenever the choice changes. It is
+ * the page's own read, not the loader's: which places to load follows from it,
+ * and the loader only loads what it is handed.
+ *
+ * @returns the chosen integrations' ids, and nothing when this form has no
+ *   workspace service.
+ */
+export function useChosenAgents(): string[] {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(
+    () => workspaces?.current()?.agents ?? NO_AGENTS,
+    [workspaces]
+  )
+  return React.useSyncExternalStore(subscribe, read)
+}
+
+/**
+ * The places this build reads, in the order their contributions ask for.
+ *
+ * Every workspace-scope place an enabled integration contributes is read: a
+ * workspace is a folder the hub was pointed at, so its directories are a fact
+ * about it rather than a choice. A machine-wide place belongs to one agent, so
+ * it is read only while the sidebar has that agent chosen — the choice is what
+ * says which of the machine's agents this hub delivers to.
+ *
+ * @returns the places to read, sorted by their contributions' order.
+ */
+export function useReadablePlaces(): SkillLocationContribution[] {
+  const contributions = useContributions("skillLocation")
+  const targets = useContributions("target")
+  const chosen = useChosenAgents()
+
+  return React.useMemo(() => {
+    const machineWide = new Set(
+      targets
+        .filter((target) => chosen.includes(target.id))
+        .map((target) => target.globalSkillLocation)
+        .filter((id): id is string => id !== undefined)
+    )
+    return [...contributions]
+      .filter((place) => place.scope === "workspace" || machineWide.has(place.id))
+      .sort((left, right) => left.order - right.order)
+  }, [contributions, targets, chosen])
+}
+
+/**
  * Where one row's files live, and how that directory reads.
  *
  * @param skill — the row.
@@ -96,16 +149,34 @@ export function holdsOf(skill: Skill): SkillHold[] {
 export function placeOf(
   skill: Skill,
   places: readonly SkillPlaceView[]
-): { id: SkillPlace; dir: string; display: string } | null {
+): { id: SkillPlace; ref: SkillPlaceRef; display: string } | null {
   const hold = holdsOf(skill)[0]
   if (hold === undefined) return null
   const display = places.find((place) => place.id === hold.id)?.view?.display
-  return { id: hold.id, dir: hold.dir, display: display ?? hold.dir }
+  return {
+    id: hold.id,
+    ref: { scope: hold.scope, dir: hold.dir },
+    display: display ?? hold.dir,
+  }
 }
 
 /** Whether the hub's own library holds this row, so the row is not only a place's. */
 export function inLibrary(skill: Skill): boolean {
   return skill.location === "library" || skill.location === "both"
+}
+
+/**
+ * How one place's directory reads to a person. A place is a directory inside a
+ * scope, and the scope's root is the part a person already knows: inside a
+ * workspace that root is the folder in use, and outside every workspace it is
+ * the home directory — so the directory alone is the answer, spelled from `~`
+ * where the root is the machine's own.
+ *
+ * @param place — the place to name.
+ * @returns the directory as a person would write it.
+ */
+export function placePath(place: { scope: SkillScope; dir: string }): string {
+  return place.scope === "global" ? `~/${place.dir}` : place.dir
 }
 
 /**
@@ -224,15 +295,15 @@ export function useSkillDocument(
     void (async () => {
       try {
         /* A skill no library record holds is read where the place keeps it. */
-        const dir = holdsOf(skill)[0]?.dir
+        const hold = holdsOf(skill)[0]
         const record =
-          dir === undefined
+          hold === undefined
             ? await store.get(skill.id)
-            : await store.workspaceSkill(skill.id, dir)
+            : await store.placeSkill(skill.id, { scope: hold.scope, dir: hold.dir })
         if (record === undefined || record === null) return
         const text = "body" in record ? record.body : record.text
         const read: SkillDocument = {
-          body: dir === undefined ? text : parseSkillFile(text).body,
+          body: hold === undefined ? text : parseSkillFile(text).body,
           files: record.files,
         }
         documents.set(key, read)
@@ -297,7 +368,7 @@ export function toSkill(
 const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
 
 /** One skill's row for a skill a place holds and the library does not. */
-function placeRow(skill: WorkspaceSkill, place: SkillHold): Skill {
+function placeRow(skill: PlaceSkill, place: SkillHold): Skill {
   return {
     id: skill.id,
     name: skill.name,
@@ -308,7 +379,7 @@ function placeRow(skill: WorkspaceSkill, place: SkillHold): Skill {
     source: "local",
     updated: "",
     location: place.id,
-    places: [{ id: place.id, dir: place.dir }],
+    places: [{ id: place.id, scope: place.scope, dir: place.dir }],
     installed: false,
     stale: skill.origin === "stale",
   }
@@ -318,7 +389,8 @@ function placeRow(skill: WorkspaceSkill, place: SkillHold): Skill {
 export interface SkillPlaceSpec {
   id: SkillPlace
   labelKey: string
-  /** The place's directory inside the workspace, `/`-separated. */
+  scope: SkillScope
+  /** The place's directory inside that scope's root, `/`-separated. */
   dir: string
 }
 
@@ -342,9 +414,11 @@ export function useSkillLibrary(
 
   /* A contribution list is rebuilt on every render, so the loads follow the
      places it names rather than the array that carried them. */
-  const specKey = JSON.stringify(specs.map((spec) => [spec.id, spec.dir]))
+  const specKey = JSON.stringify(
+    specs.map((spec) => [spec.id, spec.scope, spec.dir])
+  )
   const targets = React.useMemo(
-    () => JSON.parse(specKey) as [SkillPlace, string][],
+    () => JSON.parse(specKey) as [SkillPlace, SkillScope, string][],
     [specKey]
   )
 
@@ -356,18 +430,12 @@ export function useSkillLibrary(
     () => workspaces?.current()?.current ?? null,
     [workspaces]
   )
-  /* The chosen agent decides which place the page opens on. */
-  const readAgent = React.useCallback(
-    () => workspaces?.current()?.agent ?? null,
-    [workspaces]
-  )
   /* The workspace in use decides which skills are in reach, so it is a reload key. */
   const workspaceId = React.useSyncExternalStore(subscribeWorkspaces, readWorkspaceId)
-  const agent = React.useSyncExternalStore(subscribeWorkspaces, readAgent)
 
   const [page, setPage] = React.useState<SkillPage | null>(null)
   /* What each place holds, keyed by its id; a place that could not be read is absent. */
-  const [held, setHeld] = React.useState<Record<string, WorkspaceSkillsView | null>>({})
+  const [held, setHeld] = React.useState<Record<string, PlaceSkillsView | null>>({})
   const [loading, setLoading] = React.useState(store !== null)
   const [error, setError] = React.useState<string | null>(null)
   const [tags, setTags] = React.useState<string[]>([])
@@ -383,7 +451,7 @@ export function useSkillLibrary(
     try {
       const [catalog, ...views] = await Promise.all([
         store.list(needle === "" ? { sort: "updated" } : { sort: "updated", q: needle }),
-        ...targets.map(([, dir]) => store.workspaceSkills(dir)),
+        ...targets.map(([, scope, dir]) => store.placeSkills({ scope, dir })),
       ])
       /* A slower earlier request must not overwrite a newer one. */
       if (current !== generation.current) return
@@ -438,10 +506,11 @@ export function useSkillLibrary(
     if (store === null) return []
     const items = page?.items ?? []
     /** Every place, with the directory it reads and the skills it holds. */
-    const roots = targets.map(([id, dir]) => {
+    const roots = targets.map(([id, scope, dir]) => {
       const view = held[id] ?? null
       return {
         id,
+        scope,
         dir,
         root: view?.root ?? null,
         byId: new Map((view?.skills ?? []).map((skill) => [skill.id, skill])),
@@ -466,7 +535,7 @@ export function useSkillLibrary(
         const adopted = reachedFrom(item, place.root)
         const installed = own?.origin === "hub"
         if (adopted || installed) {
-          holding.push({ id: place.id, dir: place.dir })
+          holding.push({ id: place.id, scope: place.scope, dir: place.dir })
           if (adopted) linkAt = "library"
           else if (linkAt === undefined) linkAt = place.id
         } else if (own !== undefined) {
@@ -502,9 +571,9 @@ export function useSkillLibrary(
   }, [store, page, held, targets, locale])
 
   const install = React.useCallback(
-    async (id: string, dir?: string) => {
+    async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
-      const landed = await store.installToWorkspace(id, dir)
+      const landed = await store.installInto(id, ref)
       await reload()
       return landed
     },
@@ -512,29 +581,29 @@ export function useSkillLibrary(
   )
 
   const adopt = React.useCallback(
-    async (id: string, dir?: string) => {
+    async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
       /* The place keeps its files; the library reaches them through a link. */
-      const landed = await store.importFromWorkspace(id, dir)
+      const landed = await store.adoptFrom(id, ref)
       await reload()
       return landed
     },
     [store, reload]
   )
 
-  const deleteWorkspaceSkill = React.useCallback(
-    async (id: string, dir?: string) => {
+  const deleteInPlace = React.useCallback(
+    async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
-      await store.deleteWorkspaceSkill(id, dir)
+      await store.deleteInPlace(id, ref)
       await reload()
     },
     [store, reload]
   )
 
   const remove = React.useCallback(
-    async (id: string, dir?: string) => {
+    async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
-      await store.removeFromWorkspace(id, dir)
+      await store.removeFrom(id, ref)
       await reload()
     },
     [store, reload]
@@ -577,7 +646,6 @@ export function useSkillLibrary(
       counts: {},
       places: [],
       workspaceId,
-      agent: null,
       loading: false,
       error: null,
       root: null,
@@ -585,7 +653,7 @@ export function useSkillLibrary(
       reload: async () => undefined,
       install: async () => "link",
       adopt: async () => "link",
-      deleteWorkspaceSkill: async () => undefined,
+      deleteInPlace: async () => undefined,
       remove: async () => undefined,
       checkUpdate: async () => {
         throw new Error("this form has no skill library")
@@ -611,7 +679,6 @@ export function useSkillLibrary(
     counts,
     places,
     workspaceId,
-    agent,
     loading,
     error,
     root: page?.root ?? null,
@@ -619,7 +686,7 @@ export function useSkillLibrary(
     reload,
     install,
     adopt,
-    deleteWorkspaceSkill,
+    deleteInPlace,
     remove,
     checkUpdate,
     checkAll,

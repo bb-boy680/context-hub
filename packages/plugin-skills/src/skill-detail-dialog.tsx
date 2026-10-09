@@ -1,5 +1,6 @@
 import {
   ArrowLeftIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardPasteIcon,
@@ -23,6 +24,7 @@ import {
   XIcon,
 } from "lucide-react"
 import * as React from "react"
+import { Fragment } from "react"
 import { Navigation, Thumbs } from "swiper/modules"
 import { Swiper, SwiperSlide } from "swiper/react"
 import type { SwiperClass } from "swiper/react"
@@ -32,20 +34,22 @@ import "swiper/css/thumbs"
 import { CodeView } from "./code-view.tsx"
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { formatAge, holdsOf, inLibrary, placeOf, skillKey, type SkillPlaceView } from "./library.ts"
+import { formatAge, holdsOf, inLibrary, placeOf, placePath, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
+  PlaceSkillDetail,
   SkillDetail,
   SkillFileEntry,
+  SkillPlaceRef,
   SkillStore,
   SkillUpdateCheck,
-  WorkspaceSkillDetail,
 } from "./store.ts"
 
-import { useContributions, useI18n } from "@workspace/extensions/react"
+import { useI18n } from "@workspace/extensions/react"
+import type { SkillScope } from "@workspace/extensions"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -1194,6 +1198,16 @@ function SourceSection({
   )
 }
 
+/** The two scopes, in the order a list of places reads them. */
+const SCOPES: readonly SkillScope[] = ["workspace", "global"]
+
+/**
+ * How many places of one scope the panel lists before it offers the rest. A
+ * person may enable more agents than this panel can show beside the skill it
+ * describes.
+ */
+const PLACES_VISIBLE = 8
+
 /**
  * Every place this skill could live, with the row's own action on each: the way
  * into a place that does not hold it yet is here, not only the way out of the
@@ -1204,7 +1218,7 @@ function PlacesSection({
   skill,
   path,
   places,
-  reason,
+  blocked,
   onAdopt,
   onInstall,
   onRemove,
@@ -1212,13 +1226,13 @@ function PlacesSection({
   skill: Skill
   /** The skill's directory, spelled as a person would write it; `null` when unknown. */
   path: string | null
-  /** Every place a workspace keeps skills in, as the contributions describe them. */
+  /** Every place an agent keeps skills in, as the contributions describe them. */
   places: readonly SkillPlaceView[]
-  /** Why this skill cannot be installed right now, ready to show. */
-  reason: string | null
-  onAdopt: () => void
-  onInstall: (dir: string) => void
-  onRemove: (dir: string) => void
+  /** Why a workspace place cannot be written, ready to show; `null` when one can. */
+  blocked: string | null
+  onAdopt: (ref: SkillPlaceRef) => void
+  onInstall: (ref: SkillPlaceRef) => void
+  onRemove: (ref: SkillPlaceRef) => void
 }) {
   const { t } = useI18n()
   const holds = holdsOf(skill)
@@ -1228,13 +1242,31 @@ function PlacesSection({
   const installed = holds.length + (own ? 1 : 0)
   /* The icon and the label are the contribution's, since only the extension
      that knows a place can draw it. */
-  const contributed = useContributions("skillLocation")
+  const contributed = useReadablePlaces()
   const icons = React.useMemo(
     () => new Map(contributed.map((place) => [place.id, place.icon])),
     [contributed]
   )
 
-  const row = "flex h-14 items-center gap-2.5 border-b border-border pb-0"
+  /* Each scope folds on its own: the machine-wide list grows with every agent a
+     person enables, while the workspace holds only the folders this hub knows. */
+  const [unfolded, setUnfolded] = React.useState<readonly SkillScope[]>([])
+  const fold = (scope: SkillScope) =>
+    setUnfolded((current) =>
+      current.includes(scope)
+        ? current.filter((one) => one !== scope)
+        : [...current, scope]
+    )
+
+  /* Rows are told apart by their marks and names; the one rule in this list
+     separates the two scopes. */
+  const row = "flex h-14 items-center gap-2.5"
+  /* The fold reads as the sidebar's own fold row: a 40px row with an 18px
+     chevron in the mark column and no plate, since it stands for the rows
+     under it rather than for a place. */
+  const foldRow =
+    "flex h-10 w-full items-center gap-2.5 rounded-md pr-3 pl-[5px] text-left text-sm font-medium text-copy outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+  const groupHead = "py-0.5 text-[11.5px] leading-[16px] font-semibold text-muted-soft"
   const plate =
     "flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-surface-raised ring-1 ring-border ring-inset"
   const label = "truncate text-[12.5px] leading-[15px] font-semibold"
@@ -1273,7 +1305,10 @@ function PlacesSection({
               type="button"
               variant="ghost"
               aria-label={`${t("skills.action.adopt")} ${skill.name}`}
-              onClick={onAdopt}
+              onClick={() => {
+                const hold = holds[0]
+                if (hold !== undefined) onAdopt({ scope: hold.scope, dir: hold.dir })
+              }}
               className={soft}
             >
               <PlusIcon className="size-[13px]" />
@@ -1281,44 +1316,90 @@ function PlacesSection({
             </Button>
           )}
         </li>
-        {places.map((place) => {
-          const held = holds.some((hold) => hold.id === place.id)
-          const Icon = icons.get(place.id) ?? LibraryIcon
-          const taken = !held && skill.takenAt?.includes(place.id) === true
+        {/* The two scopes answer different questions — a folder this hub was
+            pointed at, and a machine-wide directory of a chosen agent — so each
+            group is named, and a rule keeps them apart. */}
+        {SCOPES.map((scope) => {
+          const inScope = places.filter((place) => place.scope === scope)
+          if (inScope.length === 0) return null
+          const open = unfolded.includes(scope)
+          const rest = inScope.length - PLACES_VISIBLE
+          const group = open || rest <= 0 ? inScope : inScope.slice(0, PLACES_VISIBLE)
           return (
-            <li key={place.id} className={row}>
-              <span className={plate}>
-                <Icon className="size-[15px]" aria-hidden />
-              </span>
-              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className={label}>{t(place.labelKey)}</span>
-                <span className={where}>{place.view?.display ?? place.dir}</span>
-              </span>
-              {held ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  aria-label={`${t("skills.action.remove")} ${skill.name}`}
-                  onClick={() => onRemove(place.dir)}
-                  className={outlinePill}
-                >
-                  <MinusIcon className="size-[13px]" />
-                  {t("skills.action.remove")}
-                </Button>
-              ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  aria-label={`${t("skills.action.install")} ${skill.name}`}
-                  disabled={reason !== null || taken}
-                  title={taken ? t("skills.workspace.taken") : (reason ?? undefined)}
-                  onClick={() => onInstall(place.dir)}
-                  className={soft}
-                >
-                  <PlusIcon className="size-[13px]" />
-                  {t("skills.action.install")}
-                </Button>              )}
-            </li>
+            <Fragment key={scope}>
+              {scope === "global" ? (
+                <li aria-hidden className="h-px shrink-0 bg-border" />
+              ) : null}
+              <li className={groupHead}>{t(`skills.group.${scope}`)}</li>
+              {group.map((place) => {
+                const held = holds.some((hold) => hold.id === place.id)
+                const Icon = icons.get(place.id) ?? LibraryIcon
+                const taken = !held && skill.takenAt?.includes(place.id) === true
+                /* A workspace place has nothing to write into without a folder;
+                   a machine-wide one never needs one. */
+                const unavailable =
+                  held || place.scope !== "workspace" ? null : blocked
+                const why = taken ? t("skills.workspace.taken") : unavailable
+                return (
+                  <li key={place.id} className={row}>
+                    <span className={plate}>
+                      <Icon className="size-[15px]" aria-hidden />
+                    </span>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className={label}>{t(place.labelKey)}</span>
+                      <span className={where}>{placePath(place)}</span>
+                    </span>
+                    {held ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        aria-label={`${t("skills.action.remove")} ${skill.name}`}
+                        onClick={() => onRemove({ scope: place.scope, dir: place.dir })}
+                        className={outlinePill}
+                      >
+                        <MinusIcon className="size-[13px]" />
+                        {t("skills.action.remove")}
+                      </Button>
+                    ) : (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-label={`${t("skills.action.install")} ${skill.name}`}
+                        disabled={taken || unavailable !== null}
+                        title={why ?? undefined}
+                        onClick={() => onInstall({ scope: place.scope, dir: place.dir })}
+                        className={soft}
+                      >
+                        <PlusIcon className="size-[13px]" />
+                        {t("skills.action.install")}
+                      </Button>
+                    )}
+                  </li>
+                )
+              })}
+              {rest <= 0 ? null : (
+                <li>
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => fold(scope)}
+                    className={foldRow}
+                  >
+                    <span className="flex size-[18px] shrink-0 items-center justify-center">
+                      <ChevronDownIcon
+                        className={`size-[18px] shrink-0 transition-transform ${
+                          open ? "rotate-180" : ""
+                        }`}
+                        aria-hidden
+                      />
+                    </span>
+                    {open
+                      ? t("skills.place.collapse")
+                      : t("skills.place.expand").replace("{count}", String(rest))}
+                  </button>
+                </li>
+              )}
+            </Fragment>
           )
         })}
       </ul>
@@ -1328,7 +1409,7 @@ function PlacesSection({
 
 function InfoPanel({
   skill,
-  reason,
+  blocked,
   path,
   inPlace,
   places,
@@ -1342,22 +1423,22 @@ function InfoPanel({
   onTagsChange,
 }: {
   skill: Skill
-  /** Why this skill cannot be installed here, ready to show; `null` when it can. */
-  reason: string | null
+  /** Why a workspace place cannot be written, ready to show; `null` when one can. */
+  blocked: string | null
   /** The skill's directory, spelled as a person would write it. */
   path: string | null
   /** Whether the directory above is a place's rather than the library's. */
   inPlace: boolean
-  /** Every place a workspace keeps skills in, with what each holds. */
+  /** Every place an agent keeps skills in, with what each holds. */
   places: readonly SkillPlaceView[]
   /** `null` when this skill cannot be deleted from here. */
   onDelete: (() => Promise<void>) | null
-  /** Copy a skill this workspace wrote into the library. */
-  onAdopt: () => void
+  /** Copy a skill a place wrote into the library. */
+  onAdopt: (ref: SkillPlaceRef) => void
   /** Link this skill into a place that does not hold it yet. */
-  onInstallPlace: (dir: string) => void
+  onInstallPlace: (ref: SkillPlaceRef) => void
   /** Take back the link that put it there. */
-  onRemovePlace: (dir: string) => void
+  onRemovePlace: (ref: SkillPlaceRef) => void
   /** Measure this skill against the source it was installed from; `undefined`
       on a form with no library, where there is nothing to compare. */
   onCheckUpdate?: () => Promise<SkillUpdateCheck>
@@ -1407,7 +1488,7 @@ function InfoPanel({
           skill={skill}
           path={path}
           places={places}
-          reason={reason}
+          blocked={blocked}
           onAdopt={onAdopt}
           onInstall={onInstallPlace}
           onRemove={onRemovePlace}
@@ -1598,20 +1679,20 @@ function useSkillFiles(
   skill: Skill,
   store: SkillStore | null,
   detail: SkillDetail | null,
-  held: WorkspaceSkillDetail | null
+  held: PlaceSkillDetail | null
 ): SkillFiles {
   const attached = store !== null && (detail !== null || held !== null)
-  const dir = holdsOf(skill)[0]?.dir
+  const hold = holdsOf(skill)[0]
   const read = React.useCallback(
     (path: string): Promise<string> => {
       if (store === null) return Promise.reject(new Error("this form has no skill library"))
       /* A skill no library record holds is read where its place keeps it; the
          library's own files are also where a linked skill's files end up. */
-      return dir === undefined || inLibrary(skill)
+      return hold === undefined || inLibrary(skill)
         ? store.readFile(skill.id, path)
-        : store.workspaceFile(skill.id, path, dir)
+        : store.placeFile(skill.id, path, { scope: hold.scope, dir: hold.dir })
     },
-    [store, skill, dir]
+    [store, skill, hold]
   )
   return React.useMemo(() => {
     if (!attached) return NO_FILES
@@ -1627,7 +1708,7 @@ function LightboxBody({
   root,
   placePath,
   inPlace,
-  reason,
+  blocked,
   places,
   onInstallPlace,
   onRemovePlace,
@@ -1642,7 +1723,7 @@ function LightboxBody({
   /** The stored record, present when a library answered. */
   detail: SkillDetail | null
   /** The place's own record, present when the skill lives in one. */
-  held: WorkspaceSkillDetail | null
+  held: PlaceSkillDetail | null
   store: SkillStore | null
   /** The skills root as the library spells it, for the delete question. */
   root: string | null
@@ -1650,16 +1731,16 @@ function LightboxBody({
   placePath: string | null
   /** Whether the skill lives in a place rather than only in the library. */
   inPlace: boolean
-  /** Why this skill cannot be installed here, ready to show; `null` when it can. */
-  reason: string | null
-  /** Every place a workspace keeps skills in, with what each holds. */
+  /** Why a workspace place cannot be written, ready to show; `null` when one can. */
+  blocked: string | null
+  /** Every place an agent keeps skills in, with what each holds. */
   places: readonly SkillPlaceView[]
   /** Link this skill into a place that does not hold it yet. */
-  onInstallPlace: (dir: string) => void
+  onInstallPlace: (ref: SkillPlaceRef) => void
   /** Take back the link that put it there. */
-  onRemovePlace: (dir: string) => void
-  /** Copy a skill this workspace wrote into the library. */
-  onAdopt: () => void
+  onRemovePlace: (ref: SkillPlaceRef) => void
+  /** Copy a skill a place wrote into the library. */
+  onAdopt: (ref: SkillPlaceRef) => void
   onDelete: (() => Promise<void>) | null
   /** Measure this skill against the source it was installed from; `undefined`
       on a form with no library, where there is nothing to compare. */
@@ -1702,7 +1783,7 @@ function LightboxBody({
       <MediaPane doc={doc} source={media} />
       <InfoPanel
         skill={skill}
-        reason={reason}
+        blocked={blocked}
         path={path}
         inPlace={inPlace}
         places={places}
@@ -1737,12 +1818,12 @@ export function SkillDetailDialog({
   store,
   root,
   places,
-  reason,
+  blocked,
   onInstallPlace,
   onRemovePlace,
   onAdopt,
   onDelete,
-  onDeleteWorkspace,
+  onDeletePlace,
   onCheckUpdate,
   onUpdate,
   onTagsChange,
@@ -1756,18 +1837,18 @@ export function SkillDetailDialog({
   root: string | null
   /** The places in use, which carry each one's directory and display path. */
   places: readonly SkillPlaceView[]
-  /** Why this skill cannot be installed here, ready to show; `null` when it can. */
-  reason: string | null
+  /** Why a workspace place cannot be written, ready to show; `null` when one can. */
+  blocked: string | null
   /** Link this skill into a place that does not hold it yet. */
-  onInstallPlace: (skill: Skill, dir: string) => void
+  onInstallPlace: (skill: Skill, ref: SkillPlaceRef) => void
   /** Take back the link that put it there. */
-  onRemovePlace: (skill: Skill, dir: string) => void
+  onRemovePlace: (skill: Skill, ref: SkillPlaceRef) => void
   /** Copy a skill a place wrote into the library. */
-  onAdopt: (skill: Skill) => void
+  onAdopt: (skill: Skill, ref: SkillPlaceRef) => void
   /** Delete the skill and everything the hub stores for it. */
   onDelete: (skill: Skill) => Promise<void>
   /** Delete a skill's directory from the place holding it. */
-  onDeleteWorkspace: (skill: Skill, dir: string) => Promise<void>
+  onDeletePlace: (skill: Skill, ref: SkillPlaceRef) => Promise<void>
   /** Measure one skill against the source its files came from. */
   onCheckUpdate?: (skill: Skill) => Promise<SkillUpdateCheck>
   /** Install that source's current revision over this copy. */
@@ -1778,13 +1859,13 @@ export function SkillDetailDialog({
   onOpenChange: (open: boolean) => void
 }) {
   const [loaded, setLoaded] = React.useState<{ id: string; detail: SkillDetail } | null>(null)
-  const [held, setHeld] = React.useState<{ id: string; detail: WorkspaceSkillDetail } | null>(null)
+  const [held, setHeld] = React.useState<{ id: string; detail: PlaceSkillDetail } | null>(null)
   const id = skill?.id ?? null
   /* Where the row's files live, and whether the library holds it too. */
   const place = skill === null ? null : placeOf(skill, places)
   const inLib = skill !== null && inLibrary(skill)
   const placeOnly = skill !== null && !inLib && place !== null
-  const placeDir = place?.dir ?? null
+  const placeRef = place?.ref ?? null
 
   /* Load the stored record whenever the lightbox opens on a library skill, and
      again after a write moves its timestamp. A skill no library record holds
@@ -1811,11 +1892,11 @@ export function SkillDetailDialog({
   /* A skill no library record holds lives outside the library, so its own
      manifest and files are read from the place that keeps them. */
   React.useEffect(() => {
-    if (store === null || id === null || !placeOnly || placeDir === null) return
+    if (store === null || id === null || !placeOnly || placeRef === null) return
     let live = true
     void (async () => {
       try {
-        const found = await store.workspaceSkill(id, placeDir)
+        const found = await store.placeSkill(id, placeRef)
         if (live && found !== null) setHeld({ id, detail: found })
       } catch {
         /* An unreadable skill leaves the panel on the catalog row it came from. */
@@ -1824,7 +1905,7 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, id, placeOnly, placeDir])
+  }, [store, id, placeOnly, placeRef])
 
   const workspace = held !== null && held.id === id ? held.detail : null
 
@@ -1844,18 +1925,18 @@ export function SkillDetailDialog({
             root={root}
             placePath={place?.display ?? null}
             inPlace={placeOnly}
-            reason={reason}
+            blocked={blocked}
             places={places}
-            onInstallPlace={(dir) => onInstallPlace(skill, dir)}
-            onRemovePlace={(dir) => onRemovePlace(skill, dir)}
-            onAdopt={() => onAdopt(skill)}
+            onInstallPlace={(ref) => onInstallPlace(skill, ref)}
+            onRemovePlace={(ref) => onRemovePlace(skill, ref)}
+            onAdopt={(ref) => onAdopt(skill, ref)}
             /* Each side deletes what it owns: the library its record, the place
                its directory. */
             onDelete={
               store === null
                 ? null
-                : placeOnly && placeDir !== null
-                  ? () => onDeleteWorkspace(skill, placeDir)
+                : placeOnly && placeRef !== null
+                  ? () => onDeletePlace(skill, placeRef)
                   : () => onDelete(skill)
             }
             {...(onCheckUpdate === undefined || onUpdate === undefined

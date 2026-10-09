@@ -4,6 +4,7 @@
  * carry the same calls over their own channel, so nothing here assumes a
  * transport.
  */
+import type { SkillScope } from "@workspace/extensions"
 
 /** Where a skill came from: this machine, the hub build, or a registry. */
 export type SkillOrigin = "local" | "builtin" | "registry"
@@ -206,38 +207,49 @@ export interface ImportedSkill {
   files: ImportedFile[]
 }
 
-/** Where a skill in a workspace came from. */
-export type WorkspaceSkillOrigin =
+/** Where a skill in a place came from. */
+export type PlaceSkillOrigin =
   /** Installed from the library by this hub, as a link into it. */
   | "hub"
-  /** The project's own directory; the hub reads it and leaves it alone. */
+  /** Somebody else's directory; the hub reads it and leaves it alone. */
   | "own"
   /** A link into the library whose skill is gone; only cleanup can follow. */
   | "stale"
 
-/** One skill the current workspace holds, as `<workspace>/.agents/skills` has it. */
-export interface WorkspaceSkill {
-  /** Directory name under the workspace's skills root. */
+/** One skill a place holds, as its directory has it. */
+export interface PlaceSkill {
+  /** Directory name under the place's skills root. */
   id: string
   name: string
   description: string
-  origin: WorkspaceSkillOrigin
-  /** Where a link points, for a skill this workspace holds as one. */
+  origin: PlaceSkillOrigin
+  /** Where a link points, for a skill the place holds as one. */
   link?: string
 }
 
-/** The skills of one workspace, read without changing anything. */
-export interface WorkspaceSkillsView {
-  /** The workspace's own skills directory, absolute. */
+/**
+ * One place to read or write, as the caller knows it: the directory, and the
+ * root it sits under. Every call that touches a place names both, because the
+ * same directory name under two scopes is two different directories.
+ */
+export interface SkillPlaceRef {
+  scope: SkillScope
+  /** The place's directory inside that root, `/`-separated. */
+  dir: string
+}
+
+/** The skills of one place, read without changing anything. */
+export interface PlaceSkillsView {
+  /** The place's own skills directory, absolute. */
   root: string
   /** The same path as a person reads it. */
   display: string
-  skills: WorkspaceSkill[]
+  skills: PlaceSkill[]
 }
 
-/** One workspace skill with its files, read where it lives. */
-export interface WorkspaceSkillDetail {
-  /** Directory name under the workspace's skills root. */
+/** One place skill with its files, read where it lives. */
+export interface PlaceSkillDetail {
+  /** Directory name under the place's skills root. */
   id: string
   name: string
   description: string
@@ -246,8 +258,8 @@ export interface WorkspaceSkillDetail {
   files: SkillFileEntry[]
 }
 
-/** How an install landed: as a link, or as a copy the workspace now owns. */
-export type WorkspaceInstall = "link" | "copy"
+/** How an install landed: as a link, or as a copy the place now owns. */
+export type SkillInstall = "link" | "copy"
 
 /**
  * The skill library. Implementations own the files; callers never touch paths.
@@ -301,59 +313,64 @@ export interface SkillStore {
   /** The URL that shows one reference; a remote URL passes through unchanged. */
   assetUrl(ref: string): string
   /**
-   * The skills the current workspace holds in one place, or `null` when none is
-   * selected or the selected one has no folder path to read.
+   * The skills one place holds, or `null` when the place cannot be read: a
+   * workspace place when no workspace is selected, or when the selected one has
+   * no folder path.
    *
-   * @param dir — the place's directory inside the workspace; omitted reads the
-   *   one the skills CLI and this hub share.
+   * @param ref — the place to read.
    */
-  workspaceSkills(dir?: string): Promise<WorkspaceSkillsView | null>
+  placeSkills(ref: SkillPlaceRef): Promise<PlaceSkillsView | null>
   /**
-   * One skill in one place of the current workspace, read where it lives;
-   * `null` when the folder holds no such skill. Such a skill is not in the
-   * library, so this is the only way to show its own manifest and files.
+   * One skill in one place, read where it lives; `null` when the place holds no
+   * such skill. Such a skill is not in the library, so this is the only way to
+   * show its own manifest and files.
    *
    * @param id — the skill's directory name under that place.
-   * @param dir — the place's directory; omitted reads the shared one.
+   * @param ref — the place to read.
    */
-  workspaceSkill(id: string, dir?: string): Promise<WorkspaceSkillDetail | null>
+  placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillDetail | null>
   /**
-   * One text file of a skill in one place of the current workspace, read where
-   * it lives. A linked skill's files belong to the library, but they are read
-   * through this too: the path is the one the workspace sees.
+   * One text file of a skill in one place, read where it lives. A linked
+   * skill's files belong to the library, but they are read through this too:
+   * the path is the one the place sees.
    *
-   * @param dir — the place's directory; omitted reads the shared one.
+   * @param id — the skill's directory name under that place.
+   * @param path — the file's path inside the skill directory.
+   * @param ref — the place to read.
    */
-  workspaceFile(id: string, path: string, dir?: string): Promise<string>
+  placeFile(id: string, path: string, ref: SkillPlaceRef): Promise<string>
   /**
-   * Put one library skill into one place of the current workspace.
+   * Put one library skill into one place.
    *
-   * @param dir — the place's directory; omitted writes into the shared one.
+   * @param id — the skill's directory name in the library.
+   * @param ref — the place to write into.
    * @returns how it landed.
    */
-  installToWorkspace(id: string, dir?: string): Promise<WorkspaceInstall>
+  installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /**
-   * Link one skill of one place in the current workspace into the library; the
-   * workspace keeps its own directory.
+   * Link one skill of one place into the library; the place keeps its own
+   * directory.
    *
-   * @param dir — the place's directory; omitted reads the shared one.
+   * @param id — the skill's directory name under that place.
+   * @param ref — the place to read.
    * @returns how it landed: a link, or a copy where the filesystem cannot hold one.
    */
-  importFromWorkspace(id: string, dir?: string): Promise<WorkspaceInstall>
+  adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /**
-   * Delete one skill from one place of the current workspace folder, its
-   * directory included. This is the destructive one; `removeFromWorkspace` only
-   * takes back a link.
+   * Delete one skill from one place, its directory included. This is the
+   * destructive one; `removeFrom` only takes back a link.
    *
-   * @param dir — the place's directory; omitted deletes from the shared one.
+   * @param id — the skill's directory name under that place.
+   * @param ref — the place to delete from.
    */
-  deleteWorkspaceSkill(id: string, dir?: string): Promise<void>
+  deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void>
   /**
-   * Take one library-installed skill out of one place of the current workspace.
+   * Take one library-installed skill out of one place.
    *
-   * @param dir — the place's directory; omitted reads the shared one.
+   * @param id — the skill's directory name under that place.
+   * @param ref — the place to remove from.
    */
-  removeFromWorkspace(id: string, dir?: string): Promise<void>
+  removeFrom(id: string, ref: SkillPlaceRef): Promise<void>
   /**
    * Measure one skill against the upstream it was installed from. Reads the
    * source over the network, so it is asked for, never automatic. The answer

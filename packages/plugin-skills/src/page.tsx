@@ -2,10 +2,13 @@ import {
   CheckIcon,
   CompassIcon,
   ChevronDownIcon,
+  ContainerIcon,
   DownloadIcon,
   FileTextIcon,
   FolderOpenIcon,
   FolderPlusIcon,
+  GlobeIcon,
+  LayersIcon,
   LayoutGridIcon,
   LibraryIcon,
   ListIcon,
@@ -24,16 +27,16 @@ import * as React from "react"
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
-import { holdsOf, inLibrary, skillKey, tokenLabel, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, placePath, skillKey, tokenLabel, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { tagTone } from "./tags.ts"
-import type { SkillStore } from "./store.ts"
-import type { Skill, SkillPlace } from "./types.ts"
+import type { SkillPlaceRef, SkillStore } from "./store.ts"
+import type { Skill } from "./types.ts"
 
 import { useContributions, useI18n } from "@workspace/extensions/react"
-import type { ExtensionIcon } from "@workspace/extensions"
+import type { ExtensionIcon, SkillScope } from "@workspace/extensions"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -44,6 +47,7 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 import {
@@ -65,23 +69,373 @@ import {
 const cardSurface =
   "[--card-spacing:1.5rem] rounded-xl ring-1 ring-border"
 
-/* The tab row carries one dimension: where a skill is, not where it came from.
-   The shell owns the first two; every place a workspace keeps skills in — the
-   directory the skills CLI shares, and each agent integration's own — is a tab
-   contributed by the extension that knows it, icon and all. */
+/* The tab row carries one dimension: where a skill's files are. Two entries are
+   the shell's own — everything, and the hub's library — and two group the places
+   by scope: the ones in the workspace in use, and the machine-wide ones of the
+   agents chosen in the sidebar. A scope can hold several places, so it says
+   which with an icon stack rather than a count: the count is what the stack
+   answers, and printing both would say it twice. */
 const SHELL_TABS: { value: SkillTab; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "skills.tab.all", icon: LayoutGridIcon },
   { value: "library", labelKey: "skills.tab.library", icon: LibraryIcon },
+  /* Not a folder: the stack beside this label already draws the places' own
+     marks, and the workspace place among them IS a folder. */
+  { value: "workspace", labelKey: "skills.tab.workspace", icon: ContainerIcon },
+  { value: "global", labelKey: "skills.tab.global", icon: GlobeIcon },
 ]
 
 /** Which rows a tab shows. */
-type SkillTab = "all" | "library" | SkillPlace
+type SkillTab = "all" | "library" | SkillScope
 
-/** Which rows one tab holds, before the category filter. */
-function rowsForTab(rows: Skill[], value: SkillTab): Skill[] {
+/** Which rows one tab holds, before the category filter. A place narrows a
+    scope to that one place; the shell's own two tabs have no places to narrow. */
+function rowsForTab(rows: Skill[], value: SkillTab, place: string | null): Skill[] {
   if (value === "all") return rows
   if (value === "library") return rows.filter(inLibrary)
-  return rows.filter((row) => holdsOf(row).some((hold) => hold.id === value))
+  return rows.filter((row) =>
+    holdsOf(row).some(
+      (hold) => hold.scope === value && (place === null || hold.id === place)
+    )
+  )
+}
+
+/** The 20px tile and the 13px step the tab row's icon stacks are drawn at. */
+const STACK_TILE = 20
+const STACK_STEP = 13
+
+/** Past this many places a stack keeps the first few and counts the rest. */
+const STACK_MAX = 5
+
+/** The two scopes, in the order a list of places reads them. */
+const SCOPES: readonly SkillScope[] = ["workspace", "global"]
+
+/**
+ * Past this many places a scope's menu searches its own list and caps its
+ * height. How many agents a person enables is their own business, so the menu
+ * has to stay usable at any number of them.
+ */
+const PLACE_SEARCH_MIN = 8
+
+/** One place a scope tab stands for, as its stack and its menu name it. */
+interface StackPlace {
+  id: string
+  icon: ExtensionIcon
+  /** The place's name, resolved in the active locale. */
+  label: string
+  /** The directory as a person reads it. */
+  where: string
+  /** How many skills the place holds; `null` when it could not be read. */
+  count: number | null
+}
+
+/**
+ * The places of one scope, as its tab shows them: a 20px mark each — the mark
+ * itself, not a glyph inside a box — stepping 13px so every one overlaps the one
+ * before it, with a 2px seam in the colour behind the stack drawn inside the
+ * tile the mark has to give up. The number of agents follows from the
+ * integrations a person enabled, so a scope can hold more than fits; past
+ * {@link STACK_MAX} the last tile carries the count.
+ */
+function PlaceStack({
+  places,
+  active,
+}: {
+  places: readonly StackPlace[]
+  /** Whether the tab this stack belongs to is the one on screen. */
+  active: boolean
+}) {
+  const shown = places.slice(0, STACK_MAX)
+  const more = places.length - shown.length
+  const slots = more === 0 ? shown.length : STACK_MAX + 1
+  const tile = "absolute top-0 flex items-center justify-center overflow-hidden rounded-[6px]"
+  const seam = `pointer-events-none absolute inset-0 rounded-[6px] ring-2 ring-inset ${
+    active ? "ring-foreground dark:ring-accent" : "ring-secondary"
+  }`
+  const at = (index: number) => ({ left: STACK_STEP * index, width: STACK_TILE, height: STACK_TILE })
+
+  return (
+    <span
+      className="relative shrink-0"
+      style={{ width: STACK_STEP * (slots - 1) + STACK_TILE, height: STACK_TILE }}
+    >
+      {shown.map((place, index) => {
+        const Mark = place.icon
+        return (
+          <span key={place.id} className={tile} style={at(index)}>
+            <Mark className="size-5" aria-hidden />
+            <span className={seam} aria-hidden />
+          </span>
+        )
+      })}
+      {more === 0 ? null : (
+        <span key="more" className={`${tile} bg-current/15`} style={at(STACK_MAX)}>
+          <span className="font-mono text-[10px] leading-none">{`+${more}`}</span>
+          <span className={seam} aria-hidden />
+        </span>
+      )}
+    </span>
+  )
+}
+
+/** One place as a menu offers it. */
+interface PlaceChoice {
+  id: string
+  icon: ExtensionIcon
+  label: string
+  where: string
+  /** Taken already, so the row shows its check. */
+  checked?: boolean
+  /** Why the row cannot be taken right now; nothing when it can. */
+  blocked?: string | null
+  /** How many skills the place holds; omitted where the menu does not count. */
+  count?: number | null
+}
+
+/**
+ * The places a menu lists, as its whole content: a header naming what the list
+ * is for, a search field once the list is longer than a glance, and one row per
+ * place. Three menus ask the same question — which place — so they all show the
+ * same answer: the scope tab's own list, a row's install menu, and the batch
+ * bar's.
+ */
+function PlaceMenu({
+  title,
+  groups,
+  leading,
+  closeOnClick = true,
+  onPick,
+}: {
+  /** What the list is for, e.g. "Install into". */
+  title: string
+  groups: readonly { label: string; choices: readonly PlaceChoice[] }[]
+  /** A row above the groups that names the whole list rather than one place. */
+  leading?: { choice: PlaceChoice; onPick: () => void }
+  /** Whether taking a place dismisses the menu. */
+  closeOnClick?: boolean
+  onPick: (id: string) => void
+}) {
+  const { t } = useI18n()
+  const [query, setQuery] = React.useState("")
+  const all = groups.flatMap((group) => group.choices)
+  const searchable = all.length >= PLACE_SEARCH_MIN
+  const needle = query.trim().toLowerCase()
+  const showing = groups
+    .map((group) => ({
+      label: group.label,
+      choices:
+        needle === ""
+          ? group.choices
+          : group.choices.filter(
+              (choice) =>
+                choice.label.toLowerCase().includes(needle) ||
+                choice.where.toLowerCase().includes(needle)
+            ),
+    }))
+    .filter((group) => group.choices.length > 0)
+  const found = showing.reduce((sum, group) => sum + group.choices.length, 0)
+
+  const row = "items-start gap-2.5 py-2"
+  const plate =
+    "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary ring-1 ring-border ring-inset"
+  const name = "text-[13.5px] leading-[18px] font-semibold"
+  const whereClass = "truncate font-mono text-[12px] leading-[16px] text-muted-foreground"
+  const tally = "mt-0.5 shrink-0 font-mono text-[12.5px] text-muted-foreground"
+
+  const renderRow = (choice: PlaceChoice, pick: () => void) => {
+    const Mark = choice.icon
+    const blocked = choice.blocked ?? null
+    return (
+      <DropdownMenuItem
+        key={choice.id}
+        /* Taking one place should not dismiss the menu: an install can go to
+           several, and the row just taken shows its check in place. */
+        closeOnClick={closeOnClick}
+        disabled={blocked !== null}
+        title={blocked ?? undefined}
+        onClick={pick}
+        className={row}
+      >
+        <span className={plate}>
+          <Mark className="size-3.5" aria-hidden />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col text-left">
+          <span className={name}>{choice.label}</span>
+          <span className={whereClass}>{choice.where}</span>
+        </span>
+        {choice.count === undefined ? null : (
+          <span className={tally}>{choice.count ?? "—"}</span>
+        )}
+        {choice.checked === true ? <CheckIcon className="mt-1 size-4 shrink-0" /> : null}
+      </DropdownMenuItem>
+    )
+  }
+
+  return (
+    <DropdownMenuContent
+      align="start"
+      sideOffset={6}
+      /* A searchable menu scrolls its own list, under a field that stays put,
+         so the popup itself must not be the scroller. */
+      className={`w-[280px] ${searchable ? "overflow-hidden p-0" : ""}`}
+    >
+      {searchable ? (
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3">
+          <SearchIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+          <input
+            value={query}
+            aria-label={t("skills.place.search")}
+            placeholder={t("skills.place.search")}
+            onChange={(event) => setQuery(event.target.value)}
+            /* A menu keeps focus on its own items, which would send typing to
+               its typeahead instead of here; the field takes focus itself. */
+            onMouseDown={(event) => {
+              event.stopPropagation()
+              event.currentTarget.focus()
+            }}
+            onClick={(event) => event.stopPropagation()}
+            /* Typing belongs to this field once it has focus: the menu reads
+               the same keys for its own navigation. */
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && query !== "") {
+                event.preventDefault()
+                event.stopPropagation()
+                setQuery("")
+                return
+              }
+              if (event.key !== "Escape") event.stopPropagation()
+            }}
+            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70"
+          />
+          {query === "" ? null : (
+            <button
+              type="button"
+              aria-label={t("skills.place.searchClear")}
+              onClick={() => setQuery("")}
+              className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <XIcon className="size-3" />
+            </button>
+          )}
+        </div>
+      ) : null}
+      <div className={searchable ? "max-h-[400px] overflow-y-auto p-1" : "p-1"}>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex items-center justify-between gap-2">
+            <span>{title}</span>
+            <span className="font-mono text-[11px] font-normal">
+              {t("skills.location.count").replace("{count}", String(all.length))}
+            </span>
+          </DropdownMenuLabel>
+          {/* A row that names the whole list is the answer to no query, so a
+             search sets it aside. */}
+          {leading !== undefined && needle === ""
+            ? renderRow(leading.choice, leading.onPick)
+            : null}
+          {showing.map((group, index) => (
+            <React.Fragment key={group.label}>
+              {/* Two groups are two different answers — a folder the hub was
+                  pointed at, and a machine-wide directory of a chosen agent —
+                  so a rule keeps them apart. The first needs none. */}
+              {index === 0 ? null : <DropdownMenuSeparator />}
+              <DropdownMenuLabel className="text-[11.5px] font-semibold text-muted-soft">
+                {group.label}
+              </DropdownMenuLabel>
+              {group.choices.map((choice) => renderRow(choice, () => onPick(choice.id)))}
+            </React.Fragment>
+          ))}
+        </DropdownMenuGroup>
+        {found === 0 ? (
+          <p className="px-2 py-3 text-center text-[12.5px] text-muted-foreground">
+            {t("skills.place.searchEmpty")}
+          </p>
+        ) : null}
+      </div>
+    </DropdownMenuContent>
+  )
+}
+
+/**
+ * One scope, as the tab row offers it: one pill holding the scope's name and the
+ * marks of the places it stands for, which is the whole control. Pressing it
+ * opens the list of places; choosing one is what opens the scope, so a person
+ * never lands on a scope without having said which place they meant.
+ */
+function PlacePicker({
+  scopeIcon: ScopeIcon,
+  scopeLabel,
+  places,
+  chosen,
+  active,
+  onChoose,
+}: {
+  scopeIcon: ExtensionIcon
+  /** The scope's own name, which the menu's first row takes whole. */
+  scopeLabel: string
+  places: readonly StackPlace[]
+  /** The place the scope is narrowed to; `null` when it is whole. */
+  chosen: string | null
+  /** Whether this scope is the one on screen. */
+  active: boolean
+  onChoose: (id: string | null) => void
+}) {
+  const { t } = useI18n()
+  /* Narrowed to one place, the marks are that one place's. */
+  const marks = chosen === null ? places : places.filter((place) => place.id === chosen)
+  const total = places.reduce((sum, place) => sum + (place.count ?? 0), 0)
+  const pill = `flex h-9 flex-none shrink-0 items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+    active
+      ? "bg-foreground text-background dark:bg-accent dark:text-foreground"
+      : "text-muted-foreground hover:text-foreground"
+  }`
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <button
+            type="button"
+            aria-label={`${scopeLabel} · ${places.map((place) => place.label).join(", ")}`}
+            /* The pill is the scope's own control rather than a tab, so being
+               the scope on screen is a current state, not a tab selection. */
+            aria-current={active ? "true" : undefined}
+            className={pill}
+          >
+            <ScopeIcon className="size-3.5 shrink-0" aria-hidden />
+            {scopeLabel}
+            <PlaceStack places={marks} active={active} />
+          </button>
+        }
+      />
+      <PlaceMenu
+        title={t("skills.place.which")}
+        groups={[
+          {
+            label: scopeLabel,
+            choices: places.map((place) => ({
+              id: place.id,
+              icon: place.icon,
+              label: place.label,
+              where: place.where,
+              count: place.count,
+              checked: place.id === chosen,
+            })),
+          },
+        ]}
+        leading={{
+          choice: {
+            id: "",
+            icon: LayersIcon,
+            label: t("skills.place.all"),
+            where: scopeLabel,
+            count: total,
+            checked: chosen === null,
+          },
+          onPick: () => onChoose(null),
+        }}
+        onPick={(id) => onChoose(id)}
+      />
+    </DropdownMenu>
+  )
 }
 
 /**
@@ -157,21 +511,20 @@ function SkillActionButton({
   onRemove,
 }: {
   skill: Skill
-  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  /** Why a workspace place cannot be written, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (dir: string) => void
-  onAdopt: () => void
-  onRemove: (dir: string) => void
+  onInstall: (ref: SkillPlaceRef) => void
+  onAdopt: (ref: SkillPlaceRef) => void
+  onRemove: (ref: SkillPlaceRef) => void
 }) {
   const { t } = useI18n()
-  /* The places are contributions, so this row offers them itself rather than
-     having every list thread them down to it. */
-  const contributed = useContributions("skillLocation")
-  const places = React.useMemo(
-    () => [...contributed].sort((left, right) => left.order - right.order),
-    [contributed]
-  )
+  /* The places this build reads, which the row offers itself rather than having
+     every list thread them down to it. */
+  const places = useReadablePlaces()
   const holds = holdsOf(skill)
+  /* A machine-wide place needs no workspace, so only the workspace ones depend
+     on there being a folder to write into. */
+  const writable = places.filter((place) => place.scope !== "workspace" || blocked === null)
   /* One size for every row action: the design's 32px pill. */
   const shell =
     "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -188,7 +541,8 @@ function SkillActionButton({
         aria-label={`${t("skills.action.cleanup")} ${skill.name}`}
         onClick={(event) => {
           event.stopPropagation()
-          onRemove(holds[0]?.dir ?? "")
+          const hold = holds[0]
+          if (hold !== undefined) onRemove({ scope: hold.scope, dir: hold.dir })
         }}
         className={outline}
       >
@@ -208,7 +562,8 @@ function SkillActionButton({
         aria-label={`${t("skills.action.adopt")} ${skill.name}`}
         onClick={(event) => {
           event.stopPropagation()
-          onAdopt()
+          const hold = holds[0]
+          if (hold !== undefined) onAdopt({ scope: hold.scope, dir: hold.dir })
         }}
         className={fill}
       >
@@ -225,8 +580,8 @@ function SkillActionButton({
           <Button
             type="button"
             variant="outline"
-            disabled={blocked !== null || places.length === 0}
-            title={blocked ?? undefined}
+            disabled={writable.length === 0}
+            title={writable.length === 0 ? (blocked ?? undefined) : undefined}
             /* The word does not change with the row's state: installing into a
                second place is still installing, and the menu says which places
                are taken. */
@@ -240,46 +595,35 @@ function SkillActionButton({
           </Button>
         }
       />
-      <DropdownMenuContent
-        align="end"
-        sideOffset={6}
-        className="w-[240px]"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <DropdownMenuGroup>
-          <DropdownMenuLabel>{t("skills.action.installInto")}</DropdownMenuLabel>
-          {places.map((place) => {
-            const checked = holds.some((hold) => hold.id === place.id)
-            const Icon = place.icon
-            return (
-              <DropdownMenuItem
-                key={place.id}
-                /* Installing into one place should not dismiss the menu: a card
-                   can go to several, and the row that was just taken shows its
-                   check in place. */
-                closeOnClick={false}
-                /* A place holding its own skill of this name cannot take a second. */
-                disabled={!checked && skill.takenAt?.includes(place.id) === true}
-                onClick={() => (checked ? onRemove(place.dir) : onInstall(place.dir))}
-                className="items-start gap-2.5 py-2"
-              >
-                <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary ring-1 ring-border ring-inset">
-                  <Icon className="size-3.5" />
-                </span>
-                <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="text-[13.5px] leading-[18px] font-semibold">
-                    {t(place.labelKey)}
-                  </span>
-                  <span className="truncate font-mono text-[12px] leading-[16px] text-muted-foreground">
-                    {place.dir}
-                  </span>
-                </span>
-                {checked ? <CheckIcon className="mt-1 size-4 shrink-0" /> : null}
-              </DropdownMenuItem>
-            )
-          })}
-        </DropdownMenuGroup>
-      </DropdownMenuContent>
+      <PlaceMenu
+        title={t("skills.action.installInto")}
+        closeOnClick={false}
+        groups={SCOPES.map((scope) => ({
+          label: t(`skills.group.${scope}`),
+          choices: writable
+            .filter((place) => place.scope === scope)
+            .map((place) => ({
+              id: place.id,
+              icon: place.icon,
+              label: t(place.labelKey),
+              where: placePath(place),
+              checked: holds.some((hold) => hold.id === place.id),
+              blocked:
+                (place.scope === "workspace" ? blocked : null) ??
+                (!holds.some((hold) => hold.id === place.id) &&
+                skill.takenAt?.includes(place.id) === true
+                  ? t("skills.workspace.taken")
+                  : null),
+            })),
+        })).filter((group) => group.choices.length > 0)}
+        onPick={(id) => {
+          const place = writable.find((entry) => entry.id === id)
+          if (place === undefined) return
+          const ref = { scope: place.scope, dir: place.dir }
+          if (holds.some((hold) => hold.id === place.id)) onRemove(ref)
+          else onInstall(ref)
+        }}
+      />
     </DropdownMenu>
   )
 }
@@ -411,9 +755,9 @@ function SkillCard({
   store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (dir: string) => void
-  onAdopt: () => void
-  onRemove: (dir: string) => void
+  onInstall: (ref: SkillPlaceRef) => void
+  onAdopt: (ref: SkillPlaceRef) => void
+  onRemove: (ref: SkillPlaceRef) => void
   onOpen: () => void
 }) {
   const shownTags = skill.tags.slice(0, 2)
@@ -597,9 +941,9 @@ function SkillGrid({
   store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (skill: Skill, dir: string) => void
-  onAdopt: (skill: Skill) => void
-  onRemove: (skill: Skill, dir: string) => void
+  onInstall: (skill: Skill, ref: SkillPlaceRef) => void
+  onAdopt: (skill: Skill, ref: SkillPlaceRef) => void
+  onRemove: (skill: Skill, ref: SkillPlaceRef) => void
   onOpen: (skill: Skill) => void
 }) {
   /*
@@ -617,9 +961,9 @@ function SkillGrid({
             skill={skill}
             store={store}
             blocked={blocked}
-            onInstall={(dir) => onInstall(skill, dir)}
-            onAdopt={() => onAdopt(skill)}
-            onRemove={(dir) => onRemove(skill, dir)}
+            onInstall={(ref) => onInstall(skill, ref)}
+            onAdopt={(ref) => onAdopt(skill, ref)}
+            onRemove={(ref) => onRemove(skill, ref)}
             onOpen={() => onOpen(skill)}
           />
         ))}
@@ -689,17 +1033,16 @@ function BulkBar({
   onClear,
 }: {
   count: number
-  /** Why no folder can be installed into, ready to show; `null` when one can. */
+  /** Why a workspace place cannot be written, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (dir: string) => void
+  onInstall: (ref: SkillPlaceRef) => void
   onClear: () => void
 }) {
   const { t } = useI18n()
-  const contributed = useContributions("skillLocation")
-  const places = React.useMemo(
-    () => [...contributed].sort((left, right) => left.order - right.order),
-    [contributed]
-  )
+  const places = useReadablePlaces()
+  /* A machine-wide place needs no workspace, so only the workspace ones depend
+     on there being a folder to write into. */
+  const writable = places.filter((place) => place.scope !== "workspace" || blocked === null)
 
   return (
     <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface-raised px-5">
@@ -720,8 +1063,8 @@ function BulkBar({
           render={
             <Button
               type="button"
-              disabled={count === 0 || blocked !== null || places.length === 0}
-              title={blocked ?? undefined}
+              disabled={count === 0 || writable.length === 0}
+              title={writable.length === 0 ? (blocked ?? undefined) : undefined}
               className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
             >
               {t("skills.action.installInto")}
@@ -729,32 +1072,25 @@ function BulkBar({
             </Button>
           }
         />
-        <DropdownMenuContent align="end" sideOffset={6} className="w-[240px]">
-          <DropdownMenuGroup>
-            {places.map((place) => {
-              const Icon = place.icon
-              return (
-                <DropdownMenuItem
-                  key={place.id}
-                  onClick={() => onInstall(place.dir)}
-                  className="items-start gap-2.5 py-2"
-                >
-                  <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary ring-1 ring-border ring-inset">
-                    <Icon className="size-3.5" />
-                  </span>
-                  <span className="flex min-w-0 flex-1 flex-col">
-                    <span className="text-[13.5px] leading-[18px] font-semibold">
-                      {t(place.labelKey)}
-                    </span>
-                    <span className="truncate font-mono text-[12px] leading-[16px] text-muted-foreground">
-                      {place.dir}
-                    </span>
-                  </span>
-                </DropdownMenuItem>
-              )
-            })}
-          </DropdownMenuGroup>
-        </DropdownMenuContent>
+        <PlaceMenu
+          title={t("skills.action.installInto")}
+          groups={SCOPES.map((scope) => ({
+            label: t(`skills.group.${scope}`),
+            choices: writable
+              .filter((place) => place.scope === scope)
+              .map((place) => ({
+                id: place.id,
+                icon: place.icon,
+                label: t(place.labelKey),
+                where: placePath(place),
+                blocked: place.scope === "workspace" ? blocked : null,
+              })),
+          })).filter((group) => group.choices.length > 0)}
+          onPick={(id) => {
+            const place = writable.find((entry) => entry.id === id)
+            if (place !== undefined) onInstall({ scope: place.scope, dir: place.dir })
+          }}
+        />
       </DropdownMenu>
     </div>
   )
@@ -779,9 +1115,9 @@ function SkillTable({
   onCheck: (keys: string[]) => void
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (skill: Skill, dir: string) => void
-  onAdopt: (skill: Skill) => void
-  onRemove: (skill: Skill, dir: string) => void
+  onInstall: (skill: Skill, ref: SkillPlaceRef) => void
+  onAdopt: (skill: Skill, ref: SkillPlaceRef) => void
+  onRemove: (skill: Skill, ref: SkillPlaceRef) => void
   onOpen: (skill: Skill) => void
 }) {
   const { t } = useI18n()
@@ -800,9 +1136,9 @@ function SkillTable({
       <BulkBar
         count={checked.length}
         blocked={blocked}
-        onInstall={(dir) => {
+        onInstall={(ref) => {
           for (const skill of skills) {
-            if (checked.includes(skillKey(skill))) onInstall(skill, dir)
+            if (checked.includes(skillKey(skill))) onInstall(skill, ref)
           }
           onCheck([])
         }}
@@ -897,9 +1233,9 @@ function SkillTable({
                 <SkillActionButton
                   skill={skill}
                   blocked={blocked}
-                  onInstall={(dir) => onInstall(skill, dir)}
-                  onAdopt={() => onAdopt(skill)}
-                  onRemove={(dir) => onRemove(skill, dir)}
+                  onInstall={(ref) => onInstall(skill, ref)}
+                  onAdopt={(ref) => onAdopt(skill, ref)}
+                  onRemove={(ref) => onRemove(skill, ref)}
                 />
               </TableCell>
             </TableRow>
@@ -1086,12 +1422,10 @@ function ViewButton({
 
 export function SkillsPage() {
   const { t } = useI18n()
-  /* A tab a person chose, remembered with the agent that was in use when they
-     chose it: switching agents in the sidebar means "work on this one", so the
-     page opens on that agent's place until the next manual switch. */
-  const [picked, setPicked] = React.useState<{ tab: SkillTab; agent: string | null } | null>(
-    null
-  )
+  const [tab, setTab] = React.useState<SkillTab>("all")
+  /* One place inside the current scope, once a person picked one from the tab's
+     menu; `null` leaves the scope whole. */
+  const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
@@ -1112,42 +1446,41 @@ export function SkillsPage() {
   /* The open lightbox is a row key, because the same id can be two rows. */
   const [detailKey, setDetailKey] = React.useState<string | null>(null)
 
-  /* The places a workspace keeps skills in arrive as contributions, so one
-     agent integration adds its own tab and install target without this page
-     knowing it by name. */
-  const locationContributions = useContributions("skillLocation")
-  const places = React.useMemo(
-    () => [...locationContributions].sort((left, right) => left.order - right.order),
-    [locationContributions]
-  )
+  /* The places this build reads: every workspace one an enabled integration
+     contributes, and the machine-wide ones of the agents the sidebar chose. */
+  const places = useReadablePlaces()
   const placeSpecs = React.useMemo(
-    () => places.map((place) => ({ id: place.id, labelKey: place.labelKey, dir: place.dir })),
+    () =>
+      places.map((place) => ({
+        id: place.id,
+        labelKey: place.labelKey,
+        scope: place.scope,
+        dir: place.dir,
+      })),
     [places]
   )
 
   const library = useSkillLibrary(placeSpecs, needle)
-  /* The chosen agent is an integration, and what it names is a place; only a
-     place this build knows is something to open on. */
-  const target = useContributions("target").find((entry) => entry.id === library.agent)
-  const agentPlace =
-    target?.skillLocation !== undefined &&
-    places.some((place) => place.id === target.skillLocation)
-      ? target.skillLocation
-      : null
   /* A registry plugin answers the search; with none the dialog says so. */
   const registries = useContributions("skillRegistry")
   const registry = registries[0] ?? null
-  const tabs = React.useMemo(
-    () => [
-      ...SHELL_TABS,
-      ...places.map((place) => ({
-        value: place.id,
-        labelKey: place.labelKey,
+  /* Each scope tab names the places it holds by their marks, so the number of
+     them is a count of places rather than of skills; the same list, with what
+     each place holds, is what hovering the stack shows. */
+  const scopePlaces = React.useMemo(() => {
+    const byScope: Record<SkillScope, StackPlace[]> = { workspace: [], global: [] }
+    for (const place of places) {
+      const view = library.places.find((held) => held.id === place.id)?.view ?? null
+      byScope[place.scope].push({
+        id: place.id,
         icon: place.icon,
-      })),
-    ],
-    [places]
-  )
+        label: t(place.labelKey),
+        where: placePath(place),
+        count: view === null ? null : view.skills.length,
+      })
+    }
+    return byScope
+  }, [places, library.places, t])
 
   /* The page filters and pages what the hook hands it: rows come from the
      library and the places both, and only the library has a server page. */
@@ -1159,42 +1492,85 @@ export function SkillsPage() {
     return rows.filter((row) => matchesQuery(row, text))
   }, [rows, needle])
 
-  /* An agent's place is the page's landing screen while it holds something;
-     opening on one that holds nothing shows an empty screen and hides every
-     skill behind a tab, which is what a fresh load must not do. The query and
-     the category do not move the landing screen, so typing cannot land the
-     page on a different tab mid-word. */
-  const landing: SkillTab =
-    agentPlace !== null && rowsForTab(rows, agentPlace).length > 0 ? agentPlace : "all"
-  const tab: SkillTab =
-    picked !== null && picked.agent === library.agent ? picked.tab : landing
-  const setTab = (value: SkillTab) => setPicked({ tab: value, agent: library.agent })
-
-  const currentPlace = library.places.find((place) => place.id === tab) ?? null
-  /* With no folder to install into, the action says why it is unavailable. */
+  /* With no folder to install into, the action says why it is unavailable. A
+     machine-wide place needs no workspace, so only the workspace ones have
+     nothing to write into without one. */
   const blocked =
-    library.workspaceId === null
+    library.workspaceId === null && places.some((place) => place.scope === "workspace")
       ? t("skills.workspace.none")
-      : tab !== "all" && tab !== "library" && currentPlace?.view === null
-        ? t("skills.workspace.noPath")
-        : null
+      : null
 
   const onTag = React.useMemo(
     () => (tag === "All tags" ? offered : offered.filter((row) => row.tags.includes(tag))),
     [offered, tag]
   )
 
-  /* Counts describe what the query and the category left behind, so a tab that
-     holds nothing says so before it is opened. */
+  /* A number belongs to the tabs that hold skills; a scope tab shows which
+     places it spans instead, so its size is not printed twice. */
   const counts = React.useMemo(
-    () =>
-      Object.fromEntries(
-        tabs.map((item) => [item.value, rowsForTab(onTag, item.value).length])
-      ),
-    [tabs, onTag]
+    () => ({
+      all: rowsForTab(onTag, "all", null).length,
+      library: rowsForTab(onTag, "library", null).length,
+    }),
+    [onTag]
   )
 
-  const matching = React.useMemo(() => rowsForTab(onTag, tab), [onTag, tab])
+  /* A choice from the tab's menu only means something while the scope it belongs
+     to is the one on screen; anywhere else the scope is whole. */
+  const chosen =
+    narrowed !== null && places.some((place) => place.scope === tab && place.id === narrowed)
+      ? narrowed
+      : null
+  const matching = React.useMemo(
+    () => rowsForTab(onTag, tab, chosen),
+    [onTag, tab, chosen]
+  )
+
+  /* A scope tab holds nothing for one of four reasons, and each needs its own
+     words: a workspace the hub cannot read, one holding no skills, a
+     machine-wide scope with no agent chosen, or one whose agents hold nothing. */
+  const scopeEmpty = ((): { icon: LucideIcon; title: string; hint: string; note: string | null } | null => {
+    if (tab === "all" || tab === "library") return null
+    const held = library.places.filter((place) => place.scope === tab)
+    /* Narrowed to one place, only that place's own directory answers. */
+    if (chosen !== null) {
+      const only = scopePlaces[tab].find((place) => place.id === chosen)
+      return {
+        icon: tab === "workspace" ? FolderOpenIcon : GlobeIcon,
+        title: t("skills.place.empty"),
+        hint: t("skills.place.emptyHint"),
+        note: only?.where ?? null,
+      }
+    }
+    const readable = held.some((place) => place.view !== null)
+    const note = held.map(placePath).join(" · ") || null
+    if (tab === "global") {
+      return held.length === 0
+        ? { icon: GlobeIcon, title: t("skills.global.unread"), hint: t("skills.global.unreadHint"), note }
+        : { icon: GlobeIcon, title: t("skills.global.empty"), hint: t("skills.global.emptyHint"), note }
+    }
+    if (library.workspaceId === null) {
+      return {
+        icon: FolderOpenIcon,
+        title: t("skills.workspace.none"),
+        hint: t("skills.workspace.noneHint"),
+        note,
+      }
+    }
+    return readable
+      ? {
+          icon: FolderOpenIcon,
+          title: t("skills.workspace.empty"),
+          hint: t("skills.workspace.emptyHint"),
+          note,
+        }
+      : {
+          icon: FolderOpenIcon,
+          title: t("skills.workspace.noPath"),
+          hint: t("skills.workspace.noPathHint"),
+          note,
+        }
+  })()
 
   /* A filter, an agent switch, or a shorter list can leave the page past the
      end; the page shown is clamped rather than an empty stretch of rows. */
@@ -1217,9 +1593,9 @@ export function SkillsPage() {
   /** Why an action did not go through, ready to show. */
   const reasonOf = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure))
 
-  const install = async (skill: Skill, dir?: string) => {
+  const install = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
-      await library.install(skill.id, dir)
+      await library.install(skill.id, ref)
       setRefusal(null)
     } catch (failure) {
       setRefusal(reasonOf(failure))
@@ -1247,14 +1623,14 @@ export function SkillsPage() {
   }
 
   /** Take back the link that put a skill in a place as well as the library. */
-  const uninstall = async (skill: Skill, dir?: string) => {
+  const uninstall = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
       if (skill.linkAt === "library") {
         /* The library linked the skill in; removing its entry takes the link. */
         await (library.store?.remove(skill.id) ?? Promise.resolve())
         await library.reload()
       } else {
-        await library.remove(skill.id, dir)
+        await library.remove(skill.id, ref)
       }
       setRefusal(null)
     } catch (failure) {
@@ -1263,9 +1639,9 @@ export function SkillsPage() {
   }
 
   /** Link a skill a place wrote into the library. */
-  const adopt = async (skill: Skill, dir?: string) => {
+  const adopt = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
-      await library.adopt(skill.id, dir)
+      await library.adopt(skill.id, ref)
       setRefusal(null)
     } catch (failure) {
       setRefusal(reasonOf(failure))
@@ -1283,8 +1659,8 @@ export function SkillsPage() {
   }
 
   /** Delete a skill from the place that holds it, then close the lightbox. */
-  const removeWorkspaceSkill = async (skill: Skill, dir: string) => {
-    await library.deleteWorkspaceSkill(skill.id, dir)
+  const removePlaceSkill = async (skill: Skill, ref: SkillPlaceRef) => {
+    await library.deleteInPlace(skill.id, ref)
     setDetailKey(null)
   }
   const openDetail = (skill: Skill) => setDetailKey(skillKey(skill))
@@ -1313,7 +1689,7 @@ export function SkillsPage() {
       <Tabs
         value={tab}
         onValueChange={(value) => {
-          setTab(tabs.find((item) => item.value === value)?.value ?? "all")
+          setTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
           setPage(0)
           setChecked([])
         }}
@@ -1321,27 +1697,49 @@ export function SkillsPage() {
       >
         <div className="flex items-center justify-between gap-6">
           <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
-            {tabs.map((item) => (
-              <TabsTrigger
-                key={item.value}
-                value={item.value}
-                className="h-9 flex-none gap-1.5 rounded-full px-4 text-[length:var(--text-body)] text-muted-foreground data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-accent dark:data-active:text-foreground"
-              >
-                <item.icon className="size-3.5 shrink-0" aria-hidden />
-                {t(item.labelKey)}
-                <span
-                  className={`text-[13px] ${
-                    library.error !== null
-                      ? "opacity-45"
-                      : (counts[item.value] ?? 0) === 0
-                        ? "opacity-45"
-                        : ""
-                  }`}
-                >
-                  {library.error === null ? (counts[item.value] ?? 0) : "—"}
-                </span>
-              </TabsTrigger>
-            ))}
+            {SHELL_TABS.map((item) => {
+              const scope = item.value === "all" || item.value === "library" ? null : item.value
+              const stack = scope === null ? null : scopePlaces[scope]
+              const count = counts[item.value as keyof typeof counts]
+              const active = tab === item.value
+              /* A scope opens through its place list; the shell's own two tabs
+                 are screens already and open on the press. */
+              if (scope === null || stack === null) {
+                return (
+                  <TabsTrigger
+                    key={item.value}
+                    value={item.value}
+                    className="h-9 flex-none gap-1.5 rounded-full px-4 text-[length:var(--text-body)] text-muted-foreground data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-accent dark:data-active:text-foreground"
+                  >
+                    <item.icon className="size-3.5 shrink-0" aria-hidden />
+                    {t(item.labelKey)}
+                    <span
+                      className={`text-[13px] ${
+                        library.error !== null || count === 0 ? "opacity-45" : ""
+                      }`}
+                    >
+                      {library.error === null ? count : "—"}
+                    </span>
+                  </TabsTrigger>
+                )
+              }
+              return (
+                <PlacePicker
+                  key={item.value}
+                  scopeIcon={item.icon}
+                  scopeLabel={t(item.labelKey)}
+                  places={stack}
+                  chosen={active ? chosen : null}
+                  active={active}
+                  onChoose={(id) => {
+                    setTab(scope)
+                    setNarrowed(id)
+                    setPage(0)
+                    setChecked([])
+                  }}
+                />
+              )
+            })}
           </TabsList>
           <div className="flex shrink-0 items-center gap-2">
             <div className={viewToggleSurface}>
@@ -1453,22 +1851,27 @@ export function SkillsPage() {
                   </Button>
                 }
               />
-            ) : currentPlace !== null ? (
+            ) : scopeEmpty !== null ? (
               <EmptyState
-                icon={FolderOpenIcon}
-                title={
-                  library.workspaceId === null
-                    ? t("skills.workspace.none")
-                    : currentPlace.view === null
-                      ? t("skills.workspace.noPath")
-                      : t("skills.workspace.empty")
-                }
-                hint={t("skills.workspace.emptyHint")}
-                note={currentPlace.view?.display ?? null}
+                icon={scopeEmpty.icon}
+                title={scopeEmpty.title}
+                hint={scopeEmpty.hint}
+                note={scopeEmpty.note}
                 action={
-                  <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
-                    {t("skills.tab.all")}
-                  </Button>
+                  /* Narrowed to one place, the way out is the scope it came
+                     from; otherwise the whole library is. */
+                  chosen === null ? (
+                    <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
+                      {t("skills.tab.all")}
+                    </Button>
+                  ) : (
+                    <Button
+                      className="h-10 rounded-full px-4"
+                      onClick={() => setNarrowed(null)}
+                    >
+                      {t("skills.place.all")}
+                    </Button>
+                  )
                 }
               />
             ) : (
@@ -1559,17 +1962,14 @@ export function SkillsPage() {
         store={library.store}
         root={library.root}
         places={library.places}
-        reason={
-          blocked ??
-          (detail !== null && (detail.takenAt?.length ?? 0) > 0
-            ? t("skills.workspace.taken")
-            : null)
-        }
-        onInstallPlace={(skill, dir) => void install(skill, dir)}
-        onRemovePlace={(skill, dir) => void uninstall(skill, dir)}
-        onAdopt={(skill) => void adopt(skill, holdsOf(skill)[0]?.dir)}
+        /* Only the workspace places depend on a folder being in use; each row
+           decides for itself whether it can be written. */
+        blocked={blocked}
+        onInstallPlace={(skill, ref) => void install(skill, ref)}
+        onRemovePlace={(skill, ref) => void uninstall(skill, ref)}
+        onAdopt={(skill, ref) => void adopt(skill, ref)}
         onDelete={removeSkill}
-        onDeleteWorkspace={removeWorkspaceSkill}
+        onDeletePlace={removePlaceSkill}
         onCheckUpdate={(skill) => library.checkUpdate(skill.id)}
         onUpdate={(skill) => library.update(skill.id)}
         onTagsChange={(tags) => {

@@ -1,12 +1,12 @@
 /**
- * Behaviour check for the workspace half of the skill library: the skills a
- * workspace folder holds, and the link that installs one into it. It runs
- * against temporary directories and asserts the contract — reading never
- * creates anything, an install is a link whose target says where it came from,
- * the hub removes only links it made, and the store answers for the workspace
- * the hub is pointed at.
+ * Behaviour check for the places the skill library reads and writes: the skills
+ * a directory holds, and the link that installs one into it. It runs against
+ * temporary directories and asserts the contract — reading never creates
+ * anything, an install is a link whose target says where it came from, the hub
+ * removes only links it made, a place's directory is read under the root its
+ * scope names, and the store answers for the workspace the hub is pointed at.
  *
- * Run from the package: `node scripts/check-workspace-skills.ts`
+ * Run from the package: `node scripts/check-place-skills.ts`
  */
 import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
@@ -14,15 +14,21 @@ import path from "node:path"
 
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import {
-  deleteSkillFromWorkspace,
-  installSkillIntoWorkspace,
+  deleteSkillIn,
+  installSkillInto,
   linkSkillIntoLibrary,
-  readWorkspaceSkill,
-  readWorkspaceSkillFile,
-  readWorkspaceSkills,
-  removeSkillFromWorkspace,
-  workspaceSkillRoot,
-} from "../src/host/workspace-skills.ts"
+  readPlaceSkill,
+  readPlaceSkillFile,
+  readPlaceSkills,
+  removeSkillFrom,
+  placeSkillRoot,
+} from "../src/host/place-skills.ts"
+
+/** The directory the skills CLI and this hub share, in every workspace. */
+const SHARED = path.join(".agents", "skills")
+
+/** One agent's own directory, which is what a place is for. */
+const AGENT_DIR = path.join(".claude", "skills")
 
 let failures = 0
 
@@ -53,28 +59,31 @@ const step = async (what: string, run: () => Promise<void>) => {
   }
 }
 
-const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-ws-skills-"))
+const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-place-skills-"))
 const library = path.join(home, "skills")
 const workspace = path.join(home, "project")
+/* The home directory a global place reads under; separate from the hub's own. */
+const userHome = path.join(home, "user")
 console.log(`home: ${home}`)
 
 await writeSkill(path.join(library, "alpha"), "Alpha", "First skill")
 await writeSkill(path.join(library, "beta"), "Beta", "Second skill")
 await fs.mkdir(workspace, { recursive: true })
+await fs.mkdir(userHome, { recursive: true })
 
 /* Reading a workspace the hub has never touched creates nothing. */
-const empty = await readWorkspaceSkills(workspace, library)
+const empty = await readPlaceSkills(workspace, library, SHARED)
 check("a workspace with no skills directory reads as empty", empty.skills.length === 0, empty.skills)
-check("it names the directory it looked in", empty.root === workspaceSkillRoot(workspace), empty.root)
+check("it names the directory it looked in", empty.root === placeSkillRoot(workspace, SHARED), empty.root)
 check(
   "reading creates nothing",
-  (await fs.stat(workspaceSkillRoot(workspace)).catch(() => null)) === null
+  (await fs.stat(placeSkillRoot(workspace, SHARED)).catch(() => null)) === null
 )
 
 /* Installing is a link, and the link is the record of where it came from. */
-const first = await installSkillIntoWorkspace(workspace, library, "alpha")
+const first = await installSkillInto(workspace, library, "alpha", SHARED)
 check("installing answers how it landed", first === "link", first)
-const installed = path.join(workspaceSkillRoot(workspace), "alpha")
+const installed = path.join(placeSkillRoot(workspace, SHARED), "alpha")
 const stat = await fs.lstat(installed).catch(() => null)
 check("the entry is a link", stat?.isSymbolicLink() === true, stat?.isSymbolicLink())
 check(
@@ -86,16 +95,16 @@ check(
   (await fs.readFile(path.join(installed, "SKILL.md"), "utf8")).includes("Alpha")
 )
 
-const held = await readWorkspaceSkills(workspace, library)
+const held = await readPlaceSkills(workspace, library, SHARED)
 check("the workspace now holds one skill", held.skills.length === 1, held.skills)
 check("an installed skill reads as the hub's", held.skills[0]?.origin === "hub", held.skills[0])
 check("its name comes from the manifest", held.skills[0]?.name === "Alpha", held.skills[0])
 check("its description comes from the manifest", held.skills[0]?.description === "First skill")
 
 /* The project's own skills belong to the project, and are read, never claimed. */
-await writeSkill(path.join(workspaceSkillRoot(workspace), "own-one"), "Own one", "Written here")
-await fs.mkdir(path.join(workspaceSkillRoot(workspace), "not-a-skill"), { recursive: true })
-const withOwn = await readWorkspaceSkills(workspace, library)
+await writeSkill(path.join(placeSkillRoot(workspace, SHARED), "own-one"), "Own one", "Written here")
+await fs.mkdir(path.join(placeSkillRoot(workspace, SHARED), "not-a-skill"), { recursive: true })
+const withOwn = await readPlaceSkills(workspace, library, SHARED)
 check("the project's own skill is listed", withOwn.skills.some((skill) => skill.id === "own-one"))
 check(
   "the project's own skill reads as its own",
@@ -108,15 +117,15 @@ check(
 )
 
 /* A link the library no longer answers for is what cleanup is for. */
-await installSkillIntoWorkspace(workspace, library, "beta")
+await installSkillInto(workspace, library, "beta", SHARED)
 await fs.rm(path.join(library, "beta"), { recursive: true, force: true })
-const broken = await readWorkspaceSkills(workspace, library)
+const broken = await readPlaceSkills(workspace, library, SHARED)
 const stale = broken.skills.find((skill) => skill.id === "beta")
 check("a link with no library skill reads as stale", stale?.origin === "stale", stale)
 check("a stale link keeps its id as a name", stale?.name === "beta", stale?.name)
 
 /* Removing: the hub takes back its own link, and refuses everything else. */
-await step("removing an installed skill", () => removeSkillFromWorkspace(workspace, library, "alpha"))
+await step("removing an installed skill", () => removeSkillFrom(workspace, library, "alpha", SHARED))
 check(
   "the link is gone",
   (await fs.lstat(installed).catch(() => null)) === null
@@ -127,26 +136,26 @@ check(
 )
 let refused = ""
 try {
-  await removeSkillFromWorkspace(workspace, library, "own-one")
+  await removeSkillFrom(workspace, library, "own-one", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("the hub refuses to remove a skill it did not install", refused.includes("not installed by Context Hub"), refused)
 check(
   "the refused skill is still there",
-  (await fs.stat(path.join(workspaceSkillRoot(workspace), "own-one"))).isDirectory()
+  (await fs.stat(path.join(placeSkillRoot(workspace, SHARED), "own-one"))).isDirectory()
 )
 refused = ""
 try {
-  await removeSkillFromWorkspace(workspace, library, "missing")
+  await removeSkillFrom(workspace, library, "missing", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
-check("removing what is not there is refused", refused.includes("not in this workspace"), refused)
+check("removing what is not there is refused", refused.includes("not in this place"), refused)
 
-/* A skill the workspace owns is read where it lives, manifest and files both. */
-const own = await readWorkspaceSkill(workspace, "own-one")
-check("a workspace skill reads its own manifest", own?.name === "Own one", own?.name)
+/* A skill the project owns is read where it lives, manifest and files both. */
+const own = await readPlaceSkill(workspace, "own-one", SHARED)
+check("a place skill reads its own manifest", own?.name === "Own one", own?.name)
 check("and its description", own?.description === "Written here", own?.description)
 check("and the manifest as written, frontmatter included", own?.text.startsWith("---\n") === true, own?.text)
 check(
@@ -154,88 +163,88 @@ check(
   JSON.stringify(own?.files.map((file) => file.path)) === JSON.stringify(["SKILL.md"]),
   own?.files
 )
-await fs.writeFile(path.join(workspaceSkillRoot(workspace), "own-one", "notes.md"), "note")
-const withFile = await readWorkspaceSkill(workspace, "own-one")
+await fs.writeFile(path.join(placeSkillRoot(workspace, SHARED), "own-one", "notes.md"), "note")
+const withFile = await readPlaceSkill(workspace, "own-one", SHARED)
 check(
   "a file added beside the manifest shows up",
   withFile?.files.some((file) => file.path === "notes.md") === true,
   withFile?.files
 )
-check("a skill that is not there reads as nothing", (await readWorkspaceSkill(workspace, "missing")) === null)
+check("a skill that is not there reads as nothing", (await readPlaceSkill(workspace, "missing", SHARED)) === null)
 check(
   "a name that would read outside the root is refused",
-  await readWorkspaceSkill(workspace, "../escape").then(
+  await readPlaceSkill(workspace, "../escape", SHARED).then(
     () => false,
     (error: unknown) => (error as Error).message.includes("unusable skill name")
   )
 )
 
-/* One file of a workspace skill is read through the same directory guard. */
+/* One file of a place skill is read through the same directory guard. */
 check(
   "a file beside the manifest reads",
-  (await readWorkspaceSkillFile(workspace, "own-one", "notes.md")) === "note"
+  (await readPlaceSkillFile(workspace, "own-one", "notes.md", SHARED)) === "note"
 )
 check(
   "the manifest reads as written",
-  (await readWorkspaceSkillFile(workspace, "own-one", "SKILL.md"))?.startsWith("---\n") === true
+  (await readPlaceSkillFile(workspace, "own-one", "SKILL.md", SHARED))?.startsWith("---\n") === true
 )
 check(
   "a file that is not there reads as nothing",
-  (await readWorkspaceSkillFile(workspace, "own-one", "missing.md")) === null
+  (await readPlaceSkillFile(workspace, "own-one", "missing.md", SHARED)) === null
 )
 check(
   "a path that would read outside the skill is refused",
-  await readWorkspaceSkillFile(workspace, "own-one", "../../../outside.txt").then(
+  await readPlaceSkillFile(workspace, "own-one", "../../../outside.txt", SHARED).then(
     () => false,
     (error: unknown) => (error as Error).message.includes("escapes the skill directory")
   )
 )
 check(
   "and a name that would read outside the root is refused too",
-  await readWorkspaceSkillFile(workspace, "../escape", "SKILL.md").then(
+  await readPlaceSkillFile(workspace, "../escape", "SKILL.md", SHARED).then(
     () => false,
     (error: unknown) => (error as Error).message.includes("unusable skill name")
   )
 )
 
 /* Deleting takes the directory, which is what the row's delete offers. */
-await writeSkill(path.join(workspaceSkillRoot(workspace), "doomed"), "Doomed", "About to go")
-await fs.writeFile(path.join(workspaceSkillRoot(workspace), "doomed", "extra.md"), "x")
-await step("deleting a workspace skill", () => deleteSkillFromWorkspace(workspace, "doomed"))
+await writeSkill(path.join(placeSkillRoot(workspace, SHARED), "doomed"), "Doomed", "About to go")
+await fs.writeFile(path.join(placeSkillRoot(workspace, SHARED), "doomed", "extra.md"), "x")
+await step("deleting a place skill", () => deleteSkillIn(workspace, "doomed", SHARED))
 check(
   "the directory is gone",
-  (await fs.stat(path.join(workspaceSkillRoot(workspace), "doomed")).catch(() => null)) === null
+  (await fs.stat(path.join(placeSkillRoot(workspace, SHARED), "doomed")).catch(() => null)) === null
 )
 refused = ""
 try {
-  await deleteSkillFromWorkspace(workspace, "doomed")
+  await deleteSkillIn(workspace, "doomed", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
-check("deleting what is not there is refused", refused.includes("not in this workspace"), refused)
-await fs.mkdir(path.join(workspaceSkillRoot(workspace), "not-a-skill"), { recursive: true })
+check("deleting what is not there is refused", refused.includes("not in this place"), refused)
+await fs.mkdir(path.join(placeSkillRoot(workspace, SHARED), "not-a-skill"), { recursive: true })
 refused = ""
 try {
-  await deleteSkillFromWorkspace(workspace, "not-a-skill")
+  await deleteSkillIn(workspace, "not-a-skill", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
-check("a directory with no manifest is refused", refused.includes("not a skill in this workspace"), refused)
+check("a directory with no manifest is refused", refused.includes("not a skill in this place"), refused)
 check(
   "the refused directory is still there",
-  (await fs.stat(path.join(workspaceSkillRoot(workspace), "not-a-skill"))).isDirectory()
+  (await fs.stat(path.join(placeSkillRoot(workspace, SHARED), "not-a-skill"))).isDirectory()
 )
 refused = ""
 try {
-  await deleteSkillFromWorkspace(workspace, "../escape")
+  await deleteSkillIn(workspace, "../escape", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("a name that would delete outside the root is refused", refused.includes("unusable skill name"), refused)
 
-/* The library links a workspace skill in, so the two are one skill. */
-await writeSkill(path.join(workspaceSkillRoot(workspace), "linked-one"), "Linked one", "Lives here")
-const linkMode = await linkSkillIntoLibrary(workspace, library, "linked-one")
+/* The library links a place skill in, so the two are one skill. */
+await writeSkill(path.join(placeSkillRoot(workspace, SHARED), "linked-one"), "Linked one", "Lives here")
+const linkMode = await linkSkillIntoLibrary(workspace, library, "linked-one", SHARED)
 check("linking into the library answers how it landed", linkMode === "link", linkMode)
 const inLibrary = path.join(library, "linked-one")
 check(
@@ -243,31 +252,34 @@ check(
   (await fs.lstat(inLibrary).catch(() => null))?.isSymbolicLink() === true
 )
 check(
-  "pointing at the workspace's own directory",
-  path.resolve(library, await fs.readlink(inLibrary)) === path.join(workspaceSkillRoot(workspace), "linked-one"),
+  "pointing at the place's own directory",
+  path.resolve(library, await fs.readlink(inLibrary)) ===
+    path.join(placeSkillRoot(workspace, SHARED), "linked-one"),
   await fs.readlink(inLibrary)
 )
 check(
-  "the workspace keeps the files",
-  (await fs.readFile(path.join(workspaceSkillRoot(workspace), "linked-one", "SKILL.md"), "utf8")).includes("Linked one")
+  "the place keeps the files",
+  (
+    await fs.readFile(path.join(placeSkillRoot(workspace, SHARED), "linked-one", "SKILL.md"), "utf8")
+  ).includes("Linked one")
 )
 refused = ""
 try {
-  await linkSkillIntoLibrary(workspace, library, "linked-one")
+  await linkSkillIntoLibrary(workspace, library, "linked-one", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("linking the same name twice is refused", refused.includes("already in the library"), refused)
 refused = ""
 try {
-  await linkSkillIntoLibrary(workspace, library, "not-here")
+  await linkSkillIntoLibrary(workspace, library, "not-here", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
-check("linking a skill the workspace lacks is refused", refused.includes("not a skill in this workspace"), refused)
+check("linking a skill the place lacks is refused", refused.includes("not a skill in this place"), refused)
 refused = ""
 try {
-  await linkSkillIntoLibrary(workspace, library, "..")
+  await linkSkillIntoLibrary(workspace, library, "..", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
@@ -279,51 +291,52 @@ check(
 
 /* Installing twice is a mistake, not a second entry. */
 refused = ""
-await installSkillIntoWorkspace(workspace, library, "alpha")
+await installSkillInto(workspace, library, "alpha", SHARED)
 try {
-  await installSkillIntoWorkspace(workspace, library, "alpha")
+  await installSkillInto(workspace, library, "alpha", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
-check("installing a skill twice is refused", refused.includes("already in this workspace"), refused)
+check("installing a skill twice is refused", refused.includes("already in this place"), refused)
 refused = ""
 try {
-  await installSkillIntoWorkspace(workspace, library, "nowhere")
+  await installSkillInto(workspace, library, "nowhere", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("installing a skill the library does not have is refused", refused.includes("not a skill in the library"), refused)
 refused = ""
 try {
-  await installSkillIntoWorkspace(workspace, library, "../escape")
+  await installSkillInto(workspace, library, "../escape", SHARED)
 } catch (error) {
   refused = error instanceof Error ? error.message : String(error)
 }
 check("a name that would write outside the root is refused", refused.includes("unusable skill name"), refused)
 
 /* The store answers for the workspace the hub is pointed at. */
-await removeSkillFromWorkspace(workspace, library, "alpha")
-const store = await createFsSkillStore({ home })
-check("with no workspace picked the store answers nothing", (await store.workspaceSkills()) === null)
+await removeSkillFrom(workspace, library, "alpha", SHARED)
+const store = await createFsSkillStore({ home, userHome })
+const sharedRef = { scope: "workspace", dir: SHARED } as const
+check("with no workspace picked the store answers nothing", (await store.placeSkills(sharedRef)) === null)
 const state = path.join(home, "state")
 await fs.mkdir(state, { recursive: true })
 await fs.writeFile(
   path.join(state, "workspaces.json"),
   JSON.stringify({ folders: [{ name: "project", path: workspace }], current: workspace })
 )
-const forWorkspace = await store.workspaceSkills()
+const forWorkspace = await store.placeSkills(sharedRef)
 check("the store reads the picked workspace", forWorkspace?.skills.some((skill) => skill.id === "own-one") === true, forWorkspace)
-check("it reads the same root the reader named", forWorkspace?.root === workspaceSkillRoot(workspace), forWorkspace?.root)
-const landed = await store.installToWorkspace("alpha")
+check("it reads the same root the reader named", forWorkspace?.root === placeSkillRoot(workspace, SHARED), forWorkspace?.root)
+const landed = await store.installInto("alpha", sharedRef)
 check("the store installs into that workspace", landed === "link", landed)
 check(
   "and the workspace now holds it",
-  (await readWorkspaceSkills(workspace, library)).skills.some((skill) => skill.id === "alpha")
+  (await readPlaceSkills(workspace, library, SHARED)).skills.some((skill) => skill.id === "alpha")
 )
-await store.removeFromWorkspace("alpha")
+await store.removeFrom("alpha", sharedRef)
 check(
   "and takes it back out",
-  (await readWorkspaceSkills(workspace, library)).skills.every((skill) => skill.id !== "alpha")
+  (await readPlaceSkills(workspace, library, SHARED)).skills.every((skill) => skill.id !== "alpha")
 )
 
 /* The library lists a linked skill like any other, and says it is a link. */
@@ -333,7 +346,7 @@ const linkedRow = page.items.find((item) => item.id === "linked-one")
 check("a linked skill is listed by the library", linkedRow !== undefined, page.items.map((item) => item.id))
 check(
   "and the row says where its files live",
-  linkedRow?.link === path.join(workspaceSkillRoot(workspace), "linked-one"),
+  linkedRow?.link === path.join(placeSkillRoot(workspace, SHARED), "linked-one"),
   linkedRow?.link
 )
 check("a linked row carries no date", linkedRow?.updatedAt === "", linkedRow?.updatedAt)
@@ -343,7 +356,7 @@ check("and it carries the date of its own files", (heldRow?.updatedAt ?? "") !==
 
 /* Adopting carries the workspace's own CLI record into the library, so the
    row knows which revision it holds and can be checked against the source. */
-await writeSkill(path.join(workspaceSkillRoot(workspace), "tracked-one"), "Tracked one", "From a package")
+await writeSkill(path.join(placeSkillRoot(workspace, SHARED), "tracked-one"), "Tracked one", "From a package")
 await fs.writeFile(
   path.join(workspace, "skills-lock.json"),
   `${JSON.stringify({
@@ -358,68 +371,110 @@ await fs.writeFile(
     },
   })}\n`
 )
-await store.importFromWorkspace("tracked-one")
+await store.adoptFrom("tracked-one", sharedRef)
 const tracked = (await store.list()).items.find((item) => item.id === "tracked-one")
 check("an adopted skill keeps the source its lock recorded", tracked?.upstream?.source === "mattpocock/skills", tracked?.upstream)
 check("with the recorded revision", tracked?.upstream?.hash === "a".repeat(64), tracked?.upstream?.hash)
 await store.remove("tracked-one")
-await fs.rm(path.join(workspaceSkillRoot(workspace), "tracked-one"), { recursive: true, force: true })
+await fs.rm(path.join(placeSkillRoot(workspace, SHARED), "tracked-one"), { recursive: true, force: true })
 await fs.rm(path.join(workspace, "skills-lock.json"), { force: true })
 
 /* Removing a linked entry takes the link back and leaves those files alone. */
 await store.remove("linked-one")
 check("the library's entry is gone", (await fs.lstat(inLibrary).catch(() => null)) === null)
 check(
-  "the workspace's skill is untouched",
-  (await fs.readFile(path.join(workspaceSkillRoot(workspace), "linked-one", "SKILL.md"), "utf8")).includes(
-    "Linked one"
-  )
+  "the place's skill is untouched",
+  (
+    await fs.readFile(path.join(placeSkillRoot(workspace, SHARED), "linked-one", "SKILL.md"), "utf8")
+  ).includes("Linked one")
 )
 
 /* A place an agent contributes is a directory of its own: reads, installs and
    removals there leave the shared `.agents/skills` directory alone. */
-const agentDir = path.join(".claude", "skills")
-const agentRoot = path.join(workspace, agentDir)
+const agentRoot = path.join(workspace, AGENT_DIR)
 check(
   "a place reads its own directory",
-  (await readWorkspaceSkills(workspace, library, agentDir)).root === agentRoot,
-  (await readWorkspaceSkills(workspace, library, agentDir)).root
+  (await readPlaceSkills(workspace, library, AGENT_DIR)).root === agentRoot,
+  (await readPlaceSkills(workspace, library, AGENT_DIR)).root
 )
 check(
   "which is empty until something is installed there",
-  (await readWorkspaceSkills(workspace, library, agentDir)).skills.length === 0
+  (await readPlaceSkills(workspace, library, AGENT_DIR)).skills.length === 0
 )
 check(
   "installing into a place answers how it landed",
-  (await installSkillIntoWorkspace(workspace, library, "alpha", agentDir)) === "link"
+  (await installSkillInto(workspace, library, "alpha", AGENT_DIR)) === "link"
 )
-const shared = path.join(workspace, ".agents", "skills")
+const shared = path.join(workspace, SHARED)
 check(
   "and the shared directory is untouched",
   (await fs.lstat(path.join(shared, "alpha")).catch(() => null)) === null
 )
 check(
   "the place holds it",
-  (await readWorkspaceSkills(workspace, library, agentDir)).skills.some((skill) => skill.id === "alpha")
+  (await readPlaceSkills(workspace, library, AGENT_DIR)).skills.some((skill) => skill.id === "alpha")
 )
 check(
   "reading it back by hand goes through the same directory",
-  (await readWorkspaceSkill(workspace, "alpha", agentDir))?.name === "Alpha"
+  (await readPlaceSkill(workspace, "alpha", AGENT_DIR))?.name === "Alpha"
 )
-await removeSkillFromWorkspace(workspace, library, "alpha", agentDir)
+await removeSkillFrom(workspace, library, "alpha", AGENT_DIR)
 check(
   "taking it back out leaves the place empty again",
-  (await readWorkspaceSkills(workspace, library, agentDir)).skills.length === 0
+  (await readPlaceSkills(workspace, library, AGENT_DIR)).skills.length === 0
 )
 for (const bad of ["", "..", path.join("..", "outside"), path.resolve(workspace)]) {
   let rejected = ""
   try {
-    await readWorkspaceSkills(workspace, library, bad)
+    await readPlaceSkills(workspace, library, bad)
   } catch (error) {
     rejected = error instanceof Error ? error.message : String(error)
   }
-  check(`a directory outside the workspace is refused: "${bad}"`, rejected.includes("not a directory inside a workspace"), rejected)
+  check(`a directory outside the root is refused: "${bad}"`, rejected.includes("not a directory inside its root"), rejected)
 }
+
+/* A global place reads the same way under the home directory: the same code
+   path, a different root, and nothing of the workspace's involved. */
+const globalRef = { scope: "global", dir: AGENT_DIR } as const
+check(
+  "a global place reads under the home directory",
+  (await readPlaceSkills(userHome, library, AGENT_DIR)).root === path.join(userHome, AGENT_DIR),
+  (await readPlaceSkills(userHome, library, AGENT_DIR)).root
+)
+check(
+  "and starts empty",
+  (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.length === 0
+)
+await writeSkill(path.join(userHome, AGENT_DIR, "global-one"), "Global one", "Machine wide")
+const globalHeld = await readPlaceSkills(userHome, library, AGENT_DIR)
+check("a skill written there is listed", globalHeld.skills.some((skill) => skill.id === "global-one"))
+check(
+  "as somebody else's, not the hub's",
+  globalHeld.skills.find((skill) => skill.id === "global-one")?.origin === "own"
+)
+check(
+  "the workspace's own directory never sees it",
+  (await readPlaceSkills(workspace, library, SHARED)).skills.every((skill) => skill.id !== "global-one")
+)
+
+/* Through the store, the scope alone decides which root is read. */
+const storeGlobal = await store.placeSkills(globalRef)
+check("the store reads the global place", storeGlobal?.skills.some((skill) => skill.id === "global-one") === true, storeGlobal)
+check("and it names the home directory's root", storeGlobal?.root === path.join(userHome, AGENT_DIR), storeGlobal?.root)
+await store.installInto("alpha", globalRef)
+check(
+  "the store installs into it",
+  (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.some((skill) => skill.id === "alpha")
+)
+check(
+  "leaving the workspace's shared directory alone",
+  (await fs.lstat(path.join(shared, "alpha")).catch(() => null)) === null
+)
+await store.removeFrom("alpha", globalRef)
+check(
+  "and takes it back out",
+  (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.every((skill) => skill.id !== "alpha")
+)
 
 await store.dispose()
 await fs.rm(home, { recursive: true, force: true })

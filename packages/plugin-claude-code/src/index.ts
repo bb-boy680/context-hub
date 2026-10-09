@@ -32,6 +32,9 @@ const ClaudeCodeIcon: ExtensionIcon = ClaudeCode.Color
 /** The place this agent reads a workspace's skills from; the skills module lists it. */
 export const CLAUDE_CODE_PLACE = "claude-code"
 
+/** The place this agent reads this machine's skills from, outside any workspace. */
+export const CLAUDE_CODE_GLOBAL_PLACE = "claude-code-global"
+
 export const claudeCodeExtension: ExtensionDefinition = {
   manifest: {
     id: CLAUDE_CODE_ID,
@@ -46,12 +49,21 @@ export const claudeCodeExtension: ExtensionDefinition = {
     permissions: ["assets.read", "assets.write", "filesystem"],
   },
   activate(scope) {
-    /* The place comes first: the target below names it, so a consumer that
-       reads one of the two always finds the other. */
+    /* The places come first: the target below names them, so a consumer that
+       reads one side always finds the other. */
     scope.contribute("skillLocation", {
       id: CLAUDE_CODE_PLACE,
       labelKey: "claudeCode.tab",
       icon: ClaudeCodeIcon,
+      scope: "workspace",
+      dir: CLAUDE_CODE_SKILL_DIR,
+      order: 20,
+    })
+    scope.contribute("skillLocation", {
+      id: CLAUDE_CODE_GLOBAL_PLACE,
+      labelKey: "claudeCode.tab",
+      icon: ClaudeCodeIcon,
+      scope: "global",
       dir: CLAUDE_CODE_SKILL_DIR,
       order: 20,
     })
@@ -66,6 +78,7 @@ export const claudeCodeExtension: ExtensionDefinition = {
       })),
       format: "Markdown with YAML frontmatter; JSON for MCP servers and hooks",
       skillLocation: CLAUDE_CODE_PLACE,
+      globalSkillLocation: CLAUDE_CODE_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",

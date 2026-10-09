@@ -73,7 +73,7 @@ export function createFsWorkspaceStore(
           : state.folders.map((known) => (known === named ? host : known)),
       /* The row that pointed at nothing by name pointed at this folder. */
       current: state.current === null || state.current === nameId ? id : state.current,
-      agent: state.agent,
+      agents: state.agents,
     }
     await documents.write(WORKSPACE_DOCUMENT, next)
     return next
@@ -160,7 +160,7 @@ export function createFsWorkspaceStore(
       changed = true
     }
     if (!changed) return state
-    const next: WorkspaceState = { folders, current, agent: state.agent }
+    const next: WorkspaceState = { folders, current, agents: state.agents }
     await documents.write(WORKSPACE_DOCUMENT, next)
     return next
   }
@@ -172,75 +172,96 @@ export function createFsWorkspaceStore(
 
   const page = async (): Promise<WorkspacePage> => {
     const state = await read()
-    return { folders: state.folders.map(view), current: state.current, agent: state.agent }
+    return { folders: state.folders.map(view), current: state.current, agents: state.agents }
+  }
+
+  /**
+   * Run one change after the previous one finished. Every change is a
+   * read-modify-write of one document, so two of them interleaving would let the
+   * later write undo the earlier one — and a person choosing two agents in quick
+   * succession is exactly that.
+   */
+  let tail: Promise<unknown> = Promise.resolve()
+  const run = <T>(change: () => Promise<T>): Promise<T> => {
+    const next = tail.then(change, change)
+    tail = next.catch(() => undefined)
+    return next
   }
 
   return {
     page,
 
-    async add(target) {
-      const at = await locate(target)
-      const folder: WorkspaceFolder = { name: workspaceName(at), path: at }
-      const state = await read()
-      const id = folderId(folder)
-      const folders = state.folders.some((known) => folderId(known) === id)
-        ? state.folders
-        : [...state.folders, folder]
-      await documents.write(WORKSPACE_DOCUMENT, { folders, current: id, agent: state.agent })
-      return page()
-    },
+    add: (target) =>
+      run(async () => {
+        const at = await locate(target)
+        const folder: WorkspaceFolder = { name: workspaceName(at), path: at }
+        const state = await read()
+        const id = folderId(folder)
+        const folders = state.folders.some((known) => folderId(known) === id)
+          ? state.folders
+          : [...state.folders, folder]
+        await documents.write(WORKSPACE_DOCUMENT, { folders, current: id, agents: state.agents })
+        return page()
+      }),
 
-    async select(id) {
-      const state = await read()
-      if (!state.folders.some((folder) => folderId(folder) === id)) {
-        throw new Error(`not a known workspace: ${id}`)
-      }
-      if (state.current !== id) {
-        await documents.write(WORKSPACE_DOCUMENT, { ...state, current: id })
-      }
-      return page()
-    },
-
-    async rename(id, name) {
-      const state = await read()
-      const folder = state.folders.find((known) => folderId(known) === id)
-      if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
-      const alias = name.trim()
-      /* Naming a workspace after its own folder stores nothing and drops any
-         earlier name, so the row and the folder cannot disagree. */
-      const folders = state.folders.map((known) => {
-        if (folderId(known) !== id) return known
-        if (alias === "" || alias === known.name) {
-          const plain: WorkspaceFolder = { name: known.name }
-          if (known.path !== undefined) plain.path = known.path
-          return plain
+    select: (id) =>
+      run(async () => {
+        const state = await read()
+        if (!state.folders.some((folder) => folderId(folder) === id)) {
+          throw new Error(`not a known workspace: ${id}`)
         }
-        return { ...known, alias }
-      })
-      await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
-      return page()
-    },
+        if (state.current !== id) {
+          await documents.write(WORKSPACE_DOCUMENT, { ...state, current: id })
+        }
+        return page()
+      }),
 
-    async remove(id) {
-      const state = await read()
-      const folder = state.folders.find((known) => folderId(known) === id)
-      if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
-      if (state.current === id) {
-        throw new Error(
-          "this workspace is in use; switch to another one before removing it"
-        )
-      }
-      const folders = state.folders.filter((known) => folderId(known) !== id)
-      await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
-      return page()
-    },
+    rename: (id, name) =>
+      run(async () => {
+        const state = await read()
+        const folder = state.folders.find((known) => folderId(known) === id)
+        if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
+        const alias = name.trim()
+        /* Naming a workspace after its own folder stores nothing and drops any
+           earlier name, so the row and the folder cannot disagree. */
+        const folders = state.folders.map((known) => {
+          if (folderId(known) !== id) return known
+          if (alias === "" || alias === known.name) {
+            const plain: WorkspaceFolder = { name: known.name }
+            if (known.path !== undefined) plain.path = known.path
+            return plain
+          }
+          return { ...known, alias }
+        })
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
+        return page()
+      }),
 
-    async selectAgent(id) {
-      const state = await read()
-      if ((state.agent ?? null) !== id) {
-        await documents.write(WORKSPACE_DOCUMENT, { ...state, agent: id })
-      }
-      return page()
-    },
+    remove: (id) =>
+      run(async () => {
+        const state = await read()
+        const folder = state.folders.find((known) => folderId(known) === id)
+        if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
+        if (state.current === id) {
+          throw new Error(
+            "this workspace is in use; switch to another one before removing it"
+          )
+        }
+        const folders = state.folders.filter((known) => folderId(known) !== id)
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
+        return page()
+      }),
+
+    setAgent: (id, on) =>
+      run(async () => {
+        const state = await read()
+        const chosen = state.agents.includes(id)
+        if (chosen === on) return page()
+        const agents = on
+          ? [...state.agents, id]
+          : state.agents.filter((known) => known !== id)
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, agents })
+        return page()
+      }),
   }
 }

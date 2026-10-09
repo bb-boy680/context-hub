@@ -81,10 +81,18 @@ export interface AgentTargetDescriptor {
   format: string
   /**
    * The `skillLocation` contribution this agent reads a workspace's skills
-   * from. An agent without one cannot take skills yet, so the workspace menu
-   * leaves it out rather than offering a choice that does nothing.
+   * from. An agent without one cannot take skills into a project, so the
+   * workspace menu leaves it out rather than offering a choice that does
+   * nothing.
    */
   skillLocation?: string
+  /**
+   * The `skillLocation` contribution this agent reads skills from outside any
+   * workspace, under the home directory. It is a separate place because it is
+   * a separate directory: nothing links the two, and an agent may offer only
+   * one of them.
+   */
+  globalSkillLocation?: string
 }
 
 /** Sidebar groups the shell renders, in order. */
@@ -106,20 +114,32 @@ export interface NavContribution {
 }
 
 /**
- * One place a workspace keeps skills for an agent: the directory itself, plus
- * how the skills module names it. The module reads that directory, lists it as
- * its own tab, and offers it as an install target, so an agent integration is a
- * contribution rather than code inside the skills module.
+ * Which directory a place's {@link SkillLocationContribution.dir} is relative
+ * to. One scope is a property of the machine and the other of one folder, so a
+ * place is either in every workspace at once or in the one in use.
+ */
+export type SkillScope = "workspace" | "global"
+
+/**
+ * One place an agent keeps skills: the directory itself, plus how the skills
+ * module names it. The module reads that directory, lists its tab, and offers
+ * it as an install target, so an agent integration is a contribution rather
+ * than code inside the skills module.
  */
 export interface SkillLocationContribution {
-  /** Stable id; the tab value and the target a row's install names. */
+  /** Stable id; the tab row's key and the target a row's install names. */
   id: string
   /** Message key for the entry's label. */
   labelKey: string
   icon: ExtensionIcon
-  /** The directory inside a workspace, `/`-separated, e.g. ".claude/skills". */
+  /**
+   * The root `dir` is read under: the workspace in use, or the home directory
+   * every workspace shares.
+   */
+  scope: SkillScope
+  /** The directory inside that root, `/`-separated, e.g. ".claude/skills". */
   dir: string
-  /** Sort rank in the tab row, after the shell's own "all" and "library". */
+  /** Sort rank among the places of its own scope. */
   order: number
 }
 
@@ -136,7 +156,7 @@ export interface ContributionMap {
   locale: LocaleContribution
   /** One coding agent's consumption contract. */
   target: AgentTargetDescriptor
-  /** One place a workspace keeps skills for an agent. */
+  /** One place an agent keeps skills, in a workspace or outside every one. */
   skillLocation: SkillLocationContribution
   /** One searchable remote skill catalog. */
   skillRegistry: SkillRegistry
