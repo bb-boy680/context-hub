@@ -18,6 +18,7 @@
   },
   "exports": {
     ".": "./src/assets.ts",
+    "./net": "./src/net.ts",
     "./plugins": "./src/plugins.ts",
     "./state": "./src/state.ts",
     "./workspace": "./src/workspace.ts",

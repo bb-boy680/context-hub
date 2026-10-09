@@ -1,6 +1,7 @@
 /** Kernel entry: contracts, platform host seam, services, and kernel composition. */
 export * from "./types.ts"
 export * from "./host.ts"
+export * from "./skill-registry.ts"
 export * from "./service.ts"
 export * from "./i18n.ts"
 export * from "./kernel.ts"

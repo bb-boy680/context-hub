@@ -9,6 +9,7 @@ import type { ComponentType } from "react"
 
 import type { PlatformHost } from "./host.ts"
 import type { I18nService } from "./i18n.ts"
+import type { SkillRegistry } from "./skill-registry.ts"
 
 /** Extension API this kernel implements; manifests declare the range they were built for. */
 export const EXTENSION_API_VERSION = "0.1"
@@ -97,6 +98,8 @@ export interface ContributionMap {
   locale: LocaleContribution
   /** One coding agent's consumption contract. */
   target: AgentTargetDescriptor
+  /** One searchable remote skill catalog. */
+  skillRegistry: SkillRegistry
   /** A sidebar entry. */
   nav: NavContribution
   /** A page. */

@@ -14,6 +14,7 @@ import { createReadStream, promises as fs } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
+import { NET_ROUTE } from "./src/net.ts"
 import { PLUGIN_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
@@ -24,6 +25,7 @@ import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
 import { createFsWorkspaceStore } from "./src/host/workspaces-fs.ts"
 import type { StateStore } from "./src/state.ts"
+import type { NetReply, NetRequest } from "./src/net.ts"
 import type { WorkspaceStore } from "./src/workspace.ts"
 
 /** One `Content-Type` for a stored file, from its extension. */
@@ -280,6 +282,115 @@ export function pluginFiles(options: { home?: string } = {}) {
       )
     },
   }
+}
+
+/**
+ * Vite plugin that performs one extension's HTTP request. A browser page
+ * cannot read a cross-origin API that serves no CORS header, so this route is
+ * how a plugin reaches one: the dev server holds the connection.
+ *
+ * It is deliberately narrow, because a route that fetches whatever it is told
+ * is a request forgery waiting to happen: HTTPS only, a public host (never a
+ * loopback, private, or link-local address), no redirects to follow, one GET,
+ * a timeout, and a cap on the body it will read.
+ */
+export function netProxy() {
+  return {
+    name: "context-hub-net-proxy",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(NET_ROUTE)) {
+            next()
+            return
+          }
+          if ((request.method ?? "GET") !== "POST") {
+            response.writeHead(405).end()
+            return
+          }
+          let asked: NetRequest
+          try {
+            asked = JSON.parse((await readBody(request)).toString("utf8")) as NetRequest
+          } catch {
+            sendJson(response, 400, { error: "net: the request body is not JSON" })
+            return
+          }
+          try {
+            sendJson(response, 200, await fetchThroughProxy(asked))
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            sendJson(response, 400, { error: message })
+          }
+        }
+      )
+    },
+  }
+}
+
+/** Longest an upstream request may take before it is abandoned. */
+const NET_TIMEOUT_MS = 10_000
+
+/** Most body bytes this route will read from an upstream response. */
+const NET_MAX_BYTES = 4 * 1024 * 1024
+
+/** Hosts a request from a plugin never reaches: this machine and its neighbours. */
+function isPublicHost(hostname: string): boolean {
+  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase()
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false
+  if (host === "::1" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return false
+  const parts = host.split(".")
+  if (parts.length === 4 && parts.every((part) => /^\d+$/.test(part))) {
+    const [a, b] = parts.map(Number)
+    if (a === 10 || a === 127 || a === 0) return false
+    if (a === 172 && b >= 16 && b <= 31) return false
+    if (a === 192 && b === 168) return false
+    if (a === 169 && b === 254) return false
+    return true
+  }
+  /* A name with no dot resolves through search domains; refuse it rather than guess. */
+  return parts.length > 1
+}
+
+/** Read one upstream response, refusing anything the rules above exclude. */
+async function fetchThroughProxy(asked: NetRequest): Promise<NetReply> {
+  if (typeof asked.url !== "string" || asked.url === "") {
+    throw new Error("net: the request needs a url")
+  }
+  let target: URL
+  try {
+    target = new URL(asked.url)
+  } catch {
+    throw new Error(`net: not a URL: ${asked.url}`)
+  }
+  if (target.protocol !== "https:") {
+    throw new Error("net: only https URLs are fetched")
+  }
+  if (!isPublicHost(target.hostname)) {
+    throw new Error(`net: refusing to fetch ${target.hostname}`)
+  }
+  const upstream = await fetch(target, {
+    method: "GET",
+    /* A redirect could point anywhere, including back at this machine. */
+    redirect: "manual",
+    headers: { Accept: "*/*", ...asked.headers },
+    signal: AbortSignal.timeout(NET_TIMEOUT_MS),
+  })
+  const chunks: Buffer[] = []
+  let size = 0
+  for await (const chunk of upstream.body ?? []) {
+    const bytes = chunk as Buffer
+    size += bytes.byteLength
+    if (size > NET_MAX_BYTES) throw new Error("net: the response is larger than this route reads")
+    chunks.push(bytes)
+  }
+  return { status: upstream.status, body: Buffer.concat(chunks).toString("utf8") }
 }
 
 /**

@@ -1816,3 +1816,137 @@ idle 且有过检查时显示 `上次检查：<age>`。更新成功后 checked �
 
 **已知边界**：工作区里直接 `npx skills add` 的技能仍不可检查（没有 upstream，按用户决定放到下一期）；
 不做自动轮询（每次检查是真实 clone）；更新仍逐技能（覆盖本地改动的提示要保留）。
+
+## 远程技能搜索：弹窗按设计稿落地（2026-10-09，用户："实现这个前端的这个弹窗的样式"）
+
+插件（skills.sh 这种"远程来源"）先不做，本轮只做**前端弹窗 + 入口**，并把接缝留出来。
+
+**入口**：技能页工具栏在 `导入` 右侧新增主色按钮 `搜索`（图标 `search`，文案 `skills.action.search`）。
+（初版叫 `下载`/`DownloadIcon`，用户 2026-10-09 指正：「这一块应该就不是下载了，应该是搜索」→ 名称、
+文件名、文案键一并改成 search。）
+
+**弹窗** `packages/plugin-skills/src/search-dialog.tsx`（`SearchSkillsDialog`）= 640 宽，
+结构照画板 `oHiQX`：标题/说明 + 关闭 → 搜索框（40 高、主色描边、左侧放大镜）→ 1px 分隔 →
+`来自 <来源>` / `按安装量排序` 行（35 高）→ 6 条 68 高结果行 → 64 高页脚（左侧 `1–6，共 N 个技能`，
+右侧 `第 x 页，共 y 页` + 上/下页箭头 + `关闭`）。
+行 = 40 图标磁贴（按分类上色）+ 技能名（176 固定列宽，让 `by @…` 列对齐）+ 描述
++ 右对齐安装量（96 宽）+ `安装` 按钮（32 高、主色、`download` 图标）/ `已安装`（绿勾 + 灰字）。
+顶部列表标题与每行的 `by @…` 都取注册表的 `name`（用户 2026-10-09 指正：`by` 后面是**来源**，不是作者）。
+
+**接缝** `packages/plugin-skills/src/registry.ts`：`SkillRegistry`（`id` / `name` / `search({query,offset,limit})`）
+与 `RemoteSkill`（`name` / `description` / 可选 `package`、`installs`、`tag`）。插件以后要实现的就是这个接口，
+页面把实例传进弹窗即可；没有插件时弹窗用内置的 `previewRegistry`（18 行 = 设计稿那 6 行 + 12 行同库名），
+预览行没有 `package`，只能在本窗口标记 `已安装`，**不会**去碰真实技能库。
+真装了插件后：行 → `store.installPackage(row.package, [row.name])` → `onInstalled()` 让页面重读目录。
+
+**行为**：输入 300ms 防抖搜索（Enter 立即搜）、页脚翻页、每次打开重读库里的 id 以显示 `已安装`、
+关闭即清空搜索；搜索用"代次"计数丢弃过期响应。
+
+**验证**：`pnpm typecheck` 6 个包全绿；`plugin-skills`、`locale-zh-cn` eslint 全绿
+（`ui` 既有 19 个 lint 错误与本次无关）。浏览器（zh-CN，真实 Vite）实测：工具栏出现主色 `搜索`
+（`rgb(79,70,229)` 底 + 白字 + 放大镜图标，85.6×36）→ 弹窗 640×641、六行结构与设计稿一致
+（行高 68、名字列 x=78/w=176、`by` 列 x=262、安装量列 x=428/w=96、按钮右缘 616 —— 与设计稿同值）
+→ 点 `安装` 行变 `已安装` → 搜索 `migrat` 得 2 行、页脚 `1–2，共 2 个技能` / `第 1 页，共 1 页`
+→ 清空恢复 → 下一页 `7–12，共 18 个技能` / `第 2 页，共 3 页`、上一页按钮变可用。
+
+**与设计稿的两处偏差（有意）**：① 预览数据只有 18 行，所以页脚是 `1–6，共 18 个技能` / `第 1 页，共 3 页`
+（画板画的是 1,284 / 214，那是真实注册表的量级）；② 搜索框打开即聚焦，因此带浏览器焦点环
+（画板上只有一圈主色描边）——搜索弹窗自动聚焦是刻意保留的。
+
+**画布**：新增 `uNo7V`（Search remote — Entry）与 `jg12C`（Search remote — Dialog）两块板，`eddWl` 扩到 15610；
+`jg12C` 首个行名从 `test-driven-development` 改回 `tdd`，与代码里的预览数据一致；两板的工具栏按钮与弹窗标题
+（`Download skill` → `Search skills`）已随本次改名同步。核对图 `designs/check-download/`（临时，不提交）。
+
+## skills.sh 插件（2026-10-09，用户："现在我们去开发skills.sh的插件"）
+
+### 站点事实（实测，决定了整个实现）
+
+| 事实 | 证据 |
+| --- | --- |
+| 文档里的 `/api/v1/*` **全部要 Vercel OIDC**（`Authorization: Bearer $VERCEL_OIDC_TOKEN`） | `GET /api/v1/skills` 与 `/api/v1/skills/search` 都返回 401 `authentication_required`；detail 路由同样 401 |
+| 免鉴权可用的是旧的 `/api/search?q=&limit=` | 200，返回 `{query, searchType, searchVersion:"algolia", skills:[{id, source, skillId, name, installs}], count}` |
+| 它**没有描述**，也没有 offset/total | 逐字符看过响应；`limit` 上限 200，`q` 少于 2 字符返回 400 `Query must be at least 2 characters` |
+| `name` 就是 `skillId`（不是好看的显示名），`id` 是 `source/skillId` | 多次查询核对（如 `code-review`、`react native`） |
+| **描述在技能页的 `<meta name="description">`** 里 = 它的 SKILL.md 摘要 | `https://www.skills.sh/<source>/<skillId>` 前 1.3KB 即含该 meta；三个来源并行实测 685ms |
+| 站点**不发 CORS**，浏览器不能直连 | 预检无 `access-control-allow-origin` |
+
+### 骨架改动（上一轮已完成，这里只列现状）
+
+- `packages/core/src/net.ts`：网络能力缝（`NET_ROUTE`、`NetRequest/NetReply`、`createRemoteNet`）。
+- `packages/core/vite.ts` 的 `netProxy()`：开发桥 `POST /hub/net`，只走 HTTPS、只去公网主机（SSRF 防护）、
+  10s 超时、4MB 上限。
+- `PlatformHost.net`（`NetPort`）+ `PlatformCapabilities.network`。
+- 内核新贡献点 **`skillRegistry`**（`packages/extensions/src/skill-registry.ts`）。
+
+### 本轮：插件从示例变成正式包 + 行样式
+
+1. **新建 monorepo 包** `packages/plugin-skills-sh`（`@workspace/plugin-skills-sh`，TS，依赖
+   `@workspace/extensions` + `lucide-react`）；**删掉** `packages/extensions/examples/skills.sh/`
+   （示例插件不该承担产品功能）。`apps/web` 加 `workspace:*` 依赖并在 catalog 里
+   `[...builtinExtensions, skillsExtension, skillsShExtension, simplifiedChineseLocale, ...]`。
+2. **接缝加两样**（`skill-registry.ts`）：
+   - `RemoteSkill.source` —— 该技能的**发布仓库**（`owner/repo` 或域名），与"安装目标" `package` 分开表达。
+   - `SkillRegistry.describe?(skill)` —— 搜索应答里没有的字段，由注册表逐行补（skills.sh 用它读技能页的
+     meta 描述）；**失败不算搜索失败**，行保持原样；实现自己缓存。
+3. **弹窗行改成两行**（用户 2026-10-09："第一行应该是name、第二行就是skills的一个注释"、
+   "后面的这个 by 还是 by 来源吧，例如 grill-me 的来源就是 mattpocock/skills"）：
+   第一行 = 名称（176 固定列宽）+ `by @<该技能的来源>`；第二行 = 描述。
+   描述缺失时弹窗调 `describe` 补全（**并发 3**，`fillDetails`，行 key 仍是 `source:name`）；
+   关闭弹窗清空补全缓存。
+4. **画布**：`oHiQX` 六行换成**真实数据**（名称/来源/描述/安装量都取自 skills.sh：grill-me、
+   setup-pre-commit、receiving-code-review、prisma-orm-setup、expo-examples、cloud-sql-basics），
+   `by @` 后面是真实仓库（`mattpocock/skills`、`obra/superpowers`、`prisma/skills`、`expo/skills`、
+   `google/skills`）；来源最长的 `by @obra/superpowers` 实测 134px，正好卡在 134px 的可用宽度内。
+
+### 验证（真实数据，非 mock）
+
+- `pnpm typecheck` 7 个包全绿；`plugin-skills-sh` / `plugin-skills` / `extensions` eslint 全绿；
+  `packages/extensions/scripts/check-plugins.ts` 全绿。
+- 浏览器（zh-CN，真实 Vite，`:5173`）：扩展页「资产源」出现 **skills.sh**（带图标 + 卸载按钮）；
+  技能页点「搜索」→ 输入 `grill-me` → 六行真数据，例如
+  `grill-me | by @mattpocock/skills | A relentless interview to sharpen a plan or design. | 131.2万 次安装`；
+  输入 `shadcn-ui` → **同一个名字的 5 行里，只有 `google-labs-code/stitch-skills` 那行显示「已安装」**
+  （库里 `shadcn-ui` 的 upstream 就是它），其余 4 行仍可安装 —— 证明按来源判重生效。
+- 行几何实测（DOM，六行完全一致）：行高 68、名称列 x=78/w=176、`by` 列 x=262、安装量列 x=428/w=96、
+  按钮右缘 616 —— 与设计稿同值。
+- 开发服务器已重启（新增工作区包后 Vite 依赖图必须重建）+ 删 `.vite` 缓存。
+
+### 已知边界（有意）
+
+- 描述是**逐行读技能页**（约 60–200KB/行，浏览器拿不到 CORS，走宿主代理）；插件侧缓存按
+  `source/skill`，同一技能不重复读。站点上没有更轻的公开描述来源：v1 要 OIDC，搜索应答没有该字段。
+- 部分来源（`open.feishu.cn`、`uizze.sh` 等 well-known）页面**没有 meta 描述**，这些行第二行为空 ——
+  这是如实显示，不编造。
+- `/api/search` 不支持 offset，翻页靠"多取一行"判断 `hasMore`；结果超过 200 条后无法再翻（上限即接口上限）。
+- 搜索应答里的 `count` 是"本次返回条数"而不是总数，所以页脚在没有总数时只显示当前页区间。
+
+### 弹窗状态与并发安装（2026-10-09，用户："空页面太丑 / 去掉来自 skills.sh / 查询要有 loading / 安装时别的按钮也被禁用了"）
+
+1. **去掉结果上方那条提示行**（`来自 skills.sh` + `按安装量排序`）：两个标签都在描述**某一个注册表**的行为，
+   而弹窗是按注册表接缝写的，多接一个插件这句话就不成立。删掉后弹窗 643 → **608**
+   （81 header + 54 search + 1 divider + 408 list + 64 footer），画板 `oHiQX` 同步删除该行并重新居中（y=236）。
+   文案键 `skills.search.from` / `.sorted` 已移除。
+2. **空态/加载态**（画板未画，直接按应用内的样子定）：
+   - 列表区**固定高度**：有查询时 408（翻页/加载都不跳动），未开始搜索时 248（弹窗 446，不至于一大片空白）。
+   - 起始态：居中 44px 圆底放大镜 + `搜索远程技能` + `输入至少 N 个字符即可看到结果。`
+   - 无结果：`SearchX` 圆底 + `没有找到匹配的技能` + `换个关键词再试一次。`
+   - 搜索失败：`TriangleAlert` 圆底 + `搜索没有成功` + 注册表原文（红色）。
+   - 加载：4 行骨架（40 方块 + 两行条 + 右侧条 + 78x32 块，`animate-pulse`），`aria-busy` 标在列表区上。
+3. **修掉一个真缺陷**：加载判定原来只看 `found === null`，而防抖窗口内 `found` 仍是 `null` 且 `busy` 仍为 false，
+   于是**刚敲字就显示"没有找到匹配的技能"**。改为记住"这份答案对应哪个 query"（`answered`），
+   `waiting = busy || answered !== query`；表格与页脚在 waiting 期间都不说话（`listed = waiting ? [] : rows`）。
+4. **并发安装**：`pending` 从单个 key 改成 **key 数组**，行按钮只禁用/转圈自己那一行（`aria-busy` + `Spinner`），
+   其他行照常可点。实测：连点两行的安装，只有这两行 disabled 且各有一个 spinner，其余 4 行不受影响；
+   失败的一行在列表下方显示 `名字: CLI 原文`。
+5. 页脚在没有行时只留 `关闭`（不再显示 `第 1 页` 这种空翻页）。
+
+**验证**：`pnpm typecheck` 7 包全绿，`plugin-skills` / `locale-zh-cn` eslint 全绿。
+浏览器（真数据）实测四种状态：起始 446 → 加载骨架 → 结果 606（搜 `shadcn` 时 `已安装` 标记仍只落在
+`google-labs-code/stitch-skills` 那行）→ 无结果态 → 清空回到 446。
+验证时真实安装的 `grill-me` 已从库里删除（库回到原来的 12 条）。
+
+**样式混乱的根因（用户："样式混乱了"）**：给列表区套的那层 `div.flex.flex-col.h-[408px]` 是 `DialogContent`
+（`grid`）的子项，grid 子项的 `min-width:auto` 等于其 min-content 宽度，于是**内容宽度变成了弹窗里这一栏的最小宽度** ——
+实测 `dialog clientWidth 640 / scrollWidth 1210`，行和安装按钮被推到弹窗外面，右上角关闭按钮与页脚翻页也被裁掉。
+修法 = 给这层加 `min-w-0`（之前的写法不需要，因为那时的 grid 子项本身就是滚动容器 `overflow-y-auto`，
+其自动最小尺寸为 0）。**动这块结构后一定要断言 dialog 与其列表区的 `clientWidth === scrollWidth`。**

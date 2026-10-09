@@ -16,6 +16,7 @@ import type { SkillStore } from "./store.ts"
 
 export { SkillsPage }
 export * from "./store.ts"
+export * from "./registry.ts"
 export { createRemoteSkillStore } from "./remote-store.ts"
 
 declare module "@deepseek-ai/cordis" {

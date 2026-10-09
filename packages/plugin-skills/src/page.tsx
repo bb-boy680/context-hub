@@ -5,6 +5,7 @@ import {
   ListIcon,
   PowerIcon,
   RefreshCwIcon,
+  SearchIcon,
   Trash2Icon,
   UploadIcon,
   type LucideIcon,
@@ -13,6 +14,7 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
+import { SearchSkillsDialog } from "./search-dialog.tsx"
 import { skillKey, useSkillBody, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
@@ -23,7 +25,7 @@ import type { Skill, SkillSource } from "./types.ts"
 
 import { Spinner } from "@workspace/ui/components/spinner"
 
-import { useI18n } from "@workspace/extensions/react"
+import { useContributions, useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Card,
@@ -875,6 +877,7 @@ export function SkillsPage() {
   const [tab, setTab] = React.useState<SkillTab>("all")
   const [view, setView] = React.useState<"grid" | "list">("grid")
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
+  const [searchOpen, setSearchOpen] = React.useState(false)
   const [tag, setTag] = React.useState("All tags")
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
@@ -891,6 +894,9 @@ export function SkillsPage() {
   >({})
 
   const library = useSkillLibrary()
+  /* A registry plugin answers the search; with none, the dialog previews its own rows. */
+  const registries = useContributions("skillRegistry")
+  const registry = registries[0] ?? null
   const usingStore = library.store !== null
   const counts = usingStore ? library.counts : SAMPLE_COUNTS
   /* With no folder to install into, the action says why it is unavailable. */
@@ -1095,6 +1101,13 @@ export function SkillsPage() {
               <UploadIcon />
               {t("skills.action.import")}
             </Button>
+            <Button
+              className="h-9 gap-2 px-4"
+              onClick={() => setSearchOpen(true)}
+            >
+              <SearchIcon />
+              {t("skills.action.search")}
+            </Button>
           </div>
         </div>
         {refusal === null ? null : (
@@ -1165,6 +1178,13 @@ export function SkillsPage() {
         onOpenChange={(open) => {
           if (!open) setAddTab(null)
         }}
+      />
+      <SearchSkillsDialog
+        open={searchOpen}
+        store={library.store}
+        registry={registry}
+        onOpenChange={setSearchOpen}
+        onInstalled={() => void library.reload()}
       />
       <SkillDetailDialog
         skill={detail}

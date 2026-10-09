@@ -7,6 +7,7 @@
  * skills plugin falls back to its sample data when nobody does.
  */
 import { STATE_ROUTE } from "@workspace/core/state"
+import { createRemoteNet } from "@workspace/core/net"
 import {
   builtinExtensions,
   createHubKernel,
@@ -18,6 +19,7 @@ import {
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
+import { skillsShExtension } from "@workspace/plugin-skills-sh"
 import * as ui from "./ui-kit.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
 
@@ -139,6 +141,7 @@ export async function startHub(): Promise<HubKernel> {
     form: "Web",
     capabilities: { code: true, filesystem: false, network: true },
     storage,
+    net: createRemoteNet(),
     log: (level, message) => {
       console[level](message)
     },
@@ -156,6 +159,7 @@ export async function startHub(): Promise<HubKernel> {
     extensions: [
       ...builtinExtensions,
       skillsExtension,
+      skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),
     ],
