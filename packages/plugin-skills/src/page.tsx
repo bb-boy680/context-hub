@@ -274,6 +274,10 @@ function PlaceMenu({
     <DropdownMenuContent
       align="start"
       sideOffset={6}
+      /* A menu drawn in a portal is still a React child of whatever opened it,
+         so its clicks bubble to that element's own handler: on a card, choosing
+         a place would also open the skill it belongs to. */
+      onClick={(event) => event.stopPropagation()}
       /* A searchable menu scrolls its own list, under a field that stays put,
          so the popup itself must not be the scroller. */
       className={`w-[280px] ${searchable ? "overflow-hidden p-0" : ""}`}
