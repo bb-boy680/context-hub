@@ -21,6 +21,7 @@ export const mcpMessages: Record<string, string> = {
   "mcp.search.clear": "Clear the search",
   "mcp.tag.all": "All tags",
   "mcp.column.select": "Select",
+  "mcp.column.selectAll": "Select every row on this page",
   "mcp.column.server": "SERVER",
   "mcp.column.place": "PLACE",
   "mcp.column.check": "CHECK",
@@ -95,10 +96,6 @@ export const mcpMessages: Record<string, string> = {
   "mcp.empty.none.hint": "Add one, or point a client at a server and check again.",
   "mcp.footer.count":
     "Showing {shown} / {total} servers · {declarations} declarations · checked {time}",
-  "mcp.footer.first": "First page",
-  "mcp.footer.previous": "Previous page",
-  "mcp.footer.next": "Next page",
-  "mcp.footer.last": "Last page",
   "mcp.detail.tab.config": "Configuration",
   "mcp.detail.tab.tools": "Tools",
   "mcp.detail.tab.files": "Config files",

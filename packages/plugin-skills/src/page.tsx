@@ -35,36 +35,26 @@ import { useContributions, useI18n } from "@workspace/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 import {
   FilterBar,
+  Ledger,
+  PageBody,
   PlaceMenu,
   PlaceScopePicker,
+  TablePagination,
+  type LedgerColumn,
   type PlaceOption,
   type PlaceWords,
 } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
-import { Card } from "@workspace/ui/components/card"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table"
-import { TablePagination } from "@workspace/ui/components/table-pagination"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
-
-const cardSurface =
-  "[--card-spacing:1.5rem] rounded-xl ring-1 ring-border"
 
 /** The two scopes, in the order a list of places reads them. */
 const SCOPES: readonly AssetScope[] = ["workspace", "global"]
@@ -111,19 +101,6 @@ function matchesQuery(row: Skill, text: string) {
     row.tags.some((item) => item.toLowerCase().includes(text))
   )
 }
-
-/* Column widths as shares of the table, not fixed pixels. The table is
-   `table-fixed` inside a panel whose width follows the window, so fixed widths
-   pushed the action column off the right edge — the one column the list exists
-   for. The shares keep the design's proportions at any width. */
-const columns = [
-  { labelKey: "", width: "2.9%" },
-  { labelKey: "skills.column.skill", width: "43.1%" },
-  { labelKey: "skills.column.tags", width: "19.3%" },
-  { labelKey: "skills.column.location", width: "16.1%" },
-  { labelKey: "skills.column.updated", width: "10.1%" },
-  { labelKey: "skills.column.action", width: "8.5%" },
-]
 
 const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
 
@@ -701,20 +678,17 @@ function Highlighted({ text, needle }: { text: string; needle: string }) {
   )
 }
 
-/* The batch strip heads the table whether or not a row is ticked: the action
-   has to be visible to be discoverable, and a bar that comes and goes shifts
-   the rows under the pointer that just ticked one. */
-function BulkBar({
+/* The batch strip's own action: the places a skill can be installed into. The
+   strip around it belongs to the ledger. */
+function BatchInstall({
   count,
   blocked,
   onInstall,
-  onClear,
 }: {
   count: number
   /** Why a workspace place cannot be written, ready to show; `null` when one can. */
   blocked: string | null
   onInstall: (ref: SkillPlaceRef) => void
-  onClear: () => void
 }) {
   const { t } = useI18n()
   const places = useReadablePlaces()
@@ -723,55 +697,41 @@ function BulkBar({
   const writable = places.filter((place) => place.scope !== "workspace" || blocked === null)
 
   return (
-    <div className="flex h-14 shrink-0 items-center gap-3 border-b border-border bg-surface-raised px-5">
-      <span className="flex h-7 items-center rounded-full bg-foreground px-3 text-[12.5px] font-semibold text-background">
-        {t("skills.batch.selected").replace("{count}", String(count))}
-      </span>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={count === 0}
-        onClick={onClear}
-        className="ml-auto h-[34px] rounded-full border-border bg-transparent px-4 text-[13px] font-semibold dark:border-input dark:bg-transparent"
-      >
-        {t("skills.batch.clear")}
-      </Button>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          render={
-            <Button
-              type="button"
-              disabled={count === 0 || writable.length === 0}
-              title={writable.length === 0 ? (blocked ?? undefined) : undefined}
-              className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
-            >
-              {t("skills.action.installInto")}
-              <ChevronDownIcon className="size-3.5" />
-            </Button>
-          }
-        />
-        <PlaceMenu
-          title={t("skills.action.installInto")}
-          words={placeWords(t)}
-          groups={SCOPES.map((scope) => ({
-            label: t(`skills.group.${scope}`),
-            options: writable
-              .filter((place) => place.scope === scope)
-              .map((place) => ({
-                id: place.id,
-                icon: place.icon,
-                label: t(place.labelKey),
-                where: placePath(place),
-                blocked: place.scope === "workspace" ? blocked : null,
-              })),
-          })).filter((group) => group.options.length > 0)}
-          onPick={(id) => {
-            const place = writable.find((entry) => entry.id === id)
-            if (place !== undefined) onInstall({ scope: place.scope, dir: place.dir })
-          }}
-        />
-      </DropdownMenu>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            disabled={count === 0 || writable.length === 0}
+            title={writable.length === 0 ? (blocked ?? undefined) : undefined}
+            className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
+          >
+            {t("skills.action.installInto")}
+            <ChevronDownIcon className="size-3.5" />
+          </Button>
+        }
+      />
+      <PlaceMenu
+        title={t("skills.action.installInto")}
+        words={placeWords(t)}
+        groups={SCOPES.map((scope) => ({
+          label: t(`skills.group.${scope}`),
+          options: writable
+            .filter((place) => place.scope === scope)
+            .map((place) => ({
+              id: place.id,
+              icon: place.icon,
+              label: t(place.labelKey),
+              where: placePath(place),
+              blocked: place.scope === "workspace" ? blocked : null,
+            })),
+        })).filter((group) => group.options.length > 0)}
+        onPick={(id) => {
+          const place = writable.find((entry) => entry.id === id)
+          if (place !== undefined) onInstall({ scope: place.scope, dir: place.dir })
+        }}
+      />
+    </DropdownMenu>
   )
 }
 
@@ -801,127 +761,103 @@ function SkillTable({
 }) {
   const { t } = useI18n()
 
-  const keys = skills.map(skillKey)
-  const allChecked = keys.length > 0 && keys.every((key) => checked.includes(key))
-  const someChecked = checked.length > 0 && !allChecked
-
-  const toggle = (skill: Skill, next: boolean) => {
-    const key = skillKey(skill)
-    onCheck(next ? [...checked, key] : checked.filter((item) => item !== key))
-  }
+  /* Column widths as shares of the table, not fixed pixels. The table is
+     `table-fixed` inside a panel whose width follows the window, so fixed widths
+     pushed the action column off the right edge — the one column the list exists
+     for. The shares keep the design's proportions at any width. */
+  const columns: LedgerColumn<Skill>[] = [
+    { key: "select", width: "2.9%" },
+    {
+      key: "skill",
+      label: t("skills.column.skill"),
+      width: "43.1%",
+      cell: (skill) => (
+        <div className="flex items-center gap-3">
+          <SkillThumb skill={skill} />
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate text-[14px] leading-[18px] font-semibold">
+                <Highlighted text={skill.name} needle={needle} />
+              </span>
+              <UpdateBadge skill={skill} />
+            </span>
+            <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
+              <Highlighted text={skill.description} needle={needle} />
+            </span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: "tags",
+      label: t("skills.column.tags"),
+      width: "19.3%",
+      cell: (skill) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {skill.tags.map((tag) => (
+            <TagChip key={tag} tag={tag} size="md" />
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "location",
+      label: t("skills.column.location"),
+      width: "16.1%",
+      cell: (skill) => <ProvenanceLine skill={skill} />,
+    },
+    {
+      key: "updated",
+      label: t("skills.column.updated"),
+      width: "10.1%",
+      cell: (skill) => (
+        <span className="text-[13px] text-muted-foreground">{skill.updated}</span>
+      ),
+    },
+    {
+      key: "action",
+      label: t("skills.column.action"),
+      width: "8.5%",
+      cell: (skill) => (
+        <SkillActionButton
+          skill={skill}
+          blocked={blocked}
+          onInstall={(ref) => onInstall(skill, ref)}
+          onAdopt={(ref) => onAdopt(skill, ref)}
+          onRemove={(ref) => onRemove(skill, ref)}
+        />
+      ),
+    },
+  ]
 
   return (
-    <Card className={`${cardSurface} gap-0 overflow-hidden py-0`}>
-      <BulkBar
-        count={checked.length}
-        blocked={blocked}
-        onInstall={(ref) => {
-          for (const skill of skills) {
-            if (checked.includes(skillKey(skill))) onInstall(skill, ref)
-          }
-          onCheck([])
-        }}
-        onClear={() => onCheck([])}
-      />
-      <Table className="table-fixed">
-        <TableHeader>
-          <TableRow className="h-11 border-b border-border hover:bg-transparent">
-            {columns.map((column, index) => (
-              <TableHead
-                key={column.labelKey || index}
-                style={{ width: column.width }}
-                className={
-                  index === 0
-                    ? "p-0 pl-5"
-                    : index === columns.length - 1
-                      ? "p-0 pr-5 pl-3.5 text-[12px] font-semibold text-muted-soft"
-                      : "p-0 pl-3.5 text-[12px] font-semibold text-muted-soft"
-                }
-              >
-                {/* The head takes the whole page's rows at once; a page that is
-                    only partly ticked shows the dash rather than a check. */}
-                {index === 0 ? (
-                  <Checkbox
-                    checked={allChecked}
-                    indeterminate={someChecked}
-                    onCheckedChange={(next) => onCheck(next === true ? keys : [])}
-                    aria-label={t("skills.table.selectAll")}
-                    className="size-[18px] rounded-[4px]"
-                  />
-                ) : (
-                  t(column.labelKey)
-                )}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {skills.map((skill) => (
-            <TableRow
-              key={skillKey(skill)}
-              tabIndex={0}
-              onClick={() => onOpen(skill)}
-              /* A row is not a button, so it answers the two keys a button
-                 would rather than pretending to be one. */
-              onKeyDown={(event) => {
-                if (event.key !== "Enter" && event.key !== " ") return
-                if (event.target !== event.currentTarget) return
-                event.preventDefault()
-                onOpen(skill)
-              }}
-              className="h-[66px] cursor-pointer border-b border-border outline-none last:border-b-0 hover:bg-accent/40 focus-visible:bg-accent/40"
-            >
-              <TableCell onClick={(event) => event.stopPropagation()} className="p-0 pl-5">
-                <Checkbox
-                  checked={checked.includes(skillKey(skill))}
-                  onCheckedChange={(next) => toggle(skill, next === true)}
-                  aria-label={`${t("skills.table.select")} ${skill.name}`}
-                  className="size-[18px] rounded-[4px]"
-                />
-              </TableCell>
-              <TableCell className="p-0 pl-3.5">
-                <div className="flex items-center gap-3">
-                  <SkillThumb skill={skill} />
-                  <div className="flex min-w-0 flex-col gap-1.5">
-                    <span className="flex min-w-0 items-center gap-1.5">
-                      <span className="truncate text-[14px] leading-[18px] font-semibold">
-                        <Highlighted text={skill.name} needle={needle} />
-                      </span>
-                      <UpdateBadge skill={skill} />
-                    </span>
-                    <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
-                      <Highlighted text={skill.description} needle={needle} />
-                    </span>
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell className="p-0 pl-3.5">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {skill.tags.map((tag) => (
-                    <TagChip key={tag} tag={tag} size="md" />
-                  ))}
-                </div>
-              </TableCell>
-              <TableCell className="p-0 pl-3.5">
-                <ProvenanceLine skill={skill} />
-              </TableCell>
-              <TableCell className="p-0 pl-3.5 text-[13px] text-muted-foreground">
-                {skill.updated}
-              </TableCell>
-              <TableCell className="p-0 pr-5 pl-3.5">
-                <SkillActionButton
-                  skill={skill}
-                  blocked={blocked}
-                  onInstall={(ref) => onInstall(skill, ref)}
-                  onAdopt={(ref) => onAdopt(skill, ref)}
-                  onRemove={(ref) => onRemove(skill, ref)}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </Card>
+    <Ledger
+      columns={columns}
+      rows={skills}
+      rowKey={skillKey}
+      checked={checked}
+      onCheck={onCheck}
+      selectLabel={(skill) => `${t("skills.table.select")} ${skill.name}`}
+      selectAllLabel={t("skills.table.selectAll")}
+      batch={{
+        label: t("skills.batch.selected").replace("{count}", String(checked.length)),
+        clearLabel: t("skills.batch.clear"),
+        onClear: () => onCheck([]),
+        action: (
+          <BatchInstall
+            count={checked.length}
+            blocked={blocked}
+            onInstall={(ref) => {
+              for (const skill of skills) {
+                if (checked.includes(skillKey(skill))) onInstall(skill, ref)
+              }
+              onCheck([])
+            }}
+          />
+        ),
+      }}
+      onOpen={onOpen}
+    />
   )
 }
 
@@ -1242,6 +1178,20 @@ export function SkillsPage() {
     />
   )
 
+  /* The page's own footer, not a strip inside whichever view is open: it reads
+     the whole filtered set, so switching views leaves it where it is. */
+  const footer =
+    skills.length === 0 ? null : (
+      <div className="flex h-9 shrink-0 items-center justify-between gap-4">
+        <span className="text-[13px] text-muted-foreground">
+          {t("skills.footer.count")
+            .replace("{shown}", String(skills.length))
+            .replace("{total}", String(matching.length))}
+        </span>
+        {pagination}
+      </div>
+    )
+
   return (
     <div className="flex flex-1 flex-col gap-8">
       <PageHeading />
@@ -1363,149 +1313,137 @@ export function SkillsPage() {
         {refusal === null ? null : (
           <span className="text-xs leading-[15px] text-destructive">{refusal}</span>
         )}
-        <TabsContent value={tab} className="flex flex-col gap-6">
-          {library.store === null ? (
-            /* No library at all is a different answer from an empty one: the
-               rows would have to be invented, and an invented catalog is worse
-               than saying where the real one lives. */
-            <EmptyState
-              icon={TriangleAlertIcon}
-              title={t("skills.empty.noLibrary")}
-              hint={t("skills.empty.noLibraryHint")}
-            />
-          ) : library.loading ? (
-            <GridSkeleton />
-          ) : library.error !== null ? (
-            /* A read that failed says what failed and leaves the last answer
-               standing: an error is not a reason to lose the list. */
-            <EmptyState
-              icon={TriangleAlertIcon}
-              title={t("skills.failed.title")}
-              hint={t("skills.failed.hint")}
-              note={library.error}
-              action={
-                <Button className="h-10 rounded-full px-4" onClick={() => void library.reload()}>
-                  {t("skills.retry")}
-                </Button>
-              }
-            />
-          ) : skills.length === 0 ? (
-            needle !== "" ? (
-              /* The filters, not the library: saying "no skills yet" here would
-                 be a lie about a library that may hold plenty. */
+        <TabsContent value={tab} className="flex flex-col">
+          <PageBody footer={footer}>
+            {library.store === null ? (
+              /* No library at all is a different answer from an empty one: the
+                 rows would have to be invented, and an invented catalog is worse
+                 than saying where the real one lives. */
               <EmptyState
-                icon={SearchXIcon}
-                title={t("skills.empty.filter")}
-                hint={t("skills.empty.filterHint").replace("{query}", needle)}
+                icon={TriangleAlertIcon}
+                title={t("skills.empty.noLibrary")}
+                hint={t("skills.empty.noLibraryHint")}
+              />
+            ) : library.loading ? (
+              <GridSkeleton />
+            ) : library.error !== null ? (
+              /* A read that failed says what failed and leaves the last answer
+                 standing: an error is not a reason to lose the list. */
+              <EmptyState
+                icon={TriangleAlertIcon}
+                title={t("skills.failed.title")}
+                hint={t("skills.failed.hint")}
+                note={library.error}
                 action={
-                  <Button
-                    className="h-10 rounded-full px-4"
-                    onClick={() => {
-                      setQuery("")
-                      setTag("All tags")
-                    }}
-                  >
-                    {t("skills.filter.reset")}
-                  </Button>
-                }
-                secondary={
-                  <Button
-                    variant="outline"
-                    className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
-                    onClick={() => setSearchOpen(true)}
-                  >
-                    <CompassIcon />
-                    {t("skills.action.exploreRemote")}
+                  <Button className="h-10 rounded-full px-4" onClick={() => void library.reload()}>
+                    {t("skills.retry")}
                   </Button>
                 }
               />
-            ) : scopeEmpty !== null ? (
-              <EmptyState
-                icon={scopeEmpty.icon}
-                title={scopeEmpty.title}
-                hint={scopeEmpty.hint}
-                note={scopeEmpty.note}
-                action={
-                  /* Narrowed to one place, the way out is the scope it came
-                     from; otherwise the whole library is. */
-                  chosen === null ? (
-                    <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
-                      {t("skills.tab.all")}
-                    </Button>
-                  ) : (
+            ) : skills.length === 0 ? (
+              needle !== "" ? (
+                /* The filters, not the library: saying "no skills yet" here would
+                   be a lie about a library that may hold plenty. */
+                <EmptyState
+                  icon={SearchXIcon}
+                  title={t("skills.empty.filter")}
+                  hint={t("skills.empty.filterHint").replace("{query}", needle)}
+                  action={
                     <Button
                       className="h-10 rounded-full px-4"
-                      onClick={() => setNarrowed(null)}
+                      onClick={() => {
+                        setQuery("")
+                        setTag("All tags")
+                      }}
                     >
-                      {t("skills.place.all")}
+                      {t("skills.filter.reset")}
                     </Button>
-                  )
-                }
+                  }
+                  secondary={
+                    <Button
+                      variant="outline"
+                      className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+                      onClick={() => setSearchOpen(true)}
+                    >
+                      <CompassIcon />
+                      {t("skills.action.exploreRemote")}
+                    </Button>
+                  }
+                />
+              ) : scopeEmpty !== null ? (
+                <EmptyState
+                  icon={scopeEmpty.icon}
+                  title={scopeEmpty.title}
+                  hint={scopeEmpty.hint}
+                  note={scopeEmpty.note}
+                  action={
+                    /* Narrowed to one place, the way out is the scope it came
+                       from; otherwise the whole library is. */
+                    chosen === null ? (
+                      <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
+                        {t("skills.tab.all")}
+                      </Button>
+                    ) : (
+                      <Button
+                        className="h-10 rounded-full px-4"
+                        onClick={() => setNarrowed(null)}
+                      >
+                        {t("skills.place.all")}
+                      </Button>
+                    )
+                  }
+                />
+              ) : (
+                <EmptyState
+                  icon={FolderPlusIcon}
+                  title={t("skills.empty.library")}
+                  hint={t("skills.empty.libraryHint")}
+                  note={library.root}
+                  action={
+                    <Button
+                      className="h-10 rounded-full px-4"
+                      onClick={() => setAddTab("local")}
+                    >
+                      <FolderPlusIcon />
+                      {t("skills.action.importFolder")}
+                    </Button>
+                  }
+                  secondary={
+                    <Button
+                      variant="outline"
+                      className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+                      onClick={() => setSearchOpen(true)}
+                    >
+                      <CompassIcon />
+                      {t("skills.action.exploreRemote")}
+                    </Button>
+                  }
+                />
+              )
+            ) : view === "grid" ? (
+              <SkillGrid
+                skills={skills}
+                store={library.store}
+                blocked={blocked}
+                onInstall={install}
+                onAdopt={adopt}
+                onRemove={uninstall}
+                onOpen={openDetail}
               />
             ) : (
-              <EmptyState
-                icon={FolderPlusIcon}
-                title={t("skills.empty.library")}
-                hint={t("skills.empty.libraryHint")}
-                note={library.root}
-                action={
-                  <Button
-                    className="h-10 rounded-full px-4"
-                    onClick={() => setAddTab("local")}
-                  >
-                    <FolderPlusIcon />
-                    {t("skills.action.importFolder")}
-                  </Button>
-                }
-                secondary={
-                  <Button
-                    variant="outline"
-                    className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
-                    onClick={() => setSearchOpen(true)}
-                  >
-                    <CompassIcon />
-                    {t("skills.action.exploreRemote")}
-                  </Button>
-                }
+              <SkillTable
+                skills={skills}
+                needle={needle}
+                checked={checked}
+                onCheck={setChecked}
+                blocked={blocked}
+                onInstall={install}
+                onAdopt={adopt}
+                onRemove={uninstall}
+                onOpen={openDetail}
               />
-            )
-          ) : view === "grid" ? (
-            <SkillGrid
-              skills={skills}
-              store={library.store}
-              blocked={blocked}
-              onInstall={install}
-              onAdopt={adopt}
-              onRemove={uninstall}
-              onOpen={openDetail}
-            />
-          ) : (
-            <SkillTable
-              skills={skills}
-              needle={needle}
-              checked={checked}
-              onCheck={setChecked}
-              blocked={blocked}
-              onInstall={install}
-              onAdopt={adopt}
-              onRemove={uninstall}
-              onOpen={openDetail}
-            />
-          )}
-          {/* The page's own footer, not a strip inside whichever view is open:
-              it reads the whole filtered set, so switching views leaves it
-              where it is. `mt-auto` holds it at the foot of the content while
-              the list is short, and lets it follow the list once it is long. */}
-          {skills.length === 0 ? null : (
-            <div className="mt-auto flex h-9 shrink-0 items-center justify-between gap-4">
-              <span className="text-[13px] text-muted-foreground">
-                {t("skills.footer.count")
-                  .replace("{shown}", String(skills.length))
-                  .replace("{total}", String(matching.length))}
-              </span>
-              {pagination}
-            </div>
-          )}
+            )}
+          </PageBody>
         </TabsContent>
       </Tabs>
       <AddSkillDialog

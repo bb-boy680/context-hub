@@ -23,6 +23,7 @@ import {
   type Plugin,
   type PluginMarketplace,
 } from "@/lib/plugins"
+import { TablePagination } from "@workspace/extensions/components"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -48,7 +49,6 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
-import { TablePagination } from "@workspace/ui/components/table-pagination"
 import {
   Tabs,
   TabsContent,

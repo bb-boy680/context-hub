@@ -8,11 +8,6 @@
  * this component's state.
  */
 import {
-  ChevronDownIcon,
-  ChevronsLeftIcon,
-  ChevronsRightIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CircleCheckIcon,
   ContainerIcon,
   GlobeIcon,
@@ -40,7 +35,9 @@ import type { McpAgentPlace, McpPlaceKind, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import {
   FilterBar,
+  PageBody,
   PlaceScopePicker,
+  TablePagination,
   type PlaceOption,
 } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
@@ -225,17 +222,21 @@ function FilterTabs({
   )
 }
 
-/** The row count, the page size, and the four page buttons. */
+/** The row count on the left, and the shared pager on the right. */
 function Footer({
   shown,
   total,
   declarations,
   age,
+  pager,
 }: {
   shown: number
   total: number
   declarations: number
   age: string
+  /** What pages this collection; it reads the whole filtered set, so it stays
+      put while a view swaps the rows above it. */
+  pager: React.ReactNode
 }) {
   const { t } = useI18n()
 
@@ -248,38 +249,7 @@ function Footer({
           .replace("{declarations}", String(declarations))
           .replace("{time}", age)}
       </span>
-      <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-4">
-        <span className="text-[length:var(--text-caption)] text-muted-foreground">
-          {t("pager.rowsPerPage")}
-        </span>
-        <button
-          type="button"
-          className="flex h-8 w-[100px] shrink-0 items-center justify-between rounded-full border border-border px-2.5"
-        >
-          <span className="text-[length:var(--text-body)] text-foreground">12</span>
-          <ChevronDownIcon className="size-4 text-muted-soft" />
-        </button>
-        <span className="text-[length:var(--text-caption)] text-muted-foreground">1 / 1</span>
-        <div className="flex items-center gap-1">
-          {(
-            [
-              [ChevronsLeftIcon, "mcp.footer.first"],
-              [ChevronLeftIcon, "mcp.footer.previous"],
-              [ChevronRightIcon, "mcp.footer.next"],
-              [ChevronsRightIcon, "mcp.footer.last"],
-            ] as const
-          ).map(([Icon, labelKey]) => (
-            <button
-              key={labelKey}
-              type="button"
-              aria-label={t(labelKey)}
-              className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border hover:bg-muted"
-            >
-              <Icon className="size-4 text-muted-soft" />
-            </button>
-          ))}
-        </div>
-      </div>
+      <div className="flex min-h-8 min-w-0 flex-wrap items-center gap-4">{pager}</div>
     </div>
   )
 }
@@ -323,6 +293,8 @@ export function McpServersPage() {
   const [openId, setOpenId] = React.useState<string | null>(null)
   const [adding, setAdding] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
+  const [page, setPage] = React.useState(0)
+  const [pageSize, setPageSize] = React.useState(12)
 
   const counts = React.useMemo(() => {
     const ready = servers.filter((server) => server.status === "ready").length
@@ -386,6 +358,15 @@ export function McpServersPage() {
     })
   }, [servers, query, tab, tag, chosen, places])
 
+  /* A filter, an agent switch, or a shorter list can leave the page past the
+     end; the page shown is clamped rather than an empty stretch of rows. */
+  const pageCount = Math.max(1, Math.ceil(visible.length / pageSize))
+  const shownPage = Math.min(page, pageCount - 1)
+  const rows = React.useMemo(
+    () => visible.slice(shownPage * pageSize, (shownPage + 1) * pageSize),
+    [visible, shownPage, pageSize]
+  )
+
   const declarations = servers.reduce((sum, server) => sum + server.installed, 0)
   const age = ageText(catalog?.scannedAt ?? null, t)
   const open = servers.find((server) => server.id === openId) ?? null
@@ -416,21 +397,6 @@ export function McpServersPage() {
     }),
     [library, places, run]
   )
-
-  const toggle = React.useCallback((id: string) => {
-    setSelected((current) => {
-      const next = new Set(current)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
-    })
-  }, [])
-
-  const toggleAll = React.useCallback(() => {
-    setSelected((current) =>
-      current.size === visible.length ? new Set() : new Set(visible.map((server) => server.id))
-    )
-  }, [visible])
 
   const installSelected = React.useCallback(
     (place: string) => {
@@ -468,10 +434,10 @@ export function McpServersPage() {
           .replace("{message}", problem.message))
 
   return (
-    /* The same shell the skills page uses: the shell's own padding, and a 32px
-       gap between the heading, the toolbar, the filters and the list. Every row
-       below wraps or scrolls on its own, so the page never needs to know how
-       wide it is. */
+    /* The same shell the skills page uses: a 32px gap between the heading, the
+       toolbar, the filters and the body, and the shared body that holds the
+       page's footer at the bottom. Every row inside it wraps or scrolls on its
+       own, so the page never needs to know how wide it is. */
     <div className="flex min-w-0 flex-1 flex-col gap-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-display font-normal text-foreground">{t("mcp.title")}</h1>
@@ -488,7 +454,10 @@ export function McpServersPage() {
             <div className="min-w-0 max-w-full overflow-x-auto">
               <FilterTabs
                 tab={tab}
-                onTab={setTab}
+                onTab={(next) => {
+                  setTab(next)
+                  setPage(0)
+                }}
                 counts={counts}
                 scopePlaces={scopePlaces}
                 chosen={chosen}
@@ -496,6 +465,7 @@ export function McpServersPage() {
                   setTab(scope)
                   setNarrowed(place)
                   setSelected(new Set())
+                  setPage(0)
                 }}
               />
             </div>
@@ -510,11 +480,17 @@ export function McpServersPage() {
 
           <FilterBar
             query={query}
-            onQuery={setQuery}
+            onQuery={(next) => {
+              setQuery(next)
+              setPage(0)
+            }}
             tags={serverTags}
             tag={tag}
             all=""
-            onTag={setTag}
+            onTag={(next) => {
+              setTag(next)
+              setPage(0)
+            }}
             words={{
               search: t("mcp.search.placeholder"),
               clear: t("mcp.search.clear"),
@@ -528,40 +504,59 @@ export function McpServersPage() {
         <span className="text-[12.5px] leading-[1.4] text-destructive">{status}</span>
       )}
 
-      {catalog === null ? (
-        <EmptyState
-          title={t(library.available ? "mcp.empty.none.title" : "mcp.empty.noStore.title")}
-          hint={t(library.available ? "mcp.empty.none.hint" : "mcp.empty.noStore.hint")}
-        />
-      ) : view === "list" ? (
-        <ServerListView
-          servers={visible}
-          places={places}
-          selected={selected}
-          onToggle={toggle}
-          onToggleAll={toggleAll}
-          onClearSelection={() => setSelected(new Set())}
-          onInstallSelected={installSelected}
-          onOpen={(server) => setOpenId(server.id)}
-          rowActions={rowActions}
-        />
-      ) : (
-        <ServerCardView
-          servers={visible}
-          age={age}
-          onOpen={(server) => setOpenId(server.id)}
-          rowActions={rowActions}
-        />
-      )}
-
-      {catalog === null ? null : (
-        <Footer
-          shown={visible.length}
-          total={servers.length}
-          declarations={declarations}
-          age={age}
-        />
-      )}
+      <PageBody
+        footer={
+          catalog === null ? null : (
+            <Footer
+              shown={rows.length}
+              total={visible.length}
+              declarations={declarations}
+              age={age}
+              pager={
+                <TablePagination
+                  pageText={`${shownPage + 1} / ${pageCount}`}
+                  label={t("pager.rowsPerPage")}
+                  pageSize={pageSize}
+                  onPageSizeChange={(size) => {
+                    setPageSize(size)
+                    setPage(0)
+                  }}
+                  canPrev={shownPage > 0}
+                  canNext={shownPage + 1 < pageCount}
+                  onFirst={() => setPage(0)}
+                  onPrev={() => setPage((current) => Math.max(0, current - 1))}
+                  onNext={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+                  onLast={() => setPage(pageCount - 1)}
+                />
+              }
+            />
+          )
+        }
+      >
+        {catalog === null ? (
+          <EmptyState
+            title={t(library.available ? "mcp.empty.none.title" : "mcp.empty.noStore.title")}
+            hint={t(library.available ? "mcp.empty.none.hint" : "mcp.empty.noStore.hint")}
+          />
+        ) : view === "list" ? (
+          <ServerListView
+            servers={rows}
+            places={places}
+            selected={selected}
+            onCheck={(keys) => setSelected(new Set(keys))}
+            onInstallSelected={installSelected}
+            onOpen={(server) => setOpenId(server.id)}
+            rowActions={rowActions}
+          />
+        ) : (
+          <ServerCardView
+            servers={rows}
+            age={age}
+            onOpen={(server) => setOpenId(server.id)}
+            rowActions={rowActions}
+          />
+        )}
+      </PageBody>
 
       {open === null ? null : (
         <ServerDialog

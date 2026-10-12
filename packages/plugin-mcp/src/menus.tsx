@@ -58,12 +58,15 @@ export function InstallToMenu({
   places,
   onToggle,
   align = "start",
+  disabled = false,
 }: {
   server: McpServer
   places: readonly McpAgentPlace[]
   onToggle: (place: string) => void
   /** The batch bar's menu opens under a wide row, so it may need the other edge. */
   align?: "start" | "end"
+  /** A batch has nothing to install until a row is ticked. */
+  disabled?: boolean
 }) {
   const { t } = useI18n()
   const state = new Map(server.detail.installs.map((install) => [install.place, install]))
@@ -75,6 +78,7 @@ export function InstallToMenu({
           <Button
             variant="secondary"
             aria-label={t("mcp.action.installTo")}
+            disabled={disabled}
             onClick={stop}
             className={TRIGGER}
           >

@@ -1952,6 +1952,50 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
       断链、同名拒装、越界名字拒装、库外技能拒删）；`check-workspaces.ts` 重写到 33 项（含列目录）；
       `check-store.ts` / `check-state.ts` 无回归；浏览器实测见下
 
+## 分页控件上移为共享组件，MCP 接上真分页（2026-10-12）
+
+用户："把这个分页组件也封装成公用组件，然后提供给MCP使用。现在MCP的分页组件使用不了"
+
+- `TablePagination` 从 `packages/ui/src/components/table-pagination.tsx` 移到
+  `packages/extensions/src/components/pagination.tsx`，从 barrel `@workspace/extensions/components` 一处导入
+  （与 PlacePicker / TagEditor / FilterBar / DialogSplit / PageBody 同一套路），旧文件删除；
+  三处调用点（skills 页、shell 的 overview / plugins）改从 barrel 导入。
+- MCP 页脚原本是一份**手写的假分页**（硬编码 "12"、永远是 "1 / 1"、四个按钮没有 `onClick`），
+  现在换成共享控件并接上真分页：`page` / `pageSize` 状态、`pageCount` 与钳制后的 `shownPage`、
+  `rows = visible.slice(...)` 交给列表与卡片两个视图共用；页签 / 范围 / 搜索 / 类型变化时 `setPage(0)`；
+  表头全选只覆盖当前页；页脚左侧计数仍是全量声明数与上次检查时间。
+- 死键清理：假分页四个按钮的 aria-label `mcp.footer.first|previous|next|last` 已从 en 与 zh 删除。
+- 验证：extensions / plugin-skills / plugin-mcp / web 四个包 `tsc --noEmit` 与 lint 全绿，
+  `check-messages.ts` 423/423。浏览器里 skills 页脚仍是 `显示 12 / 19 · 1 / 2`；MCP 页把 `pageSize`
+  临时设为 2 → `1 / 2`（钉钉两条）→ 点下一页 → `2 / 2`（context7 / playwright），切到列表视图也只渲染
+  该页 2 行，按钮禁用状态随页码翻转；改回 12 后 `1 / 1`，Console 0 error。
+
+## 表格上移为共享 Ledger，MCP 列表改用同一张表（2026-10-12）
+
+用户："把这个表格组件也封装成公用的组件，现在MCP的表格组件和功能稍微差很多"
+
+- 新增 `packages/extensions/src/components/ledger.tsx`（barrel 导出 `Ledger` / `LedgerColumn` / `LedgerBatch`）：
+  卡片外壳 + 批量条 + `table-fixed` 表格 + 表头（第一列是全选框、部分选中显示短横）+ 66px 行
+  （hover / focus-visible 底色、选中底色、Enter/Space 开详情、末行无分隔线）+ 首列 20px / 中间 14px / 末列 14+20 的单元格内边距。
+  列宽一律是**份额**（`width: "43.1%"`），列的内容由调用方给 `cell`；不带 `cell` 的那一列就是勾选列（组件自己画）。
+  批量条**常显**（技能页原有理由：动作要看得见、且条子进出会把行顶到指针下面），条内的动作是调用方给的节点。
+- 技能页：`SkillTable` 的整段表格换成 `Ledger`，`BulkBar` 瘦成只产"安装到"菜单的 `BatchInstall`，
+  模块级 `columns` 常量与 `Card`/`Checkbox`/`Table*` 导入一并删除（契约现在由控件持有）。
+- MCP：`list-view.tsx` 整份重写成 `Ledger` + 六个 `cell`，列宽取画布 32/338/136/150/128/244 的份额
+  （3.1/32.9/13.2/14.6/12.5/23.7%）。因此 MCP 列表**补齐**了技能页有的东西：行 hover / 键盘可达、
+  常显批量条、表头 44px、末行无分隔线、勾选行底色；**失去**了原来 690px 固定高 + 内部横竖滚动
+  （现在与卡片视图、技能页一致：卡片随内容长，整页滚动）。`page.tsx` 的 `toggle`/`toggleAll` 删除，
+  选择改为控件回报整个数组（`onCheck={(keys) => setSelected(new Set(keys))}`）；
+  `InstallToMenu` 加 `disabled`（批量条里没勾选时不可点）；新增键 `mcp.column.selectAll`（中英各一条）。
+- 顺手修掉 `list-view.tsx` 里一处被编辑毁掉的类名 —— `className="flex min-w-0 itemicon={server.check?.icon} s-center gap-4"`
+  （那段文本整个是 class 名，所以 tsc/eslint 都不报；重写后消失）。
+- 验证：extensions / plugin-skills / plugin-mcp / web `tsc --noEmit` 与 lint 全绿，`check-messages.ts` 424/424。
+  浏览器（zh-CN）：MCP 列表 4 行 × 66px、表头 6 列 36/386/155/171/147/278（1172 容器）、表头可全选、
+  勾一行 → 条子"已选 1" + 行底色 #f7f7f7 + 安装到可点，取消 → 恢复且安装到禁用；焦点在第 2 行按 Enter
+  打开详情（新能力）；技能列表 12 行 × 66px、六列标签与内边距仍为 20/14…/14+20、页脚"显示 12 / 19 · 1 / 2"不变；Console 0 error。
+- 遗留差异：技能页与 MCP 的行内容本身不同（缩略图 vs 瓦片、来源行 vs 位置胶囊），那是各自的数据；
+  表头/行的**结构、内边距、行高、交互**现已同一份代码。
+
 # 添加服务器表单：必填校验 + 注释/类型字段 + 占位符 + 去掉 stdio 默认值（2026-10-12，用户报告）
 
 ## 目标（用户原话）

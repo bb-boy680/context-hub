@@ -1,3 +1,12 @@
+/**
+ * The foot of one collection: how many rows a page holds, which page is on
+ * screen, and the four ways through the pages.
+ *
+ * Supplying the handlers wires the pager to real data; without them the control
+ * still draws, disabled, which is how a screen whose data is still sample-sized
+ * keeps the footer's geometry. The caption and the page text are the caller's,
+ * since the primitive ships no copy of its own.
+ */
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -19,7 +28,18 @@ const outline = "border-input bg-transparent dark:bg-transparent"
 /** Rows-per-page choices a wired pager offers. */
 const PAGE_SIZE_CHOICES = [12, 24, 48]
 
-/** Rows-per-page control plus a first/prev/next/last pager, shared by every collection footer. */
+/**
+ * Rows-per-page control plus a first/prev/next/last pager.
+ *
+ * @param pageText — which page is shown, already formatted, e.g. `2 / 5`.
+ * @param label — the rows-per-page caption, which is also the select's
+ * accessible name.
+ * @param compact — keeps only the page text and the two step arrows.
+ * @param pageSize — the rows a page holds; omitting it leaves the select.
+ * @param onPageSizeChange — picks a new page size; omitting it disables the select.
+ * @param onFirst / onPrev / onNext / onLast — the page the person asked for.
+ * @param canPrev / canNext — whether a page sits before or after this one.
+ */
 export function TablePagination({
   pageText,
   label = "Rows per page",
@@ -34,11 +54,8 @@ export function TablePagination({
   canNext = false,
 }: {
   pageText: string
-  /* Localized caption and accessible name; the primitive ships no copy of its own. */
   label?: string
-  /* Grid footers keep only the page text and the two step arrows. */
   compact?: boolean
-  /* Supplying the handlers wires the pager to real data; without them it is a static mock. */
   pageSize?: number
   onPageSizeChange?: (size: number) => void
   onFirst?: () => void
@@ -63,7 +80,7 @@ export function TablePagination({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(pageSize === undefined ? [12, 24, 48] : PAGE_SIZE_CHOICES).map((size) => (
+              {PAGE_SIZE_CHOICES.map((size) => (
                 <SelectItem key={size} value={String(size)}>
                   {size}
                 </SelectItem>
