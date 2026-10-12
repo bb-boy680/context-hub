@@ -15,12 +15,14 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
 import { NET_ROUTE } from "./src/net.ts"
+import { PLACE_FILES_ROUTE, readPlaceCall } from "./src/place-files.ts"
 import { PLUGIN_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
 import { hostFolder } from "./src/host/fs-browse.ts"
 import { resolveHubHome } from "./src/host/home.ts"
+import { createFsPlaceFiles } from "./src/host/place-files.ts"
 import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
 import { createFsWorkspaceStore } from "./src/host/workspaces-fs.ts"
@@ -199,6 +201,67 @@ export function stateStore(options: { home?: string } = {}) {
               return
             }
             response.writeHead(405).end()
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error)
+            sendJson(response, 400, { error: message })
+          }
+        }
+      )
+    },
+  }
+}
+
+/**
+ * Vite plugin that reads and writes the client configuration files a hub
+ * consumer names, so a browser form can reach the files its agent plugins own.
+ * The workspace in use is the one the workspace list holds, so switching
+ * workspace switches the files, and a product form mounts the same reader
+ * itself.
+ */
+export function placeFiles(options: { home?: string; folder?: string } = {}) {
+  const files = createFsPlaceFiles({
+    ...(options.home === undefined ? {} : { home: options.home }),
+    ...(options.folder === undefined ? {} : { folder: options.folder }),
+  })
+
+  return {
+    name: "context-hub-place-files",
+    configureServer(server: {
+      middlewares: { use: (handler: unknown) => void }
+    }) {
+      server.middlewares.use(
+        async (
+          request: IncomingMessage,
+          response: ServerResponse,
+          next: () => void
+        ) => {
+          const url = new URL(request.url ?? "/", "http://localhost")
+          if (!url.pathname.startsWith(PLACE_FILES_ROUTE)) {
+            next()
+            return
+          }
+          if ((request.method ?? "GET") !== "POST") {
+            response.writeHead(405).end()
+            return
+          }
+          try {
+            const call = readPlaceCall(JSON.parse((await readBody(request)).toString("utf8")))
+            if (call.action === "workspace") {
+              sendJson(response, 200, { workspace: await files.workspace() })
+              return
+            }
+            if (call.ref === undefined) throw new Error("a call needs a place")
+            if (call.action === "read") {
+              sendJson(response, 200, { text: await files.read(call.ref) })
+              return
+            }
+            if (call.action === "write") {
+              await files.write(call.ref, call.text ?? "")
+              sendJson(response, 200, { ok: true })
+              return
+            }
+            await files.remove(call.ref)
+            sendJson(response, 200, { ok: true })
           } catch (error) {
             const message = error instanceof Error ? error.message : String(error)
             sendJson(response, 400, { error: message })

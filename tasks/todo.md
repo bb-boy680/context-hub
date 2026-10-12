@@ -1,4 +1,249 @@
-# Context Hub 插件机制（Cordis 内核）落地（2026-10-07）
+# 插件机制：两条轨道 + MCP 由 Agent 插件自持（2026-10-11；2026-10-12 归位）
+
+## 目标
+
+把「插件机制」拆成两条轨道，让 Agent 插件**自己实现** MCP 客户端的读写，而不是把行为伪装成数据
+塞进贡献点：**数据走贡献点，行为走 Cordis 服务**。上一轮（下面那节）的 `mcpLocation` +
+`McpSwitch` 是过渡形状，本轮删除。
+
+## 归位（2026-10-12，用户："为啥 mcp 的功能在 extensions 里面？？不对啊"）
+
+MCP 是**功能**，不是内核机制，所以它的契约与工具集不能留在 `@workspace/extensions`：
+
+- **搬到 `@workspace/plugin-mcp`**：`contract.ts`（导出面）、`provider.ts`（`McpProvider`/`McpService`/
+  `McpRegistry`/`MCP_SERVICE`）、`toolkit.ts`（`McpTools` 全套）、`declaration.ts`/`jsonc.ts`/`toml.ts`/
+  `value.ts`/`failure.ts`。内核的 `src/mcp/` 目录、`"./mcp"` 导出与 `jsonc-parser`/`smol-toml` 依赖**已删**。
+  子路径导出 `@workspace/plugin-mcp/contract` 只带契约，不带页面（所以 Node 下的检查脚本能加载它）。
+- **服务名与类型归发布者**：`declare module "@workspace/extensions" { interface ExtensionServices }`
+  由 plugin-mcp 自己合并；内核只留这张 merge-extensible 表与 `provide`/`inject`。
+- **Agent 插件不再从内核取 MCP**：`plugin-claude-code` 只 `import type … from "@workspace/plugin-mcp/contract"`
+  （类型导入会被擦除，运行期零依赖），注册与编辑器仍然全部来自 `plugins.mcp`。
+- **Codex 搬出内核成为 `@workspace/plugin-codex`**：它要用工具集，而内核不能反向依赖功能插件。
+  包内含 `target` 贡献 + `codex.*` 文案 + provider；`builtin/index.ts` 只剩 Copilot 与英文包；
+  `apps/web` 的目录里加入 `codexExtension`。（副作用：扩展状态文档里键的顺序变了，用户的选择值不变。）
+- 检查脚本随代码走：`plugin-mcp/scripts/check-mcp-tools.ts`、`plugin-codex/scripts/check-provider.ts`。
+
+## 改动
+
+- **内核 `@workspace/extensions/mcp`（已于 2026-10-12 搬到 plugin-mcp，见上）**：声明（`McpDeclaration` + 读/写/单行显示/参数切分）、
+  JSONC 编辑器（`editJson`/`jsonValueLines`/`readJsonObject`，注释与格式保留）、TOML 编辑器
+  （`setTomlEntry`/`setTomlField`/`clearTomlEntry`，写后校验）、失败形状（`McpFailure`/`McpError`/
+  `mcpFailure`）、**服务契约** `McpProvider`/`McpRegistry`/`MCP_SERVICE`。全程无 `node:*`。
+- **服务轨道**：`ExtensionScope.provide(name, api)` / `.inject(names, cb)`；`ExtensionView.provides`
+  让目录页说得清谁提供了什么；manifest 未声明就 provide 会**激活失败**，不是可选行为。
+- **`packages/core` 新增文件缝**：`PlaceRef`/`PlaceFiles`（`read`/`write`/`remove`/`workspace`）+
+  `host/place-files.ts`（原子写、只允许 scope 内相对路径）+ dev 桥 `POST /hub/place-files`
+  （`readPlaceCall` 校验线上形状）。`PlatformHost.files` 是这条缝的入口。
+- **`plugin-mcp` 重写为「记录 + 目录 + 页面 + 注册表」**：不再有 store/remote-store/host/vite；
+  `createMcpRegistry()` 作为 `mcp` 服务发布；记录落 `host.storage` 的 `mcp` 键；目录 = 记录 ∪ 各 provider
+  读到的声明；页面按 provider 分派每个动作；失败一律以 key 报出、由 `library.ts` 翻译成句子。
+- **两个 provider**：`plugin-claude-code/src/provider.ts`（`.mcp.json` + `~/.claude.json`，开关写
+  per-project `disabledMcpServers`，项目键按 `\`→`/` 与大小写归一匹配、绝不新造记录）；
+  `plugin-codex/src/provider.ts`（`mcp_servers` + `enabled` 字段，2026-10-12 从内核搬出）。
+- 删除：`mcpLocation` 贡献点、`McpSwitch`、`MCP_WORKSPACE_SEGMENT`、`plugin-mcp` 的 store 三件套、
+  `hub.mcp` 服务与 `MCP_ENDPOINT` 探活、claude-code 里那段 `contribute("skill"/"mcp")` 草稿。
+
+## 验收（已过；2026-10-12 归位后重跑）
+
+- 检查：`plugin-mcp/scripts/check-mcp-tools.ts` 82/82（含 JSONC 装→卸逐字节还原）、
+  `plugin-mcp/scripts/check-mcp.ts` 43/43（假 provider）、`plugin-mcp/scripts/check-plugin.ts` 29/29
+  （把 example 目录当"下载来的插件"跑通）、`plugin-codex/scripts/check-provider.ts` 30/30
+  （真实 TOML 文件 byte-for-byte 还原）、`plugin-claude-code/scripts/check-provider.ts` 33/33
+  （47KB 真实文件、项目键归一匹配、开关幂等）、`extensions/scripts/check-services.ts` 16/16
+  （含「回调里属性访问会抛，`(ctx, services)` 的 services 才是正路」）、
+  `core/scripts/check-place-files.ts` 27/27、`locale-zh-cn/scripts/check-messages.ts` 387/387
+  （覆盖面扩到全部英文表，含新包的 `codex.*`）。
+  typecheck 10/10；八个包 lint 干净。
+- 浏览器（真实机器、真实文件）：MCP 页读到 `~/.claude.json` 的 `context7`；扩展页启用 Codex →
+  `~/.codex/config.toml` 的位置与 `node_repl` 行出现（图标取自新包的 manifest），停用即消失，
+  `~/.codex/config.toml` 哈希与操作前一致；`state/extensions.json` 恢复为用户原来的选择
+  （Codex 停用；键顺序因插件从内核移到应用目录而变化，值不变）。
+
+## 未决 / 已知
+
+- **skills 还没迁到同一条缝**：`skillLocation` 仍是贡献点 + 自带 codec 的过渡形状，下一轮按同一模型
+  （`SkillProvider` 服务）迁移。
+- 仍缺：测试连接（stdio/http 真握手）、工具页签读真实 `tools/list`、检查结果落盘。
+- 10 个模拟 Agent 插件未做（用户已改口：后面一个个真做）。
+
+## 作用域页签下钻到 Agent（2026-10-12，用户："mcp 页面的 tab 选择没有和 skill 模块一样、可以选择 Agent 智能体"）
+
+- 新增 `plugin-mcp/src/place-picker.tsx`：整段搬自 `plugin-skills/src/page.tsx` 的
+  `PlaceStack` / `PlaceMenu` / `PlacePicker`（20px 瓦片、13px 步进、>5 片显 `+N`、>8 个位置出搜索框、
+  首行「全部位置」+ 勾选态），只换文案键为 `mcp.place.*` 与 `mcp.detail.place.count`。
+- `page.tsx`：`workspace`/`global` 两个页签改由 `PlacePicker` 渲染（`all/ready/failed` 仍是计数按钮，
+  counts 收窄为 `Record<ShellTab, number>`）；新增 `narrowed` 状态与 `chosen` 派生（离开该作用域即失效）；
+  `scopePlaces` 按 `detail.installs` 里 `installed` 的位置给每个位置算「声明了几台」；`visible` 增加
+  按位置收窄（`scopeOf` 由 `places` 派生）。
+- 文案：英文 `mcp.place.which/all/search/searchClear/searchEmpty`，中文同步；`check-messages.ts`
+  387 → 392/392。
+- 浏览器实测（真实机器、仅启用 Claude Code）：两个作用域药丸各带自己的图标堆叠；
+  工作区菜单「位置 1 个位置 / 全部位置 工作区 0 ✓ / 工作区 → Claude Code `.mcp.json` 0」；
+  全局菜单「全部位置 全局 1 ✓ / Claude Code `~/.claude.json` 1」；选单个 Agent 后药丸保持作用域态、
+  菜单勾移到该行、列表只剩 `context7`（显示 1 / 1 个服务器）。
+
+---
+
+# Agent 插件接入 MCP（2026-10-11，过渡形状，已被上一节取代）
+
+## 目标
+
+`plugin-mcp` 原本在 `src/host/places.ts` 里硬编码 4 个客户端文件，claude-code 插件只贡献
+skill 位置。现在 **MCP 的客户端文件由 Agent 插件贡献**，与 skills 同一个模型。
+
+## 改动
+
+- 内核新增贡献点 `mcpLocation`（`{id, label, icon, scope, file, format, key, switchable?, order}`）；
+  原来的 `SkillScope` 重命名为共享的 `AssetScope`（skill 与 MCP 的 place 是同一个「作用域」概念）。
+- 贡献者：`@workspace/plugin-claude-code` 贡献 `.mcp.json`（工作区，order 20）与
+  `~/.claude.json`（全局，order 10）；内核内置 `hub.target.codex` 贡献 `~/.codex/config.toml`
+  （TOML、`mcp_servers`、`switchable`）。
+- `plugin-mcp`：`McpPlaceRef` 随每次调用传入（load/refresh 传数组，写操作传单个），宿主不再知道任何客户端；
+  place 的 label/路径/图标在页面侧由贡献渲染；`McpCatalog` 不再回传 places。
+- 桥改为全 POST（`?action=…` + JSON body），并在边界用 `assertPlaceRef` 校验（拒绝绝对路径、`..`、
+  未知格式、非法表名）；`hub.ts` 的探活改成 `POST ?action=load` 空 places。
+
+## 未决 / 已知
+
+- **Cursor 不再出现在菜单里**：它没有插件，`hud.target.cursor` 之类也不存在（此前是硬编码）。
+  等 Cursor 插件建好会自动出现。
+- MCP 目前读**所有已启用扩展**的位置，不像 skills 的全局位置那样还要求侧栏选中该 agent。
+- 切换开关仍只有 Codex（`enabled` 字段）；Claude Code 的停用名单在 `~/.claude.json` 的 per-project，未做。
+
+---
+
+````markdown
+# MCP 功能实现 + 10 个模拟 Agent（2026-10-11）
+
+## 目标
+
+1. **MCP 从 mock 到真实**：`packages/plugin-mcp` 目前整页 mock（`mock.ts` 提供 9 个服务器、
+   写操作只改内存）。接入与 skills 相同的存储缝：hub 记录落盘 `<home>/mcp/index.json`、
+   读写真实客户端配置文件、检查与（后续）测试连接。
+2. **10 个模拟 Agent**：新建插件包，通过扩展机制注册 9 个 mock Agent
+   （+ 现有 Claude Code = 10 个），图标用 `@lobehub/icons`（Claude Code 同款库）。
+   每个 Agent 是独立 ExtensionDefinition（独立启停、独立 manifest）。
+
+## 已核实的事实（权威，不要重编）
+
+- 本机真实文件：`~/.claude.json`（43 KB，`mcpServers` 为空、含 `projects`）；
+  `~/.codex/config.toml`（含 `[mcp_servers.node_repl]`）；`~/.cursor/mcp.json` 不存在。
+- 键名：Claude Code / Cursor 用 `mcpServers`（`.mcp.json` / `.cursor/mcp.json`）；
+  Codex 是 `mcp_servers`（下划线，`~/.codex/config.toml`）。
+- `@lobehub/icons/es/` 有全部 9 个 Agent 图标；6 个有 `.Color`（Gemini/Qwen/Kiro/Minimax/Qoder/Trae），
+  Cursor / Cline / CommandCode 只有单色（默认导出即图标）。
+- skills CLI（本机缓存 `cli.mjs`）的 Agent 目录表：
+  cursor `.agents/skills`/`~/.cursor/skills`；gemini-cli `.agents/skills`/`~/.gemini/skills`；
+  qwen-code `.qwen/skills`/`~/.qwen/skills`；cline `.agents/skills`/`~/.agents/skills`；
+  kiro-cli `.kiro/skills`/`~/.kiro/skills`；minimax-code `.minimax/skills`/`~/.minimax/skills`；
+  qoder `.qoder/skills`/`~/.qoder/skills`；trae `.trae/skills`/`~/.trae/skills`；
+  command-code `.commandcode/skills`/`~/.commandcode/skills`。
+
+## 数据模型（MCP）
+
+- **声明** `McpDeclaration`：结构化 —— stdio `{command, args, env}` / 远程 `{url, headers}`，按 transport 判别。
+- **记录**（catalog）：`<home>/mcp/index.json`，hub 拥有的服务器记录（声明本体 + 标签/描述/检查字段）。
+- **发现**：扫描 4 个 place 文件，得到每个服务器名的安装位置与各处声明；同名声明不一致 = 冲突。
+- **合并**：列表 = 记录 ∪ 发现（发现但无记录的名字生成归纳行）；installs 由发现计算；
+  「检查」= 重扫 + 冲突比对（不联网）；「测试连接」才是网络/进程操作（阶段 3）。
+
+## 阶段与验收
+
+### 阶段 1 — MCP 数据落地（读 + 记录写入 + 检查）
+- [x] `src/declaration.ts`（声明类型 + 显示串 + 参数切分）、`src/host/toml-edit.ts`（TOML 块级写 + 写后校验）
+- [x] 解析用库：`smol-toml`（读 TOML）+ `jsonc-parser`（读 JSONC / 单节点格式保留写）
+- [x] `src/store.ts` 契约、`src/host/mcp-fs.ts`（catalog + discover + 合并 + create/update/remove/refresh/install/uninstall/setEnabled/file，全部写操作串行化）
+- [x] `src/vite.ts` 桥 + `src/remote-store.ts` + `apps/web` 挂桥 + `hub.ts` 探活注入 + exports
+- [x] `src/library.ts`（useMcpLibrary）+ 页面接线：mock → store；添加/编辑/删除/安装/卸载接通
+- [x] 检查脚本：`scripts/check-mcp.ts`（56 项）+ `scripts/check-messages.ts`（中英键集合对齐）
+- **验收（已过）**：检查脚本 56/56；桥返回真实发现（本机 `~/.codex/config.toml` 的 `node_repl`）；
+  浏览器：添加 → `~/.context-hub/mcp/index.json` 落盘 → 安装到 `.mcp.json`（新建文件，注释保留）→
+  安装到 `~/.codex/config.toml`（只 +4 行）→ 卸载 → **哈希与备份逐字节一致** → 删除记录 → 全仓库 typecheck 9/9。
+  中文包补齐 31 个键（124/124 对齐）。
+
+### 阶段 2 — 写客户端文件（安装/移除/启停/删除/批量）
+- [x] install/uninstall 写 4 个文件：JSON 三件走 jsonc-parser 单节点编辑（注释保留）；Codex TOML 走块编辑 + smol-toml 写后校验
+- [x] 启停：Codex `enabled` 字段（`switchable`；Claude Code 的停用名单在 `~/.claude.json` per-project，暂标自管）
+- [x] 批量安装、详情「保存」（改名会带着已装位置一起改）
+- [x] 删除的确认气泡（照 skills 的 `DeleteBubble`：取消保留、确认才删；失败留在气泡里）
+- [ ] 标签「添加类型」仍无交互
+- **已验**：安装/卸载（`.mcp.json` 新建 + Codex 真文件 +4 行并哈希还原）、删除气泡（取消/确认两条路）；
+  **待验**：启停开关（Codex `enabled`，检查脚本已覆盖，浏览器未点）、批量安装、改名保存、
+  两处端点不同的冲突显示（需要临时造一份不一致的副本）。
+
+### 阶段 3 — 检查增强 + 测试连接 + 工具页签
+- [ ] 「检查」落盘 checked 状态与冲突文案；「测试连接」真握手（stdio spawn / http）；
+  工具页签读真实 `tools/list`；行状态 ready/failed 由检查结果派生
+- **验收**：对真实服务器测试连接成功并列出工具；两处不同端点同名时行上显示冲突。
+
+### 阶段 4 — 9 个模拟 Agent 插件
+- [ ] `packages/plugin-mock-agents`：9 个 ExtensionDefinition（独立启停）+ `@lobehub/icons` 图标 + messages；
+  `apps/web` 加 workspace 依赖并注册；pnpm install + 重启 dev server
+- **验收**：侧栏 Agents 段 10 个（触发 >8 折叠）；勾选 Cursor → 技能页出现其全局页签；
+  扩展页 9 个新条目可独立启停；typecheck/lint 通过。
+
+---
+
+````markdown
+# MCP 设计稿 1:1 还原（2026-10-10）
+
+## 目标
+
+把 `designs/mcp.pen` 里的 MCP 模块按 1:1 还原成 React + shadcn/ui（`@workspace/ui`）实现，
+先用 mock 数据，功能后置；MCP 代码独立成 `packages/plugin-mcp` 插件包。
+
+## 设计稿画板
+
+| # | 画板名 | 位置 | 用途 |
+|---|---|---|---|
+| 1 | Context Hub — MCP servers | (1560,167) | 列表视图主屏 |
+| 2 | Context Hub — MCP servers — Cards | (0,167) | 卡片视图 |
+| 3 | Context Hub — MCP — Add server — HTTP + SSE | (1560,1492) | 远程传输添加弹窗 |
+| 4 | Context Hub — MCP — Add server | (0,1492) | stdio 添加弹窗 |
+| 5 | …filesystem-mcp — Detail · 配置 | (0,2957) | 详情弹窗·配置 |
+| 6 | …filesystem-mcp — Detail · 工具 | (1560,2957) | 详情弹窗·工具 |
+| 7 | …filesystem-mcp — Detail · 配置文件 | (3120,2957) | 详情弹窗·配置文件 |
+| 8–11 | MCP — 配置结构 / 一份记录，多个副本 / 安装与开关 / 工具详情（完整） | — | 说明稿，作为实现依据 |
+
+## 代币映射
+
+`$canvas`→`bg-background`/`bg-card`；`$ink`→`text-foreground`；`$body`→`text-copy`；
+`$muted`→`text-muted-foreground`；`$muted-soft`→`text-muted-soft`；`$hairline`→`border-border`；
+`$surface-soft`→`bg-muted`；`$surface-strong`→`bg-secondary`；`$primary`→`bg-primary`；
+`$on-primary`→`text-primary-foreground`；`$semantic-up`→`text-chart-2`；`$semantic-down`→`text-destructive`；
+圆角 `xs/sm/md/lg/xl/pill` = 4/8/12/16/24/100（`rounded-xs/sm/md/lg/xl/full`）。
+
+## 阶段与验收
+
+### 阶段 0 — 基建
+- 新建 `packages/plugin-mcp`（package.json / tsconfig / eslint / src）。
+- 导出 `mcpExtension`，用内核 `nav` + `route` 贡献 `/mcp-servers`。
+- `apps/web` 移除内置 MCP 页与内置导航项，改由插件提供。
+- **验收**：`pnpm dev` 起得来，`/mcp-servers` 渲染插件页面，侧栏项来自插件；`pnpm typecheck` 通过。
+
+### 阶段 1 — 列表页（画板 1 `q6TFxz`）
+- **验收**：内容区 pad 20/32 gap 24；页签条 h36/gap2/pad3；搜索 300×44；9 个标签胶囊；
+  Ledger 690 高 `$radius-xl` + Bulk Bar h56 + Head h40（列宽 32/338/136/150/128/244）+ 行高 66；
+  9 行数据与画板逐行一致；Footer 文案一致。
+
+### 阶段 2 — 卡片视图（画板 2 `IAZDi`）
+- **验收**：卡片数量、封面、标题、状态、位置行与画板一致。
+
+### 阶段 3 — 详情弹窗 · 配置（画板 5 `WbVnP`）
+- **验收**：弹窗 1088×712；左 Tab Bar h48 + 指示器 30×2 `$primary`；右面板 360；表单 5 分区。
+  不做权限控件（画板已删）。
+
+### 阶段 4 — 详情弹窗 · 工具（画板 6 `hCArW` + 说明稿 11）
+- **验收**：14 项工具名一致；树缩进 16px/级；必填 `*` 红色。
+
+### 阶段 5 — 详情弹窗 · 配置文件（画板 7 `u1UBUK`）
+- **验收**：文件名、路径、片段与画板一致。
+
+### 阶段 6 — 添加服务器弹窗（画板 3、4）
+- **验收**：字段、按钮、提示文案与画板一致。
+
+### 收尾
+- `pnpm lint` / `pnpm typecheck` / `pnpm build` 通过；删掉本次核对截图。
 
 ## 目标
 

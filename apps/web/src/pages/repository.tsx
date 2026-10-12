@@ -121,7 +121,7 @@ function RepositoryCard() {
           <div className="relative">
             <GitForkIcon className="pointer-events-none absolute top-1/2 left-3 size-[15px] -translate-y-1/2 text-muted-foreground" />
             <Input
-              className="h-[38px] pl-8.5 text-[13.5px]"
+              className="h-[38px] pl-8.5 font-mono text-[13.5px]"
               defaultValue={repository}
               aria-label="Repository"
             />
@@ -152,7 +152,7 @@ function RepositoryCard() {
             <div className="relative">
               <FolderIcon className="pointer-events-none absolute top-1/2 left-3 size-[15px] -translate-y-1/2 text-muted-foreground" />
               <Input
-                className="h-[38px] pl-8.5 text-[13.5px]"
+                className="h-[38px] pl-8.5 font-mono text-[13.5px]"
                 defaultValue={repositoryPath}
                 aria-label="Path in repository"
               />
@@ -256,9 +256,9 @@ const connectionMeta: { key: string; value: ReactNode }[] = [
   },
   {
     key: "Repository",
-    value: <span className="text-xs leading-4">{repository}</span>,
+    value: <span className="font-mono text-xs leading-4">{repository}</span>,
   },
-  { key: "Branch", value: <span className="text-xs leading-4">{branch}</span> },
+  { key: "Branch", value: <span className="font-mono text-xs leading-4">{branch}</span> },
   {
     key: "Visibility",
     value: <span className="text-xs leading-4">Private</span>,
@@ -269,7 +269,7 @@ const connectionMeta: { key: string; value: ReactNode }[] = [
   },
   {
     key: "Latest commit",
-    value: <span className="text-xs leading-4">8f21ac4</span>,
+    value: <span className="font-mono text-xs leading-4">8f21ac4</span>,
   },
 ]
 
@@ -321,7 +321,7 @@ function RecentSyncsCard() {
             className="flex h-[50px] items-center gap-4 border-b border-border"
           >
             <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-              <span className="text-xs leading-4">{sync.commit}</span>
+              <span className="font-mono text-xs leading-4">{sync.commit}</span>
               <span className="text-[11.5px] leading-[14px] text-muted-foreground">
                 {sync.meta}
               </span>

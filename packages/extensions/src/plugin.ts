@@ -61,6 +61,11 @@ export interface PluginModule {
  * The scope a disk plugin's `activate` receives: the kernel's own scope plus
  * what a module that imports nothing still needs — React, the icon table (a
  * contribution carries a component, not a name), and the form's UI kit.
+ *
+ * Anything else a plugin would have imported arrives as a service instead: the
+ * MCP toolkit, for instance, rides on the `mcp` service, which a provider
+ * requires anyway. Installing a plugin is copying a directory; there is no
+ * package resolution to lean on.
  */
 export interface PluginScope extends ExtensionScope {
   react: typeof React

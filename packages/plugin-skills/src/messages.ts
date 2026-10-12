@@ -16,6 +16,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.action.import": "Import",
   "skills.action.explore": "Explore",
   "skills.action.install": "Install",
+  "skills.action.installInto": "Install to",
   "skills.action.adopt": "Push",
   "skills.action.remove": "Remove",
   "skills.action.cleanup": "Clean up",

@@ -3,7 +3,6 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router"
 import { AppLayout } from "@/components/app-layout"
 import { useNavGroups } from "@/lib/navigation"
 import { ExtensionsPage } from "@/pages/extensions"
-import { McpServersPage } from "@/pages/mcp-servers"
 import { OverviewPage } from "@/pages/overview"
 import { PlaceholderPage } from "@/pages/placeholder"
 import { PluginsPage } from "@/pages/plugins"
@@ -11,13 +10,7 @@ import { RepositoryPage } from "@/pages/repository"
 import { useContributions } from "@workspace/extensions/react"
 
 /** Pages the shell owns; every other route comes from an extension. */
-const designedPaths = [
-  "/",
-  "/mcp-servers",
-  "/plugins",
-  "/extensions",
-  "/repository",
-]
+const designedPaths = ["/", "/plugins", "/extensions", "/repository"]
 
 export function App() {
   const contributed = useContributions("route")
@@ -31,7 +24,6 @@ export function App() {
       <Routes>
         <Route element={<AppLayout />}>
           <Route index element={<OverviewPage />} />
-          <Route path="/mcp-servers" element={<McpServersPage />} />
           <Route path="/plugins" element={<PluginsPage />} />
           <Route path="/extensions" element={<ExtensionsPage />} />
           <Route path="/repository" element={<RepositoryPage />} />

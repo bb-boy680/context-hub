@@ -7,7 +7,7 @@
  */
 import * as React from "react"
 import { useContributions, useHub, useI18n } from "@workspace/extensions/react"
-import type { SkillLocationContribution, SkillScope } from "@workspace/extensions"
+import type { AssetScope, SkillLocationContribution } from "@workspace/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
 import type {
@@ -39,7 +39,7 @@ export interface SkillPlaceView {
   /** Message key the provenance line resolves for this place. */
   labelKey: string
   /** Which root the place's directory sits under. */
-  scope: SkillScope
+  scope: AssetScope
   /** The place's directory inside that root, `/`-separated. */
   dir: string
   /** The place's own skills directory, as it reads; `null` when it has none. */
@@ -175,7 +175,7 @@ export function inLibrary(skill: Skill): boolean {
  * @param place — the place to name.
  * @returns the directory as a person would write it.
  */
-export function placePath(place: { scope: SkillScope; dir: string }): string {
+export function placePath(place: { scope: AssetScope; dir: string }): string {
   return place.scope === "global" ? `~/${place.dir}` : place.dir
 }
 
@@ -389,7 +389,7 @@ function placeRow(skill: PlaceSkill, place: SkillHold): Skill {
 export interface SkillPlaceSpec {
   id: SkillPlace
   labelKey: string
-  scope: SkillScope
+  scope: AssetScope
   /** The place's directory inside that scope's root, `/`-separated. */
   dir: string
 }
@@ -418,7 +418,7 @@ export function useSkillLibrary(
     specs.map((spec) => [spec.id, spec.scope, spec.dir])
   )
   const targets = React.useMemo(
-    () => JSON.parse(specKey) as [SkillPlace, SkillScope, string][],
+    () => JSON.parse(specKey) as [SkillPlace, AssetScope, string][],
     [specKey]
   )
 

@@ -35,6 +35,12 @@ importers:
       '@workspace/plugin-claude-code':
         specifier: workspace:*
         version: link:../../packages/plugin-claude-code
+      '@workspace/plugin-codex':
+        specifier: workspace:*
+        version: link:../../packages/plugin-codex
+      '@workspace/plugin-mcp':
+        specifier: workspace:*
+        version: link:../../packages/plugin-mcp
       '@workspace/plugin-skills':
         specifier: workspace:*
         version: link:../../packages/plugin-skills
@@ -209,6 +215,9 @@ importers:
       '@workspace/extensions':
         specifier: workspace:*
         version: link:../extensions
+      '@workspace/plugin-mcp':
+        specifier: workspace:*
+        version: link:../plugin-mcp
       '@workspace/plugin-skills':
         specifier: workspace:*
         version: link:../plugin-skills
@@ -234,6 +243,101 @@ importers:
       '@types/react':
         specifier: ^19
         version: 19.2.18
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../core
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.10.0(jiti@2.7.0))
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/plugin-codex:
+    dependencies:
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../extensions
+      '@workspace/plugin-mcp':
+        specifier: workspace:*
+        version: link:../plugin-mcp
+      lucide-react:
+        specifier: ^1.48.0
+        version: 1.48.0(react@19.2.8)
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../core
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/plugin-mcp:
+    dependencies:
+      '@deepseek-ai/cordis':
+        specifier: ^4.0.4
+        version: 4.0.4
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../core
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../extensions
+      '@workspace/ui':
+        specifier: workspace:*
+        version: link:../ui
+      cn:
+        specifier: ^0.4.0
+        version: 0.4.0
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
+      lucide-react:
+        specifier: ^1.48.0
+        version: 1.48.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+      smol-toml:
+        specifier: ^1.9.1
+        version: 1.9.1
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: ^19
+        version: 19.2.7(@types/react@19.2.18)
       eslint:
         specifier: ^10
         version: 10.10.0(jiti@2.7.0)
@@ -3597,6 +3701,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  jsonc-parser@3.3.1:
+    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
+
   jsonfile@6.2.1:
     resolution: {integrity: sha512-zwOTdL3rFQ/lRdBnntKVOX6k5cKJwEc1HdilT71BWEu7J41gXIB2MRp+vxduPSwZJPWBxEzv4yH1wYLJGUHX4Q==}
 
@@ -4875,6 +4982,10 @@ packages:
   smart-buffer@4.2.0:
     resolution: {integrity: sha512-94hK0Hh8rPqQl2xXc3HsaBoOXKV20MToPkcXvwbISWLEs+64sBq5kFgn2kJDHb1Pry9yrP0dxrCI9RRci7RXKg==}
     engines: {node: '>= 6.0.0', npm: '>= 3.0.0'}
+
+  smol-toml@1.9.1:
+    resolution: {integrity: sha512-j7WyPdf0CJoutMzMoPLF/bVXHtKZIT9Rb4eGeEbWw8X2t5oirjPgpL+OpaENZrILYaXqYwnVH+qgUwVbl+pUJQ==}
+    engines: {node: '>= 18'}
 
   socks@2.8.10:
     resolution: {integrity: sha512-e0VyvkVTwVYViNovRkZ9aodhxVlyoMn7eJhVUPxZ+eK9P/7CBkxvvsBOHqFPEH416726W8tLXXXjKwqgTErrCQ==}
@@ -8695,6 +8806,8 @@ snapshots:
 
   json5@2.2.3: {}
 
+  jsonc-parser@3.3.1: {}
+
   jsonfile@6.2.1:
     dependencies:
       universalify: 2.0.1
@@ -10330,6 +10443,8 @@ snapshots:
   sisteransi@1.0.5: {}
 
   smart-buffer@4.2.0: {}
+
+  smol-toml@1.9.1: {}
 
   socks@2.8.10:
     dependencies:

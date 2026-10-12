@@ -3,7 +3,6 @@ import {
   GitBranchIcon,
   LayoutDashboardIcon,
   PlugIcon,
-  ServerIcon,
   SettingsIcon,
 } from "lucide-react"
 import * as React from "react"
@@ -37,7 +36,6 @@ export const navGroups: NavGroup[] = [
     labelKey: "nav.group.manage",
     items: [
       { labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon, order: 10 },
-      { labelKey: "nav.mcpServers", path: "/mcp-servers", icon: ServerIcon, order: 20 },
       { labelKey: "nav.plugins", path: "/plugins", icon: PlugIcon, order: 30 },
     ],
   },

@@ -1,7 +1,14 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import { assetLibrary, netProxy, pluginFiles, stateStore, workspaceList } from "@workspace/core/vite"
+import {
+  assetLibrary,
+  netProxy,
+  placeFiles,
+  pluginFiles,
+  stateStore,
+  workspaceList,
+} from "@workspace/core/vite"
 import { skillLibrary } from "@workspace/plugin-skills/vite"
 import { defineConfig } from "vite"
 
@@ -18,6 +25,7 @@ export default defineConfig({
     workspaceList(),
     netProxy(),
     skillLibrary(),
+    placeFiles(),
   ],
   resolve: {
     alias: {

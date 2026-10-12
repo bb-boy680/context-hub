@@ -19,6 +19,7 @@
   "exports": {
     ".": "./src/assets.ts",
     "./net": "./src/net.ts",
+    "./place-files": "./src/place-files.ts",
     "./plugins": "./src/plugins.ts",
     "./state": "./src/state.ts",
     "./workspace": "./src/workspace.ts",
@@ -27,6 +28,7 @@
     "./host/fs-browse": "./src/host/fs-browse.ts",
     "./host/home": "./src/host/home.ts",
     "./host/plugins": "./src/host/plugins-fs.ts",
+    "./host/place-files": "./src/host/place-files.ts",
     "./host/state": "./src/host/state-fs.ts",
     "./host/workspaces": "./src/host/workspaces-fs.ts",
     "./vite": "./vite.ts"

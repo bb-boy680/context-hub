@@ -6,6 +6,8 @@
 import type { Context } from "@deepseek-ai/cordis"
 import type { ComponentType } from "react"
 
+import type { AssetScope } from "@workspace/core/place-files"
+
 import type { PlatformHost } from "./host.ts"
 import type { I18nService } from "./i18n.ts"
 import type { SkillRegistry } from "./skill-registry.ts"
@@ -114,13 +116,6 @@ export interface NavContribution {
 }
 
 /**
- * Which directory a place's {@link SkillLocationContribution.dir} is relative
- * to. One scope is a property of the machine and the other of one folder, so a
- * place is either in every workspace at once or in the one in use.
- */
-export type SkillScope = "workspace" | "global"
-
-/**
  * One place an agent keeps skills: the directory itself, plus how the skills
  * module names it. The module reads that directory, lists its tab, and offers
  * it as an install target, so an agent integration is a contribution rather
@@ -136,14 +131,16 @@ export interface SkillLocationContribution {
    * The root `dir` is read under: the workspace in use, or the home directory
    * every workspace shares.
    */
-  scope: SkillScope
+  scope: AssetScope
   /** The directory inside that root, `/`-separated, e.g. ".claude/skills". */
   dir: string
   /** Sort rank among the places of its own scope. */
   order: number
 }
 
-/** One page contributed by an extension; a UI shell mounts it at its path. */
+/**
+ * One page contributed by an extension; a UI shell mounts it at its path.
+ */
 export interface RouteContribution {
   path: string
   /** Rendered without props; the page reads its own data through the kernel. */
@@ -188,7 +185,44 @@ export interface ExtensionScope {
   readonly i18n?: I18nService
   /** Register one contribution; removed automatically when the extension is disabled. */
   contribute<P extends ExtensionPointId>(point: P, value: ContributionMap[P]): void
+  /**
+   * Publish an API under a service name, for other extensions to require.
+   *
+   * The name must be declared in {@link ExtensionManifest.provides}, so a
+   * dependency a person could satisfy is discoverable from the catalog rather
+   * than only from a throw. What is published lives as long as this extension
+   * is enabled, and an extension that required it unloads when this one is
+   * disabled.
+   *
+   * @throws when another enabled extension already provides that name.
+   */
+  provide(name: string, api: unknown): void
+  /**
+   * Run `setup` once the named services are all provided, with a context that
+   * has them and a map of the services themselves; unwind it again when one of
+   * them goes away.
+   *
+   * This is how one plugin uses another's API without knowing which extension
+   * supplies it, and without either being loaded first: the callback is simply
+   * not called until the dependency exists. `services` is keyed by the names
+   * asked for, so a plugin reads `services.mcp` rather than reaching for a
+   * property of the context — see {@link ExtensionServices}.
+   */
+  inject<N extends keyof ExtensionServices & string>(
+    names: readonly N[],
+    setup: (ctx: Context, services: Pick<ExtensionServices, N>) => void
+  ): void
 }
+
+/**
+ * The services a plugin may require, by name.
+ *
+ * Merge-extensible: the module that publishes a service is the module that
+ * types it, so a plugin that requires that name reads it with its own type, and
+ * a name no module declared cannot be asked for at all.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the kernel ships no service of its own; every entry is merged in by the module that publishes one.
+export interface ExtensionServices {}
 
 /** Identity and presentation of one extension package. */
 export interface ExtensionManifest {

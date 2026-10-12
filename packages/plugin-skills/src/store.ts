@@ -4,7 +4,7 @@
  * carry the same calls over their own channel, so nothing here assumes a
  * transport.
  */
-import type { SkillScope } from "@workspace/extensions"
+import type { AssetScope } from "@workspace/extensions"
 
 /** Where a skill came from: this machine, the hub build, or a registry. */
 export type SkillOrigin = "local" | "builtin" | "registry"
@@ -233,7 +233,7 @@ export interface PlaceSkill {
  * same directory name under two scopes is two different directories.
  */
 export interface SkillPlaceRef {
-  scope: SkillScope
+  scope: AssetScope
   /** The place's directory inside that root, `/`-separated. */
   dir: string
 }

@@ -531,15 +531,18 @@
                               "type": "frame",
                               "id": "l4Y2BG",
                               "name": "Tabs",
-                              "height": 40,
+                              "height": 44,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
                               "gap": 4,
+                              "padding": 4,
                               "alignItems": "center",
                               "children": [
                                 {
                                   "type": "frame",
                                   "id": "dLSLM",
                                   "name": "Tab 全部",
-                                  "height": 40,
+                                  "height": 36,
                                   "fill": "$ink",
                                   "cornerRadius": "$radius-pill",
                                   "gap": 6,
@@ -550,14 +553,24 @@
                                   "alignItems": "center",
                                   "children": [
                                     {
+                                      "type": "icon",
+                                      "id": "w3M0Y",
+                                      "name": "Icon",
+                                      "width": 14,
+                                      "height": 14,
+                                      "icon": "layout-grid",
+                                      "library": "lucide",
+                                      "fill": "$on-dark"
+                                    },
+                                    {
                                       "type": "text",
                                       "id": "X81MFZ",
                                       "name": "Label",
                                       "fill": "$on-dark",
                                       "content": "全部",
                                       "fontFamily": "$font-sans",
-                                      "fontSize": 14,
-                                      "fontWeight": "normal"
+                                      "fontSize": 13,
+                                      "fontWeight": "600"
                                     },
                                     {
                                       "type": "text",
@@ -565,7 +578,7 @@
                                       "name": "Count",
                                       "fill": "#FFFFFFA6",
                                       "content": "12",
-                                      "fontFamily": "$font-sans",
+                                      "fontFamily": "$font-mono",
                                       "fontSize": 13,
                                       "fontWeight": "normal"
                                     }
@@ -575,7 +588,7 @@
                                   "type": "frame",
                                   "id": "kEnVJ",
                                   "name": "Tab 技能库",
-                                  "height": 40,
+                                  "height": 36,
                                   "cornerRadius": "$radius-pill",
                                   "gap": 6,
                                   "padding": [
@@ -585,14 +598,24 @@
                                   "alignItems": "center",
                                   "children": [
                                     {
+                                      "type": "icon",
+                                      "id": "ShpZO",
+                                      "name": "Icon",
+                                      "width": 14,
+                                      "height": 14,
+                                      "icon": "library",
+                                      "library": "lucide",
+                                      "fill": "$muted"
+                                    },
+                                    {
                                       "type": "text",
                                       "id": "Dh6Zi",
                                       "name": "Label",
-                                      "fill": "$body",
+                                      "fill": "$muted",
                                       "content": "技能库",
                                       "fontFamily": "$font-sans",
-                                      "fontSize": 14,
-                                      "fontWeight": "normal"
+                                      "fontSize": 13,
+                                      "fontWeight": "500"
                                     },
                                     {
                                       "type": "text",
@@ -600,7 +623,7 @@
                                       "name": "Count",
                                       "fill": "$muted",
                                       "content": "9",
-                                      "fontFamily": "$font-sans",
+                                      "fontFamily": "$font-mono",
                                       "fontSize": 13,
                                       "fontWeight": "normal"
                                     }
@@ -610,7 +633,7 @@
                                   "type": "frame",
                                   "id": "EJJhS",
                                   "name": "Tab 工作区",
-                                  "height": 40,
+                                  "height": 36,
                                   "cornerRadius": "$radius-pill",
                                   "gap": 6,
                                   "padding": [
@@ -620,32 +643,62 @@
                                   "alignItems": "center",
                                   "children": [
                                     {
-                                      "type": "text",
-                                      "id": "Kp5D2",
-                                      "name": "Label",
-                                      "fill": "$body",
-                                      "content": "工作区",
-                                      "fontFamily": "$font-sans",
-                                      "fontSize": 14,
-                                      "fontWeight": "normal"
+                                      "type": "icon",
+                                      "id": "ngRwu",
+                                      "name": "Icon",
+                                      "width": 14,
+                                      "height": 14,
+                                      "icon": "container",
+                                      "library": "lucide",
+                                      "fill": "$muted"
                                     },
                                     {
                                       "type": "text",
-                                      "id": "wS2oQ",
-                                      "name": "Count",
+                                      "id": "Kp5D2",
+                                      "name": "Label",
                                       "fill": "$muted",
-                                      "content": "3",
+                                      "content": "工作区",
                                       "fontFamily": "$font-sans",
                                       "fontSize": 13,
-                                      "fontWeight": "normal"
+                                      "fontWeight": "500"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "I6lyFD",
+                                      "name": "Agent Stack",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": "#00000000",
+                                      "layout": "none",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "vJXkC",
+                                          "layoutPosition": "absolute",
+                                          "x": 0,
+                                          "y": 0,
+                                          "name": "Tile 0",
+                                          "width": 20,
+                                          "height": 20,
+                                          "fill": {
+                                            "type": "image",
+                                            "enabled": true,
+                                            "url": "agent-icons/claude-code.png",
+                                            "mode": "cover"
+                                          },
+                                          "cornerRadius": 6,
+                                          "stroke": "$canvas",
+                                          "strokeWidth": 2
+                                        }
+                                      ]
                                     }
                                   ]
                                 },
                                 {
                                   "type": "frame",
                                   "id": "ZTJZY",
-                                  "name": "Tab Claude Code",
-                                  "height": 40,
+                                  "name": "Tab 全局",
+                                  "height": 36,
                                   "cornerRadius": "$radius-pill",
                                   "gap": 6,
                                   "padding": [
@@ -655,24 +708,54 @@
                                   "alignItems": "center",
                                   "children": [
                                     {
-                                      "type": "text",
-                                      "id": "Lr5oq",
-                                      "name": "Label",
-                                      "fill": "$body",
-                                      "content": "Claude Code",
-                                      "fontFamily": "$font-sans",
-                                      "fontSize": 14,
-                                      "fontWeight": "normal"
+                                      "type": "icon",
+                                      "id": "ktKxb",
+                                      "name": "Icon",
+                                      "width": 14,
+                                      "height": 14,
+                                      "icon": "globe",
+                                      "library": "lucide",
+                                      "fill": "$muted"
                                     },
                                     {
                                       "type": "text",
-                                      "id": "J5aEf",
-                                      "name": "Count",
+                                      "id": "Lr5oq",
+                                      "name": "Label",
                                       "fill": "$muted",
-                                      "content": "0",
+                                      "content": "全局",
                                       "fontFamily": "$font-sans",
                                       "fontSize": 13,
-                                      "fontWeight": "normal"
+                                      "fontWeight": "500"
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "zkCWw",
+                                      "name": "Agent Stack",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": "#00000000",
+                                      "layout": "none",
+                                      "children": [
+                                        {
+                                          "type": "frame",
+                                          "id": "sE48s",
+                                          "layoutPosition": "absolute",
+                                          "x": 0,
+                                          "y": 0,
+                                          "name": "Tile 0",
+                                          "width": 20,
+                                          "height": 20,
+                                          "fill": {
+                                            "type": "image",
+                                            "enabled": true,
+                                            "url": "agent-icons/claude-code.png",
+                                            "mode": "cover"
+                                          },
+                                          "cornerRadius": 6,
+                                          "stroke": "$canvas",
+                                          "strokeWidth": 2
+                                        }
+                                      ]
                                     }
                                   ]
                                 }
@@ -706,6 +789,16 @@
                                       "height": 36,
                                       "fill": "$canvas",
                                       "cornerRadius": "$radius-pill",
+                                      "effect": {
+                                        "type": "shadow",
+                                        "shadowType": "outer",
+                                        "color": "#0000000A",
+                                        "offset": {
+                                          "x": 0,
+                                          "y": 4
+                                        },
+                                        "blur": 12
+                                      },
                                       "justifyContent": "center",
                                       "alignItems": "center",
                                       "children": [
@@ -713,8 +806,8 @@
                                           "type": "icon",
                                           "id": "JUd4a",
                                           "name": "Icon",
-                                          "width": 16,
-                                          "height": 16,
+                                          "width": 17,
+                                          "height": 17,
                                           "icon": "layout-grid",
                                           "library": "lucide",
                                           "fill": "$ink"
@@ -735,8 +828,8 @@
                                           "type": "icon",
                                           "id": "ZP9bp",
                                           "name": "Icon",
-                                          "width": 16,
-                                          "height": 16,
+                                          "width": 17,
+                                          "height": 17,
                                           "icon": "list",
                                           "library": "lucide",
                                           "fill": "$muted"
@@ -829,7 +922,7 @@
                                   "gap": 8,
                                   "padding": [
                                     0,
-                                    20
+                                    22
                                   ],
                                   "alignItems": "center",
                                   "children": [
@@ -906,7 +999,7 @@
                                   "id": "baLvh",
                                   "name": "Placeholder",
                                   "fill": "$muted-soft",
-                                  "content": "筛选名称、描述或类型",
+                                  "content": "搜索名称、描述或类型…",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 13.5,
                                   "fontWeight": "normal"
@@ -966,7 +1059,7 @@
                                   "content": "全部标签",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 13,
-                                  "fontWeight": "normal"
+                                  "fontWeight": "600"
                                 }
                               ]
                             },
@@ -991,7 +1084,7 @@
                                   "content": "Design",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 13,
-                                  "fontWeight": "normal"
+                                  "fontWeight": "500"
                                 }
                               ]
                             },
@@ -1016,7 +1109,7 @@
                                   "content": "Engineering",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 13,
-                                  "fontWeight": "normal"
+                                  "fontWeight": "500"
                                 }
                               ]
                             },
@@ -1041,7 +1134,7 @@
                                   "content": "Quality",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 13,
-                                  "fontWeight": "normal"
+                                  "fontWeight": "500"
                                 }
                               ]
                             },
@@ -1066,7 +1159,7 @@
                                   "content": "Documents",
                                   "fontFamily": "$font-sans",
                                   "fontSize": 13,
-                                  "fontWeight": "normal"
+                                  "fontWeight": "500"
                                 }
                               ]
                             }

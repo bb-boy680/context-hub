@@ -49,7 +49,7 @@ import type {
 } from "./store.ts"
 
 import { useI18n } from "@workspace/extensions/react"
-import type { SkillScope } from "@workspace/extensions"
+import type { AssetScope } from "@workspace/extensions"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -84,7 +84,7 @@ function titleCase(value: string) {
  */
 function DocumentStage({ text }: { text: string }) {
   return (
-    <div className="scroll-thin size-full overflow-x-hidden overflow-y-auto bg-surface-raised px-8 py-6">
+    <div className="size-full scrollbar-gutter-stable overflow-x-hidden overflow-y-auto bg-surface-raised px-8 py-6">
       <Markdown className="mx-auto max-w-[640px] text-[13px] leading-[21px] text-secondary-foreground">
         {text}
       </Markdown>
@@ -1199,7 +1199,7 @@ function SourceSection({
 }
 
 /** The two scopes, in the order a list of places reads them. */
-const SCOPES: readonly SkillScope[] = ["workspace", "global"]
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
 /**
  * How many places of one scope the panel lists before it offers the rest. A
@@ -1250,8 +1250,8 @@ function PlacesSection({
 
   /* Each scope folds on its own: the machine-wide list grows with every agent a
      person enables, while the workspace holds only the folders this hub knows. */
-  const [unfolded, setUnfolded] = React.useState<readonly SkillScope[]>([])
-  const fold = (scope: SkillScope) =>
+  const [unfolded, setUnfolded] = React.useState<readonly AssetScope[]>([])
+  const fold = (scope: AssetScope) =>
     setUnfolded((current) =>
       current.includes(scope)
         ? current.filter((one) => one !== scope)
@@ -1477,7 +1477,7 @@ function InfoPanel({
       {/* Everything between the heading and the footer scrolls: seven places
           alone outrun the panel, and the actions have to stay put. The bottom
           padding is what keeps the last line clear of the footer. */}
-      <div className="scroll-thin flex min-h-0 min-w-0 flex-1 flex-col gap-[18px] overflow-y-auto px-5 pt-5 pb-5">
+      <div className="flex min-h-0 min-w-0 flex-1 scrollbar-gutter-stable flex-col gap-[18px] overflow-y-auto px-5 pt-5 pb-5">
         {/* Description, then the categories, then where it lives, then where it
             came from — the order the panel is read in. */}
         <p className="text-[13px] leading-[1.5] text-copy">{skill.description}</p>

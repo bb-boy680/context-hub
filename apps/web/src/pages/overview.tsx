@@ -371,7 +371,7 @@ function SourcesCard() {
                     {source.status}
                   </span>
                 </TableCell>
-                <TableCell className="text-muted-foreground">
+                <TableCell className="font-mono text-muted-foreground">
                   {source.tokens}
                 </TableCell>
                 <TableCell className="text-muted-foreground">

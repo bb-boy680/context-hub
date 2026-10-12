@@ -569,7 +569,7 @@ export function AddSkillDialog({
               /* Installing one row is the whole interaction: the row says which
                  skill, and the button installs that one. No selection to carry,
                  so no footer to submit it with. */
-              <ul className="scroll-thin max-h-[360px] shrink-0 overflow-y-auto">
+              <ul className="scrollbar-gutter-stable max-h-[360px] shrink-0 overflow-y-auto">
                 {candidates.map((skill) => (
                   <InstallRow
                     key={skill.name}

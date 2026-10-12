@@ -1,4 +1,4 @@
-import type { SkillScope } from "@workspace/extensions"
+import type { AssetScope } from "@workspace/extensions"
 
 import type { SkillOrigin as SkillSource } from "./store.ts"
 import type { SkillUpstream, SkillCheck } from "./store.ts"
@@ -19,7 +19,7 @@ export type SkillPlace = string
 export interface SkillHold {
   id: SkillPlace
   /** Which root the directory sits under. */
-  scope: SkillScope
+  scope: AssetScope
   /** The place's directory inside that root, `/`-separated. */
   dir: string
 }

@@ -28,7 +28,7 @@ import { TEMP_PREFIX, writeFileAtomic } from "@workspace/core/host/atomic"
 import { displayPath, resolveHubHome, userHome } from "@workspace/core/host/home"
 import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
 import type { AssetLibrary } from "@workspace/core"
-import type { SkillScope } from "@workspace/extensions"
+import type { AssetScope } from "@workspace/extensions"
 
 import {
   parseSkillFile,
@@ -221,11 +221,11 @@ export async function createFsSkillStore(
    * place has no workspace to read. A global place is always readable: the home
    * directory is the same one whatever workspace is in use.
    */
-  const placeBase = async (scope: SkillScope): Promise<string | null> =>
+  const placeBase = async (scope: AssetScope): Promise<string | null> =>
     scope === "global" ? homeDir : currentWorkspace()
 
   /** The same base, refused when there is nothing under it to read. */
-  const requiredBase = async (scope: SkillScope): Promise<string> => {
+  const requiredBase = async (scope: AssetScope): Promise<string> => {
     const base = await placeBase(scope)
     if (base === null) throw new Error("no workspace is selected")
     return base

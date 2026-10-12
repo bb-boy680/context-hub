@@ -1,18 +1,20 @@
 /**
- * Claude Code as a Context Hub integration: where it reads, and the place in a
- * workspace this hub delivers its skills to.
+ * Claude Code as a Context Hub integration: where it reads, the place in a
+ * workspace this hub delivers its skills to, and the provider that reads and
+ * writes its two MCP files.
  *
  * Nothing here renders. The integration declares an agent target and the
- * workspace place that target reads, and the shell does the rest: the menu that
- * picks which agent the hub delivers to, the skills page's place tabs and
- * install targets, and the extension catalog entry all read these two
- * contributions. Disabling this extension takes every one of them away.
+ * workspace place that target reads, registers its MCP provider into the MCP
+ * module's registry, and the shell does the rest: the menu that picks which
+ * agent the hub delivers to, the skills page's place tabs and install targets,
+ * the MCP page's places, and the extension catalog entry all read these. What
+ * this extension does not declare it does not get — and disabling it takes
+ * every one of them away, including its MCP files, in the same step.
  */
 import ClaudeCode from "@lobehub/icons/es/ClaudeCode"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
 
-import { claudeCodeMessages } from "./messages.ts"
 import {
   CLAUDE_CODE_ID,
   CLAUDE_CODE_SKILL_DIR,
@@ -20,12 +22,18 @@ import {
   PROJECT_LOCATIONS,
   SUPPORTS,
 } from "./locations.ts"
+import { claudeCodeMessages } from "./messages.ts"
+import { createClaudeCodeMcp } from "./provider.ts"
 
 /**
  * The brand mark in its own colours. It takes a `size` of its own as well, but
  * the shell sizes every icon with a class, and a `className` on the svg beats
  * the width/height it sets as attributes — so one mark fits a 14px tab, a
  * 15px menu row and a 20px catalog tile.
+ *
+ * It is declared once, here, and travels as this extension's manifest icon: the
+ * MCP page draws it beside this client's places and the catalog draws it on the
+ * row, both from that one declaration.
  */
 const ClaudeCodeIcon: ExtensionIcon = ClaudeCode.Color
 
@@ -34,6 +42,8 @@ export const CLAUDE_CODE_PLACE = "claude-code"
 
 /** The place this agent reads this machine's skills from, outside any workspace. */
 export const CLAUDE_CODE_GLOBAL_PLACE = "claude-code-global"
+
+export { createClaudeCodeMcp } from "./provider.ts"
 
 export const claudeCodeExtension: ExtensionDefinition = {
   manifest: {
@@ -49,6 +59,18 @@ export const claudeCodeExtension: ExtensionDefinition = {
     permissions: ["assets.read", "assets.write", "filesystem"],
   },
   activate(scope) {
+    /* The MCP module publishes its service; this runs once it exists, and is
+       unwound when it goes away. With that module disabled the rest of this
+       extension still works: skills do not depend on MCP.
+
+       Nothing here imports the MCP module: the registry to register into and
+       the toolkit to write a file with both arrive as `plugins.mcp`, which is
+       the same way a plugin installed as a folder gets them. */
+    scope.inject(["mcp"], (ctx, plugins) => {
+      const { registry, tools } = plugins.mcp
+      ctx.effect(() => registry.register(createClaudeCodeMcp(tools)))
+    })
+
     /* The places come first: the target below names them, so a consumer that
        reads one side always finds the other. */
     scope.contribute("skillLocation", {

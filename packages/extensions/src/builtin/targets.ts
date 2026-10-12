@@ -7,38 +7,9 @@
  * Claude Code is not here: it ships as its own package, because it brings a page
  * and a workspace place with it rather than only a descriptor.
  */
-import { PuzzleIcon, SquareTerminalIcon } from "lucide-react"
+import { PuzzleIcon } from "lucide-react"
 
 import type { ExtensionDefinition } from "../types.ts"
-
-/** Codex: one instructions file plus a TOML config for MCP. */
-export const codexTarget: ExtensionDefinition = {
-  manifest: {
-    id: "hub.target.codex",
-    name: "Codex",
-    version: "0.1.0",
-    apiVersion: "^0.1",
-    kind: "code",
-    category: "integration",
-    description: "Deliver skills, memory and MCP servers to Codex.",
-    icon: SquareTerminalIcon,
-    defaultEnabled: true,
-    permissions: ["assets.read", "filesystem"],
-  },
-  activate(scope) {
-    scope.contribute("target", {
-      id: "hub.target.codex",
-      displayName: "Codex",
-      icon: SquareTerminalIcon,
-      supports: ["skill", "mcp", "memory"],
-      locations: [
-        { label: "Instructions", path: "~/.codex/AGENTS.md" },
-        { label: "Config", path: "~/.codex/config.toml" },
-      ],
-      format: "Markdown instructions; TOML for configuration and MCP servers",
-    })
-  },
-}
 
 /** Copilot: repository-scoped instruction and prompt files. */
 export const copilotTarget: ExtensionDefinition = {

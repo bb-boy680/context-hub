@@ -204,7 +204,9 @@ function ResultRow({
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
         <div className="flex min-w-0 items-baseline gap-2">
-          <span className="truncate font-sans text-sm leading-[17px] font-semibold">
+          {/* A name a person reads, so it is the document family; the remote
+              registry's own spelling stays as it published it. */}
+          <span className="truncate text-sm leading-[17px] font-semibold">
             {skill.name}
           </span>
           <span className="shrink-0 text-xs leading-[15px] text-muted-foreground">
@@ -552,7 +554,7 @@ export function SearchSkillsDialog({
               hint={t("skills.search.empty.hint")}
             />
           ) : (
-            <ul className="scroll-thin h-full overflow-y-auto">
+            <ul className="scrollbar-gutter-stable h-full overflow-y-auto">
               {rows.map((skill) => (
                 <ResultRow
                   key={rowKey(skill)}

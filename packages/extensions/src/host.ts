@@ -3,6 +3,7 @@
  * extension read capabilities from here, so no extension asks which form it
  * runs in.
  */
+import type { PlaceFiles } from "@workspace/core/place-files"
 
 /**
  * What the kernel and its extensions remember about this hub: one JSON value
@@ -62,9 +63,13 @@ export interface PlatformHost {
   readonly storage: StoragePort
   /** How this form reaches the network; `null` when it cannot. */
   readonly net: NetPort | null
+  /** The client configuration files under this form's two roots; `null` when it cannot reach them. */
+  readonly files: PlaceFiles | null
   /** Record one kernel-owned diagnostic line, e.g. an activation failure. */
   log(level: "info" | "warn" | "error", message: string): void
 }
+
+export type { AssetScope, PlaceFiles, PlaceRef } from "@workspace/core/place-files"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {

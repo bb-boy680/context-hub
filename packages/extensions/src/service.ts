@@ -43,6 +43,8 @@ export interface ExtensionView {
   error?: string
   /** Points this extension currently contributes. */
   points: ExtensionPointId[]
+  /** Service names this extension currently publishes. */
+  provides: string[]
 }
 
 /** Immutable catalog state published on every change. */
@@ -73,6 +75,8 @@ interface Entry {
   error?: string
   /** Undoes the declarative (data) contributions of this entry. */
   readonly disposers: Disposer[]
+  /** Service names this entry published while it is active. */
+  readonly provides: Set<string>
 }
 
 export class ExtensionService extends Service {
@@ -103,6 +107,7 @@ export class ExtensionService extends Service {
         enabled: false,
         status: "inactive",
         disposers: [],
+        provides: new Set(),
       }
       this.entries.set(id, entry)
       if (!isCompatible(definition.manifest.apiVersion)) {
@@ -229,6 +234,19 @@ export class ExtensionService extends Service {
         contribute: (point, value) => {
           pluginCtx.effect(() => this.contribute(entry, point, value))
         },
+        provide: (name, api) => {
+          pluginCtx.effect(() => this.provide(entry, pluginCtx, name, api))
+        },
+        inject: (names, setup) => {
+          pluginCtx.inject([...names], (inner) => {
+            /* A published service is reached with `get`, not as a property of
+               the callback's context: property access resolves along a fiber's
+               own chain, and a sibling extension's service is not on it. */
+            const services: Record<string, unknown> = {}
+            for (const name of names) services[name] = inner.get(name)
+            setup(inner, services as never)
+          })
+        },
       }
       activate(scope)
     }
@@ -296,6 +314,26 @@ export class ExtensionService extends Service {
     this.publish()
   }
 
+  /**
+   * Publish one service under its name, for as long as this entry is active.
+   *
+   * @throws when the manifest never declared that name — a dependency another
+   * extension could require has to be visible in the catalog, not only at the
+   * point where it happens to be registered.
+   */
+  private provide(entry: Entry, ctx: Context, name: string, api: unknown): Disposer {
+    const { id, provides } = entry.definition.manifest
+    if (provides === undefined || !provides.includes(name)) {
+      throw new Error(`extensions: "${id}" provides "${name}", which its manifest does not declare`)
+    }
+    const dispose = ctx.provide(name, api)
+    entry.provides.add(name)
+    return () => {
+      entry.provides.delete(name)
+      dispose()
+    }
+  }
+
   private contribute(
     entry: Entry,
     point: ExtensionPointId,
@@ -352,6 +390,7 @@ export class ExtensionService extends Service {
         status: entry.status,
         error: entry.error,
         points,
+        provides: [...entry.provides],
       })
     }
     return { entries, revision: this.revision }

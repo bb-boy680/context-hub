@@ -19,9 +19,12 @@ import {
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { claudeCodeExtension } from "@workspace/plugin-claude-code"
+import { codexExtension } from "@workspace/plugin-codex"
+import { mcpExtension } from "@workspace/plugin-mcp"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import { skillsShExtension } from "@workspace/plugin-skills-sh"
 import * as ui from "./ui-kit.ts"
+import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
 
 /** Path the active form serves the skill library on, when it serves one at all. */
@@ -143,6 +146,7 @@ export async function startHub(): Promise<HubKernel> {
     capabilities: { code: true, filesystem: false, network: true },
     storage,
     net: createRemoteNet(),
+    files: (await placeFilesAvailable()) ? createRemotePlaceFiles() : null,
     log: (level, message) => {
       console[level](message)
     },
@@ -160,7 +164,9 @@ export async function startHub(): Promise<HubKernel> {
     extensions: [
       ...builtinExtensions,
       skillsExtension,
+      mcpExtension,
       claudeCodeExtension,
+      codexExtension,
       skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),

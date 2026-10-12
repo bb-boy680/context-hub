@@ -7,7 +7,6 @@
  * CLI shares. Both are listed here so the descriptor, the page and the skills
  * module read the same strings.
  */
-
 /** This integration's id; the kernel matches it against the manifest. */
 export const CLAUDE_CODE_ID = "hub.target.claude-code"
 
@@ -17,6 +16,31 @@ export const CLAUDE_CODE_ID = "hub.target.claude-code"
  * outside one.
  */
 export const CLAUDE_CODE_SKILL_DIR = ".claude/skills"
+
+/**
+ * The MCP file Claude Code reads at a project's root. It is the project's own
+ * document, separate from the settings below: a server declared here is shared
+ * with whoever opens the project.
+ */
+export const CLAUDE_CODE_MCP_FILE = ".mcp.json"
+
+/**
+ * The MCP file Claude Code reads outside any project. It is Claude Code's own
+ * top-level document — the same file that records its projects and machine-wide
+ * settings — so a write touches this node and nothing beside it.
+ */
+export const CLAUDE_CODE_GLOBAL_MCP_FILE = ".claude.json"
+
+/** The key declarations live under, in both files. */
+export const CLAUDE_CODE_MCP_KEY = "mcpServers"
+
+/**
+ * Where Claude Code records that a declared server should not be connected: one
+ * `disabledMcpServers` list per project, in its own top-level document, keyed
+ * by the project's path. Both places share that list, because a project can
+ * disable a server either scope declared.
+ */
+export const CLAUDE_CODE_DISABLED_KEY = "disabledMcpServers"
 
 /** One place either scope reads assets from. */
 export interface ClaudeCodeLocation {

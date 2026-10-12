@@ -36,7 +36,7 @@ import type { SkillPlaceRef, SkillStore } from "./store.ts"
 import type { Skill } from "./types.ts"
 
 import { useContributions, useI18n } from "@workspace/extensions/react"
-import type { ExtensionIcon, SkillScope } from "@workspace/extensions"
+import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -85,7 +85,7 @@ const SHELL_TABS: { value: SkillTab; labelKey: string; icon: ExtensionIcon }[] =
 ]
 
 /** Which rows a tab shows. */
-type SkillTab = "all" | "library" | SkillScope
+type SkillTab = "all" | "library" | AssetScope
 
 /** Which rows one tab holds, before the category filter. A place narrows a
     scope to that one place; the shell's own two tabs have no places to narrow. */
@@ -107,7 +107,7 @@ const STACK_STEP = 13
 const STACK_MAX = 5
 
 /** The two scopes, in the order a list of places reads them. */
-const SCOPES: readonly SkillScope[] = ["workspace", "global"]
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
 /**
  * Past this many places a scope's menu searches its own list and caps its
@@ -1472,7 +1472,7 @@ export function SkillsPage() {
      them is a count of places rather than of skills; the same list, with what
      each place holds, is what hovering the stack shows. */
   const scopePlaces = React.useMemo(() => {
-    const byScope: Record<SkillScope, StackPlace[]> = { workspace: [], global: [] }
+    const byScope: Record<AssetScope, StackPlace[]> = { workspace: [], global: [] }
     for (const place of places) {
       const view = library.places.find((held) => held.id === place.id)?.view ?? null
       byScope[place.scope].push({
@@ -1718,7 +1718,7 @@ export function SkillsPage() {
                     <item.icon className="size-3.5 shrink-0" aria-hidden />
                     {t(item.labelKey)}
                     <span
-                      className={`text-[13px] ${
+                      className={`font-mono text-[13px] ${
                         library.error !== null || count === 0 ? "opacity-45" : ""
                       }`}
                     >
