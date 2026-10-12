@@ -146,7 +146,6 @@ export const mcpMessages: Record<string, string> = {
   "mcp.detail.tools.output": "Output",
   "mcp.detail.tools.inputDesc": "arguments",
   "mcp.detail.tools.outputDesc": "what comes back",
-  "mcp.detail.tools.noOutput": "The server declared no output structure.",
   "mcp.detail.files.empty": "No file holds this server yet.",
   "mcp.detail.files.unreadable": "This file does not name the server where the pane can point.",
   "mcp.detail.files.copy": "Copy this file",

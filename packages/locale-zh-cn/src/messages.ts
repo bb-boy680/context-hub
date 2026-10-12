@@ -398,7 +398,6 @@ export const messages: Record<string, string> = {
   "mcp.detail.tools.output": "出参",
   "mcp.detail.tools.inputDesc": "入参",
   "mcp.detail.tools.outputDesc": "返回信息",
-  "mcp.detail.tools.noOutput": "服务器没有声明输出结构。",
   "mcp.detail.files.empty": "还没有任何文件声明这台服务器。",
   "mcp.detail.files.unreadable": "这个文件里找不到能指向的声明位置。",
   "mcp.detail.files.copy": "复制这个文件",

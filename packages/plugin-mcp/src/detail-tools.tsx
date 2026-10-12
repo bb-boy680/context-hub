@@ -81,14 +81,11 @@ function TreeLine({ row }: { row: TreeRow }) {
       <span className="flex h-[18px] w-6 shrink-0 items-center justify-center rounded-xs bg-muted font-mono text-[10.5px] leading-none text-muted-foreground">
         {TYPE_GLYPH[field.type]}
       </span>
-      <span
-        className={cn(
-          "w-2 shrink-0 font-mono text-[12px] leading-[1.3] font-semibold",
-          field.required ? "text-destructive" : "text-transparent"
-        )}
-      >
-        *
-      </span>
+      {field.required ? (
+        <span className="font-mono text-[12px] leading-[1.3] font-semibold text-destructive">
+          *
+        </span>
+      ) : null}
       <span
         className={cn(
           "shrink-0 font-mono text-[12px] leading-[1.3]",
@@ -134,28 +131,36 @@ function ToolCard({ tool }: { tool: McpTool }) {
 
   return (
     <div className="overflow-clip rounded-lg border border-border bg-card">
-      <button
-        type="button"
-        aria-expanded={open}
-        onClick={() => setOpen((current) => !current)}
-        className="flex h-11 w-full items-center gap-2.5 px-4 text-left transition-colors hover:bg-muted"
-      >
-        {open ? (
-          <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
-        ) : (
-          <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-        )}
-        <span className="shrink-0 font-mono text-[12px] leading-[1.3] font-semibold text-foreground">
-          {tool.name}
-        </span>
-        <span className="shrink-0 text-[12px] leading-[1.3] text-muted-foreground">：</span>
-        <span className="truncate text-[12px] leading-[1.3] text-copy">{tool.title}</span>
-      </button>
+      {/* The head row and the description below it are one item: the pointer
+          anywhere on the two tints both, while only the head row toggles. */}
+      <div className="transition-colors hover:bg-muted">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpen((current) => !current)}
+          className="flex h-11 w-full items-center gap-2.5 px-4 text-left"
+        >
+          {open ? (
+            <ChevronDownIcon className="size-4 shrink-0 text-muted-foreground" />
+          ) : (
+            <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+          )}
+          {/* The name, its separator and the title are one phrase, so they sit
+              on a 4px gap while the chevron keeps the row's 10px one. */}
+          <span className="flex min-w-0 flex-1 items-center gap-1">
+            <span className="shrink-0 font-mono text-[12px] leading-[1.3] font-semibold text-foreground">
+              {tool.name}
+            </span>
+            <span className="shrink-0 text-[12px] leading-[1.3] text-muted-foreground">：</span>
+            <span className="truncate text-[12px] leading-[1.3] text-copy">{tool.title}</span>
+          </span>
+        </button>
 
-      <div className="px-4 pb-3 pl-[42px]">
-        <p className="truncate text-[12px] leading-[1.25] text-muted-foreground">
-          {tool.description}
-        </p>
+        <div className="px-4 pb-3 pl-[42px]">
+          <p className="truncate text-[12px] leading-[1.25] text-muted-foreground">
+            {tool.description}
+          </p>
+        </div>
       </div>
 
       {open ? (
@@ -174,19 +179,14 @@ function ToolCard({ tool }: { tool: McpTool }) {
               }
             />
           </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[11.5px] leading-[1.3] font-semibold text-muted-foreground">
-              {t("mcp.detail.tools.output")}
-            </span>
-            {/* The output schema is optional, and many servers never write one.
-                A bare root row would read as "nothing to see", so a server that
-                declared neither fields nor a sentence gets told apart from one
-                whose output is simply not described here. */}
-            {tool.output.length === 0 && tool.outputDescription === "" ? (
-              <span className="text-[12px] leading-[1.4] text-muted-soft">
-                {t("mcp.detail.tools.noOutput")}
+          {/* The output schema is optional, and many servers never write one.
+              Nothing declared means the section is left out rather than shown
+              empty: a heading with no tree under it reads as a rendering bug. */}
+          {tool.output.length === 0 && tool.outputDescription === "" ? null : (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[11.5px] leading-[1.3] font-semibold text-muted-foreground">
+                {t("mcp.detail.tools.output")}
               </span>
-            ) : (
               <Tree
                 root="output"
                 fields={tool.output}
@@ -196,8 +196,8 @@ function ToolCard({ tool }: { tool: McpTool }) {
                     : tool.outputDescription
                 }
               />
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ) : null}
     </div>
