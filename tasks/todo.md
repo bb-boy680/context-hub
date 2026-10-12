@@ -1,3 +1,31 @@
+# 描述兜底 + 就地编辑 + 失败改走 toast（2026-10-12）
+
+用户报告：「有些 MCP 它是没有注释的」→ 要在代码里给一句默认注释，并**双击就地改成 textarea**；
+随后补充「卡片和表格的那个描述，也是这个默认描述」，最后指出**文案要统一**、
+不要用 `{x === "" ? … : x}` 这种写法。
+
+- **一句话，三处共用**：`mcp.description.missing` = 「这个 MCP 没有说明自己的用途，双击这里可以手动补充。」
+  （en: `This server says nothing about itself. Double-click here to write its description.`）。
+  卡片（`card-view.tsx`）、列表行（`list-view.tsx`）、详情弹窗（`server-dialog.tsx`）都读它；
+  弹窗原来另开的 `mcp.detail.description.missing` 已删除（两处措辞不一致被用户否掉）。
+- **就地编辑**：`server-dialog.tsx` 新增 `DescriptionLine` —— 一行 `<p>`，双击换成 `Textarea`
+  （`autoFocus`、初值 = 当前显示的文字，所以编辑服务器自己的话是**改**不是**重打**）；
+  Enter 换行、Cmd/Ctrl+Enter 或点击别处提交、Esc 丢弃（用 `thrown` ref 挡住 Esc 引发的 blur 提交）。
+  提交写进 hub 的记录（`library.update(id, {description})`），而记录在 `descriptionOf()` 里**先于**服务器自己的话被读。
+- **`||` 而非 `??`**：这一项是**空字符串**，`??` 不会回落（实测 `"" ?? f → ""`），写成 nullable 回落
+  正好让最需要这句话的服务器显示空白。三处的颜色与文案都跟着同一个真值判断走
+  （`x ? "text-copy" : "text-muted-foreground"` + `{x || missing}`）。
+- **失败改走 toast**：页面原来在列表上方渲染一行红字（`status = failure ?? notice ?? scan problem`），
+  会一直留着、像页面状态，而且把一切失败都说成「探测」。现在：
+  `apps/web/src/App.tsx` 在 shell 里挂一份 `<Toaster>`（整个表单共用一个 viewport），
+  页面用 `toast.add({type:"error", title})` 报失败（`useRef` 记住已报过的那句，避免重渲染重弹），
+  保存成功也走 `type:"success"`。`notice` state 与那行 `<span>` 连同 `run()` 一起删除。
+- 验证：`plugin-mcp` + `web` typecheck/lint 干净、`check-mcp` 61/61、`check-messages` 432/432；
+  浏览器：三台无描述的服务器在三处都显示提示句（`rgb(124,130,138)` 的 muted 色）而 context7 显示自己的句子，
+  双击弹窗那行出现 textarea、Esc 取消后记录文件逐字节未变。
+- 现场复原：验证过程中一次控件点击让 `upsert` 把记录移到文件末尾（内容不变、只是顺序），
+  已按原顺序写回并逐字节核对。顺带发现 `钉钉待办` 的标签是 `" 钉钉"`（前导空格）——属既有数据，未改。
+
 # 列表视图的图标漏用探测缓存（2026-10-12，用户报告）
 
 用户："列表布局这一块的那个图标，没有显示我们缓存后的那个图标"。
