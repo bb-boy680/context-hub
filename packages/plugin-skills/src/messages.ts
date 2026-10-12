@@ -97,6 +97,8 @@ export const skillsMessages: Record<string, string> = {
   "skills.update.applying": "Updating…",
   "skills.update.modified":
     "The files here were changed after the install; updating replaces them.",
+  "skills.update.edited": "Changed here since the install",
+  "skills.update.modifiedCount": "{count} changed here since the install",
   "skills.update.checkAll": "Check updates",
   "skills.update.checkingAll": "Checking sources…",
   "skills.update.badge": "Update available",

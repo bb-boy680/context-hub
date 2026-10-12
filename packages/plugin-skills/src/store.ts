@@ -187,6 +187,13 @@ export interface SkillUpdateSummary {
   checked: number
   /** Of those, how many the source has moved past. */
   outdated: number
+  /**
+   * Of those, how many no longer match the revision they were installed from —
+   * a person's own edit, which an update would overwrite. A source that has not
+   * moved on does not make such a copy any less changed, so it is counted and
+   * reported on its own.
+   */
+  modified: number
   /** Skills whose source could not be read, each with the reason; the rest
       still ran, so one unreachable package does not silence the others. */
   failed: { name: string; reason: string }[]

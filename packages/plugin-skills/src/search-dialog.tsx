@@ -34,6 +34,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Spinner } from "@workspace/ui/components/spinner"
+import { toast } from "@workspace/ui/components/toast"
 
 import { useI18n } from "@workspace/extensions/react"
 
@@ -296,8 +297,6 @@ export function SearchSkillsDialog({
   /** Rows whose install is in flight, by row key; each one waits on its own. */
   const [pending, setPending] = React.useState<string[]>([])
   const [error, setError] = React.useState<string | null>(null)
-  /** Why the last install did not land; the rows it describes stay on screen. */
-  const [failure, setFailure] = React.useState<string | null>(null)
   /** What the library holds: its own rows, plus what this visit installed. */
   const [held, setHeld] = React.useState<HeldSkill[]>([])
   /** What a registry filled in per row, by row key; the search answer carries the rest. */
@@ -396,7 +395,6 @@ export function SearchSkillsDialog({
       setBusy(false)
       setPending([])
       setError(null)
-      setFailure(null)
       setHeld([])
       setDetails({})
     }
@@ -411,26 +409,26 @@ export function SearchSkillsDialog({
       return
     }
     setPending((current) => [...current, key])
-    setFailure(null)
     try {
       const result = await store.installPackage(skill.package, [skill.name])
       /*
        * The library reports a refusal instead of throwing, because one download
        * can half-fail: a registry row whose repository no longer holds that
        * skill is refused by the CLI, and that reason is the only thing worth
-       * showing.
+       * showing. It is said as a toast, so the list keeps its rows.
        */
       if (result.installed.length > 0) {
         setHeld((current) => [...current, { id: skill.name, source: skill.package ?? "" }])
         onInstalled()
       }
       if (result.failed.length > 0) {
-        setFailure(
-          result.failed.map((entry) => `${entry.name}: ${entry.reason}`).join(" · ")
-        )
+        toast.add({
+          type: "error",
+          title: result.failed.map((entry) => `${entry.name}: ${entry.reason}`).join(" · "),
+        })
       }
     } catch (thrown) {
-      setFailure(messageOf(thrown))
+      toast.add({ type: "error", title: messageOf(thrown) })
     } finally {
       setPending((current) => current.filter((item) => item !== key))
     }
@@ -569,12 +567,6 @@ export function SearchSkillsDialog({
             </ul>
           )}
         </div>
-
-        {failure === null ? null : (
-          <p className="shrink-0 px-6 pb-3 text-[12px] leading-[16px] text-destructive">
-            {failure}
-          </p>
-        )}
 
         <div className="flex h-16 shrink-0 items-center justify-between gap-3 border-t border-border px-6">
           <span className="truncate text-xs text-muted-foreground">

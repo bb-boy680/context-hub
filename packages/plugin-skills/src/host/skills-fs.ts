@@ -805,10 +805,15 @@ export async function createFsSkillStore(
       const { latest, failed } = await askSources(groups)
       const recorded = await recordChecks(latest)
       let outdated = 0
-      for (const id of recorded.keys()) {
-        if (current.skills[id]?.upstream?.hash !== latest.get(id)) outdated += 1
+      let modified = 0
+      for (const [id, currentHash] of recorded) {
+        const installed = current.skills[id]?.upstream?.hash
+        if (installed !== latest.get(id)) outdated += 1
+        /* A source that has not moved on does not make a changed copy any less
+           changed, so the two are counted apart. */
+        if (currentHash !== installed) modified += 1
       }
-      return { checked: recorded.size, outdated, failed }
+      return { checked: recorded.size, outdated, modified, failed }
     },
 
     async updateFromUpstream(id: string): Promise<void> {

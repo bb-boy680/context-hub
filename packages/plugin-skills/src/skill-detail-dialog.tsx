@@ -62,6 +62,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { Spinner } from "@workspace/ui/components/spinner"
+import { toast } from "@workspace/ui/components/toast"
 
 function titleCase(value: string) {
   return value
@@ -442,7 +443,6 @@ function MediaPane({
   const [addFace, setAddFace] = React.useState<"menu" | "link">("menu")
   const [notice, setNotice] = React.useState<string | null>(null)
   const [link, setLink] = React.useState("")
-  const [addError, setAddError] = React.useState<string | null>(null)
   const mainRef = React.useRef<SwiperClass | null>(null)
   const fileRef = React.useRef<HTMLInputElement | null>(null)
   const prevRef = React.useRef<HTMLButtonElement | null>(null)
@@ -552,13 +552,19 @@ function MediaPane({
     void source.addUrl(value).then(
       () => {
         setLink("")
-        setAddError(null)
         setAddOpen(false)
       },
       (failure: unknown) => {
         /* A refused fetch is a TypeError; the store's own refusals carry a reason. */
-        if (failure instanceof TypeError) setAddError(t("skills.media.add.failed"))
-        else setAddError(failure instanceof Error ? failure.message : String(failure))
+        toast.add({
+          type: "error",
+          title:
+            failure instanceof TypeError
+              ? t("skills.media.add.failed")
+              : failure instanceof Error
+                ? failure.message
+                : String(failure),
+        })
       }
     )
   }
@@ -722,10 +728,7 @@ function MediaPane({
           open={addOpen}
           onOpenChange={(next) => {
             setAddOpen(next)
-            if (!next) {
-              setAddError(null)
-              setAddFace("menu")
-            }
+            if (!next) setAddFace("menu")
           }}
         >
           <PopoverTrigger
@@ -833,11 +836,6 @@ function MediaPane({
                     {t("skills.media.add.action")}
                   </Button>
                 </div>
-                {addError === null ? null : (
-                  <span className="text-[11px] leading-[15px] text-destructive">
-                    {addError}
-                  </span>
-                )}
               </>
             )}
           </PopoverContent>
@@ -885,17 +883,20 @@ function DeleteBubble({
   const { t } = useI18n()
   const [open, setOpen] = React.useState(false)
   const [busy, setBusy] = React.useState(false)
-  const [failure, setFailure] = React.useState<string | null>(null)
 
   const confirm = () => {
     setBusy(true)
-    setFailure(null)
     void (async () => {
       try {
         await onDelete()
       } catch (reason) {
-        /* The dialog unmounts on success, so a failure is the only state left. */
-        setFailure(reason instanceof Error ? reason.message : String(reason))
+        /* The dialog unmounts on success, so a failure leaves this bubble up
+           with the button ready; why it failed is said where every other
+           refusal is. */
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
         setBusy(false)
       }
     })()
@@ -923,9 +924,6 @@ function DeleteBubble({
           <span className="rounded-md bg-surface-raised px-2.5 py-2 font-mono text-[11px] leading-[15px] text-copy">
             {path}
           </span>
-        )}
-        {failure !== null && (
-          <span className="text-[12px] leading-[16px] text-destructive">{failure}</span>
         )}
         <div className="flex items-center justify-end gap-2">
           <Button
@@ -1002,17 +1000,23 @@ function SourceSection({
     | { kind: "checking" }
     | { kind: "applying" }
     | { kind: "checked"; result: SkillUpdateCheck }
-    | { kind: "failed"; reason: string }
-  >(() => (known !== null && known.outdated ? { kind: "checked", result: known } : { kind: "idle" }))
+  >(() =>
+    known !== null && (known.outdated || known.modified)
+      ? { kind: "checked", result: known }
+      : { kind: "idle" }
+  )
 
   const check = async () => {
     setState({ kind: "checking" })
     try {
       setState({ kind: "checked", result: await onCheck() })
     } catch (failure) {
-      setState({
-        kind: "failed",
-        reason: failure instanceof Error ? failure.message : String(failure),
+      /* The row falls back to what it already knew, and why the check could not
+         run is said the way every other refusal is. */
+      setState({ kind: "idle" })
+      toast.add({
+        type: "error",
+        title: failure instanceof Error ? failure.message : String(failure),
       })
     }
   }
@@ -1023,9 +1027,10 @@ function SourceSection({
       await onUpdate()
       setState({ kind: "idle" })
     } catch (failure) {
-      setState({
-        kind: "failed",
-        reason: failure instanceof Error ? failure.message : String(failure),
+      setState({ kind: "idle" })
+      toast.add({
+        type: "error",
+        title: failure instanceof Error ? failure.message : String(failure),
       })
     }
   }
@@ -1037,18 +1042,21 @@ function SourceSection({
 
   const busy = state.kind === "checking" || state.kind === "applying"
   const outdated = state.kind === "checked" && state.result.outdated
+  /* A copy a person edited is worth saying whether or not the source moved on:
+     it is the reason an update is not free, and the reason to keep a copy. */
+  const modified = state.kind === "checked" && state.result.modified
   const text =
     state.kind === "checking"
       ? t("skills.update.checking")
       : state.kind === "applying"
         ? t("skills.update.applying")
-        : state.kind === "failed"
-          ? state.reason
-          : state.kind === "checked"
-            ? state.result.outdated
-              ? t("skills.update.available")
+        : state.kind === "checked"
+          ? state.result.outdated
+            ? t("skills.update.available")
+            : state.result.modified
+              ? t("skills.update.edited")
               : t("skills.update.current")
-            : upstream.source
+          : upstream.source
   const label = outdated ? t("skills.update.apply") : t("skills.update.check")
   const checkedAt = skill.checked?.at ?? null
   const href = sourceHref(skill)
@@ -1090,8 +1098,9 @@ function SourceSection({
           <ExternalLinkIcon className="size-[13px] shrink-0" />
         </a>
       )}
-      {/* Only a newer revision makes the loss real, so only then is it said. */}
-      {state.kind === "checked" && state.result.outdated && state.result.modified ? (
+      {/* Only a newer revision makes the loss real, so only then is the
+          warning worded as one. */}
+      {outdated && modified ? (
         <span className="text-[12px] text-amber-600 dark:text-amber-400">
           {t("skills.update.modified")}
         </span>
@@ -1100,8 +1109,6 @@ function SourceSection({
           worth showing; a fresh check replaces this line with its result. */}
       {state.kind === "checked" || state.kind === "checking" ? (
         <span className="text-[12px] text-muted-soft">{text}</span>
-      ) : state.kind === "failed" ? (
-        <span className="text-[12px] text-destructive">{text}</span>
       ) : checkedAt !== null ? (
         <span className="text-[12px] text-muted-soft">
           {t("skills.update.lastChecked").replace("{age}", formatAge(checkedAt, locale.active))}
@@ -1449,20 +1456,22 @@ function FilesPanel({
   const current = picked !== null && files.some((file) => file.path === picked) ? picked : fallback
   /* What was read is kept with the file it came from, so a row that just
      changed shows its own state rather than the previous file's text. */
-  const [content, setContent] = React.useState<
-    { path: string; kind: "text"; text: string } | { path: string; kind: "failure"; reason: string }
-  >()
+  const [content, setContent] = React.useState<{ path: string; text: string }>()
 
   React.useEffect(() => {
     if (current === null) return
     let live = true
     read(current).then(
       (text) => {
-        if (live) setContent({ path: current, kind: "text", text })
+        if (live) setContent({ path: current, text })
       },
       (reason: unknown) => {
-        const message = reason instanceof Error ? reason.message : String(reason)
-        if (live) setContent({ path: current, kind: "failure", reason: message })
+        /* The card has no text to show either way; why the read failed is said
+           where every other refusal is. */
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
       }
     )
     return () => {
@@ -1523,7 +1532,7 @@ function FilesPanel({
         <CodeCard
           title={name}
           path={current ?? ""}
-          text={loaded !== null && loaded.kind === "text" ? loaded.text : undefined}
+          text={loaded === null ? undefined : loaded.text}
           trailing={<MoreHorizontalIcon className="size-4 shrink-0 text-muted-foreground" />}
           className="flex-1"
         >
@@ -1532,8 +1541,6 @@ function FilesPanel({
               <Spinner />
               {t("skills.detail.files.loading")}
             </div>
-          ) : loaded.kind === "failure" ? (
-            <p className="p-3.5 text-xs text-destructive">{loaded.reason}</p>
           ) : null}
         </CodeCard>
       </div>

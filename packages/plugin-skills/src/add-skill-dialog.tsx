@@ -33,6 +33,7 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 import { Spinner } from "@workspace/ui/components/spinner"
+import { toast } from "@workspace/ui/components/toast"
 
 import { useI18n } from "@workspace/extensions/react"
 
@@ -149,12 +150,12 @@ function InstallRow({
   )
 }
 
-/** The one line a list shows instead of rows: a wait, or a refusal. */
+/** The one line a list shows instead of rows: a wait, or that it found none. */
 function ListState({ text, busy }: { text: string; busy: boolean }) {
   return (
     <div className="flex items-center gap-2 px-5 py-7 text-[12px]">
       {busy && <Spinner className="size-3.5" />}
-      <span className={busy ? "text-muted-foreground" : "text-destructive"}>{text}</span>
+      <span className="text-muted-foreground">{text}</span>
     </div>
   )
 }
@@ -209,8 +210,6 @@ export function AddSkillDialog({
   /** Ids this library already holds, lower-cased for comparison. */
   const [installed, setInstalled] = React.useState<string[]>([])
   const [busy, setBusy] = React.useState<"list" | "import" | null>(null)
-  const [error, setError] = React.useState<string | null>(null)
-  const [failed, setFailed] = React.useState<{ name: string; reason: string }[]>([])
 
   /** What the library holds now, so a row can say it is already in. */
   const readInstalled = React.useCallback(async (): Promise<string[]> => {
@@ -249,8 +248,6 @@ export function AddSkillDialog({
     setFolderName("")
     setCapped(false)
     setBusy(null)
-    setError(null)
-    setFailed([])
   }
 
   /* Closing always clears the dialog, so the next open starts from nothing. */
@@ -268,22 +265,20 @@ export function AddSkillDialog({
     const alreadyListed = request.source === listed
     setListed(request.source)
     setSeeded(seed)
-    setFailed([])
     if (alreadyListed) return
     if (store === null) {
       setPackaged([])
-      setError(t("skills.add.offline"))
+      toast.add({ type: "error", title: t("skills.add.offline") })
       return
     }
     setBusy("list")
-    setError(null)
     try {
       setPackaged(await store.listPackage(request.source))
     } catch (failure) {
       setListed("")
       setSeeded("")
       setPackaged([])
-      setError(messageOf(failure))
+      toast.add({ type: "error", title: messageOf(failure) })
     } finally {
       setBusy(null)
     }
@@ -302,8 +297,6 @@ export function AddSkillDialog({
     folderRead.current?.abort()
     const controller = new AbortController()
     folderRead.current = controller
-    setError(null)
-    setFailed([])
     setBusy("list")
     try {
       const { files, truncated } = await read(controller.signal)
@@ -318,7 +311,7 @@ export function AddSkillDialog({
     } catch (failure) {
       if (controller.signal.aborted) return
       setFolder(null)
-      setError(messageOf(failure))
+      toast.add({ type: "error", title: messageOf(failure) })
     } finally {
       if (folderRead.current === controller) {
         folderRead.current = null
@@ -330,13 +323,12 @@ export function AddSkillDialog({
   /** Put one row into the library, and leave the list up for the next one. */
   const installOne = async (name: string) => {
     if (store === null) {
-      setError(t("skills.add.offline"))
+      toast.add({ type: "error", title: t("skills.add.offline") })
       return
     }
     const found = (folder ?? []).find((skill) => skill.name === name)
     if (tab === "local" && found === undefined) return
     setPending((current) => [...current, name])
-    setError(null)
     try {
       const result: SkillImport =
         tab === "local"
@@ -347,14 +339,17 @@ export function AddSkillDialog({
             )
       if (result.installed.length > 0) onImported()
       if (result.failed.length > 0) {
-        setFailed((current) => [
-          ...current.filter((entry) => entry.name !== name),
-          ...result.failed,
-        ])
+        /* The list keeps the rows it has; the refusal is said where every other
+           one in this app is, so nothing sits under the list as if it were its
+           state. */
+        toast.add({
+          type: "error",
+          title: result.failed.map((entry) => `${entry.name}: ${entry.reason}`).join(" · "),
+        })
       }
       void readInstalled().then(setInstalled)
     } catch (failure) {
-      setError(messageOf(failure))
+      toast.add({ type: "error", title: messageOf(failure) })
     } finally {
       setPending((current) => current.filter((item) => item !== name))
     }
@@ -367,7 +362,7 @@ export function AddSkillDialog({
 
   /* A listing is on screen once it has been asked for, even when it found nothing. */
   const hasList = tab === "local" ? folder !== null : listed !== ""
-  const showList = hasList || busy === "list" || error !== null
+  const showList = hasList || busy === "list"
 
   const summary = (tab === "local"
     ? t("skills.add.foundFolder")
@@ -424,7 +419,7 @@ export function AddSkillDialog({
         <SegmentRow tab={tab} onTabChange={onTabChange} />
 
         {tab === "local" ? (
-          folder === null && busy !== "list" && error === null ? (
+          folder === null && busy !== "list" ? (
             /* Nothing chosen yet, so the drop target is the whole screen and
                browsing is its one button. */
             <div className="px-5 pb-5">
@@ -561,8 +556,6 @@ export function AddSkillDialog({
             <div className="h-px shrink-0 bg-border" />
             {busy === "list" ? (
               <ListState text={t("skills.add.listing")} busy />
-            ) : error !== null ? (
-              <ListState text={error} busy={false} />
             ) : candidates.length === 0 ? (
               <ListState text={t("skills.add.none")} busy={false} />
             ) : (
@@ -581,15 +574,6 @@ export function AddSkillDialog({
                   />
                 ))}
               </ul>
-            )}
-            {failed.length > 0 && (
-              <div className="flex shrink-0 flex-col gap-0.5 px-6 py-2 text-[12px] text-destructive">
-                {failed.map((entry) => (
-                  <span key={entry.name}>
-                    {entry.name} — {entry.reason}
-                  </span>
-                ))}
-              </div>
             )}
           </>
         )}

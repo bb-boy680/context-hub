@@ -55,6 +55,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
+import { toast } from "@workspace/ui/components/toast"
 import {
   Tabs,
   TabsContent,
@@ -1043,9 +1044,6 @@ export function SkillsPage() {
   const [checked, setChecked] = React.useState<readonly string[]>([])
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
-  /* Why the last action did not go through. A success says nothing: the row it
-     changed already shows the result. */
-  const [refusal, setRefusal] = React.useState<string | null>(null)
   /* A batch check clones every recorded source; the toolbar says it is busy. */
   const [checking, setChecking] = React.useState(false)
   /* A batch a tab's menu started, which holds the menu's item disabled until the
@@ -1213,30 +1211,43 @@ export function SkillsPage() {
   /** Why an action did not go through, ready to show. */
   const reasonOf = (failure: unknown) => (failure instanceof Error ? failure.message : String(failure))
 
+  /**
+   * Say what went wrong the way every other failure in this app is said: a
+   * toast, which carries its own words and leaves when it is done, rather than
+   * a line that would stay on the page like a state.
+   */
+  const refuse = (failure: unknown) =>
+    toast.add({ type: "error", title: reasonOf(failure) })
+
   const install = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
       await library.install(skill.id, ref)
-      setRefusal(null)
     } catch (failure) {
-      setRefusal(reasonOf(failure))
+      refuse(failure)
     }
   }
 
-  /** Ask every recorded source; the badges that change are the report. A
-      source that could not be read is named, since nothing else would say so. */
+  /** Ask every recorded source; the badges that change are the report, and a
+      copy somebody edited is named because an update would overwrite it. A
+      source that could not be read is named too, since nothing else would. */
   const checkAll = async () => {
     setChecking(true)
     try {
       const summary = await library.checkAll()
-      setRefusal(
-        summary.failed.length === 0
-          ? null
-          : summary.failed
-              .map((entry) => `${entry.name}: ${entry.reason}`)
-              .join(" · ")
-      )
+      if (summary.modified > 0) {
+        toast.add({
+          type: "warning",
+          title: t("skills.update.modifiedCount").replace("{count}", String(summary.modified)),
+        })
+      }
+      if (summary.failed.length > 0) {
+        toast.add({
+          type: "error",
+          title: summary.failed.map((entry) => `${entry.name}: ${entry.reason}`).join(" · "),
+        })
+      }
     } catch (failure) {
-      setRefusal(reasonOf(failure))
+      refuse(failure)
     } finally {
       setChecking(false)
     }
@@ -1252,9 +1263,8 @@ export function SkillsPage() {
       } else {
         await library.remove(skill.id, ref)
       }
-      setRefusal(null)
     } catch (failure) {
-      setRefusal(reasonOf(failure))
+      refuse(failure)
     }
   }
 
@@ -1262,9 +1272,8 @@ export function SkillsPage() {
   const adopt = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
       await library.adopt(skill.id, ref)
-      setRefusal(null)
     } catch (failure) {
-      setRefusal(reasonOf(failure))
+      refuse(failure)
     }
   }
 
@@ -1280,7 +1289,6 @@ export function SkillsPage() {
    */
   const adoptAll = async () => {
     setBatch("adopt")
-    setRefusal(null)
     try {
       for (const skill of unstoredRows) {
         const hold = holdsOf(skill)[0]
@@ -1288,7 +1296,7 @@ export function SkillsPage() {
         await library.adopt(skill.id, { scope: hold.scope, dir: hold.dir })
       }
     } catch (failure) {
-      setRefusal(reasonOf(failure))
+      refuse(failure)
     } finally {
       setBatch(null)
     }
@@ -1297,11 +1305,10 @@ export function SkillsPage() {
   /** Install the source's current revision over every copy that fell behind. */
   const updateAll = async () => {
     setBatch("update")
-    setRefusal(null)
     try {
       for (const skill of outdatedRows) await library.update(skill.id)
     } catch (failure) {
-      setRefusal(reasonOf(failure))
+      refuse(failure)
     } finally {
       setBatch(null)
     }
@@ -1500,9 +1507,6 @@ export function SkillsPage() {
             all: t("skills.allTags"),
           }}
         />
-        {refusal === null ? null : (
-          <span className="text-xs leading-[15px] text-destructive">{refusal}</span>
-        )}
         <TabsContent value={screenTab} className="flex flex-col">
           <PageBody footer={footer}>
             {library.store === null ? (

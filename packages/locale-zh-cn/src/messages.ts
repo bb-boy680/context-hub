@@ -184,6 +184,8 @@ export const messages: Record<string, string> = {
   "skills.update.apply": "更新",
   "skills.update.applying": "正在更新…",
   "skills.update.modified": "这份文件在安装后被改过，更新会覆盖它们。",
+  "skills.update.edited": "安装后在这里被改过",
+  "skills.update.modifiedCount": "{count} 份在安装后被改过",
   "skills.update.checkAll": "检查更新",
   "skills.update.checkingAll": "正在检查…",
   "skills.update.badge": "有更新",
