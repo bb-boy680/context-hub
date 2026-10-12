@@ -54,4 +54,11 @@
   而不是 `packages/core`（那是宿主/Node 侧内核，零 React 依赖）。子路径导出写进该包 `exports` 的 `./components/<name>`。
 - 抽共享控件时**领域类型留在各插件**：控件的输入用 `{ id, icon, label, where?, … }` 这种无领域含义的结构，
   文案由调用方注入（`PlaceWords`/`PlaceListWords`），i18n key 不跨模块共享。
+- 共享控件从 **`@workspace/extensions/components`** 一个入口导入（`src/components/index.ts` barrel + `exports["./components"]`），
+  不要再写 `components/place-picker` 这种按文件名的子路径；否则每拆一次文件都要改所有调用点。
+- **改了 `exports` 必须重启 dev server**：Vite 缓存 package.json 的解析结果，不重启会报
+  `"./components" is not exported ... from package`，看起来像导出写错了（实测：重启前 500 + overlay，重启后正常）。
+  `pnpm build` 走全新进程，能单独证伪"导出/解析写错"这一项。
+- 要真机验证又不想动用户正在用的 5173：另起一个 `pnpm exec vite --port <其它端口>` 的临时实例，
+  验证完 `Stop-Process -Id <pid>` 停掉（注意该实例只监听 `::1`，用 `localhost` 而不是 `127.0.0.1` 访问）。
 
