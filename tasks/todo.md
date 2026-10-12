@@ -39,6 +39,45 @@
 <AvatarStack marks active max />                                                               // 图标堆叠 + 溢出计数（单独文件 avatar-stack.tsx）
 ```
 
+# 公共 TagEditor + FilterBar（2026-10-12，续）
+
+用户两轮追加："把 skill 的这个添加 tag 的组件封装成公用组件，然后大家一起用"、
+"这一块的逻辑也需要提炼出公用组件"，并指出 MCP 的两处逻辑错误：
+① 详情弹窗的快捷选择写死了 9 个固定类型（`MCP_TAGS`），不是"已有类型"；
+② 筛选行的胶囊同样是那份固定清单，不是服务器自己带的值。
+
+## 组件
+
+```tsx
+<TagEditor tags suggestions words={{add, placeholder, remove}} onChange labelFor? />  // 类型行：胶囊 + × + 下拉建议（filter-bar 的姊妹件）
+<FilterBar query onQuery tags tag all onTag words={{search, clear, all}} />           // 搜索框 + 类型胶囊行（4 枚后折 +N）
+```
+
+- `TagEditor`：`suggestions` = 调用方给的"已有值"，已带的自动排除；`labelFor` 只在值≠显示名时给（MCP 已不需要）。
+- `FilterBar`：`all` 是"不筛类型"时 `tag` 的取值（skills 用 `"All tags"`，MCP 用 `""`）；`/` 聚焦与 Esc 清空
+  随控件走，两模块行为一致（MCP 原先只有一个不会响应的 `/` 装饰）。
+
+## 顺带修掉的固定清单
+
+- 删 `MCP_TAGS` / `tagList` / `McpTag` / `mcp.tag.{vcs,browser,files,database,messaging,projects,observability,docs}` 8 个键（en + zh）。
+- MCP 的类型现在只有一个来源：服务器记录自己的 `detail.tags`（自由字符串）。
+  页面 `serverTags` 同时喂筛选胶囊与详情弹窗的建议；卡片徽标直接显示该值。
+- 筛选语义修正：`server.tag`（首枚，卡片用）→ `detail.tags.includes(tag)`（任一命中），
+  否则"第二个类型"永远筛不出东西。
+
+## 验证
+
+- `pnpm --filter {extensions,plugin-mcp,plugin-skills} typecheck | lint` 全绿；`check-messages` 407/407。
+- 浏览器：MCP 胶囊 = 全部标签 / 钉钉 / docs（真实值），点「钉钉」→ 显示 1 / 3；`/` 聚焦可用；
+    skills 胶囊仍是 全部标签 / 浏览器控制 / 自动化测试 / context7 / docs / +2，展开 +N、点选筛选、清除搜索均正常。
+  
+  # 公共 DialogSplit：弹窗的两侧布局（2026-10-12）
+  
+  用户："还有 skills 这个弹窗的两侧布局也要封装成公用的组件 … 我指的只是弹窗的两侧布局啊，
+  并不是里面的内容啊 … 你只需要看 skill 那个的弹窗，不要看 MCP 弹窗的代码。不然的话，你会乱封装的。"
+  
+  ## 组件
+
 - 数据：`PlaceOption { id, icon, label, where?, note?, count?, selected?, blocked? }`（extends `AvatarMark { id, icon }`），不含领域类型
 - 操作：`onPick(id)`（行=动作）、`action(option)`（列表每行尾部，调用方自渲染）、`trailing(option)`（菜单尾部）、
   `activation: "row" | "control"`（行是否可点）、`count(all)`（表头计数口径）
@@ -393,7 +432,8 @@ skill 位置。现在 **MCP 的客户端文件由 Agent 插件贡献**，与 ski
 - [x] 启停：Codex `enabled` 字段（`switchable`；Claude Code 的停用名单在 `~/.claude.json` per-project，暂标自管）
 - [x] 批量安装、详情「保存」（改名会带着已装位置一起改）
 - [x] 删除的确认气泡（照 skills 的 `DeleteBubble`：取消保留、确认才删；失败留在气泡里）
-- [ ] 标签「添加类型」仍无交互
+- [x] 标签「添加类型」可增可删：目录标签（去掉「全部标签」与已有项）做成 Popover 建议，
+      × 移除；每次改动走 `library.update(id, { tags })` 落进记录
 - **已验**：安装/卸载（`.mcp.json` 新建 + Codex 真文件 +4 行并哈希还原）、删除气泡（取消/确认两条路）；
   **待验**：启停开关（Codex `enabled`，检查脚本已覆盖，浏览器未点）、批量安装、改名保存、
   两处端点不同的冲突显示（需要临时造一份不一致的副本）。
