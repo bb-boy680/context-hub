@@ -323,6 +323,7 @@ export const messages: Record<string, string> = {
   "mcp.scan.problem": "{path}：{message}",
   "mcp.error.read": "读不到这个客户端的配置文件。",
   "mcp.error.scan": "扫描客户端配置文件失败。",
+  "mcp.error.records": "读不到 Hub 自己的 MCP 记录文件。",
   "mcp.error.action": "这次改动没有完成。",
   "mcp.error.unknown": "目录里没有名为 {name} 的服务器。",
   "mcp.error.unknownPlace": "没有 Agent 插件描述位置 {place}。",

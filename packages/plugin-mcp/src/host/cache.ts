@@ -40,8 +40,8 @@ export const PROBE_VERSION = 4
 /** The document's own format version. */
 const CACHE_VERSION = 1
 
-/** Directory under the hub home the cache lives in. */
-export const CACHE_DIR = "mcp"
+/** Directory under the hub home the module's files live in. */
+export const MCP_DIR = "mcp"
 
 /** One server as the cache is asked about it. */
 export interface McpProbeTarget extends McpProbeSubject {
@@ -113,7 +113,7 @@ export function cacheEntryOf(
  * @param options — `home` overrides the hub home, which the check script uses.
  */
 export function createProbeCache(options: { home?: string } = {}): McpProbeCache {
-  const root = path.join(resolveHubHome(options.home), CACHE_DIR)
+  const root = path.join(resolveHubHome(options.home), MCP_DIR)
   const file = path.join(root, "cache.json")
   let tail: Promise<unknown> = Promise.resolve()
 

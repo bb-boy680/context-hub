@@ -1,8 +1,8 @@
 /**
- * Development bridge for MCP probes. A probe starts child processes and
- * reaches the network, so it belongs to the process that owns the machine —
- * here the dev server, the same way the skill library does. The cache lives
- * under the hub home, so the browser form and a product host keep one cache.
+ * Development bridge for the MCP module's host half. A probe starts child
+ * processes and reaches the network, and the records file lives under the hub
+ * home, so both belong to the process that owns the machine — here the dev
+ * server, the same way the skill library does.
  *
  * Product forms mount the same modules themselves; nothing here is a service
  * the app depends on.
@@ -18,6 +18,7 @@ import type { AssetScope } from "@workspace/core/place-files"
 import type { McpDeclaration } from "./src/declaration.ts"
 import { cacheEntryOf, createProbeCache } from "./src/host/cache.ts"
 import { probeDeclaration } from "./src/host/probe.ts"
+import { createRecordStore } from "./src/host/records.ts"
 import { MCP_ROUTE, readMcpCall } from "./src/probe.ts"
 
 /** Read a whole request body into one buffer. */
@@ -45,6 +46,7 @@ function sendError(response: ServerResponse, error: unknown) {
 export function mcpProbe(options: { home?: string } = {}) {
   const home = resolveHubHome(options.home)
   const cache = createProbeCache({ home })
+  const records = createRecordStore({ home })
   let store: ReturnType<typeof createFsWorkspaceStore> | null = null
 
   /**
@@ -85,6 +87,17 @@ export function mcpProbe(options: { home?: string } = {}) {
           try {
             const body = JSON.parse((await readBody(request)).toString("utf8")) as unknown
             const call = readMcpCall(body)
+
+            if (call.action === "records") {
+              sendJson(response, 200, { value: await records.read() })
+              return
+            }
+            if (call.action === "save-records") {
+              await records.save(call.records)
+              sendJson(response, 200, { ok: true })
+              return
+            }
+
             const cwd = await startFolder()
             const subjectOf = (query: { declaration: McpDeclaration; scope: AssetScope }) => ({
               declaration: query.declaration,

@@ -14,7 +14,8 @@ import type { ExtensionIcon } from "@workspace/extensions"
 import type { McpEntry, McpPlace, McpProvider } from "../src/contract.ts"
 import type { PlaceFiles } from "@workspace/core/place-files"
 
-import { RECORDS_KEY, buildCatalog, placesOf, readRecords, scanPlaces, upsert } from "../src/catalog.ts"
+import { buildCatalog, placesOf, scanPlaces } from "../src/catalog.ts"
+import { documentOf, readRecords, recordsFromState, upsert } from "../src/records.ts"
 import type { McpCacheEntry } from "../src/probe.ts"
 import { createMcpService } from "../src/registry.ts"
 import { toolTree } from "../src/schema-tree.ts"
@@ -262,18 +263,64 @@ async function main(): Promise<void> {
 
   console.log("the records a form stores")
 
+  const REMOTE = {
+    transport: "sse",
+    url: "https://mcp.example.com/sse",
+    headers: { Authorization: "Bearer x" },
+  } as const
+  const record = { name: "github", declaration: STDIO, description: "", tags: ["vcs"] }
+  const stored = documentOf(record)
+
+  check("a record is stored under its own name", Object.keys(stored.mcpServers)[0] === "github")
+  check(
+    "the entry is the shape a client file holds",
+    JSON.stringify(stored.mcpServers.github) ===
+      JSON.stringify({ command: "npx", args: ["-y", "@x/github"] })
+  )
+  check(
+    "the notes around it travel with it",
+    stored.description === "" && JSON.stringify(stored.tags) === JSON.stringify(["vcs"])
+  )
+  check(
+    "reading it back gives the record",
+    JSON.stringify(readRecords([stored])[0]) === JSON.stringify(record)
+  )
+  check(
+    "an sse server names its transport, so it does not read back as http",
+    readRecords([documentOf({ name: "x", declaration: REMOTE, description: "", tags: [] })])[0]
+      ?.declaration.transport === "sse"
+  )
+  check(
+    "a client's own spelling of a remote server reads too",
+    readRecords([
+      { name: "x", mcpServers: { x: { type: "streamable-http", url: "https://a/b" } } },
+    ])[0]?.declaration.transport === "http"
+  )
   check("an empty document holds none", readRecords(null).length === 0)
-  check("something that is not a list holds none", readRecords({ servers: [] }).length === 0)
+  check("something that is not a record holds none", readRecords({ servers: [] }).length === 0)
   check(
     "a value that is not a record is left out",
-    readRecords([{ name: "x" }, "nope", null, { name: "ok", declaration: STDIO }]).length === 1
+    readRecords([{ name: "x" }, "nope", null, stored]).length === 1
   )
   check(
+    "an entry keyed under another name is left out",
+    readRecords([{ name: "a", mcpServers: { b: { command: "npx" } } }]).length === 0
+  )
+  check("a file with one server may be that one object", readRecords(stored).length === 1)
+  check(
     "a record's missing fields are filled in",
-    JSON.stringify(readRecords([{ name: "ok", declaration: STDIO }])[0]) ===
+    JSON.stringify(readRecords([{ name: "ok", mcpServers: { ok: STDIO } }])[0]) ===
       JSON.stringify({ name: "ok", declaration: STDIO, description: "", tags: [] })
   )
-  check("the key it lives under is the module's own", RECORDS_KEY === "mcp")
+  check(
+    "records an earlier build kept in the state document are carried over",
+    recordsFromState([{ name: "ok", declaration: REMOTE, description: "d", tags: ["t"] }])[0]
+      ?.declaration.transport === "sse"
+  )
+  check(
+    "a state entry that names no declaration carries nothing",
+    recordsFromState([{ name: "ok" }, "nope", null]).length === 0
+  )
   check(
     "adding a record replaces the one with its name",
     upsert([{ name: "a", declaration: STDIO, description: "old", tags: [] }], {

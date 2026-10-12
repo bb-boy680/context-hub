@@ -26,14 +26,21 @@ export * from "./types.ts"
 export {
   buildCatalog,
   placesOf,
-  readRecords,
-  RECORDS_KEY,
-  recordOf,
   scanPlaces,
-  upsert,
   type McpLog,
   type McpScan,
   type ScannedPlace,
 } from "./catalog.ts"
+export {
+  createRemoteRecords,
+  documentOf,
+  entryOf,
+  readRecords,
+  recordOf,
+  recordsFromState,
+  upsert,
+  type McpRecordDocument,
+  type McpRecordsPort,
+} from "./records.ts"
 
 export const mcpExtension: ExtensionDefinition = mcpExtensionWith(McpServersPage)

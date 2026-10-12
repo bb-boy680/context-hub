@@ -1,6 +1,8 @@
 /**
  * Probing an MCP server: what one probe answers, what a cached answer carries,
- * and the browser's way of asking the host to run one.
+ * and the browser's way of asking the host to run one. The host's MCP route
+ * also reads and writes the records file, so this module holds the wire shape
+ * every call shares.
  *
  * The probe itself runs in the host process — it starts a child process or
  * reaches the network, which a browser form cannot do — so this module holds
@@ -10,7 +12,7 @@ import type { AssetScope } from "@workspace/core/place-files"
 
 import type { McpDeclaration } from "./contract.ts"
 
-/** Route the host serves probes and cache reads on. */
+/** Route the host serves the MCP operations on. */
 export const MCP_ROUTE = "/hub/mcp"
 
 /** One icon a server offered, as the picker kept it. */
@@ -127,6 +129,8 @@ export interface McpProbePort {
 export type McpCall =
   | { action: "cache"; servers: McpProbeQuery[] }
   | ({ action: "probe" } & McpProbeRequest)
+  | { action: "records" }
+  | { action: "save-records"; records: unknown[] }
 
 const SCOPES: readonly string[] = ["workspace", "global"]
 
@@ -149,6 +153,12 @@ export function readMcpCall(body: unknown): McpCall {
     timeoutMs?: unknown
     save?: unknown
     names?: unknown
+    records?: unknown
+  }
+  if (held.action === "records") return { action: "records" }
+  if (held.action === "save-records") {
+    if (!Array.isArray(held.records)) throw new Error("a save call carries its records")
+    return { action: "save-records", records: held.records }
   }
   if (held.action === "cache") {
     if (!Array.isArray(held.servers)) throw new Error("a cache call carries its servers")
@@ -183,30 +193,38 @@ export async function probeAvailable(): Promise<boolean> {
 }
 
 /**
+ * One MCP call, as a browser makes it: a POST whose answer is JSON.
+ *
+ * @param body — the call, in the shape {@link readMcpCall} reads.
+ * @throws when the host refused the call.
+ */
+export async function callMcp(body: unknown): Promise<unknown> {
+  const answer = await fetch(MCP_ROUTE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+  if (!answer.ok) throw new Error(`${answer.status} ${answer.statusText}`)
+  return answer.json()
+}
+
+/**
  * The browser's probe port: both calls are one POST each.
  *
  * @returns the port; a call the host refused rejects with its status.
  */
 export function createRemoteProbe(): McpProbePort {
-  const post = async (body: unknown): Promise<unknown> => {
-    const answer = await fetch(MCP_ROUTE, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    })
-    if (!answer.ok) throw new Error(`${answer.status} ${answer.statusText}`)
-    return answer.json()
-  }
-
   return {
     async cache(servers) {
-      const answer = (await post({ action: "cache", servers })) as {
+      const answer = (await callMcp({ action: "cache", servers })) as {
         entries?: Record<string, McpCacheEntry | null>
       }
       return answer.entries ?? {}
     },
     async probe(request) {
-      const answer = (await post({ action: "probe", ...request })) as { entry: McpCacheEntry }
+      const answer = (await callMcp({ action: "probe", ...request })) as {
+        entry: McpCacheEntry
+      }
       return answer.entry
     },
   }

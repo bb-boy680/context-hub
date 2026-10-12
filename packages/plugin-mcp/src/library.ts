@@ -1,11 +1,11 @@
 /**
  * The page's one read of MCP state, and every action that changes it.
  *
- * The module owns the records and the screen; each agent extension owns one
- * client's file. This hook is where the two meet: it asks the registry for the
- * places, reads every file through the provider that described it, merges the
- * answer with the records, and routes each action to the provider whose place
- * it names.
+ * The module owns the records file and the screen; each agent extension owns
+ * one client's file. This hook is where the two meet: it asks the registry for
+ * the places, reads every file through the provider that described it, merges
+ * the answer with the records, and routes each action to the provider whose
+ * place it names.
  *
  * Failures arrive as message keys and leave as sentences, so a client's own
  * wording never reaches the screen untranslated.
@@ -26,16 +26,14 @@ import { createRemoteProbe, probeAvailable, type McpCacheEntry, type McpProbeQue
 import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
 
 import {
-  RECORDS_KEY,
   buildCatalog,
   placesOf,
-  readRecords,
   scanPlaces,
-  upsert,
   type McpLog,
   type McpScan,
   type ScannedPlace,
 } from "./catalog.ts"
+import { createRemoteRecords, documentOf, readRecords, upsert } from "./records.ts"
 import type {
   McpAgentPlace,
   McpCatalog,
@@ -129,9 +127,7 @@ export function useMcpLibrary(): McpLibrary {
     [providers, iconFor]
   )
   const placeKey = places.map((place) => place.id).join("|")
-  const [records, setRecords] = React.useState<McpRecord[]>(() =>
-    readRecords(ctx.host.storage.read(RECORDS_KEY))
-  )
+  const [records, setRecords] = React.useState<McpRecord[]>([])
   /* The scan and the moment it ran travel together: the page says how long ago
      it checked, and both are replaced by the same read. */
   const [scan, setScan] = React.useState<{ answer: McpScan; at: number } | null>(null)
@@ -146,6 +142,20 @@ export function useMcpLibrary(): McpLibrary {
   const availability = React.useRef<Promise<boolean> | null>(null)
   const probing = React.useRef(new Map<string, Promise<McpCacheEntry>>())
   const port = React.useMemo(() => createRemoteProbe(), [])
+  const store = React.useMemo(() => createRemoteRecords(), [])
+
+  /** Read the records file once, naming its failure as the store's own. */
+  const loadRecords = React.useCallback(async (): Promise<McpRecord[]> => {
+    try {
+      return readRecords(await store.read())
+    } catch (error) {
+      throw new McpError(
+        "mcp.error.records",
+        undefined,
+        error instanceof Error ? error.message : String(error)
+      )
+    }
+  }, [store])
 
   /** Whether a host answers for probes; asked once, remembered for the session. */
   const reachable = React.useCallback(async (): Promise<boolean> => {
@@ -196,19 +206,17 @@ export function useMcpLibrary(): McpLibrary {
    * never holds up the ones beside it.
    */
   const probeAll = React.useCallback(
-    async (answer: McpScan, at: number, force: boolean, current: number) => {
+    async (
+      answer: McpScan,
+      at: number,
+      force: boolean,
+      current: number,
+      declared: readonly McpRecord[]
+    ) => {
       if (!(await reachable())) return
       if (current !== generation.current) return
       const places = currentPlaces(service, iconFor)
-      /* The records are read from the store rather than from state: this runs
-         inside a callback that must not be rebuilt every time they change. */
-      const servers = buildCatalog(
-        readRecords(ctx.host.storage.read(RECORDS_KEY)),
-        answer,
-        places,
-        [],
-        at
-      ).servers
+      const servers = buildCatalog(declared, answer, places, [], at).servers
       const targets = probeTargets(servers, places)
       if (targets.length === 0) return
       const names = targets.map((target) => target.name)
@@ -251,7 +259,7 @@ export function useMcpLibrary(): McpLibrary {
         Array.from({ length: Math.min(PROBE_CONCURRENCY, queue.length) }, worker)
       )
     },
-    [service, iconFor, ctx, port, probeOnce, reachable, t]
+    [service, iconFor, port, probeOnce, reachable, t]
   )
 
   /**
@@ -268,15 +276,19 @@ export function useMcpLibrary(): McpLibrary {
       /* Probes belong to the scan that asked for them; a new one starts over. */
       setTesting([])
       try {
+        /* The records are read first: their failure names itself, while a scan
+           of client files has its own sentence. */
+        const declared = await loadRecords()
         const answer = await scanPlaces(currentPlaces(service, iconFor), files, log)
         /* A slower earlier scan must not overwrite a newer one. */
         if (current !== generation.current) return
         const at = Date.now()
+        setRecords(declared)
         setScan({ answer, at })
         setFailure(null)
         /* The list is readable now; its probes run beside it, not before it. */
         setBusy(false)
-        await probeAll(answer, at, force, current)
+        await probeAll(answer, at, force, current, declared)
       } catch (error) {
         if (current !== generation.current) return
         setFailure(failureText(t, mcpFailure(error, "mcp.error.scan")))
@@ -284,7 +296,7 @@ export function useMcpLibrary(): McpLibrary {
         if (current === generation.current) setBusy(false)
       }
     },
-    [service, iconFor, placeKey, files, log, t, probeAll]
+    [service, iconFor, placeKey, files, log, t, loadRecords, probeAll]
   )
 
   React.useEffect(() => {
@@ -311,13 +323,13 @@ export function useMcpLibrary(): McpLibrary {
     )
   }, [scan, records, service, revision, iconFor, t, checks])
 
-  /** Save the records and hand them to the form's own state store. */
+  /** Write the records file, then show the rows as the file now holds them. */
   const keep = React.useCallback(
-    (next: McpRecord[]) => {
+    async (next: McpRecord[]) => {
+      await store.save(next.map(documentOf))
       setRecords(next)
-      ctx.host.storage.write(RECORDS_KEY, next)
     },
-    [ctx]
+    [store]
   )
 
   /** One row of the catalog, or a failure naming the server that is not there. */
@@ -409,7 +421,7 @@ export function useMcpLibrary(): McpLibrary {
           throw new McpError("mcp.error.duplicate", { name: draft.name })
         }
         if (declarationOf(draft.declaration) === null) throw new McpError("mcp.error.incomplete")
-        keep(
+        await keep(
           upsert(records, {
             name: draft.name,
             declaration: draft.declaration,
@@ -441,7 +453,7 @@ export function useMcpLibrary(): McpLibrary {
           await found.provider.install(io, install.place, name, declaration)
         }
 
-        keep(
+        await keep(
           upsert(
             records.filter((record) => record.name !== id),
             {
@@ -460,7 +472,7 @@ export function useMcpLibrary(): McpLibrary {
         if (!records.some((record) => record.name === id)) {
           throw new McpError("mcp.error.noRecord", { name: id })
         }
-        keep(records.filter((record) => record.name !== id))
+        await keep(records.filter((record) => record.name !== id))
       })
     },
 

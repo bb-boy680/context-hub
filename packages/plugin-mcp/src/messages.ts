@@ -77,6 +77,7 @@ export const mcpMessages: Record<string, string> = {
   "mcp.scan.problem": "{path}: {message}",
   "mcp.error.read": "This client's config file could not be read.",
   "mcp.error.scan": "The hub could not scan the client config files.",
+  "mcp.error.records": "The hub could not read its own MCP records file.",
   "mcp.error.action": "The hub could not finish that change.",
   "mcp.error.unknown": "No server named {name} is in the catalog.",
   "mcp.error.unknownPlace": "No agent extension describes the place {place}.",

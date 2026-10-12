@@ -28,9 +28,6 @@ import type {
   McpServer,
 } from "./types.ts"
 
-/** State key the hub's own records live under. */
-export const RECORDS_KEY = "mcp"
-
 /** The brands the web form ships artwork for, matched by name. */
 const BRANDS: [McpMark, string][] = [
   ["github", "github"],
@@ -53,34 +50,6 @@ export interface McpScan {
   entries: Map<string, McpEntry[]>
   /** Why a file could not be read, in the words the extension named it with. */
   problems: { place: string; failure: McpFailure }[]
-}
-
-/**
- * Read one stored value back as a record, or null when it is not one — a state
- * document is durable JSON, so a reader validates what it finds.
- */
-export function recordOf(value: unknown): McpRecord | null {
-  if (typeof value !== "object" || value === null) return null
-  const held = value as Partial<McpRecord>
-  if (typeof held.name !== "string" || held.name === "") return null
-  if (typeof held.declaration !== "object" || held.declaration === null) return null
-  return {
-    name: held.name,
-    declaration: held.declaration,
-    description: typeof held.description === "string" ? held.description : "",
-    tags: Array.isArray(held.tags) ? held.tags.filter((tag) => typeof tag === "string") : [],
-  }
-}
-
-/** The records a form's stored state holds. */
-export function readRecords(stored: unknown): McpRecord[] {
-  if (!Array.isArray(stored)) return []
-  return stored.map(recordOf).filter((record): record is McpRecord => record !== null)
-}
-
-/** The records with one added, replacing the one that carried its name. */
-export function upsert(records: readonly McpRecord[], next: McpRecord): McpRecord[] {
-  return [...records.filter((record) => record.name !== next.name), next]
 }
 
 /**

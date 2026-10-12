@@ -8,7 +8,7 @@
  *
  * Run from the package: `node scripts/check-probe.ts`
  */
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url"
 import type { McpDeclaration } from "../src/declaration.ts"
 import { PROBE_VERSION, cacheEntryOf, createProbeCache, fingerprintOf } from "../src/host/cache.ts"
 import { probeDeclaration } from "../src/host/probe.ts"
+import { createRecordStore } from "../src/host/records.ts"
 import { readMcpCall } from "../src/probe.ts"
 
 let failures = 0
@@ -39,6 +40,24 @@ function throws(work: () => unknown): boolean {
   } catch {
     return true
   }
+}
+
+/** Whether running `work` rejected, which is what a refused read must do. */
+async function rejects(work: () => Promise<unknown>): Promise<boolean> {
+  try {
+    await work()
+    return false
+  } catch {
+    return true
+  }
+}
+
+/** Whether a file is there. */
+async function exists(file: string): Promise<boolean> {
+  return await stat(file).then(
+    () => true,
+    () => false
+  )
 }
 
 const FIXTURE = fileURLToPath(new URL("./fixture-server.mjs", import.meta.url))
@@ -195,6 +214,75 @@ async function main(): Promise<void> {
     await rm(home, { recursive: true, force: true })
   }
 
+  console.log("the records file")
+
+  const recordsHome = await mkdtemp(path.join(os.tmpdir(), "hub-mcp-records-"))
+  try {
+    const records = createRecordStore({ home: recordsHome })
+    check("a hub with no records file reads none", (await records.read()) === null)
+
+    const document = [
+      { name: "github", mcpServers: { github: { command: "npx" } }, description: "", tags: ["vcs"] },
+    ]
+    await records.save(document)
+    check(
+      "a saved document reads back",
+      JSON.stringify(await records.read()) === JSON.stringify(document)
+    )
+    const file = path.join(recordsHome, "mcp", "mcp.json")
+    check(
+      "it sits at <home>/mcp/mcp.json",
+      (await readFile(file, "utf8")).endsWith("\n") && JSON.parse(await readFile(file, "utf8"))[0].name === "github"
+    )
+
+    await writeFile(file, "{ not json", "utf8")
+    check(
+      "a records file that is not JSON is refused, not guessed at",
+      await rejects(() => createRecordStore({ home: recordsHome }).read())
+    )
+  } finally {
+    await rm(recordsHome, { recursive: true, force: true })
+  }
+
+  /* The state document earlier builds kept the records in. */
+  const stateHome = await mkdtemp(path.join(os.tmpdir(), "hub-mcp-state-"))
+  try {
+    const legacy = path.join(stateHome, "state", "mcp.json")
+    await mkdir(path.dirname(legacy), { recursive: true })
+    await writeFile(
+      legacy,
+      JSON.stringify([
+        {
+          name: "playwright",
+          declaration: {
+            transport: "stdio",
+            command: "npx",
+            args: ["@playwright/mcp"],
+            env: {},
+          },
+          description: "",
+          tags: ["browser"],
+        },
+      ]),
+      "utf8"
+    )
+    const adopted = (await createRecordStore({ home: stateHome }).read()) as {
+      mcpServers?: Record<string, unknown>
+    }[]
+    check(
+      "a state document's records are carried into the file",
+      adopted[0]?.mcpServers?.playwright !== undefined,
+      adopted
+    )
+    check(
+      "the carried records land in the file",
+      JSON.parse(await readFile(path.join(stateHome, "mcp", "mcp.json"), "utf8")).length === 1
+    )
+    check("the state document is gone once they are safe", !(await exists(legacy)))
+  } finally {
+    await rm(stateHome, { recursive: true, force: true })
+  }
+
   console.log("the wire")
 
   check(
@@ -210,6 +298,12 @@ async function main(): Promise<void> {
       .action === "probe"
   )
   check("an unknown action is refused", throws(() => readMcpCall({ action: "nope" })))
+  check("a records call reads", readMcpCall({ action: "records" }).action === "records")
+  check(
+    "a save call carries its records",
+    readMcpCall({ action: "save-records", records: [] }).action === "save-records"
+  )
+  check("a save call without records is refused", throws(() => readMcpCall({ action: "save-records" })))
   check(
     "a bad scope is refused",
     throws(() =>
