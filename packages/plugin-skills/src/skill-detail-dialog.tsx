@@ -29,7 +29,6 @@ import type { SwiperClass } from "swiper/react"
 import "swiper/css"
 import "swiper/css/thumbs"
 
-import { CodeView } from "./code-view.tsx"
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
 import { formatAge, holdsOf, inLibrary, placeOf, placePath, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
@@ -47,7 +46,7 @@ import type {
 
 import { useI18n } from "@workspace/extensions/react"
 import type { AssetScope } from "@workspace/extensions"
-import { DialogSplit, PlaceList, TagEditor } from "@workspace/extensions/components"
+import { CodeCard, DialogSplit, PlaceList, TagEditor } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -1521,25 +1520,22 @@ function FilesPanel({
           />
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-border bg-surface-raised">
-          <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3.5">
-            <FileTextIcon className="size-3.5 shrink-0 text-muted-foreground" />
-            <span className="truncate text-[13px] font-medium">{name}</span>
-            <MoreHorizontalIcon className="ml-auto size-4 shrink-0 text-muted-foreground" />
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto">
-            {loaded === null ? (
-              <div className="flex items-center gap-2 p-3.5 text-xs text-muted-foreground">
-                <Spinner />
-                {t("skills.detail.files.loading")}
-              </div>
-            ) : loaded.kind === "failure" ? (
-              <p className="p-3.5 text-xs text-destructive">{loaded.reason}</p>
-            ) : (
-              <CodeView text={loaded.text} path={current ?? ""} />
-            )}
-          </div>
-        </div>
+        <CodeCard
+          title={name}
+          path={current ?? ""}
+          text={loaded !== null && loaded.kind === "text" ? loaded.text : undefined}
+          trailing={<MoreHorizontalIcon className="size-4 shrink-0 text-muted-foreground" />}
+          className="flex-1"
+        >
+          {loaded === null ? (
+            <div className="flex items-center gap-2 p-3.5 text-xs text-muted-foreground">
+              <Spinner />
+              {t("skills.detail.files.loading")}
+            </div>
+          ) : loaded.kind === "failure" ? (
+            <p className="p-3.5 text-xs text-destructive">{loaded.reason}</p>
+          ) : null}
+        </CodeCard>
       </div>
     </div>
   )

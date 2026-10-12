@@ -591,6 +591,9 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+      shiki:
+        specifier: ^4.5.0
+        version: 4.5.0
     devDependencies:
       '@eslint/js':
         specifier: ^10
@@ -799,9 +802,6 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
-      shiki:
-        specifier: ^4.5.0
-        version: 4.5.0
       swiper:
         specifier: ^14.3.0
         version: 14.3.0

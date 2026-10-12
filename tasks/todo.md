@@ -1,3 +1,41 @@
+# MCP 详情弹窗：页签、配置文件面板、共享代码块（2026-10-12，用户三轮报告）
+
+## 目标（用户原话）
+
+1. "这里使用英文的时候直接乱码了，你是不是没有用 shancn-ui 的组件" —— 英文标签互相重叠。
+2. "Config files 是展示 mcp 的 mcpServers"；"context7只有claude-code全局绑定的，
+   但是他查看MCP配置文件的时候，把clode.json全部给展示出来了，我只需要展示MCP的MCP server"。
+3. "MCP弹窗这一块和分割线好像是没有间距呀…和 SKILL 的布局不一致"。
+
+## 改动
+
+- **页签**（`server-dialog.tsx`）：删掉手写 `button` + `style={{width: 30|56}}`（按中文标签量的像素宽），
+  改用 `@workspace/ui/components/tabs` 的 `Tabs` / `TabsList variant="line"` / `TabsTrigger`，宽度交给文字。
+  `h-12!` 与 `after:bottom-0!` 是压过 line 变体自带的 32px 与 `-5px`：组件自身的类排在 caller 的类**前面**，
+  非 important 的覆盖会被它盖掉。
+- **配置文件面板**（`detail-files.tsx` 重写）：不再读客户端整文件，改为**由记录组装**
+  `{ mcpServers: { <name>: entryOf(declaration) } }`（组装在 `server-dialog.tsx` 的 `useMemo` 里）。
+  页面因此不再需要拉文件：删掉 `held` state、`installedPlaces` / `placesKey` 与那个 effect，
+  `ServerDialog` 也不再收 `files` 属性。
+- **共享代码块**：`CodeView` + `CodeCard` 移到 `@workspace/extensions/components`（skills 与 MCP 共用一份），
+  `shiki` 依赖从 plugin-skills 移到 extensions；复制按钮点完变 `CheckIcon`（主色）、**3 秒**后还原；
+  卡片没有标题时复制按钮浮在右上（配置文件面板没有文件名可写）。
+- **分隔线间距**：MCP 的 places `<ul>` 从 `flex flex-col` 改成 `flex flex-col gap-2.5`，
+  与 skills 的 `PlacesSection` 一致（发丝线上下各 10px）。
+- 回退：中途为"只显示 mcpServers 片段"改过 `provider.ts` / `toolkit.ts` / `jsonc.ts` / `toml.ts`
+  的跨包契约（新增 `excerpt`），用户指出记录里已有数据、不该改这些文件，已全部 `git checkout` 还原。
+
+## 验证
+
+- `pnpm --filter {extensions,plugin-mcp,plugin-skills} typecheck|lint` 全绿；`check-messages` 427/427；
+  `check-mcp` 60/60、`check-probe` 54/54、`check-mcp-tools` 84/84、`check-plugin` 29/29；`pnpm build` 通过。
+- 浏览器（zh-CN + 真数据）：英文档下页签为 104 / 36 / 86.4px，各贴自己的文字宽度，不再重叠；
+  context7（只装在 Claude Code 全局）的面板只剩它自己的 `mcpServers` 条目（`url` / `headers` / `type`），
+  `~/.claude.json` 的项目设置不再出现；places 分组分隔线上下各 10px，与 skills 一致。
+- 未提交：`packages/agents-extensions/cline/src/index.ts` 是**用户在进行中**的改动
+  （注册了 Cline 的 MCP provider，但缺 `read`/`install`/`uninstall`，会让 `pnpm build` 报 TS2345），
+  与本次无关，保持原样。
+
 # MCP 记录改存 `mcp/mcp.json`，格式带 `mcpServers`（2026-10-12，用户报告）
 
 ## 目标（用户原话）

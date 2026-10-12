@@ -168,12 +168,12 @@
 }
 
 /* A file's text as shiki rendered it. Every line is one `span.line`, so the numbers are a
-   counter and the colours are the per-theme variables the two themes were compiled into. */
+   counter and the colours are the per-theme variables the two themes were compiled into.
+   A line wider than the panel keeps its width; the panel scrolls to it. */
 @utility file-code {
     font-family: var(--font-mono);
     font-size: 11.5px;
     line-height: 20px;
-    overflow-wrap: anywhere;
 
     & .shiki {
         padding: 12px 14px;

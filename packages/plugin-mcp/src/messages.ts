@@ -34,7 +34,7 @@ export const mcpMessages: Record<string, string> = {
   "mcp.action.enabled": "Status",
   "mcp.action.enable": "Turn on",
   "mcp.action.disable": "Turn off",
-  "mcp.action.installTo": "Install to",
+  "mcp.action.installTo": "Install",
   "mcp.status.ready": "Ready",
   "mcp.status.failed": "Failed",
   "mcp.status.off": "Off",

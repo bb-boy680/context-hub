@@ -58,6 +58,30 @@
   不要再写 `components/place-picker` 这种按文件名的子路径；否则每拆一次文件都要改所有调用点。
 - **改了 `exports` 必须重启 dev server**：Vite 缓存 package.json 的解析结果，不重启会报
   `"./components" is not exported ... from package`，看起来像导出写错了（实测：重启前 500 + overlay，重启后正常）。
+
+## 交付与改动范围
+
+- **先看 `@workspace/ui/components` 里有没有现成交互控件**，别手写。MCP 详情页签原先是手写 `button` 加
+  `style={{width: 30|56}}` —— 那是照**中文**标签量的像素宽，界面一换英文就互相重叠
+  （用户："这里使用英文的时候直接乱码了，你是不是没有用 shancn-ui 的组件"）。
+  规则：控件的宽高由内容决定；确实要压过共享组件自带的几何值时记住它的类排在 caller 的类**前面**，
+  不加 `!` 的覆盖会被盖掉（`h-12!`、`after:bottom-0!`）。
+- **需求能用已有数据满足时，不要改跨包契约**：本次"只显示 mcpServers 片段"我一度去改
+  `provider.ts` / `toolkit.ts` / `jsonc.ts` / `toml.ts`（加 `excerpt`、动 `McpProvider` 形状、
+  连累 claude-code / codex / acme-mcp 三处调用点），用户直接指出"你不是都已经获取到了这个 MCP 的一些信息了吗？
+  直接用这个 MCP 组装"——记录里本来就有声明，`entryOf()` 组装一次就够了。改之前先问：
+  **这个数据是不是已经在手里了**。想清楚再动手，别把展示层的诉求扩散成契约变更。
+- **同一类控件的容器间距要跨模块对齐**：MCP 详情与 skills 详情用的是同一个 `PlaceList`，
+  但 MCP 的 `<ul>` 写的是 `flex flex-col`、skills 写的是 `flex flex-col gap-2.5`，
+  于是分组发丝线在 MCP 里上下各 0px、贴住下一组标签（用户："和 SKILL 的布局不一致"）。
+  复用共享控件时把**调用方的容器**也照抄一致，差一个字都看得出来。
+- **展示尺寸不要跟用户的临时意见来回改**：代码块先被要求"溢出换行"，改成 `pre-wrap` 后用户又说
+  "算了、还是不要换行了"，只好还原。这类一次性的口味调整先问清是最终意见再动
+  （本次白改一轮，还顺带把 `.line` 改成 `display:block` 引发了空隙与错位——见下条）。
+- **shiki 的 `.line` 不要改成 `display:block`**：`codeToHtml` 的行之间是文本节点 `"\n"`，
+  把行改成 block 后那个换行符自己变成一个空块，于是每行多出 20px 空隙、文字还右移 14px。
+  要整行上色就 `display:inline-block` + `width: calc(100% + 28px)` + 负外边距补回内边距。
+
 - **新增 workspace 包同理**：`apps/web/src/lib/hub.ts` 新引入的 `@workspace/agent-*` 包若在 dev server
   启动时还不存在，页面报 500 "Failed to resolve import"；`node_modules` 链接其实已就位
   （pnpm 把它们链在 `apps/web/node_modules/@workspace/` 而不是根目录），**重启 dev server** 即恢复。

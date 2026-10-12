@@ -19,31 +19,31 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import { cn } from "cn"
-
 import { installedCount, MCP_SCOPES, placesInScope, placesOf, type McpPlaceState } from "./installs.ts"
 import { FilesPane } from "./detail-files.tsx"
 import { ToolsPane } from "./detail-tools.tsx"
 import { failureText } from "./library.ts"
+import { entryOf } from "./records.ts"
 import { ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"
 import { ServerForm, formErrors, valuesOf, type ServerFormErrors, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
-import type { McpAgentPlace, McpConfigFile, McpServer } from "./types.ts"
+import type { McpAgentPlace, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import { DialogSplit, PlaceList, TagEditor } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogClose, DialogTitle } from "@workspace/ui/components/dialog"
 import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Switch } from "@workspace/ui/components/switch"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 
 /** The three panes the dialog can show. */
 export type DetailTab = "config" | "tools" | "files"
 
-const TABS: { id: DetailTab; key: string; width: number }[] = [
-  { id: "config", key: "mcp.detail.tab.config", width: 30 },
-  { id: "tools", key: "mcp.detail.tab.tools", width: 30 },
-  { id: "files", key: "mcp.detail.tab.files", width: 56 },
+const TABS: { id: DetailTab; key: string }[] = [
+  { id: "config", key: "mcp.detail.tab.config" },
+  { id: "tools", key: "mcp.detail.tab.tools" },
+  { id: "files", key: "mcp.detail.tab.files" },
 ]
 
 /**
@@ -221,7 +221,7 @@ function Places({
           {t("mcp.place.none")}
         </span>
       ) : null}
-      <ul className="flex flex-col">
+      <ul className="flex flex-col gap-2.5">
         <PlaceList
           groups={MCP_SCOPES.map((scope) => ({
             label: t(`mcp.detail.group.${scope}`),
@@ -433,7 +433,6 @@ export function ServerDialog({
   server,
   places,
   tagSuggestions,
-  files,
   tools,
   age,
   busy,
@@ -449,8 +448,6 @@ export function ServerDialog({
   places: readonly McpAgentPlace[]
   /** Every type the servers carry, for the editor's quick picks. */
   tagSuggestions: string[]
-  /** Every file that holds this server, as the page loaded them. */
-  files: McpConfigFile[]
   tools: McpTool[]
   age: string
   busy: boolean
@@ -469,6 +466,19 @@ export function ServerDialog({
   )
   const [errors, setErrors] = React.useState<ServerFormErrors | null>(null)
 
+  /* What installation writes is the record's own entry, so the pane builds it
+     from the record rather than reading a client file back: one of those files
+     carries every project's settings beside the servers. */
+  const files = React.useMemo(() => {
+    const declaration = server.detail.declaration
+    if (declaration === null) return null
+    return {
+      /* The grammar is picked from the extension, as a file's would be. */
+      path: "mcp.json",
+      text: JSON.stringify({ mcpServers: { [server.name]: entryOf(declaration) } }, null, 2),
+    }
+  }, [server.detail.declaration, server.name])
+
   /* A message marks a field until that field is filled, so the two follow every
      edit rather than waiting for the next save. */
   const change = (next: ServerFormValues) => {
@@ -486,69 +496,63 @@ export function ServerDialog({
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogSplit
         pane={
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <Tabs
+            value={tab}
+            onValueChange={setTab}
+            className="min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden"
+          >
+            {/* A tab is as wide as its own label, so a locale with longer words
+                widens the strip instead of overlapping the tabs. */}
             <div className="flex h-12 shrink-0 items-center border-b border-border px-6">
-              <div className="flex h-12 items-end gap-7">
-                {TABS.map((entry) => {
-                  const active = tab === entry.id
-                  return (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() => setTab(entry.id)}
-                      style={{ width: entry.width }}
-                      className="flex h-12 flex-col items-center justify-end gap-3"
-                    >
-                      <span
-                        className={cn(
-                          "text-[13.5px] leading-[1.4]",
-                          active ? "font-semibold text-foreground" : "font-medium text-muted-foreground"
-                        )}
-                      >
-                        {t(entry.key)}
-                      </span>
-                      <span className={cn("h-0.5 w-full", active ? "bg-primary" : "bg-transparent")} />
-                    </button>
-                  )
-                })}
-              </div>
+              <TabsList variant="line" className="h-12! gap-7 p-0">
+                {TABS.map((entry) => (
+                  <TabsTrigger
+                    key={entry.id}
+                    value={entry.id}
+                    className="h-12 flex-none rounded-none border-0 px-0 py-0 text-[13.5px] leading-[1.4] font-medium text-muted-foreground after:inset-x-0 after:bottom-0! after:h-0.5 after:bg-primary data-active:font-semibold data-active:text-foreground"
+                  >
+                    {t(entry.key)}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
             </div>
-            {/* The config and tools panes share one card, so the two read as the
-                same surface and their scrollbars sit in the same place. The
-                files pane brings its own card — it is a reading surface, and
-                the canvas fills it to the pane's height. */}
-            {tab === "files" ? (
-              <div className="min-h-0 flex-1 px-6 py-[22px]">
-                <FilesPane files={files} />
-              </div>
-            ) : (
-              <div className="min-h-0 flex-1 scrollbar-gutter-stable overflow-y-auto px-6 py-[22px]">
-                <div className="flex flex-col gap-[18px] rounded-lg border border-border bg-card p-5">
-                  {tab === "config" ? (
-                    <ServerForm
-                      values={values}
-                      onChange={change}
-                      notice={t("mcp.form.notice")}
-                      errors={errors}
-                    />
-                  ) : null}
-                  {tab === "tools" ? (
-                    <ToolsPane
-                      tools={tools}
-                      empty={t(
-                        server.check === undefined
-                          ? "mcp.detail.tools.empty"
-                          : server.check.ok
-                            ? "mcp.detail.tools.none"
-                            : "mcp.detail.tools.failed"
-                      )}
-                    />
-                  ) : null}
+            <TabsContent value={tab} className="flex min-h-0 flex-1 flex-col">
+              {/* The config and tools panes share one card, so the two read as the
+                  same surface and their scrollbars sit in the same place. The
+                  files pane brings its own card — it is a reading surface, and
+                  the canvas fills it to the pane's height. */}
+              {tab === "files" ? (
+                <div className="min-h-0 flex-1 px-6 py-[22px]">
+                  <FilesPane files={files} />
                 </div>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="min-h-0 flex-1 scrollbar-gutter-stable overflow-y-auto px-6 py-[22px]">
+                  <div className="flex flex-col gap-[18px] rounded-lg border border-border bg-card p-5">
+                    {tab === "config" ? (
+                      <ServerForm
+                        values={values}
+                        onChange={change}
+                        notice={t("mcp.form.notice")}
+                        errors={errors}
+                      />
+                    ) : null}
+                    {tab === "tools" ? (
+                      <ToolsPane
+                        tools={tools}
+                        empty={t(
+                          server.check === undefined
+                            ? "mcp.detail.tools.empty"
+                            : server.check.ok
+                              ? "mcp.detail.tools.none"
+                              : "mcp.detail.tools.failed"
+                        )}
+                      />
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         }
         panel={
           <ServerPanel

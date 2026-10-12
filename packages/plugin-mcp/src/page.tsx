@@ -36,7 +36,7 @@ import type { ServerActions } from "./menus.tsx"
 import { ServerDialog } from "./server-dialog.tsx"
 import type { ServerFormValues } from "./server-form.tsx"
 import { declarationOf } from "./server-form.tsx"
-import type { McpAgentPlace, McpConfigFile, McpPlaceKind, McpServer } from "./types.ts"
+import type { McpAgentPlace, McpPlaceKind, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import {
   FilterBar,
@@ -322,9 +322,6 @@ export function McpServersPage() {
   const [selected, setSelected] = React.useState<ReadonlySet<string>>(new Set())
   const [openId, setOpenId] = React.useState<string | null>(null)
   const [adding, setAdding] = React.useState(false)
-  /* The files a server's places hold, tagged with the server they were read
-     for: a list that belongs to a closed dialog is simply not shown. */
-  const [held, setHeld] = React.useState<{ id: string; files: McpConfigFile[] } | null>(null)
   const [notice, setNotice] = React.useState<string | null>(null)
 
   const counts = React.useMemo(() => {
@@ -392,29 +389,6 @@ export function McpServersPage() {
   const declarations = servers.reduce((sum, server) => sum + server.installed, 0)
   const age = ageText(catalog?.scannedAt ?? null, t)
   const open = servers.find((server) => server.id === openId) ?? null
-  const files = held !== null && held.id === openId ? held.files : []
-  const installedPlaces = (open?.detail.installs ?? [])
-    .filter((install) => install.installed)
-    .map((install) => install.place)
-  /* Joined, because the array is rebuilt on every render and two loads of the
-     same places are the same load. */
-  const placesKey = installedPlaces.join(",")
-
-  /* The config-files pane reads the whole file, so the page asks for it when a
-     server is opened rather than on every scan. The answer is tagged with the
-     server it was read for, so a late one cannot land under another dialog. */
-  React.useEffect(() => {
-    if (openId === null || placesKey === "") return
-    let live = true
-    const list = placesKey.split(",")
-    void Promise.all(list.map((place) => library.file(openId, place))).then((loaded) => {
-      if (!live) return
-      setHeld({ id: openId, files: loaded.filter((file): file is McpConfigFile => file !== null) })
-    })
-    return () => {
-      live = false
-    }
-  }, [library, openId, placesKey])
 
   const run = React.useCallback((action: () => Promise<void>) => {
     setNotice(null)
@@ -594,7 +568,6 @@ export function McpServersPage() {
           server={open}
           places={places}
           tagSuggestions={serverTags}
-          files={files}
           tools={open.detail.tools}
           age={ageText(open.check?.at ?? catalog?.scannedAt ?? null, t)}
           busy={library.busy}
