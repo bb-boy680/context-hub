@@ -473,7 +473,7 @@ export function McpServersPage() {
       if (open === null) return
       const declaration = declarationOf(values)
       void run(() =>
-        library.update(open.id, { name: values.name, declaration }).then(() => {
+        library.update(open.id, { name: values.name.trim(), declaration }).then(() => {
           setNotice(t("mcp.form.saved"))
         })
       )
@@ -617,6 +617,7 @@ export function McpServersPage() {
         <AddServerDialog
           busy={library.busy}
           canProbe={library.canProbe}
+          tagSuggestions={serverTags}
           onTest={library.testDraft}
           onSubmit={(draft) => library.create(draft)}
           onClose={() => setAdding(false)}

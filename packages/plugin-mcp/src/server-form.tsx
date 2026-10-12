@@ -1,9 +1,11 @@
 /**
  * The server form: the name, the transport, the endpoint, and the environment
- * rows. One component serves the add dialog and the detail pane, so a server is
- * described the same way wherever it is edited, and the values it edits are the
- * form's own shape — {@link valuesOf} and {@link declarationOf} are the two
- * conversions between that shape and the declaration every file carries.
+ * rows — plus the record's own description and types where the host edits them
+ * here rather than in a panel of its own. One component serves the add dialog
+ * and the detail pane, so a server is described the same way wherever it is
+ * edited, and the values it edits are the form's own shape — {@link valuesOf}
+ * and {@link declarationOf} are the two conversions between that shape and the
+ * declaration every file carries.
  */
 import { InfoIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import * as React from "react"
@@ -12,10 +14,15 @@ import { cn } from "cn"
 
 import { splitArguments, type McpDeclaration, type McpTransport } from "./contract.ts"
 import { useI18n } from "@workspace/extensions/react"
+import { TagEditor } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
+import { Textarea } from "@workspace/ui/components/textarea"
 
 /** The transports the form picks between. */
 const TRANSPORTS: McpTransport[] = ["stdio", "sse", "http"]
+
+/** The red line every field a submit found empty carries. */
+const ERROR = "text-[12px] leading-[1.3] text-destructive"
 
 /** One `name`/`value` row: an environment variable, or a request header. */
 export interface McpPair {
@@ -32,6 +39,38 @@ export interface ServerFormValues {
   args: string
   url: string
   pairs: McpPair[]
+}
+
+/** The record's own fields beside the declaration, which the add dialog edits too. */
+export interface ServerRecordValues {
+  /** One sentence on what the server offers. */
+  description: string
+  /** The types it carries. */
+  tags: string[]
+}
+
+/** The message for every required field a submit found empty, keyed by the field. */
+export interface ServerFormErrors {
+  name?: string
+  command?: string
+  url?: string
+}
+
+/** The messages for the fields the values leave empty; null when every one is filled. */
+export function formErrors(
+  values: ServerFormValues,
+  t: (key: string) => string
+): ServerFormErrors | null {
+  const errors: ServerFormErrors = {}
+  if (values.name.trim() === "") errors.name = t("mcp.add.error.name")
+  if (values.transport === "stdio") {
+    if (values.command.trim() === "") errors.command = t("mcp.add.error.command")
+  } else if (values.url.trim() === "") {
+    errors.url = t("mcp.add.error.url")
+  }
+  return errors.name === undefined && errors.command === undefined && errors.url === undefined
+    ? null
+    : errors
 }
 
 /** The values a form opens with for one server; an unknown declaration opens empty. */
@@ -114,6 +153,7 @@ function Field({
   placeholder,
   onChange,
   mono = false,
+  invalid = false,
   className,
 }: {
   value: string
@@ -121,20 +161,29 @@ function Field({
   onChange: (value: string) => void
   /** A machine value — a command, an argument list, a URL — which the canvas sets in monospace. */
   mono?: boolean
+  /** A value a submit found missing, which the field marks in red. */
+  invalid?: boolean
   className?: string
 }) {
   return (
     <input
       value={value}
       placeholder={placeholder}
+      aria-invalid={invalid || undefined}
       onChange={(event) => onChange(event.target.value)}
       className={cn(
         "h-10 min-w-0 grow rounded-md border border-border px-3 text-[12.5px] leading-[1.3] text-foreground outline-none placeholder:text-muted-soft focus:border-ring",
         mono && "font-mono",
+        invalid && "border-destructive focus:border-destructive",
         className
       )}
     />
   )
+}
+
+/** The line under a field a submit found empty, absent while the field is filled. */
+function FieldError({ message }: { message: string | undefined }) {
+  return message === undefined ? null : <span className={ERROR}>{message}</span>
 }
 
 /** A `name` + `value` pair, as the environment and header rows both are. */
@@ -192,10 +241,21 @@ export function ServerForm({
   values,
   onChange,
   notice,
+  errors = null,
+  record,
+  onRecord,
+  tagSuggestions = [],
 }: {
   values: ServerFormValues
   onChange: (values: ServerFormValues) => void
   notice?: string
+  /** The messages for every required field the host's last submit found empty. */
+  errors?: ServerFormErrors | null
+  /** The record's own fields, which a host that edits them elsewhere leaves out. */
+  record?: ServerRecordValues
+  onRecord?: (record: ServerRecordValues) => void
+  /** Every type the servers carry, for the editor's quick picks. */
+  tagSuggestions?: readonly string[]
 }) {
   const { t } = useI18n()
   const remote = values.transport !== "stdio"
@@ -207,7 +267,13 @@ export function ServerForm({
   return (
     <div className="flex flex-col gap-5">
       <Section label={t("mcp.detail.field.name")}>
-        <Field value={values.name} onChange={(name) => onChange({ ...values, name })} />
+        <Field
+          value={values.name}
+          placeholder={t("mcp.add.namePlaceholder")}
+          invalid={errors?.name !== undefined}
+          onChange={(name) => onChange({ ...values, name })}
+        />
+        <FieldError message={errors?.name} />
       </Section>
 
       <Section label={t("mcp.detail.field.transport")}>
@@ -239,18 +305,56 @@ export function ServerForm({
         ) : null}
       </Section>
 
+      {/* The description and the types belong to the record, not to the
+          declaration the transport picks apart, so they follow the transport
+          rather than sitting among the fields a client file is written from. */}
+      {record === undefined || onRecord === undefined ? null : (
+        <>
+          <Section label={t("mcp.add.description")}>
+            <Textarea
+              value={record.description}
+              placeholder={t("mcp.add.descriptionPlaceholder")}
+              onChange={(event) => onRecord({ ...record, description: event.target.value })}
+              className="min-h-[72px] resize-none rounded-md border-border px-3 py-2.5 text-[12.5px] leading-[1.5] placeholder:text-muted-soft focus-visible:border-ring focus-visible:ring-0 md:text-[12.5px]"
+            />
+          </Section>
+          <Section label={t("mcp.add.tags")}>
+            <TagEditor
+              tags={record.tags}
+              suggestions={tagSuggestions}
+              onChange={(tags) => onRecord({ ...record, tags })}
+              words={{
+                add: t("mcp.detail.tag.add"),
+                placeholder: t("mcp.detail.tag.placeholder"),
+                remove: t("mcp.detail.tag.remove"),
+              }}
+            />
+          </Section>
+        </>
+      )}
+
       {remote ? (
         <Section label={t("mcp.add.url")}>
-          <Field value={values.url} onChange={(url) => onChange({ ...values, url })} mono />
+          <Field
+            value={values.url}
+            placeholder={t("mcp.add.urlPlaceholder")}
+            invalid={errors?.url !== undefined}
+            onChange={(url) => onChange({ ...values, url })}
+            mono
+          />
+          <FieldError message={errors?.url} />
         </Section>
       ) : (
         <>
           <Section label={t("mcp.detail.field.command")}>
             <Field
               value={values.command}
+              placeholder={t("mcp.add.commandPlaceholder")}
+              invalid={errors?.command !== undefined}
               onChange={(command) => onChange({ ...values, command })}
               mono
             />
+            <FieldError message={errors?.command} />
           </Section>
           <Section label={t("mcp.detail.field.arguments")}>
             <Field

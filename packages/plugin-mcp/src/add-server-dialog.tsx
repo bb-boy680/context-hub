@@ -14,27 +14,38 @@ import { cn } from "cn"
 import { mcpFailure } from "./contract.ts"
 import { failureText } from "./library.ts"
 import type { McpProbeReport } from "./probe.ts"
-import { ServerForm, declarationOf, type ServerFormValues } from "./server-form.tsx"
+import {
+  ServerForm,
+  declarationOf,
+  formErrors,
+  type ServerFormErrors,
+  type ServerFormValues,
+  type ServerRecordValues,
+} from "./server-form.tsx"
 import type { McpDeclaration, McpDraft } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@workspace/ui/components/dialog"
 
-/** What a new server starts from: a command that is really runnable, and empty rows. */
+/** What a new server starts from: every field empty, so nothing is written by accident. */
 const NEW_SERVER: ServerFormValues = {
   name: "",
   transport: "stdio",
-  command: "npx",
-  args: "-y @modelcontextprotocol/server-filesystem .",
+  command: "",
+  args: "",
   url: "",
   pairs: [{ name: "", value: "" }],
 }
+
+/** What a new record starts with: nothing said about itself yet. */
+const NEW_RECORD: ServerRecordValues = { description: "", tags: [] }
 
 /** The dialog that adds one server. */
 export function AddServerDialog({
   remote = false,
   busy = false,
   canProbe = false,
+  tagSuggestions = [],
   onTest,
   onSubmit,
   onClose,
@@ -44,6 +55,8 @@ export function AddServerDialog({
   busy?: boolean
   /** Whether this form can run a probe at all. */
   canProbe?: boolean
+  /** Every type the servers carry, for the editor's quick picks. */
+  tagSuggestions?: readonly string[]
   /** Prove one declaration without recording it. */
   onTest: (declaration: McpDeclaration) => Promise<McpProbeReport>
   /** Record the draft; a thrown error keeps the dialog open with its reason. */
@@ -54,20 +67,31 @@ export function AddServerDialog({
   const [values, setValues] = React.useState<ServerFormValues>(() =>
     remote ? { ...NEW_SERVER, transport: "sse" } : NEW_SERVER
   )
+  const [record, setRecord] = React.useState<ServerRecordValues>(NEW_RECORD)
+  const [errors, setErrors] = React.useState<ServerFormErrors | null>(null)
   const [failure, setFailure] = React.useState<string | null>(null)
   const [testing, setTesting] = React.useState(false)
   const [probe, setProbe] = React.useState<McpProbeReport | null>(null)
 
+  /* A message marks a field until that field is filled, so the two follow every
+     edit rather than waiting for the next click. */
+  const change = (next: ServerFormValues) => {
+    setValues(next)
+    if (errors !== null) setErrors(formErrors(next, t))
+  }
+
   const test = () => {
-    const declaration = declarationOf(values)
     setProbe(null)
-    if (declaration === null) {
-      setFailure(t("mcp.error.incomplete"))
+    const missing = formErrors(values, t)
+    if (missing !== null) {
+      setErrors(missing)
+      setFailure(null)
       return
     }
+    setErrors(null)
     setFailure(null)
     setTesting(true)
-    void onTest(declaration)
+    void onTest(declarationOf(values))
       .then(setProbe)
       .catch((error: unknown) => {
         setFailure(failureText(t, mcpFailure(error, "mcp.error.probe")))
@@ -76,12 +100,19 @@ export function AddServerDialog({
   }
 
   const submit = () => {
+    const missing = formErrors(values, t)
+    if (missing !== null) {
+      setErrors(missing)
+      setFailure(null)
+      return
+    }
+    setErrors(null)
     setFailure(null)
     void onSubmit({
-      name: values.name,
+      name: values.name.trim(),
       declaration: declarationOf(values),
-      description: "",
-      tags: [],
+      description: record.description.trim(),
+      tags: record.tags,
     })
       .then(onClose)
       .catch((error: unknown) => {
@@ -125,7 +156,15 @@ export function AddServerDialog({
         <div className="h-px shrink-0 bg-border" />
 
         <div className="px-6 py-5">
-          <ServerForm values={values} onChange={setValues} notice={t("mcp.form.notice")} />
+          <ServerForm
+            values={values}
+            onChange={change}
+            notice={t("mcp.form.notice")}
+            errors={errors}
+            record={record}
+            onRecord={setRecord}
+            tagSuggestions={tagSuggestions}
+          />
           {failure === null ? null : (
             <p className="pt-3 text-[12.5px] leading-[1.4] text-destructive">{failure}</p>
           )}

@@ -27,7 +27,7 @@ import { ToolsPane } from "./detail-tools.tsx"
 import { failureText } from "./library.ts"
 import { ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"
-import { ServerForm, valuesOf, type ServerFormValues } from "./server-form.tsx"
+import { ServerForm, formErrors, valuesOf, type ServerFormErrors, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
 import type { McpAgentPlace, McpConfigFile, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
@@ -467,6 +467,20 @@ export function ServerDialog({
   const [values, setValues] = React.useState<ServerFormValues>(() =>
     valuesOf(server.detail.declaration, server.name)
   )
+  const [errors, setErrors] = React.useState<ServerFormErrors | null>(null)
+
+  /* A message marks a field until that field is filled, so the two follow every
+     edit rather than waiting for the next save. */
+  const change = (next: ServerFormValues) => {
+    setValues(next)
+    if (errors !== null) setErrors(formErrors(next, t))
+  }
+
+  const save = () => {
+    const missing = formErrors(values, t)
+    setErrors(missing)
+    if (missing === null) onSave(values)
+  }
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -514,8 +528,9 @@ export function ServerDialog({
                   {tab === "config" ? (
                     <ServerForm
                       values={values}
-                      onChange={setValues}
+                      onChange={change}
                       notice={t("mcp.form.notice")}
+                      errors={errors}
                     />
                   ) : null}
                   {tab === "tools" ? (
@@ -545,7 +560,7 @@ export function ServerDialog({
             onTogglePlace={onTogglePlace}
             onSetPlaceEnabled={onSetPlaceEnabled}
             onTest={onTest}
-            onSave={() => onSave(values)}
+            onSave={save}
             onDelete={onDelete}
             onSetTags={onSetTags}
           />

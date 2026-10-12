@@ -1914,6 +1914,47 @@ bespoke 画框是 **Material Symbols**（`power_settings_new`），写错会报 
       断链、同名拒装、越界名字拒装、库外技能拒删）；`check-workspaces.ts` 重写到 33 项（含列目录）；
       `check-store.ts` / `check-state.ts` 无回归；浏览器实测见下
 
+# 添加服务器表单：必填校验 + 注释/类型字段 + 占位符 + 去掉 stdio 默认值（2026-10-12，用户报告）
+
+## 目标（用户原话）
+
+"1、添加服务器的时候表单没有校验这个功能，有些东西是必填的，你得校验啊；
+2、添加 MCP 的时候，最好把 MCP 的那个注释和 MCP 的那个添加类型那个组件也加上；
+3、有些输入框是没有那个输入框注释的，还有传输方式的 stdio 命令和参数有默认值、需要移除掉。"
+
+## 执行顺序
+
+- [x] 1. `server-form.tsx`：新增 `formErrors(values, t)`（名称必填；stdio 命令必填；远端 URL 必填），
+      `Field` 支持 `invalid`，三个字段渲染红色错误行；名称/命令/URL 补占位符（示例值照设计稿）
+- [x] 2. `server-form.tsx`：新增可选 `record` / `onRecord` / `tagSuggestions`，有记录字段时渲染
+      「描述（可选）」+「类型（可选）」TagEditor（与详情面板同一组件、同一批文案）
+- [x] 3. `add-server-dialog.tsx`：`NEW_SERVER` 去掉 `npx` / `-y @modelcontextprotocol/server-filesystem .`
+      默认值；提交与测试连接先校验、错误落在字段上；`onSubmit` 带上 description / tags
+- [x] 4. `server-dialog.tsx`：保存同样先校验（共用同一个 `formErrors`），错误传给 `ServerForm`
+- [x] 5. `page.tsx`：把 `serverTags` 作为类型建议传给添加弹窗；保存名称做 trim
+- [x] 6. 文案：`mcp.add.description` / `tags` / 三个占位符 / 三条错误（en + zh-cn）
+- [x] 7. 验证：`pnpm -r typecheck` 10/10、`pnpm -r lint` 干净、`check-messages` 417/417，
+      临时实例（5199）走查四种路径（空名称 / 空命令 / 空 URL / 正常添加 + 保存 trim）
+
+## 用户追加的两条
+
+- [x] 「这些表单都放在传输方式的下面」：描述 / 类型从「名称」下方移到「传输方式」下方
+- [x] 「这里使用 textarea 组件」：描述改用 `@workspace/ui/components/textarea`
+      （`min-h-[72px]`、透明底、12px 圆角与同排字段一致、`field-sizing-content` 自动增高）
+
+## 验证记录（临时实例 5199，未动用户 5173）
+
+- 空提交 → 名称 + 命令两行红字、两个 `aria-invalid`；切 http 后 → 只剩 URL 一条
+- 正常添加一台 `zz-verify-form`（description + 类型「验证」）→ 打开详情面板确认描述与类型落库，
+  连接探测通过（就绪；且回填 url 是 context7 自己的 mcp 端点）
+- 详情「配置」页清空名称 → 保存被拦，红字「名称不能为空。」；名称补回带尾空格保存 → 已保存，
+  名称被 trim（卡片标题无尾空格）
+- 结束后删除这台记录：服务器数回到 4，「验证」类型从筛选行消失
+
+**坑**：临时实例首次打开报 500 —— `apps/web/src/lib/hub.ts` 新引入的 `@workspace/agent-*`
+在 dev server 启动时还不存在，Vite 的依赖图谱过期；`node_modules` 里链接其实已就位
+（`apps/web/node_modules/@workspace/agent-*`），**重启 dev server** 即恢复，与本次改动无关。
+
 **浏览器实测（zh-CN，真实桥，Windows junction）**：侧栏菜单 →`创建工作区`→ 选文件夹对话框（560 宽，
 面包屑 `~ / AppData / Local / Temp / hub-demo / project`，底部等宽当前路径）→ `选择此文件夹` →
 侧栏第二行变 `project`、页签 `全部 3 / 工作区 2`、列表混排（`grilling` 工作区/移除、`grill-me` 技能库/安装、

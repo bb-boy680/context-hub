@@ -58,6 +58,10 @@
   不要再写 `components/place-picker` 这种按文件名的子路径；否则每拆一次文件都要改所有调用点。
 - **改了 `exports` 必须重启 dev server**：Vite 缓存 package.json 的解析结果，不重启会报
   `"./components" is not exported ... from package`，看起来像导出写错了（实测：重启前 500 + overlay，重启后正常）。
+- **新增 workspace 包同理**：`apps/web/src/lib/hub.ts` 新引入的 `@workspace/agent-*` 包若在 dev server
+  启动时还不存在，页面报 500 "Failed to resolve import"；`node_modules` 链接其实已就位
+  （pnpm 把它们链在 `apps/web/node_modules/@workspace/` 而不是根目录），**重启 dev server** 即恢复。
+  判断依据：`pnpm install` 说 "Already up to date" 却仍解析失败 —— 那就是模块图过期，不是依赖缺失。
 - **同一件事在两处出现就是共享控件的信号，别只在一处修**：本轮先只给 MCP 写了内联的"类型选择"，
   用户随即要求"把 skill 的那个封装成公用组件，然后大家一起用"。判据不是"代码是否重复"，
   而是"这是不是同一个用户动作"——类型编辑（TagEditor）与筛选行（FilterBar）两处都是。
