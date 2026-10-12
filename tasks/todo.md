@@ -1,3 +1,81 @@
+# 列表视图的图标漏用探测缓存（2026-10-12，用户报告）
+
+用户："列表布局这一块的那个图标，没有显示我们缓存后的那个图标"。
+
+- 卡片（`card-view.tsx`）与详情弹窗（`server-dialog.tsx`）都传了 `icon={server.check?.icon}`，
+  只有列表行 `list-view.tsx` 的 `<ServerTile mark={server.mark} />` 漏了这一个属性，
+  于是缓存里的图标（context7 的 `https://context7.com/context7-icon-green.png`）只在另外两处出现。
+- 改动 = 一行：`<ServerTile mark={server.mark} icon={server.check?.icon} />`（沿用 36px 默认尺寸）。
+- 验证：列表与卡片两视图逐行核对 —— context7 有 `<img>` 且 `naturalWidth > 0`，
+  另外三台的缓存里本来就没有 `icon` 字段，按设计回落通用 mark。typecheck / lint 干净。
+
+# MCP 探测缓存改为「按名字命中」：只有没有缓存数据才自动探测（2026-10-12，用户报告）
+
+## 目标（用户原话）
+
+- BUG：切换工作区时「所有的 MCP 都会自动触发检测」；改启用/停用状态时「也会触动触发这个 MCP 的检测」；
+  安装到 Agent 时「也会触发这个 MCP 的检测」。
+- 正确实现：以上三种操作都**不触发检测**；「只有第一次安装或者扫描时、触发检测、并且缓存检测结果」；
+  「当下一次刷新页面时去和缓存数据做对比、如果这个 mcp 没有检测缓存数据、自动触发检测」；
+  「下一次检测只能用户手动触发、并缓存检测结果」。
+
+## 根因
+
+`cache.compare` 的「命中」= 缓存里有这个名字 **且声明指纹一致**（声明 + scope + 解析后 cwd 的 sha256）：
+
+- 切工作区：宿主 `startFolder()` 跟着换 → cwd 变 → 每个服务器都「没命中」→ 全部重探
+  （已在运行的 dev 里实测：切到 `new-api` 后连着发出 4 个 `probe`）。
+- 安装到 Agent：记录的服务器原先没有任何安装（`targetScope` = workspace），装进全局 place 后
+  scope 变 global → 指纹变 → 重探。
+- 改启用/停用：声明本身不变（Claude Code 写 `disabledMcpServers`、Codex 写 `enabled` 字段），
+  这一条主要是**观感**——`checking` 绑的是 `busy`（任何动作都显示「检查中…」），
+  卡片「检测于 {age}」用的是本次扫描时间（`catalog.scannedAt`），一按开关四张卡同时变「刚刚」。
+
+## 改动
+
+- `src/host/cache.ts`：`compare(names)` 只按名字命中（仍要求 `probe === PROBE_VERSION`，探测实现换代仍重探一次）；
+  删掉 `fingerprintOf`、条目里的 `fingerprint`、`McpProbeSubject.cwd`；`CACHE_VERSION` 1 → 2
+  （旧文档里多出的 fingerprint 字段被忽略，仍可读）。
+- `src/probe.ts` / `vite.ts`：`cache` 动作只传名字；`cwd` 只在真探测时解析（顺带省掉一次工作区查询）。
+- `src/library.ts`：`probeAll` 按名字取缓存，`known[name] === null`（没有任何缓存数据）才自动探测；
+  「检查全部」「测试连接」照旧强制重探并写回缓存。
+- `page.tsx` / `card-view.tsx`：工具条「检查中…」只在真有探测在跑时出现（`library.testing` 非空）；
+  卡片「检测于」= 这条自己的检测时间（没有检测才回落扫描时间，与详情弹窗同一条规则）；
+  页脚「上次检查」= 所有服务器里最新的一次检测时间（没有检测才回落扫描时间）。
+- 检查脚本随规则走：`scripts/check-probe.ts` 的指纹段落改成「换了声明/作用域/工作目录仍然命中」，
+  `scripts/check-mcp.ts` 的夹具条目去掉 `fingerprint`。
+
+## 验证
+
+- [x] `plugin-mcp` typecheck + lint 干净；`check-probe` 49/49、`check-mcp` 60/60、`check-mcp-tools` 84/84、
+      `check-plugin` 30/30、`check-messages` 425/425。
+- [x] 重启 dev server（宿主侧代码不热更）后真机走查（用页面内 fetch 记录 + 网络监听双份证据）：
+
+| 操作 | 发出的请求 |
+| --- | --- |
+| 刷新页面（4 台都有缓存） | `records` + `cache`，**0 个 probe** |
+| 切工作区（→ new-api、→ dsh-context-hub） | `records` + `cache`，**0 个 probe** |
+| 开关「启用/停用」（钉钉 AI 表格 · Claude Code 本项目） | `records` + `cache`，**0 个 probe** |
+| 安装到 Agent（playwright → Claude Code `~/.claude.json`，作用域 workspace → global） | `records` + `cache`，**0 个 probe** |
+| 卸载同一处 | `records` + `cache`，**0 个 probe** |
+| 删掉 playwright 的缓存条目后刷新 | `records` + `cache` + **恰好 1 个 `probe:playwright`**（随后再刷新不再探测） |
+| 卡片「测试连接」 | 1 个 `probe:<该服务器>` |
+| 「检查全部」 | 4 个 `probe` |
+
+- [x] 观感核对：开关/安装/切工作区后卡片「检测于」不再跳到「刚刚」，各卡显示自己那条检测的时间；
+      工具条不再因为普通动作显示「检查中…」。
+- [x] 旧缓存文档（version 1、带 fingerprint）被新构建直接读用、**不触发重探**；下一次写入升到 version 2。
+- [x] 副作用复原：安装测试往 `~/.claude.json` 写的条目已撤回（与操作前逐字节一致）；
+      开关测试把「钉钉 AI 表格」恢复为原来的已停用（`disabledMcpServers: ["钉钉 AI 表格"]`）；
+      仓库根的 `.mcp.json` 未改动。
+
+## 说明 / 注意
+
+- 升级路径：`PROBE_VERSION` 仍是唯一的「老旧判定作废」开关（探测实现换代时每台自动重探一次），
+  声明/作用域/工作目录不再参与命中判定。
+- 本机另有一个 22:04 启动的旧 vite 实例仍占着 5173（跑的是旧宿主代码）。两个 dev server 同时开着时，
+  旧实例会把不带 fingerprint 的新条目按「读不懂」丢掉并重探，看到「探测风暴」时先确认只剩一个实例。
+
 # MCP 详情弹窗：页签、配置文件面板、共享代码块（2026-10-12，用户三轮报告）
 
 ## 目标（用户原话）
@@ -192,7 +270,7 @@
 并把探测结果缓存：**发现 MCP → 比对缓存 → 未命中才自动探测一次；命中就不探测，等用户手动操作。**
 探测所得（serverInfo/图标/capabilities/instructions/tools）驱动卡片图标、详情弹窗与「工具」页签。
 
-## 规则（用户 2026-10-12 确认）
+## 规则（用户 2026-10-12 确认；**同日已被推翻** —— 见文首「按名字命中」，指纹不再参与命中判定）
 
 - **命中** = 缓存里有这个名字，**且声明指纹一致**。声明改了（命令/参数/URL/headers/env/作用域）
   等于「没找到」，自动重探一次；只改注释、空白、键顺序不影响。
