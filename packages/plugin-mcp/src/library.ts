@@ -46,29 +46,10 @@ import type {
   McpRecord,
   McpScanProblem,
   McpServer,
-  McpTag,
 } from "./types.ts"
 
 /** How many probes run side by side; a stdio server takes seconds to answer. */
 const PROBE_CONCURRENCY = 3
-
-/** Every tag a server may carry; the first is the row's "any tag" chip. */
-export const MCP_TAGS: readonly string[] = [
-  "all",
-  "vcs",
-  "browser",
-  "files",
-  "database",
-  "messaging",
-  "projects",
-  "observability",
-  "docs",
-]
-
-/** The tag chips, with their labels resolved for the active language. */
-export function tagList(t: (key: string) => string): McpTag[] {
-  return MCP_TAGS.map((id) => ({ id, label: t(`mcp.tag.${id}`) }))
-}
 
 /** The sentence one failure reads as: its key resolved, its placeholders filled. */
 export function failureText(t: (key: string) => string, failure: McpFailure): string {

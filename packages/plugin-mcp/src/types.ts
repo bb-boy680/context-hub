@@ -178,12 +178,6 @@ export interface McpScanProblem {
   message: string
 }
 
-/** One catalog tag, as the chip row and the panel's tag list show it. */
-export interface McpTag {
-  id: string
-  label: string
-}
-
 /** What the MCP pages read once: the servers, and what the scan made of them. */
 export interface McpCatalog {
   servers: McpServer[]

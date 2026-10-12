@@ -6,19 +6,6 @@ const tone = {
   dot: "bg-muted-foreground",
 }
 
-/** Categories the design authors, in the order it lists them. */
-export const seedTags = [
-  "Documents",
-  "Engineering",
-  "Docs",
-  "Data",
-  "Design",
-  "Integrations",
-  "Quality",
-  "Reliability",
-  "Marketing",
-] as const
-
 /** The three classes a category chip renders with. */
 export function tagTone() {
   return tone

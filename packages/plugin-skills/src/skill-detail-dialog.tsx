@@ -35,7 +35,6 @@ import { parseSkillFile } from "./frontmatter.ts"
 import { formatAge, holdsOf, inLibrary, placeOf, placePath, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
 import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
-import { seedTags, tagTone } from "./tags.ts"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
   PlaceSkillDetail,
@@ -48,16 +47,14 @@ import type {
 
 import { useI18n } from "@workspace/extensions/react"
 import type { AssetScope } from "@workspace/extensions"
-import { PlaceList } from "@workspace/extensions/components"
+import { DialogSplit, PlaceList, TagEditor } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
   DialogClose,
-  DialogContent,
   DialogDescription,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
 import { Markdown } from "@workspace/ui/components/markdown"
 import {
   Popover,
@@ -587,7 +584,7 @@ function MediaPane({
         setDragOver(false)
         addFiles(event.dataTransfer.files)
       }}
-      className={`relative flex min-w-0 flex-1 flex-col items-center gap-3.5 bg-surface-raised px-7 py-6 ${
+      className={`relative flex min-h-0 min-w-0 flex-1 flex-col items-center gap-3.5 px-7 py-6 ${
         dragOver ? "ring-2 ring-primary ring-inset" : ""
       }`}
     >
@@ -862,88 +859,6 @@ function MediaPane({
       <p className="text-xs leading-[15px] text-muted-foreground">
         {t("skills.media.hint")}
       </p>
-    </div>
-  )
-}
-
-/** Category chips with inline add and remove; a new name joins the same set. */
-function CategoryEditor({
-  tags,
-  onChange,
-}: {
-  tags: string[]
-  onChange: (tags: string[]) => void
-}) {
-  const { t } = useI18n()
-  const [open, setOpen] = React.useState(false)
-  const [value, setValue] = React.useState("")
-  const available = seedTags.filter((tag) => !tags.includes(tag))
-
-  const add = (tag: string) => {
-    const next = tag.trim()
-    if (next === "" || tags.includes(next)) return
-    onChange([...tags, next])
-    setValue("")
-  }
-
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {tags.map((tag) => (
-        <span
-          key={tag}
-          className={`group/tag flex h-6 shrink-0 items-center gap-1 rounded-full pr-[5px] pl-2.5 text-[12px] font-medium ${tagTone().chip} ${tagTone().label}`}
-        >
-          {tag}
-          <button
-            type="button"
-            aria-label={`${t("skills.detail.category.remove")} ${tag}`}
-            onClick={() => onChange(tags.filter((item) => item !== tag))}
-            className="flex size-[15px] items-center justify-center rounded-full bg-foreground/8 text-muted-foreground transition-colors hover:bg-foreground/12 hover:text-foreground"
-          >
-            <XIcon className="size-[11px]" />
-          </button>
-        </span>
-      ))}
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger
-          render={
-            <button
-              type="button"
-              aria-label={t("skills.detail.category.add")}
-              className="flex h-6 shrink-0 items-center gap-[5px] rounded-full px-2.5 text-[12px] font-medium text-muted-foreground ring-1 ring-muted-soft transition-colors hover:text-foreground hover:ring-foreground/40"
-            />
-          }
-        >
-          <PlusIcon className="size-3" />
-          {t("skills.detail.category.add")}
-        </PopoverTrigger>
-        <PopoverContent align="start" className="w-60 gap-2 p-2">
-          <Input
-            value={value}
-            onChange={(event) => setValue(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") add(value)
-            }}
-            placeholder={t("skills.detail.category.placeholder")}
-            aria-label={t("skills.detail.category.placeholder")}
-            className="h-8"
-          />
-          {available.length > 0 ? (
-            <div className="flex flex-wrap gap-1.5">
-              {available.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => add(tag)}
-                  className={`flex h-6 shrink-0 items-center rounded-full px-2.5 text-[12px] font-medium transition-opacity hover:opacity-80 ${tagTone().chip} ${tagTone().label}`}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-          ) : null}
-        </PopoverContent>
-      </Popover>
     </div>
   )
 }
@@ -1378,6 +1293,7 @@ function InfoPanel({
   onUpdate,
   onViewFiles,
   onTagsChange,
+  tagSuggestions,
 }: {
   skill: Skill
   /** Why a workspace place cannot be written, ready to show; `null` when one can. */
@@ -1403,11 +1319,13 @@ function InfoPanel({
   onUpdate?: () => Promise<void>
   onViewFiles: () => void
   onTagsChange: (tags: string[]) => void
+  /** Every type in use across the library, for the editor's quick picks. */
+  tagSuggestions: string[]
 }) {
   const { t } = useI18n()
 
   return (
-    <div className="flex w-[360px] min-h-0 shrink-0 flex-col border-l border-border">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex h-[84px] shrink-0 items-start gap-3 border-b border-border px-5 pt-[22px]">
         <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
           <DialogTitle className="truncate text-[16px] leading-[21px] font-semibold">
@@ -1439,7 +1357,16 @@ function InfoPanel({
             came from — the order the panel is read in. */}
         <p className="text-[13px] leading-[1.5] text-copy">{skill.description}</p>
 
-        <CategoryEditor tags={skill.tags} onChange={onTagsChange} />
+        <TagEditor
+          tags={skill.tags}
+          suggestions={tagSuggestions}
+          onChange={onTagsChange}
+          words={{
+            add: t("skills.detail.category.add"),
+            placeholder: t("skills.detail.category.placeholder"),
+            remove: t("skills.detail.category.remove"),
+          }}
+        />
 
         <PlacesSection
           skill={skill}
@@ -1675,6 +1602,7 @@ function LightboxBody({
   onUpdate,
   onTagsChange,
   onChanged,
+  tagSuggestions,
 }: {
   skill: Skill
   /** The stored record, present when a library answered. */
@@ -1707,6 +1635,8 @@ function LightboxBody({
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
+  /** Every type in use across the library, for the editor's quick picks. */
+  tagSuggestions: string[]
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
   const media = useMediaItems(skill, store, detail, onChanged)
@@ -1736,36 +1666,43 @@ function LightboxBody({
   }, [])
 
   return (
-    <div className="relative flex h-full min-h-0">
-      <MediaPane doc={doc} source={media} />
-      <InfoPanel
-        skill={skill}
-        blocked={blocked}
-        path={path}
-        inPlace={inPlace}
-        places={places}
-        onDelete={onDelete}
-        onAdopt={onAdopt}
-        onInstallPlace={onInstallPlace}
-        onRemovePlace={onRemovePlace}
-        onCheckUpdate={onCheckUpdate}
-        onUpdate={onUpdate}
-        onViewFiles={() => setFilesOpen(true)}
-        onTagsChange={onTagsChange}
-      />
-      <div
-        className={`pointer-events-none absolute inset-0 z-10 bg-scrim transition-opacity duration-300 ${
-          filesOpen ? "opacity-100" : "opacity-0"
-        }`}
-      />
-      <FilesPanel
-        skill={skill}
-        files={files.files}
-        read={files.read}
-        open={filesOpen}
-        onBack={() => setFilesOpen(false)}
-      />
-    </div>
+    <DialogSplit
+      pane={<MediaPane doc={doc} source={media} />}
+      panel={
+        <InfoPanel
+          skill={skill}
+          blocked={blocked}
+          path={path}
+          inPlace={inPlace}
+          places={places}
+          onDelete={onDelete}
+          onAdopt={onAdopt}
+          onInstallPlace={onInstallPlace}
+          onRemovePlace={onRemovePlace}
+          onCheckUpdate={onCheckUpdate}
+          onUpdate={onUpdate}
+          onViewFiles={() => setFilesOpen(true)}
+          onTagsChange={onTagsChange}
+          tagSuggestions={tagSuggestions}
+        />
+      }
+      overlay={
+        <>
+          <div
+            className={`pointer-events-none absolute inset-0 z-10 bg-scrim transition-opacity duration-300 ${
+              filesOpen ? "opacity-100" : "opacity-0"
+            }`}
+          />
+          <FilesPanel
+            skill={skill}
+            files={files.files}
+            read={files.read}
+            open={filesOpen}
+            onBack={() => setFilesOpen(false)}
+          />
+        </>
+      }
+    />
   )
 }
 
@@ -1785,6 +1722,7 @@ export function SkillDetailDialog({
   onUpdate,
   onTagsChange,
   onChanged,
+  tagSuggestions,
   onOpenChange,
 }: {
   skill: Skill | null
@@ -1813,6 +1751,8 @@ export function SkillDetailDialog({
   onTagsChange: (tags: string[]) => void
   /** The stored record changed; the caller re-reads its page. */
   onChanged: () => void
+  /** Every type in use across the library, for the editor's quick picks. */
+  tagSuggestions: string[]
   onOpenChange: (open: boolean) => void
 }) {
   const [loaded, setLoaded] = React.useState<{ id: string; detail: SkillDetail } | null>(null)
@@ -1868,45 +1808,41 @@ export function SkillDetailDialog({
 
   return (
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>
-      <DialogContent
-        showCloseButton={false}
-        className="flex h-[min(740px,calc(100vh-48px))] w-[min(1136px,calc(100vw-48px))] flex-col gap-0 overflow-hidden rounded-xl bg-dialog p-0 shadow-soft ring-1 ring-border sm:max-w-none"
-      >
-        {skill ? (
-          <LightboxBody
-            key={skillKey(skill)}
-            skill={skill}
-            detail={detail}
-            held={workspace}
-            store={store}
-            root={root}
-            placePath={place?.display ?? null}
-            inPlace={placeOnly}
-            blocked={blocked}
-            places={places}
-            onInstallPlace={(ref) => onInstallPlace(skill, ref)}
-            onRemovePlace={(ref) => onRemovePlace(skill, ref)}
-            onAdopt={(ref) => onAdopt(skill, ref)}
-            /* Each side deletes what it owns: the library its record, the place
-               its directory. */
-            onDelete={
-              store === null
-                ? null
-                : placeOnly && placeRef !== null
-                  ? () => onDeletePlace(skill, placeRef)
-                  : () => onDelete(skill)
-            }
-            {...(onCheckUpdate === undefined || onUpdate === undefined
-              ? {}
-              : {
-                  onCheckUpdate: () => onCheckUpdate(skill),
-                  onUpdate: () => onUpdate(skill),
-                })}
-            onTagsChange={onTagsChange}
-            onChanged={onChanged}
-          />
-        ) : null}
-      </DialogContent>
+      {skill ? (
+        <LightboxBody
+          key={skillKey(skill)}
+          skill={skill}
+          detail={detail}
+          held={workspace}
+          store={store}
+          root={root}
+          placePath={place?.display ?? null}
+          inPlace={placeOnly}
+          blocked={blocked}
+          places={places}
+          onInstallPlace={(ref) => onInstallPlace(skill, ref)}
+          onRemovePlace={(ref) => onRemovePlace(skill, ref)}
+          onAdopt={(ref) => onAdopt(skill, ref)}
+          /* Each side deletes what it owns: the library its record, the place
+             its directory. */
+          onDelete={
+            store === null
+              ? null
+              : placeOnly && placeRef !== null
+                ? () => onDeletePlace(skill, placeRef)
+                : () => onDelete(skill)
+          }
+          {...(onCheckUpdate === undefined || onUpdate === undefined
+            ? {}
+            : {
+                onCheckUpdate: () => onCheckUpdate(skill),
+                onUpdate: () => onUpdate(skill),
+              })}
+          onTagsChange={onTagsChange}
+          onChanged={onChanged}
+          tagSuggestions={tagSuggestions}
+        />
+      ) : null}
     </Dialog>
   )
 }

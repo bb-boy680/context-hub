@@ -11,11 +11,11 @@ import { cn } from "cn"
 
 import { ServerControls, type ServerActions } from "./menus.tsx"
 import { ServerTile, StatusPill, TransportChip } from "./parts.tsx"
-import type { McpServer, McpTag } from "./types.ts"
+import type { McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 
 /** The tag chip and place summary a card's name column carries. */
-function CardMeta({ server, tag }: { server: McpServer; tag?: McpTag }) {
+function CardMeta({ server, tag }: { server: McpServer; tag?: string }) {
   const { t } = useI18n()
   const places = server.places.map((place) => t(`mcp.place.chip.${place}`)).join(" · ")
 
@@ -23,7 +23,7 @@ function CardMeta({ server, tag }: { server: McpServer; tag?: McpTag }) {
     <div className="flex min-w-0 items-center gap-1.5">
       {tag ? (
         <span className="inline-flex h-[18px] shrink-0 items-center rounded-full bg-secondary px-1.5 text-[11px] leading-[13px] font-medium text-copy">
-          {tag.label}
+          {tag}
         </span>
       ) : null}
       <span className="size-[3px] shrink-0 rounded-full bg-muted-soft" />
@@ -79,7 +79,8 @@ function ServerCard({
   onOpen,
 }: {
   server: McpServer
-  tag?: McpTag
+  /** The type the card prints, which is the record's first one. */
+  tag?: string
   /** How long ago the scan ran, as the card's own line says it. */
   age: string
   actions: ServerActions
@@ -193,20 +194,16 @@ const GRID =
 /** The card grid, one to five columns, chosen by the width the page has. */
 export function ServerCardView({
   servers,
-  tags,
   age,
   onOpen,
   rowActions,
 }: {
   servers: McpServer[]
-  tags: McpTag[]
   /** How long ago the scan ran, which every card prints. */
   age: string
   onOpen: (server: McpServer) => void
   rowActions: (server: McpServer) => ServerActions
 }) {
-  const byId = new Map(tags.map((tag) => [tag.id, tag]))
-
   return (
     <div className={GRID}>
       {servers.map((server) => {
@@ -215,7 +212,7 @@ export function ServerCardView({
           <ServerCard
             key={server.id}
             server={server}
-            tag={server.tag === "" ? undefined : byId.get(server.tag)}
+            tag={server.tag === "" ? undefined : server.tag}
             age={age}
             actions={actions}
             onOpen={() => onOpen(server)}

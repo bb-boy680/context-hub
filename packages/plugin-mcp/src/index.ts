@@ -21,7 +21,7 @@ export * from "./contract.ts"
 export { mcpExtensionWith } from "./extension.ts"
 export { McpServersPage }
 export { createMcpService } from "./registry.ts"
-export { failureText, MCP_TAGS, tagList, useMcpLibrary } from "./library.ts"
+export { failureText, useMcpLibrary } from "./library.ts"
 export * from "./types.ts"
 export {
   buildCatalog,

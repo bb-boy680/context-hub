@@ -12,12 +12,10 @@ import {
   ListIcon,
   PlusIcon,
   RefreshCwIcon,
-  SearchIcon,
   SearchXIcon,
   TriangleAlertIcon,
   Trash2Icon,
   UploadIcon,
-  XIcon,
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
@@ -36,6 +34,7 @@ import type { Skill } from "./types.ts"
 import { useContributions, useI18n } from "@workspace/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 import {
+  FilterBar,
   PlaceMenu,
   PlaceScopePicker,
   type PlaceOption,
@@ -44,7 +43,6 @@ import {
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { Kbd } from "@workspace/ui/components/kbd"
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -953,126 +951,6 @@ function useSettled(value: string, delay = 180) {
   return settled
 }
 
-const chipPill =
-  "flex h-8 shrink-0 items-center justify-center rounded-full px-3.5 text-[length:var(--text-caption)] transition-colors"
-
-/**
- * The query box and the category chips, which narrow the same list and so
- * share one row. Typing is the page's filter; the toolbar's Explore button is
- * the other, remote, verb.
- */
-function FilterRow({
-  query,
-  onQueryChange,
-  tag,
-  onTagChange,
-  options,
-}: {
-  /** What the box holds right now, before the query settles. */
-  query: string
-  onQueryChange: (query: string) => void
-  /** Selected category filter, or "All tags". */
-  tag: string
-  onTagChange: (tag: string) => void
-  /** The categories on offer, from the library or the bundle. */
-  options: readonly string[]
-}) {
-  const { t } = useI18n()
-  const [expanded, setExpanded] = React.useState(false)
-  const field = React.useRef<HTMLInputElement>(null)
-  const visible = expanded ? options : options.slice(0, 4)
-
-  /* The shortcut the box prints, so the key it names does focus it. */
-  React.useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return
-      const active = document.activeElement
-      if (
-        active instanceof HTMLElement &&
-        (active.isContentEditable || active.tagName === "INPUT" || active.tagName === "TEXTAREA")
-      ) {
-        return
-      }
-      event.preventDefault()
-      field.current?.focus()
-    }
-
-    window.addEventListener("keydown", onKeyDown)
-    return () => window.removeEventListener("keydown", onKeyDown)
-  }, [])
-
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex h-11 w-[300px] shrink-0 items-center gap-2 rounded-md border border-border px-3.5 focus-within:border-primary">
-        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-        <input
-          ref={field}
-          value={query}
-          aria-label={t("skills.filter.placeholder")}
-          placeholder={t("skills.filter.placeholder")}
-          onChange={(event) => onQueryChange(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key !== "Escape" || query === "") return
-            event.preventDefault()
-            onQueryChange("")
-          }}
-          className="min-w-0 flex-1 bg-transparent text-[length:var(--text-body)] outline-none placeholder:text-muted-foreground/70"
-        />
-        {query === "" ? (
-          <Kbd className="shrink-0 border-0 bg-transparent text-muted-foreground">/</Kbd>
-        ) : (
-          <button
-            type="button"
-            aria-label={t("skills.filter.clear")}
-            onClick={() => onQueryChange("")}
-            className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
-          >
-            <XIcon className="size-3.5" />
-          </button>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          aria-pressed={tag === "All tags"}
-          onClick={() => onTagChange("All tags")}
-          className={`${chipPill} ${
-            tag === "All tags"
-              ? "bg-foreground font-semibold text-background"
-              : "bg-secondary text-foreground hover:bg-accent"
-          }`}
-        >
-          {t("skills.allTags")}
-        </button>
-        {visible.map((item) => (
-          <button
-            key={item}
-            type="button"
-            aria-pressed={tag === item}
-            onClick={() => onTagChange(item)}
-            className={`${chipPill} ${
-              tag === item
-                ? "bg-foreground font-semibold text-background"
-                : "bg-secondary text-foreground hover:bg-accent"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-        {expanded || options.length <= visible.length ? null : (
-          <button
-            type="button"
-            onClick={() => setExpanded(true)}
-            className={`${chipPill} bg-secondary text-muted-foreground hover:bg-accent`}
-          >
-            +{options.length - visible.length}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function ViewButton({
   icon: Icon,
   label,
@@ -1463,18 +1341,24 @@ export function SkillsPage() {
             </Button>
           </div>
         </div>
-        <FilterRow
+        <FilterBar
           query={query}
-          onQueryChange={(next) => {
+          onQuery={(next) => {
             setQuery(next)
             setChecked([])
           }}
+          tags={library.tags}
           tag={tag}
-          onTagChange={(next) => {
+          all="All tags"
+          onTag={(next) => {
             setTag(next)
             setChecked([])
           }}
-          options={library.tags}
+          words={{
+            search: t("skills.filter.placeholder"),
+            clear: t("skills.filter.clear"),
+            all: t("skills.allTags"),
+          }}
         />
         {refusal === null ? null : (
           <span className="text-xs leading-[15px] text-destructive">{refusal}</span>
@@ -1659,6 +1543,9 @@ export function SkillsPage() {
         onTagsChange={(tags) => {
           if (detail) setTags(detail, tags)
         }}
+        /* The editor offers the types the library already carries rather than
+           a fixed vocabulary, so picking one cannot invent a second spelling. */
+        tagSuggestions={library.tags}
         onChanged={() => void library.reload()}
         onOpenChange={(open) => {
           if (!open) setDetailKey(null)

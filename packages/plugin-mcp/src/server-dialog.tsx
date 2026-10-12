@@ -29,11 +29,11 @@ import { ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"
 import { ServerForm, valuesOf, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
-import type { McpAgentPlace, McpConfigFile, McpServer, McpTag } from "./types.ts"
+import type { McpAgentPlace, McpConfigFile, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
-import { PlaceList } from "@workspace/extensions/components"
+import { DialogSplit, PlaceList, TagEditor } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
-import { Dialog, DialogClose, DialogContent, DialogTitle } from "@workspace/ui/components/dialog"
+import { Dialog, DialogClose, DialogTitle } from "@workspace/ui/components/dialog"
 import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Switch } from "@workspace/ui/components/switch"
 
@@ -305,38 +305,40 @@ function ProbeSection({ check }: { check: McpCacheEntry }) {
 function ServerPanel({
   server,
   places,
-  tags,
+  tagSuggestions,
   age,
   onTogglePlace,
   onSetPlaceEnabled,
   onTest,
   onSave,
   onDelete,
+  onSetTags,
   busy,
 }: {
   server: McpServer
   places: readonly McpAgentPlace[]
-  tags: McpTag[]
+  /** Every type the servers carry, for the editor's quick picks. */
+  tagSuggestions: string[]
   age: string
   onTogglePlace: (place: string) => void
   onSetPlaceEnabled: (place: string, enabled: boolean) => void
   onTest: () => void
   onSave: () => void
   onDelete: () => Promise<void>
+  onSetTags: (tags: string[]) => void
   busy: boolean
 }) {
   const { t } = useI18n()
   const states = placesOf(places, server.detail.installs)
-  const byId = new Map(tags.map((tag) => [tag.id, tag]))
 
   return (
-    <aside className="flex max-h-full min-w-0 shrink grow-0 basis-[360px] flex-col overflow-hidden bg-card">
+    <aside className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
       <header className="flex h-[84px] shrink-0 items-center gap-3 border-b border-border px-5">
         <ServerTile mark={server.mark} icon={server.check?.icon} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="truncate text-[16px] leading-[1.3] font-semibold text-foreground">
+          <DialogTitle className="truncate text-[16px] leading-[1.3] font-semibold text-foreground">
             {server.name}
-          </span>
+          </DialogTitle>
           <div className="flex items-center gap-1.5 text-[12px] leading-[1.3]">
             <PlugIcon className="size-[13px] text-muted-soft" />
             <span className="font-mono font-semibold text-foreground">{server.transport}</span>
@@ -363,26 +365,16 @@ function ServerPanel({
       <div className="flex min-h-0 flex-1 scrollbar-gutter-stable flex-col gap-[18px] overflow-y-auto p-5">
         <p className="text-[12.5px] leading-[1.5] text-copy">{server.description}</p>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          {server.detail.tags.map((id) => (
-            <span
-              key={id}
-              className="flex h-6 items-center gap-1.5 rounded-full bg-secondary px-2.5 text-[12px] leading-[1.3] text-foreground"
-            >
-              {byId.get(id)?.label ?? id}
-              <span className="flex size-[15px] items-center justify-center rounded-full bg-foreground/10">
-                <XIcon className="size-2.5 text-muted-foreground" />
-              </span>
-            </span>
-          ))}
-          <button
-            type="button"
-            className="flex h-6 items-center gap-1.5 rounded-full border border-border px-2.5 text-[12px] leading-[1.3] text-muted-foreground transition-colors hover:border-foreground/40 hover:text-foreground"
-          >
-            <PlusIcon className="size-3" />
-            {t("mcp.detail.tag.add")}
-          </button>
-        </div>
+        <TagEditor
+          tags={server.detail.tags}
+          suggestions={tagSuggestions}
+          onChange={onSetTags}
+          words={{
+            add: t("mcp.detail.tag.add"),
+            placeholder: t("mcp.detail.tag.placeholder"),
+            remove: t("mcp.detail.tag.remove"),
+          }}
+        />
 
         <Places states={states} onToggle={onTogglePlace} onSetEnabled={onSetPlaceEnabled} />
 
@@ -440,7 +432,7 @@ function ServerPanel({
 export function ServerDialog({
   server,
   places,
-  tags,
+  tagSuggestions,
   files,
   tools,
   age,
@@ -451,10 +443,12 @@ export function ServerDialog({
   onTest,
   onSave,
   onDelete,
+  onSetTags,
 }: {
   server: McpServer
   places: readonly McpAgentPlace[]
-  tags: McpTag[]
+  /** Every type the servers carry, for the editor's quick picks. */
+  tagSuggestions: string[]
   /** Every file that holds this server, as the page loaded them. */
   files: McpConfigFile[]
   tools: McpTool[]
@@ -466,6 +460,7 @@ export function ServerDialog({
   onTest: () => void
   onSave: (values: ServerFormValues) => void
   onDelete: () => Promise<void>
+  onSetTags: (tags: string[]) => void
 }) {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<DetailTab>("config")
@@ -475,27 +470,9 @@ export function ServerDialog({
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent
-        showCloseButton={false}
-        /* The dialog's width is its own; the component's built-in `sm:max-w-sm`
-           would clamp it, and an inline ceiling settles that in one place
-           instead of re-stating the breakpoint here. */
-        style={{ maxWidth: "none" }}
-        className="h-[min(712px,calc(100dvh-2rem))] w-[min(1088px,calc(100vw-2rem))] gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 ring-0"
-      >
-        <DialogTitle className="sr-only">{server.name}</DialogTitle>
-        {/* One row of two panes while they fit side by side, and two stacked
-            rows when they do not — the wrap does that on its own, because the
-            form's basis plus the panel's is what the dialog is compared
-            against. A permanent left border on the panel would land in the
-            wrong place once it wraps, so the two panes are told apart by their
-            own surfaces, which is how the canvas separates them anyway.
-            Each pane is capped at this row's height: a wrapping row sizes
-            itself to its tallest item, so without the cap the panes grow past
-            the dialog and it is this row — not their own panes — that scrolls,
-            which pushes both footers out of view. */}
-        <div className="flex h-full min-h-0 flex-wrap items-stretch scrollbar-gutter-auto overflow-y-auto">
-          <div className="flex max-h-full min-h-[380px] min-w-0 shrink grow basis-[520px] flex-col overflow-hidden bg-muted">
+      <DialogSplit
+        pane={
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
             <div className="flex h-12 shrink-0 items-center border-b border-border px-6">
               <div className="flex h-12 items-end gap-7">
                 {TABS.map((entry) => {
@@ -557,10 +534,12 @@ export function ServerDialog({
               </div>
             )}
           </div>
+        }
+        panel={
           <ServerPanel
             server={server}
             places={places}
-            tags={tags}
+            tagSuggestions={tagSuggestions}
             age={age}
             busy={busy}
             onTogglePlace={onTogglePlace}
@@ -568,9 +547,10 @@ export function ServerDialog({
             onTest={onTest}
             onSave={() => onSave(values)}
             onDelete={onDelete}
+            onSetTags={onSetTags}
           />
-        </div>
-      </DialogContent>
+        }
+      />
     </Dialog>
   )
 }

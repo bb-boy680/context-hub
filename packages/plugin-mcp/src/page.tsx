@@ -20,7 +20,6 @@ import {
   ListIcon,
   PlugZapIcon,
   PlusIcon,
-  SearchIcon,
   TriangleAlertIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -30,7 +29,7 @@ import { cn } from "cn"
 
 import { AddServerDialog } from "./add-server-dialog.tsx"
 import { ServerCardView } from "./card-view.tsx"
-import { MCP_TAGS, tagList, useMcpLibrary } from "./library.ts"
+import { useMcpLibrary } from "./library.ts"
 import { ServerListView } from "./list-view.tsx"
 import { placeWords } from "./place-words.ts"
 import type { ServerActions } from "./menus.tsx"
@@ -40,11 +39,11 @@ import { declarationOf } from "./server-form.tsx"
 import type { McpAgentPlace, McpConfigFile, McpPlaceKind, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import {
+  FilterBar,
   PlaceScopePicker,
   type PlaceOption,
 } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
-import { Kbd } from "@workspace/ui/components/kbd"
 
 /** Which axis the tab row is filtering on. */
 type TabId = "all" | "ready" | "failed" | "workspace" | "global"
@@ -226,63 +225,6 @@ function FilterTabs({
   )
 }
 
-/** The search field and the tag chips, which filter the same list. */
-function FilterRow({
-  query,
-  onQuery,
-  tag,
-  onTag,
-  tags,
-}: {
-  query: string
-  onQuery: (query: string) => void
-  tag: string
-  onTag: (tag: string) => void
-  tags: { id: string; label: string }[]
-}) {
-  const { t } = useI18n()
-
-  return (
-    <div className="flex min-w-0 flex-wrap items-center gap-3">
-      {/* The field keeps the canvas's 300px. The chips stay beside it while the
-          whole group fits on that line, then drop to a line of their own —
-          `min-w-fit` is what keeps the group from splitting mid-row. */}
-      <div className="flex h-11 w-[300px] max-w-full shrink-0 items-center gap-2 rounded-md border border-border px-3.5 focus-within:border-primary">
-        <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
-        <input
-          value={query}
-          onChange={(event) => onQuery(event.target.value)}
-          placeholder={t("mcp.search.placeholder")}
-          aria-label={t("mcp.search.placeholder")}
-          className="min-w-0 flex-1 bg-transparent text-[length:var(--text-body)] outline-none placeholder:text-muted-foreground/70"
-        />
-        <Kbd className="shrink-0 border-0 bg-transparent text-muted-foreground">/</Kbd>
-      </div>
-      <div className="flex min-w-fit shrink-0 grow basis-[280px] flex-wrap items-center gap-2">
-        {tags.map((entry) => {
-          const active = tag === entry.id
-          return (
-            <button
-              key={entry.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onTag(entry.id)}
-              className={cn(
-                "flex h-8 shrink-0 items-center justify-center rounded-full px-3.5 text-[length:var(--text-caption)] whitespace-nowrap transition-colors",
-                active
-                  ? "bg-foreground font-semibold text-background"
-                  : "bg-secondary font-medium text-foreground hover:bg-accent"
-              )}
-            >
-              {entry.label}
-            </button>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
 /** The row count, the page size, and the four page buttons. */
 function Footer({
   shown,
@@ -358,11 +300,21 @@ export function McpServersPage() {
   const catalog = library.catalog
   const servers = React.useMemo(() => catalog?.servers ?? [], [catalog])
   const places = library.places
-  const tags = React.useMemo(() => tagList(t), [t])
+  /* The types the servers carry right now — the chips and the detail editor
+     both offer these rather than a fixed vocabulary, so a type reads the same
+     wherever it appears and picking one cannot invent a second spelling. */
+  const serverTags = React.useMemo(
+    () =>
+      [...new Set(servers.flatMap((server) => server.detail.tags))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [servers]
+  )
 
   const [view, setView] = React.useState<ViewId>("grid")
   const [tab, setTab] = React.useState<TabId>("all")
-  const [tag, setTag] = React.useState(MCP_TAGS[0])
+  /* No tag narrows the list until one is picked. */
+  const [tag, setTag] = React.useState("")
   const [query, setQuery] = React.useState("")
   /* One place inside the current scope, once a person picked one from the
      scope's menu; `null` leaves the scope whole. */
@@ -425,7 +377,9 @@ export function McpServersPage() {
         )
         if (!hit) return false
       }
-      if (tag !== MCP_TAGS[0] && server.tag !== tag) return false
+      /* A server matches the picked type when any of its types is it, not just
+         the first one, which is only the card's own label. */
+      if (tag !== "" && !server.detail.tags.includes(tag)) return false
       if (needle === "") return true
       return (
         server.name.toLowerCase().includes(needle) ||
@@ -580,12 +534,18 @@ export function McpServersPage() {
             />
           </div>
 
-          <FilterRow
+          <FilterBar
             query={query}
             onQuery={setQuery}
+            tags={serverTags}
             tag={tag}
+            all=""
             onTag={setTag}
-            tags={tags}
+            words={{
+              search: t("mcp.search.placeholder"),
+              clear: t("mcp.search.clear"),
+              all: t("mcp.tag.all"),
+            }}
           />
         </>
       )}
@@ -614,7 +574,6 @@ export function McpServersPage() {
       ) : (
         <ServerCardView
           servers={visible}
-          tags={tags}
           age={age}
           onOpen={(server) => setOpenId(server.id)}
           rowActions={rowActions}
@@ -634,7 +593,7 @@ export function McpServersPage() {
         <ServerDialog
           server={open}
           places={places}
-          tags={tags}
+          tagSuggestions={serverTags}
           files={files}
           tools={open.detail.tools}
           age={ageText(open.check?.at ?? catalog?.scannedAt ?? null, t)}
@@ -649,6 +608,9 @@ export function McpServersPage() {
           }}
           onSave={save}
           onDelete={() => run(() => library.remove(open.id).then(() => setOpenId(null)))}
+          onSetTags={(tags) => {
+            void run(() => library.update(open.id, { tags }))
+          }}
         />
       )}
       {adding ? (

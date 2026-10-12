@@ -189,6 +189,6 @@ export const skillsMessages: Record<string, string> = {
   "skills.media.add.pasteHint": "Ctrl + V · a screenshot or a copied file.",
   "skills.media.add.failed": "That URL could not be read.",
   "skills.detail.category.add": "Add type",
-  "skills.detail.category.remove": "Remove",
+  "skills.detail.category.remove": "Remove {tag}",
   "skills.detail.category.placeholder": "New type name",
 }
