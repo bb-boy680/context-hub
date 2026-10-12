@@ -316,11 +316,23 @@ function columnAt(source: string, offset: number): string {
 /** The indentation one object's properties sit at, one level in from it. */
 function indentIn(source: string, parent: Node): string {
   const first = parent.children?.[0]
-  if (first === undefined) return columnAt(source, parent.offset) + INDENT
-  const cell = columnAt(source, first.offset)
-  /* A property that starts its own line keeps that line's indentation; one that
-     shares a line is aligned under the property it follows. */
-  return cell === "" ? INDENT : cell
+  if (first !== undefined) {
+    const cell = columnAt(source, first.offset)
+    /* A property that starts its own line keeps that line's indentation; one that
+       shares a line is aligned under the property it follows. */
+    return cell === "" ? INDENT : cell
+  }
+  /* No property to read a layout from, so the line the object's brace sits on
+     decides: a brace that opens its own line is at the indent already, while one
+     that ends a line (`"mcpServers": {`) stands far right of where contents
+     belong, and measuring from its column would indent the contents to it. */
+  return `${lineIndentAt(source, parent.offset)}${INDENT}`
+}
+
+/** The whitespace a line begins with, which a token ending that line still sits under. */
+function lineIndentAt(source: string, offset: number): string {
+  const start = source.lastIndexOf("\n", offset - 1) + 1
+  return /^[ \t]*/.exec(source.slice(start, offset))?.[0] ?? ""
 }
 
 /** The 1-based line an offset falls on. */

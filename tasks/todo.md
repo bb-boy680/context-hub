@@ -1,3 +1,50 @@
+# MCP 记录改存 `mcp/mcp.json`，格式带 `mcpServers`（2026-10-12，用户报告）
+
+## 目标（用户原话）
+
+"1、应该是储存到 mcp/mcp.json 里面；2、mcp 配置的信息应该要这样存取
+`{name, mcpServers: {<name>: <entry>}, description, tags}`；后续安装到 Agent 里面的时候需要取 mcpServers 数据就可以了。"
+
+## 改动
+
+- **格式**：`packages/plugin-mcp/src/records.ts`（新，浏览器与宿主共用）——
+  `McpRecordDocument{name, mcpServers, description, tags}`、`entryOf`（= `writeDeclaration` +
+  远程服务器写 `type`，否则 `sse` 读回会变 `http`）、`documentOf`、`recordOf`（条目必须挂在
+  记录自己的名字下）、`readRecords`（数组，或单个对象）、`recordsFromState`（旧 state 形状）、
+  `upsert`、浏览器端口 `createRemoteRecords()`。
+- **存储**：`packages/plugin-mcp/src/host/records.ts`（新）—— `<home>/mcp/mcp.json`，
+  原子写 + 写队列；**首次读到文件不存在时**把旧的 `<home>/state/mcp.json` 转换并入新文件，
+  然后删掉旧的（读一次、迁一次）。目录常量 `CACHE_DIR` 改名 `MCP_DIR`（缓存与记录共用）。
+- **桥**：`/hub/mcp` 增加 `{action:"records"}` / `{action:"save-records"}`（`readMcpCall` 校验）；
+  `probe.ts` 抽出 `callMcp()`。`vite.ts` 在 `startFolder()` 之前分发这两个动作。
+- **library.ts**：不再走 `ctx.host.storage`；`read()` 里先 `loadRecords()`（失败报
+  `mcp.error.records`）再扫描，记录传给 `probeAll`；`keep()` 改为 await 落盘。
+- **文案**：`mcp.error.records`（en + zh）。
+- `catalog.ts` / `index.ts` 只管目录合并；记录解析/序列化全部搬到 `records.ts`。
+
+## 验证
+
+- `check-mcp.ts` 60/60、`check-probe.ts` 54/54（含新文件落盘、坏 JSON 拒绝、迁移后旧文件消失、
+  线上动作校验）、`check-mcp-tools.ts` 82/82、`check-plugin.ts` 29/29、`check-messages` 408/408；
+  typecheck 10/10、lint 干净、`pnpm build` 通过。
+- 真机：重启 dev server 后首读完成迁移 —— `~/.context-hub/mcp/mcp.json` 4 条全在新格式，
+  `state/mcp.json` 已删；页面 4 台服务器显示正常。UI 新增 `zz-storage-check` 再删除，
+  文件哈希回到基线（`60A92D…E632`），即写-删往返逐字节一致。
+- 坑：PowerShell 5.1 `Invoke-RestMethod` 读 UTF-8 响应会乱码/合并条目，核对线上响应要用
+  `curl.exe` + `[IO.File]::ReadAllText(..., UTF8)`。
+
+## 后续：空对象回填缩进血案（2026-10-12，用户："这换行前面换行符太多了"）
+
+- **症状**：安装 MCP 到客户端文件后，条目被写进 `"mcpServers": {` 之下却带着 18 空格缩进。
+- **根因**：`jsonc.ts` 的 `insert()` 往**空对象**填第一个属性时，缩进量从花括号自己的**列号**
+  推出来（`columnAt`），而 `{` 在 `"mcpServers": ` 行尾（列 16）→ 条目 18 空格。
+  触发路径：卸载最后一个条目 → 留下空盒（有意保留，见编辑器的两条约定）→ 再安装。
+- **修复**：空对象分支改取该行的**行首缩进**（新助手 `lineIndentAt`）+ 一级；有属性时仍借
+  第一个属性的位置（它在自己的行上，锚点是对的）。
+- **回归断言**（`check-mcp-tools.ts`，现 84/84）：删空 → 回填必须逐字节等于干净的两空格版；
+  再删回去必须逐字节等于空盒。修复前第一条失败并复现了 18 空格症状（已实测灵敏度）。
+- **教训**：凡「从某个字符的位置推缩进」，先确认那个字符独占一行；否则必须用行首空白。
+
 # 公共 PlacePicker 控件（2026-10-12）
 
 ## 目标

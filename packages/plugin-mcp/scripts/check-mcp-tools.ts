@@ -215,6 +215,17 @@ check(
   JSON.stringify(only)
 )
 
+const refilled = editJson(only, ["mcpServers", "three"], { command: "c" })
+check(
+  "filling that empty object back in indents from the line, not from the brace's column",
+  refilled === `{\n  "mcpServers": {\n    "three": {\n      "command": "c"\n    }\n  }\n}\n`,
+  JSON.stringify(refilled)
+)
+check(
+  "taking it back out returns the empty box",
+  editJson(refilled, ["mcpServers", "three"], undefined) === only
+)
+
 const grown = editJson(PRETTY, ["mcpServers", "three"], { command: "c" })
 check("a value added to a block object gets its own lines", grown.includes('\n    "three": {\n      "command": "c"\n    }\n'), grown)
 check("it sits inside the object it was added to", valueAt(parseJsonc(grown), ["mcpServers", "three", "command"]) === "c")
