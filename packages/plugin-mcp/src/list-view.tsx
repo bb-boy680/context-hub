@@ -94,7 +94,7 @@ export function ServerListView({
       width: "32.9%",
       cell: (server) => (
         <div className="flex min-w-0 items-center gap-4">
-          <ServerTile mark={server.mark} />
+          <ServerTile mark={server.mark} icon={server.check?.icon} />
           <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
             <div className="flex items-center gap-2">
               <span className="truncate text-[13.5px] leading-[1.3] font-semibold text-foreground">
