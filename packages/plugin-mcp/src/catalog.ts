@@ -207,6 +207,7 @@ function rowOf(
     ...(conflicts > 0 ? { conflicts } : {}),
     unreadable,
     installed: installs.length,
+    stored: record !== undefined,
     status: failed ? "failed" : "ready",
     ...(check === null ? {} : { check }),
     mark: markOf(name, declaration),

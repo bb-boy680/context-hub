@@ -10,14 +10,14 @@ import { ArrowRightLeftIcon, PlugZapIcon } from "lucide-react"
 import { cn } from "cn"
 
 import { ServerControls, type ServerActions } from "./menus.tsx"
-import { ServerTile, StatusPill, TransportChip } from "./parts.tsx"
+import { ServerTile, StatusPill, TransportChip, UnstoredChip, serverPlaces } from "./parts.tsx"
 import type { McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 
 /** The tag chip and place summary a card's name column carries. */
 function CardMeta({ server, tag }: { server: McpServer; tag?: string }) {
   const { t } = useI18n()
-  const places = server.places.map((place) => t(`mcp.place.chip.${place}`)).join(" · ")
+  const places = serverPlaces(server, t).join(" · ")
 
   return (
     <div className="flex min-w-0 items-center gap-1.5">
@@ -26,7 +26,11 @@ function CardMeta({ server, tag }: { server: McpServer; tag?: string }) {
           {tag}
         </span>
       ) : null}
-      <span className="size-[3px] shrink-0 rounded-full bg-muted-soft" />
+      {/* The separator belongs to the summary beside it: with nothing to
+          introduce it would read as a row whose second half failed to load. */}
+      {tag && places !== "" ? (
+        <span className="size-[3px] shrink-0 rounded-full bg-muted-soft" />
+      ) : null}
       <span className="truncate text-[11.5px] leading-[1.3] text-muted-soft">{places}</span>
     </div>
   )
@@ -106,6 +110,7 @@ function ServerCard({
               {server.name}
             </span>
             <TransportChip transport={server.transport} />
+            {server.stored ? null : <UnstoredChip />}
           </div>
           <CardMeta server={server} tag={tag} />
         </div>
@@ -157,7 +162,7 @@ function ServerCard({
             {t("mcp.detail.section.check")}
           </span>
           <span className="text-[11.5px] leading-[1.3] text-muted-soft">
-            {t("mcp.card.checked").replace("{age}", age)}
+            {t("mcp.check.checked").replace("{age}", age)}
           </span>
         </div>
         {checkRows(server, t).map((line) => (

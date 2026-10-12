@@ -10,6 +10,7 @@
 import {
   CheckIcon,
   ExternalLinkIcon,
+  LibraryIcon,
   PlusIcon,
   PlugIcon,
   PlugZapIcon,
@@ -194,18 +195,38 @@ function DeleteBubble({ name, onDelete }: { name: string; onDelete: () => Promis
   )
 }
 
-/** Which agents read this server, grouped by the root each place sits under. */
+/**
+ * Where a server lives: the hub's own records first, then every client file an
+ * agent extension describes. The library is one of the places rather than a
+ * column somewhere else, so a server the hub holds and a server only a client
+ * file declares read the same way — the first row says which it is.
+ */
 function Places({
+  server,
+  recordsFile,
   states,
+  onAdopt,
   onToggle,
   onSetEnabled,
 }: {
+  server: McpServer
+  /** The hub's records file, as a person reads it; empty when unknown. */
+  recordsFile: string
   states: McpPlaceState[]
+  onAdopt: () => void
   onToggle: (place: string) => void
   onSetEnabled: (place: string, enabled: boolean) => void
 }) {
   const { t } = useI18n()
   const byId = new Map(states.map((state) => [state.place.id, state]))
+  /* The library is one of the rows, so it is one of the count: a server the
+     hub holds is installed in one place before any client file is written. */
+  const installed = installedCount(states) + (server.stored ? 1 : 0)
+
+  /* The library row wears the same chrome as a place row, so the list reads as
+     one column; only the mark and what the right edge offers differ. */
+  const plate =
+    "flex size-7 shrink-0 items-center justify-center rounded-lg bg-surface-raised ring-1 ring-border ring-inset"
 
   return (
     <div className="flex flex-col">
@@ -214,7 +235,7 @@ function Places({
           {t("mcp.detail.section.places")}
         </span>
         <span className="text-[12px] leading-[1.3] text-muted-soft">
-          {t("mcp.detail.place.installed").replace("{count}", String(installedCount(states)))}
+          {t("mcp.detail.place.installed").replace("{count}", String(installed))}
         </span>
       </div>
       {/* No contributed client file means nothing here can be installed, which
@@ -225,6 +246,41 @@ function Places({
         </span>
       ) : null}
       <ul className="flex flex-col gap-2.5">
+        <li className="flex h-14 items-center gap-2.5">
+          <span className={plate}>
+            <LibraryIcon className="size-[15px] text-copy" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-[12.5px] leading-[15px] font-semibold">
+              {t("mcp.place.chip.library")}
+            </span>
+            {recordsFile === "" ? null : (
+              <span className="truncate font-mono text-[10.5px] leading-[14px] text-muted-foreground">
+                {/* A path reads with forward slashes whatever the platform the
+                    host runs on, as every other path this page shows does. */}
+                {recordsFile.replaceAll("\\", "/")}
+              </span>
+            )}
+          </span>
+          {/* Held, the row says which copy this is; not held, it offers the way
+              in — the same action the unstored tab holds, named as the skills
+              page names it. */}
+          {server.stored ? (
+            <span className="flex h-[22px] shrink-0 items-center rounded-full px-[9px] text-[11px] font-medium text-copy ring-1 ring-border">
+              {t("mcp.place.body")}
+            </span>
+          ) : (
+            <Button
+              variant="secondary"
+              aria-label={t("mcp.action.adopt")}
+              onClick={onAdopt}
+              className="h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
+            >
+              <PlusIcon className="size-[13px]" />
+              {t("mcp.action.adopt")}
+            </Button>
+          )}
+        </li>
         <PlaceList
           groups={MCP_SCOPES.map((scope) => ({
             label: t(`mcp.detail.group.${scope}`),
@@ -383,8 +439,10 @@ function DescriptionLine({
 function ServerPanel({
   server,
   places,
+  recordsFile,
   tagSuggestions,
   age,
+  onAdopt,
   onTogglePlace,
   onSetPlaceEnabled,
   onTest,
@@ -396,9 +454,12 @@ function ServerPanel({
 }: {
   server: McpServer
   places: readonly McpAgentPlace[]
+  /** The hub's records file, as a person reads it; empty when unknown. */
+  recordsFile: string
   /** Every type the servers carry, for the editor's quick picks. */
   tagSuggestions: string[]
   age: string
+  onAdopt: () => void
   onTogglePlace: (place: string) => void
   onSetPlaceEnabled: (place: string, enabled: boolean) => void
   onTest: () => void
@@ -460,7 +521,14 @@ function ServerPanel({
           }}
         />
 
-        <Places states={states} onToggle={onTogglePlace} onSetEnabled={onSetPlaceEnabled} />
+        <Places
+          server={server}
+          recordsFile={recordsFile}
+          states={states}
+          onAdopt={onAdopt}
+          onToggle={onTogglePlace}
+          onSetEnabled={onSetPlaceEnabled}
+        />
 
         <div className="flex flex-col">
           <div className="flex h-8 items-center gap-2">
@@ -516,11 +584,13 @@ function ServerPanel({
 export function ServerDialog({
   server,
   places,
+  recordsFile,
   tagSuggestions,
   tools,
   age,
   busy,
   onClose,
+  onAdopt,
   onTogglePlace,
   onSetPlaceEnabled,
   onTest,
@@ -531,12 +601,15 @@ export function ServerDialog({
 }: {
   server: McpServer
   places: readonly McpAgentPlace[]
+  /** The hub's records file, as a person reads it; empty when unknown. */
+  recordsFile: string
   /** Every type the servers carry, for the editor's quick picks. */
   tagSuggestions: string[]
   tools: McpTool[]
   age: string
   busy: boolean
   onClose: () => void
+  onAdopt: () => void
   onTogglePlace: (place: string) => void
   onSetPlaceEnabled: (place: string, enabled: boolean) => void
   onTest: () => void
@@ -644,9 +717,11 @@ export function ServerDialog({
           <ServerPanel
             server={server}
             places={places}
+            recordsFile={recordsFile}
             tagSuggestions={tagSuggestions}
             age={age}
             busy={busy}
+            onAdopt={onAdopt}
             onTogglePlace={onTogglePlace}
             onSetPlaceEnabled={onSetPlaceEnabled}
             onTest={onTest}

@@ -21,6 +21,7 @@ import {
   StatusPill,
   SyncChip,
   TransportChip,
+  UnstoredChip,
   checkLine,
 } from "./parts.tsx"
 import type { McpAgentPlace, McpServer } from "./types.ts"
@@ -37,6 +38,7 @@ const NOWHERE: McpServer = {
   places: [],
   unreadable: 0,
   installed: 0,
+  stored: false,
   status: "ready",
   mark: "generic",
   tag: "",
@@ -71,6 +73,7 @@ export function ServerListView({
   servers,
   places,
   selected,
+  age,
   onCheck,
   onInstallSelected,
   onOpen,
@@ -79,6 +82,8 @@ export function ServerListView({
   servers: McpServer[]
   places: readonly McpAgentPlace[]
   selected: ReadonlySet<string>
+  /** How long ago one server was checked, which its own cell says. */
+  age: (server: McpServer) => string
   onCheck: (keys: string[]) => void
   onInstallSelected: (place: string) => void
   onOpen: (server: McpServer) => void
@@ -101,6 +106,7 @@ export function ServerListView({
                 {server.name}
               </span>
               <TransportChip transport={server.transport} />
+              {server.stored ? null : <UnstoredChip />}
               {server.conflicts ? <SyncChip count={server.conflicts} /> : null}
             </div>
             {/* A server that says nothing about itself reads as the sentence
@@ -116,15 +122,13 @@ export function ServerListView({
       key: "place",
       label: t("mcp.column.place"),
       width: "13.2%",
-      cell: (server) => <PlaceChips places={server.places} />,
+      cell: (server) => <PlaceChips server={server} />,
     },
     {
       key: "check",
       label: t("mcp.column.check"),
       width: "14.6%",
-      cell: (server) => (
-        <CheckNote text={checkLine(server, t)} ok={server.status === "ready"} />
-      ),
+      cell: (server) => <CheckNote line={checkLine(server, t, age(server))} />,
     },
     {
       key: "status",

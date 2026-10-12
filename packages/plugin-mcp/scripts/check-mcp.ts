@@ -179,6 +179,8 @@ async function main(): Promise<void> {
   check("a name only a file knows is a row as well", catalog.servers.some((server) => server.name === "odd"))
   check("rows are ordered by name", catalog.servers.map((server) => server.name).join(",") === "github,odd,ours")
   check("the record's sentence reaches the row", github?.description === "Their server")
+  check("a record puts the server in the hub's own library", github?.stored === true)
+  check("a name only a file knows is not in it", catalog.servers.find((server) => server.name === "odd")?.stored === false)
   check("its first tag is the row's tag", github?.tag === "vcs")
   check("a name that reads as a brand gets its mark", github?.mark === "github")
   check("one that does not stays generic", catalog.servers.find((server) => server.name === "ours")?.mark === "generic")

@@ -154,6 +154,11 @@ export interface McpServer {
   /** How many places declare it, which the check column and the panel count. */
   installed: number
   /**
+   * The hub holds a record for it. A server only a client file declares is a
+   * row too, so this is what tells the hub's own library apart from the rest.
+   */
+  stored: boolean
+  /**
    * The row's one verdict: a declaration another file disagrees with, an entry
    * this build cannot read, or a probe that could not connect.
    */

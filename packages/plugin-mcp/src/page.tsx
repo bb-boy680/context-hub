@@ -8,11 +8,13 @@
  * this component's state.
  */
 import {
-  CircleCheckIcon,
   ContainerIcon,
   GlobeIcon,
+  InboxIcon,
   LayoutGridIcon,
+  LibraryIcon,
   ListIcon,
+  PackagePlusIcon,
   PlugZapIcon,
   PlusIcon,
   TriangleAlertIcon,
@@ -41,26 +43,44 @@ import {
   type PlaceOption,
 } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { toast } from "@workspace/ui/components/toast"
 
 /** Which axis the tab row is filtering on. */
-type TabId = "all" | "ready" | "failed" | "workspace" | "global"
+type TabId = "all" | "library" | "unstored" | "failed" | "workspace" | "global"
 
 /** The tabs that are screens already, rather than a scope holding places. */
-type ShellTab = "all" | "ready" | "failed"
+type ShellTab = "all" | "library" | "unstored" | "failed"
 
 /** How the catalog is laid out. */
 type ViewId = "list" | "grid"
 
 const TAB_MARKS: Record<TabId, LucideIcon> = {
   all: LayoutGridIcon,
-  ready: CircleCheckIcon,
+  library: LibraryIcon,
+  unstored: InboxIcon,
   failed: TriangleAlertIcon,
   workspace: ContainerIcon,
   global: GlobeIcon,
 }
 
-const TAB_ORDER: TabId[] = ["all", "ready", "failed", "workspace", "global"]
+const TAB_ORDER: TabId[] = ["all", "library", "unstored", "failed", "workspace", "global"]
+
+/**
+ * The tabs a screen shows right now. A screen that holds nothing is left out
+ * rather than drawn empty: nothing is failing, or every server is already in
+ * the library, is good news the tab row does not need to repeat.
+ */
+function tabsToShow(counts: Record<ShellTab, number>): TabId[] {
+  return TAB_ORDER.filter((id) => id !== "failed" || counts.failed > 0).filter(
+    (id) => id !== "unstored" || counts.unstored > 0
+  )
+}
 
 /** How long ago something happened, in the three steps a card or a footer prints. */
 function ageText(at: number | null, t: (key: string) => string): string {
@@ -137,7 +157,7 @@ function ToolbarActions({
   )
 }
 
-/** The five filter tabs: three screens, each with its count, and two scopes. */
+/** The filter tabs: the screens that have something to show, and two scopes. */
 function FilterTabs({
   tab,
   onTab,
@@ -145,6 +165,7 @@ function FilterTabs({
   scopePlaces,
   chosen,
   onChoose,
+  onAdopt,
 }: {
   tab: TabId
   onTab: (tab: TabId) => void
@@ -154,15 +175,17 @@ function FilterTabs({
   /** The place the scope on screen is narrowed to; `null` when it is whole. */
   chosen: string | null
   onChoose: (scope: McpPlaceKind, place: string | null) => void
+  /** Take every server the library does not hold yet into it. */
+  onAdopt: () => void
 }) {
   const { t } = useI18n()
 
   return (
     /* `w-fit` rather than a block box: the trough keeps its own width, so a line
-       too narrow for five tabs scrolls inside the wrapper instead of squashing
+       too narrow for the tabs scrolls inside the wrapper instead of squashing
        them into unreadable slivers. */
     <div className="flex h-11 w-fit items-center gap-1 rounded-full bg-secondary p-1">
-      {TAB_ORDER.map((id) => {
+      {tabsToShow(counts).map((id) => {
         const Icon = TAB_MARKS[id]
 
         /* A scope says which places it spans instead of how many servers it
@@ -188,6 +211,22 @@ function FilterTabs({
 
         const active = tab === id
 
+        /* The tab of what the library does not hold carries the one action that
+           set is for, and the action opens from the tab itself rather than from
+           a mark inside it. */
+        if (id === "unstored") {
+          return (
+            <UnstoredTab
+              key={id}
+              active={active}
+              counts={counts}
+              icon={Icon}
+              onTab={() => onTab(id)}
+              onAdopt={onAdopt}
+            />
+          )
+        }
+
         return (
           <button
             key={id}
@@ -199,27 +238,120 @@ function FilterTabs({
               active ? "bg-foreground" : "hover:bg-muted"
             )}
           >
-            <Icon className={cn("size-3.5", active ? "text-background" : "text-muted-foreground")} />
-            <span
-              className={cn(
-                "text-[length:var(--text-body)] leading-[1.3]",
-                active ? "font-semibold text-background" : "font-medium text-muted-foreground"
-              )}
-            >
-              {t(`mcp.tab.${id}`)}
-            </span>
-            <span
-              className={cn(
-                "font-mono text-[length:var(--text-body)] leading-[1.3]",
-                active ? "text-background" : "text-muted-soft"
-              )}
-            >
-              {counts[id]}
-            </span>
+            <TabLabel id={id} counts={counts} active={active} icon={Icon} />
           </button>
         )
       })}
     </div>
+  )
+}
+
+/**
+ * The tab of what the library does not hold: pressing it shows that set, and
+ * the one action the set is for opens while the pointer rests on the tab.
+ *
+ * The tab is itself the trigger, so the whole pill is the area that opens the
+ * action. A press opens nothing — on this tab a press is the tab's own switch.
+ */
+function UnstoredTab({
+  active,
+  counts,
+  icon,
+  onTab,
+  onAdopt,
+}: {
+  active: boolean
+  counts: Record<ShellTab, number>
+  icon: LucideIcon
+  onTab: () => void
+  onAdopt: () => void
+}) {
+  const { t } = useI18n()
+  const [open, setOpen] = React.useState(false)
+
+  return (
+    <DropdownMenu
+      open={open}
+      onOpenChange={(next, details) => {
+        /* The pointer and the keyboard may open the action; a press may not. */
+        if (next && details.reason === "trigger-press") return
+        setOpen(next)
+      }}
+    >
+      <DropdownMenuTrigger
+        openOnHover
+        /* Long enough to cross the gap between the tab and the action. */
+        closeDelay={140}
+        render={
+          <button
+            type="button"
+            aria-pressed={active}
+            onClick={onTab}
+            className={cn(
+              "flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4",
+              active ? "bg-foreground" : "hover:bg-muted"
+            )}
+          >
+            <TabLabel id="unstored" counts={counts} active={active} icon={icon} />
+          </button>
+        }
+      />
+      <DropdownMenuContent
+        align="start"
+        sideOffset={6}
+        /* Drawn in a portal but still a React child of the tab, so its clicks
+           would switch the tab under the menu. */
+        onClick={(event) => event.stopPropagation()}
+        className="w-[220px] p-1"
+      >
+        <DropdownMenuItem className="gap-2.5 py-2" onClick={onAdopt}>
+          <PackagePlusIcon className="size-3.5" />
+          <span className="text-[13.5px] leading-[18px] font-semibold">
+            {t("mcp.action.adoptAll")}
+          </span>
+          <span className="ml-auto font-mono text-[12.5px] text-muted-foreground">
+            {counts.unstored}
+          </span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
+/** The mark, name and count one tab prints, whatever element carries them. */
+function TabLabel({
+  id,
+  counts,
+  active,
+  icon: Icon,
+}: {
+  id: ShellTab
+  counts: Record<ShellTab, number>
+  active: boolean
+  icon: LucideIcon
+}) {
+  const { t } = useI18n()
+
+  return (
+    <>
+      <Icon className={cn("size-3.5 shrink-0", active ? "text-background" : "text-muted-foreground")} />
+      <span
+        className={cn(
+          "text-[length:var(--text-body)] leading-[1.3]",
+          active ? "font-semibold text-background" : "font-medium text-muted-foreground"
+        )}
+      >
+        {t(`mcp.tab.${id}`)}
+      </span>
+      <span
+        className={cn(
+          "font-mono text-[length:var(--text-body)] leading-[1.3]",
+          active ? "text-background" : "text-muted-soft"
+        )}
+      >
+        {counts[id]}
+      </span>
+    </>
   )
 }
 
@@ -297,13 +429,22 @@ export function McpServersPage() {
   const [pageSize, setPageSize] = React.useState(12)
 
   const counts = React.useMemo(() => {
-    const ready = servers.filter((server) => server.status === "ready").length
+    const failed = servers.filter((server) => server.status === "failed").length
     return {
       all: servers.length,
-      ready,
-      failed: servers.length - ready,
+      library: servers.filter((server) => server.stored).length,
+      unstored: servers.filter((server) => !server.stored).length,
+      failed,
     } satisfies Record<ShellTab, number>
   }, [servers])
+
+  /* A screen whose tab has just gone — the last failure cleared, the last
+     unstored server taken in — leaves the person on the whole list instead of
+     an empty one. */
+  const activeTab: TabId =
+    (tab === "failed" && counts.failed === 0) || (tab === "unstored" && counts.unstored === 0)
+      ? "all"
+      : tab
 
   /* Each scope pill names the places it holds by their marks, and its menu
      counts what each place declares, so a person can tell two client files
@@ -327,7 +468,7 @@ export function McpServersPage() {
   /* A choice from a scope's menu only means something while that scope is the
      one on screen; anywhere else the scope is whole. */
   const chosen =
-    narrowed !== null && places.some((place) => place.scope === tab && place.id === narrowed)
+    narrowed !== null && places.some((place) => place.scope === activeTab && place.id === narrowed)
       ? narrowed
       : null
 
@@ -335,14 +476,18 @@ export function McpServersPage() {
     const needle = query.trim().toLowerCase()
     const scopeOf = new Map(places.map((place) => [place.id, place.scope]))
     return servers.filter((server) => {
-      if (tab === "ready" && server.status !== "ready") return false
-      if (tab === "failed" && server.status !== "failed") return false
+      /* The hub's own library: the servers it holds a record for. A server a
+         client file declares and no record knows is still a row in the other
+         tabs — it is installed somewhere, whether or not the hub wrote it. */
+      if (activeTab === "library" && !server.stored) return false
+      if (activeTab === "unstored" && server.stored) return false
+      if (activeTab === "failed" && server.status !== "failed") return false
       /* A scope holds the servers its own places declare, narrowed to the one
          place its menu last picked. */
-      if (tab === "workspace" || tab === "global") {
+      if (activeTab === "workspace" || activeTab === "global") {
         const held = server.detail.installs.filter((install) => install.installed)
         const hit = held.some((install) =>
-          chosen === null ? scopeOf.get(install.place) === tab : install.place === chosen
+          chosen === null ? scopeOf.get(install.place) === activeTab : install.place === chosen
         )
         if (!hit) return false
       }
@@ -356,7 +501,7 @@ export function McpServersPage() {
         server.description.toLowerCase().includes(needle)
       )
     })
-  }, [servers, query, tab, tag, chosen, places])
+  }, [servers, query, activeTab, tag, chosen, places])
 
   /* A filter, an agent switch, or a shorter list can leave the page past the
      end; the page shown is clamped rather than an empty stretch of rows. */
@@ -414,6 +559,11 @@ export function McpServersPage() {
     [library, selected]
   )
 
+  /* Take every server the hub does not hold into its library, in one write. */
+  const adoptUnstored = React.useCallback(() => {
+    void library.adopt(servers.filter((server) => !server.stored).map((server) => server.id))
+  }, [library, servers])
+
   const save = React.useCallback(
     (values: ServerFormValues) => {
       if (open === null) return
@@ -464,7 +614,7 @@ export function McpServersPage() {
           <div className="flex min-w-0 flex-wrap items-center justify-between gap-6">
             <div className="min-w-0 max-w-full overflow-x-auto">
               <FilterTabs
-                tab={tab}
+                tab={activeTab}
                 onTab={(next) => {
                   setTab(next)
                   setPage(0)
@@ -478,6 +628,7 @@ export function McpServersPage() {
                   setSelected(new Set())
                   setPage(0)
                 }}
+                onAdopt={adoptUnstored}
               />
             </div>
             <ToolbarActions
@@ -550,6 +701,7 @@ export function McpServersPage() {
             servers={rows}
             places={places}
             selected={selected}
+            age={checkedAge}
             onCheck={(keys) => setSelected(new Set(keys))}
             onInstallSelected={installSelected}
             onOpen={(server) => setOpenId(server.id)}
@@ -569,11 +721,15 @@ export function McpServersPage() {
         <ServerDialog
           server={open}
           places={places}
+          recordsFile={library.recordsFile}
           tagSuggestions={serverTags}
           tools={open.detail.tools}
           age={checkedAge(open)}
           busy={library.busy}
           onClose={() => setOpenId(null)}
+          onAdopt={() => {
+            void library.adopt([open.id])
+          }}
           onTogglePlace={(place) => rowActions(open).onTogglePlace(place)}
           onSetPlaceEnabled={(place, enabled) =>
             rowActions(open).onSetPlaceEnabled(place, enabled)
