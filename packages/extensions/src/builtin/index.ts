@@ -2,6 +2,5 @@
 import type { ExtensionDefinition } from "../types.ts"
 
 import { englishLocale } from "./locale-en.ts"
-import { copilotTarget } from "./targets.ts"
 
-export const builtinExtensions: ExtensionDefinition[] = [copilotTarget, englishLocale]
+export const builtinExtensions: ExtensionDefinition[] = [englishLocale]

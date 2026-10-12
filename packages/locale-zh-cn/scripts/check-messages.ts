@@ -28,6 +28,19 @@ function keysOf(file: string): Set<string> {
 /** The pack being checked; every other table is a source of keys it must carry. */
 const TARGET = "locale-zh-cn"
 
+/**
+ * Every `src/messages.ts` a package directory holds: the package's own, or —
+ * for a grouping directory like `agents-extensions` — one per package inside
+ * it, so a table packed one level deeper is still a source of keys.
+ */
+function messageTables(dir: string): { name: string; file: string }[] {
+  const own = path.join(dir, "src/messages.ts")
+  if (existsSync(own)) return [{ name: path.basename(dir), file: own }]
+  return readdirSync(dir)
+    .map((child) => ({ name: child, file: path.join(dir, child, "src/messages.ts") }))
+    .filter((table) => existsSync(table.file))
+}
+
 /** The English tables: the kernel's base pack, then each package's own defaults. */
 function englishTables(): { name: string; keys: Set<string> }[] {
   const tables: { name: string; keys: Set<string> }[] = [
@@ -38,9 +51,9 @@ function englishTables(): { name: string; keys: Set<string> }[] {
   ]
   for (const name of readdirSync(packages).sort()) {
     if (name === TARGET) continue
-    const file = path.join(packages, name, "src/messages.ts")
-    if (!existsSync(file)) continue
-    tables.push({ name, keys: keysOf(file) })
+    for (const table of messageTables(path.join(packages, name))) {
+      tables.push({ name: table.name, keys: keysOf(table.file) })
+    }
   }
   return tables
 }

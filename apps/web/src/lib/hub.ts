@@ -6,6 +6,18 @@
  * itself, so `startHub` offers those only when a host answers for them; without
  * a host the skills page has no catalog and says so.
  */
+import { clineExtension } from "@workspace/agent-cline"
+import { codexExtension } from "@workspace/agent-codex"
+import { commandCodeExtension } from "@workspace/agent-command-code"
+import { copilotExtension } from "@workspace/agent-copilot"
+import { cursorExtension } from "@workspace/agent-cursor"
+import { geminiCliExtension } from "@workspace/agent-gemini-cli"
+import { kiroCliExtension } from "@workspace/agent-kiro-cli"
+import { minimaxCodeExtension } from "@workspace/agent-minimax-code"
+import { qoderExtension } from "@workspace/agent-qoder"
+import { qwenCodeExtension } from "@workspace/agent-qwen-code"
+import { traeExtension } from "@workspace/agent-trae"
+import { windsurfExtension } from "@workspace/agent-windsurf"
 import { STATE_ROUTE } from "@workspace/core/state"
 import { createRemoteNet } from "@workspace/core/net"
 import {
@@ -19,7 +31,6 @@ import {
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { claudeCodeExtension } from "@workspace/plugin-claude-code"
-import { codexExtension } from "@workspace/plugin-codex"
 import { mcpExtension } from "@workspace/plugin-mcp"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import { skillsShExtension } from "@workspace/plugin-skills-sh"
@@ -167,6 +178,17 @@ export async function startHub(): Promise<HubKernel> {
       mcpExtension,
       claudeCodeExtension,
       codexExtension,
+      clineExtension,
+      commandCodeExtension,
+      copilotExtension,
+      cursorExtension,
+      geminiCliExtension,
+      kiroCliExtension,
+      minimaxCodeExtension,
+      qoderExtension,
+      qwenCodeExtension,
+      traeExtension,
+      windsurfExtension,
       skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),

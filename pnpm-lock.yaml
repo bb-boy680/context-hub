@@ -23,6 +23,42 @@ importers:
 
   apps/web:
     dependencies:
+      '@workspace/agent-cline':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/cline
+      '@workspace/agent-codex':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/codex
+      '@workspace/agent-command-code':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/command-code
+      '@workspace/agent-copilot':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/copilot
+      '@workspace/agent-cursor':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/cursor
+      '@workspace/agent-gemini-cli':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/gemini-cli
+      '@workspace/agent-kiro-cli':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/kiro-cli
+      '@workspace/agent-minimax-code':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/minimax-code
+      '@workspace/agent-qoder':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/qoder
+      '@workspace/agent-qwen-code':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/qwen-code
+      '@workspace/agent-trae':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/trae
+      '@workspace/agent-windsurf':
+        specifier: workspace:*
+        version: link:../../packages/agents-extensions/windsurf
       '@workspace/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -35,9 +71,6 @@ importers:
       '@workspace/plugin-claude-code':
         specifier: workspace:*
         version: link:../../packages/plugin-claude-code
-      '@workspace/plugin-codex':
-        specifier: workspace:*
-        version: link:../../packages/plugin-codex
       '@workspace/plugin-mcp':
         specifier: workspace:*
         version: link:../../packages/plugin-mcp
@@ -105,6 +138,420 @@ importers:
       vite:
         specifier: ^8
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)
+
+  packages/agents-extensions/cline:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/codex:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@workspace/plugin-mcp':
+        specifier: workspace:*
+        version: link:../../plugin-mcp
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../../core
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/command-code:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/copilot:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/cursor:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/gemini-cli:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/kiro-cli:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/minimax-code:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/qoder:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/qwen-code:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/trae:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents-extensions/windsurf:
+    dependencies:
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
   packages/core:
     devDependencies:
@@ -255,40 +702,6 @@ importers:
       eslint-plugin-react-hooks:
         specifier: ^7.1.1
         version: 7.1.1(eslint@10.10.0(jiti@2.7.0))
-      globals:
-        specifier: ^17
-        version: 17.12.0
-      typescript:
-        specifier: ~6
-        version: 6.0.3
-      typescript-eslint:
-        specifier: ^8
-        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
-
-  packages/plugin-codex:
-    dependencies:
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../extensions
-      '@workspace/plugin-mcp':
-        specifier: workspace:*
-        version: link:../plugin-mcp
-      lucide-react:
-        specifier: ^1.48.0
-        version: 1.48.0(react@19.2.8)
-    devDependencies:
-      '@eslint/js':
-        specifier: ^10
-        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
-      '@types/node':
-        specifier: ^24
-        version: 24.13.3
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      eslint:
-        specifier: ^10
-        version: 10.10.0(jiti@2.7.0)
       globals:
         specifier: ^17
         version: 17.12.0

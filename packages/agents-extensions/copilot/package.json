@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/plugin-codex",
+  "name": "@workspace/agent-copilot",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -9,14 +9,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@lobehub/icons": "^5.23.0",
     "@workspace/extensions": "workspace:*",
-    "@workspace/plugin-mcp": "workspace:*",
-    "lucide-react": "^1.48.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10",
     "@types/node": "^24",
-    "@workspace/core": "workspace:*",
+    "@types/react": "^19",
     "eslint": "^10",
     "globals": "^17",
     "typescript": "~6",

@@ -9,12 +9,15 @@
  * carries the registry and the toolkit — which is what lets this plugin work
  * exactly like one downloaded from GitHub.
  */
-import { SquareTerminalIcon } from "lucide-react"
+import Codex from "@lobehub/icons/es/Codex"
 
-import type { ExtensionDefinition } from "@workspace/extensions"
+import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
 
 import { codexMessages } from "./messages.ts"
 import { createCodexMcp } from "./provider.ts"
+
+/** The brand mark in its own colours. */
+const CodexIcon: ExtensionIcon = Codex.Color
 
 /** Codex: one instructions file plus a TOML config for MCP. */
 export const codexExtension: ExtensionDefinition = {
@@ -26,7 +29,7 @@ export const codexExtension: ExtensionDefinition = {
     kind: "code",
     category: "integration",
     description: "Deliver skills, memory and MCP servers to Codex.",
-    icon: SquareTerminalIcon,
+    icon: CodexIcon,
     defaultEnabled: true,
     permissions: ["assets.read", "filesystem"],
   },
@@ -42,7 +45,7 @@ export const codexExtension: ExtensionDefinition = {
     scope.contribute("target", {
       id: "hub.target.codex",
       displayName: "Codex",
-      icon: SquareTerminalIcon,
+      icon: CodexIcon,
       supports: ["skill", "mcp", "memory"],
       locations: [
         { label: "Instructions", path: "~/.codex/AGENTS.md" },
