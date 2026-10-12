@@ -286,7 +286,7 @@ export const messages: Record<string, string> = {
   "mcp.bulk.installTo": "安装到",
   "mcp.action.testConnection": "测试连接",
   "mcp.action.connecting": "正在测试…",
-  "mcp.action.enabled": "启用状态",
+  "mcp.action.enabled": "状态",
   "mcp.action.enable": "启用",
   "mcp.action.disable": "停用",
   "mcp.action.installTo": "安装到",
