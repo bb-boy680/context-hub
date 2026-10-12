@@ -1,17 +1,21 @@
 /**
  * The probe cache: what each server answered the last time it was probed, kept
- * under `<home>/mcp/cache.json` so a scan probes only what the cache cannot
- * answer. It is derived data — deleting the file costs one round of probes and
- * nothing else — so a document this build cannot read is dropped and rebuilt,
- * never repaired.
+ * under `<home>/mcp/cache.json` so a scan probes only the servers the cache
+ * cannot answer for. It is derived data — deleting the file costs one round of
+ * probes and nothing else — so a document this build cannot read is dropped and
+ * rebuilt, never repaired.
  *
- * The fingerprint is what "already known" means: a declaration, a scope or a
- * working directory that changed is a miss and is probed again; an edited
- * comment in a client's file is not. The host is the only writer, every write
- * prunes names the catalog no longer holds, and writes go through one queue so
- * probes running side by side cannot lose each other's answers.
+ * A name is what "already known" means: a server the cache holds an answer for
+ * is one the page shows that answer for, whatever its declaration now says. A
+ * declaration, a scope or a working directory that changed is not a reason to
+ * probe again — the person asks for the next probe, and until then the answer
+ * they have is the answer they see. Only a name with no answer at all, or one
+ * an older probe wrote, is probed on its own.
+ *
+ * The host is the only writer, every write prunes names the catalog no longer
+ * holds, and writes go through one queue so probes running side by side cannot
+ * lose each other's answers.
  */
-import { createHash } from "node:crypto"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
@@ -38,31 +42,21 @@ import type {
 export const PROBE_VERSION = 4
 
 /** The document's own format version. */
-const CACHE_VERSION = 1
+const CACHE_VERSION = 2
 
 /** Directory under the hub home the module's files live in. */
 export const MCP_DIR = "mcp"
 
-/** One server as the cache is asked about it. */
-export interface McpProbeTarget extends McpProbeSubject {
-  name: string
-}
-
-/**
- * The part of a target that decides whether an answer still applies. The name
- * is a cache key, not a fact about the server, so it stays out of it.
- */
+/** The server an answer describes: the declaration it was probed against, and the scope it was declared in. */
 export interface McpProbeSubject {
   declaration: McpDeclaration
   scope: AssetScope
-  /** The directory a stdio server would start in; part of what makes two declarations the same one. */
-  cwd: string | null
 }
 
 /** The cache, as the route uses it. */
 export interface McpProbeCache {
-  /** For each target: its answer, or null when the cache holds none that applies. */
-  compare(targets: readonly McpProbeTarget[]): Promise<Record<string, McpCacheEntry | null>>
+  /** For each name: its answer, or null when the cache holds none this build can use. */
+  compare(names: readonly string[]): Promise<Record<string, McpCacheEntry | null>>
   /** Keep one answer, dropping every stored name that is not in `names`. */
   record(name: string, entry: McpCacheEntry, names: readonly string[]): Promise<void>
   /** Where the document lives, for a person reading the host's files. */
@@ -70,23 +64,7 @@ export interface McpProbeCache {
 }
 
 /**
- * What makes one answer apply to one server: its declaration, the scope it is
- * declared in, and the directory a stdio server would start in.
- *
- * @param subject — the server as the catalog currently describes it.
- * @returns a digest a person could compare, prefixed with its algorithm.
- */
-export function fingerprintOf(subject: McpProbeSubject): string {
-  const text = canonical({
-    cwd: subject.cwd,
-    declaration: subject.declaration,
-    scope: subject.scope,
-  })
-  return `sha256:${createHash("sha256").update(text).digest("hex")}`
-}
-
-/**
- * The entry one report becomes, fingerprinted against the server it answered.
+ * The entry one report becomes, with the server it answered recorded beside it.
  *
  * @param subject — the server the probe ran for.
  * @param report — what the probe answered.
@@ -100,7 +78,6 @@ export function cacheEntryOf(
   return {
     ...report,
     probe: PROBE_VERSION,
-    fingerprint: fingerprintOf(subject),
     target: declarationLine(subject.declaration),
     scope: subject.scope,
     at,
@@ -139,16 +116,13 @@ export function createProbeCache(options: { home?: string } = {}): McpProbeCache
   return {
     root,
 
-    async compare(targets) {
+    async compare(names) {
       const known = await read()
       const answers: Record<string, McpCacheEntry | null> = {}
-      for (const target of targets) {
-        const entry = known[target.name]
-        const applies =
-          entry !== undefined &&
-          entry.probe === PROBE_VERSION &&
-          entry.fingerprint === fingerprintOf(target)
-        answers[target.name] = applies ? entry : null
+      for (const name of names) {
+        const entry = known[name]
+        const usable = entry !== undefined && entry.probe === PROBE_VERSION
+        answers[name] = usable ? entry : null
       }
       return answers
     },
@@ -189,7 +163,6 @@ export function entryOf(value: unknown): McpCacheEntry | null {
   if (typeof value !== "object" || value === null) return null
   const held = value as Record<string, unknown>
   if (typeof held.probe !== "number") return null
-  if (typeof held.fingerprint !== "string" || held.fingerprint === "") return null
   if (typeof held.target !== "string") return null
   if (held.scope !== "workspace" && held.scope !== "global") return null
   if (typeof held.at !== "number" || typeof held.ms !== "number") return null
@@ -204,7 +177,6 @@ export function entryOf(value: unknown): McpCacheEntry | null {
     ms: held.ms,
     at: held.at,
     probe: held.probe,
-    fingerprint: held.fingerprint,
     target: held.target,
     scope: held.scope,
     ...(typeof held.protocolVersion === "string" ? { protocolVersion: held.protocolVersion } : {}),
@@ -305,16 +277,4 @@ function readParams(value: unknown): Record<string, string> | undefined {
     if (typeof held === "string") params[key] = held
   }
   return Object.keys(params).length === 0 ? undefined : params
-}
-
-/** One value as text with its keys in one order, so a digest cannot drift with key order. */
-function canonical(value: unknown): string {
-  if (Array.isArray(value)) return `[${value.map((item) => canonical(item)).join(",")}]`
-  if (typeof value === "object" && value !== null) {
-    const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) =>
-      left.localeCompare(right)
-    )
-    return `{${entries.map(([key, held]) => `${JSON.stringify(key)}:${canonical(held)}`).join(",")}}`
-  }
-  return JSON.stringify(value) ?? "null"
 }

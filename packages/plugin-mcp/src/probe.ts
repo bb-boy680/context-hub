@@ -83,12 +83,10 @@ export interface McpProbeReport {
   stderr?: string
 }
 
-/** One probe's answer as it is kept: the report plus what says it still applies. */
+/** One probe's answer as it is kept: the report plus what says it belongs to. */
 export interface McpCacheEntry extends McpProbeReport {
   /** The probe implementation's version, raised when a probe collects more. */
   probe: number
-  /** What the answer belongs to: declaration, scope and working directory. */
-  fingerprint: string
   /** The declaration as one line, for a person reading the cache. */
   target: string
   scope: AssetScope
@@ -96,7 +94,7 @@ export interface McpCacheEntry extends McpProbeReport {
   at: number
 }
 
-/** One server as the cache is asked about it. */
+/** One server as a probe is asked to run it. */
 export interface McpProbeQuery {
   name: string
   declaration: McpDeclaration
@@ -119,15 +117,15 @@ export interface McpProbeRequest {
 
 /** What the browser calls. */
 export interface McpProbePort {
-  /** For each server: its answer, or null when the cache has none that applies. */
-  cache(servers: readonly McpProbeQuery[]): Promise<Record<string, McpCacheEntry | null>>
+  /** For each name: its answer, or null when the cache holds none this build can use. */
+  cache(names: readonly string[]): Promise<Record<string, McpCacheEntry | null>>
   /** Run one probe now. */
   probe(request: McpProbeRequest): Promise<McpCacheEntry>
 }
 
 /** One call as the route reads it off a request body. */
 export type McpCall =
-  | { action: "cache"; servers: McpProbeQuery[] }
+  | { action: "cache"; names: string[] }
   | ({ action: "probe" } & McpProbeRequest)
   | { action: "records" }
   | { action: "save-records"; records: unknown[] }
@@ -146,13 +144,12 @@ export function readMcpCall(body: unknown): McpCall {
   if (typeof body !== "object" || body === null) throw new Error("a call is an object")
   const held = body as {
     action?: unknown
-    servers?: unknown
+    names?: unknown
     name?: unknown
     declaration?: unknown
     scope?: unknown
     timeoutMs?: unknown
     save?: unknown
-    names?: unknown
     records?: unknown
   }
   if (held.action === "records") return { action: "records" }
@@ -161,8 +158,11 @@ export function readMcpCall(body: unknown): McpCall {
     return { action: "save-records", records: held.records }
   }
   if (held.action === "cache") {
-    if (!Array.isArray(held.servers)) throw new Error("a cache call carries its servers")
-    return { action: "cache", servers: held.servers.map(readQuery) }
+    if (!Array.isArray(held.names)) throw new Error("a cache call carries its names")
+    return {
+      action: "cache",
+      names: held.names.filter((name): name is string => typeof name === "string" && name !== ""),
+    }
   }
   if (held.action === "probe") {
     const declaration = readWireDeclaration(held.declaration)
@@ -215,8 +215,8 @@ export async function callMcp(body: unknown): Promise<unknown> {
  */
 export function createRemoteProbe(): McpProbePort {
   return {
-    async cache(servers) {
-      const answer = (await callMcp({ action: "cache", servers })) as {
+    async cache(names) {
+      const answer = (await callMcp({ action: "cache", names })) as {
         entries?: Record<string, McpCacheEntry | null>
       }
       return answer.entries ?? {}
@@ -228,14 +228,6 @@ export function createRemoteProbe(): McpProbePort {
       return answer.entry
     },
   }
-}
-
-/** One query as the wire carries it. */
-function readQuery(value: unknown): McpProbeQuery {
-  if (typeof value !== "object" || value === null) throw new Error("a query is an object")
-  const held = value as { name?: unknown; declaration?: unknown; scope?: unknown }
-  if (typeof held.name !== "string" || held.name === "") throw new Error("a query needs a name")
-  return { name: held.name, declaration: readWireDeclaration(held.declaration), scope: readScope(held.scope) }
 }
 
 /** A declaration as the wire carries it, checked field by field. */

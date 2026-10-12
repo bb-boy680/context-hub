@@ -368,7 +368,21 @@ export function McpServersPage() {
   )
 
   const declarations = servers.reduce((sum, server) => sum + server.installed, 0)
-  const age = ageText(catalog?.scannedAt ?? null, t)
+  /* A check's own time is what its line says; a server nothing has checked yet
+     has only the scan that read its file, which is the fallback both the card
+     and the detail panel use. */
+  const checkedAge = React.useCallback(
+    (server: McpServer) => ageText(server.check?.at ?? catalog?.scannedAt ?? null, t),
+    [catalog, t]
+  )
+  /* The footer speaks for the list, so its time is the newest check any of its
+     rows carries; a list nothing has checked falls back to the scan. */
+  const age = ageText(
+    servers.reduce((newest, server) => Math.max(newest, server.check?.at ?? 0), 0) ||
+      catalog?.scannedAt ||
+      null,
+    t
+  )
   const open = servers.find((server) => server.id === openId) ?? null
 
   const run = React.useCallback((action: () => Promise<void>) => {
@@ -474,7 +488,7 @@ export function McpServersPage() {
               onView={setView}
               onAdd={() => setAdding(true)}
               onCheck={library.refresh}
-              checking={library.busy}
+              checking={library.testing.length > 0}
             />
           </div>
 
@@ -551,7 +565,7 @@ export function McpServersPage() {
         ) : (
           <ServerCardView
             servers={rows}
-            age={age}
+            age={checkedAge}
             onOpen={(server) => setOpenId(server.id)}
             rowActions={rowActions}
           />
@@ -564,7 +578,7 @@ export function McpServersPage() {
           places={places}
           tagSuggestions={serverTags}
           tools={open.detail.tools}
-          age={ageText(open.check?.at ?? catalog?.scannedAt ?? null, t)}
+          age={checkedAge(open)}
           busy={library.busy}
           onClose={() => setOpenId(null)}
           onTogglePlace={(place) => rowActions(open).onTogglePlace(place)}

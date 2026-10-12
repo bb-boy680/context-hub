@@ -81,7 +81,7 @@ function ServerCard({
   server: McpServer
   /** The type the card prints, which is the record's first one. */
   tag?: string
-  /** How long ago the scan ran, as the card's own line says it. */
+  /** How long ago this server was checked, which is what its check block says. */
   age: string
   actions: ServerActions
   onOpen: () => void
@@ -199,8 +199,8 @@ export function ServerCardView({
   rowActions,
 }: {
   servers: McpServer[]
-  /** How long ago the scan ran, which every card prints. */
-  age: string
+  /** How long ago a server was checked, as its own card's line says it. */
+  age: (server: McpServer) => string
   onOpen: (server: McpServer) => void
   rowActions: (server: McpServer) => ServerActions
 }) {
@@ -213,7 +213,7 @@ export function ServerCardView({
             key={server.id}
             server={server}
             tag={server.tag === "" ? undefined : server.tag}
-            age={age}
+            age={age(server)}
             actions={actions}
             onOpen={() => onOpen(server)}
           />

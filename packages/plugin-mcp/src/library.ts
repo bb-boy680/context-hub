@@ -230,10 +230,10 @@ export function useMcpLibrary(): McpLibrary {
 
   /**
    * Probe the servers one scan found. With `force` false the cache answers
-   * first and only the misses run; with it true every server runs again, which
-   * is what a manual check means. Each answer lands on its own row as it
-   * arrives, three probes at a time, so a server that takes seconds to wake up
-   * never holds up the ones beside it.
+   * first and only the servers it holds no answer for run; with it true every
+   * server runs again, which is what a manual check means. Each answer lands on
+   * its own row as it arrives, three probes at a time, so a server that takes
+   * seconds to wake up never holds up the ones beside it.
    */
   const probeAll = React.useCallback(
     async (
@@ -254,7 +254,7 @@ export function useMcpLibrary(): McpLibrary {
       let known: Readonly<Record<string, McpCacheEntry | null>> | null = null
       if (!force) {
         try {
-          known = await port.cache(targets)
+          known = await port.cache(names)
         } catch (error) {
           setFailure(failureText(t, mcpFailure(error, "mcp.error.probe")))
           return
@@ -263,6 +263,9 @@ export function useMcpLibrary(): McpLibrary {
         setChecks({ ...known })
       }
 
+      /* A cached answer is the answer: a server the cache holds one for waits
+         for a person, however its declaration, scope or workspace has moved
+         since. Only a server with no answer at all is probed on its own. */
       const queue = targets.filter((target) => force || known?.[target.name] === null)
       const worker = async (): Promise<void> => {
         for (;;) {
@@ -294,8 +297,8 @@ export function useMcpLibrary(): McpLibrary {
 
   /**
    * Read every place's file through the provider that described it, then bring
-   * the probe cache up to date: a server whose answer no longer applies is
-   * probed once, and one the cache still answers for waits for a person.
+   * the probe cache up to date: a server the cache holds no answer for is
+   * probed once, and one it does answer for waits for a person.
    */
   const read = React.useCallback(
     async (force = false) => {

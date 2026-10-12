@@ -1,7 +1,8 @@
 /**
  * Behaviour check for probing: the fixture stdio server the probe must read
- * correctly, the error vocabulary it must classify, the fingerprint's hit and
- * miss rules, and the cache's prune and read-back rules.
+ * correctly, the error vocabulary it must classify, the cache's answer rules —
+ * what a name it holds an answer for gets back, and what misses — plus the
+ * cache's prune and read-back rules.
  *
  * The probe runs real processes and hits a real (closed) port, so this is an
  * end-to-end check of the module and not of a stub.
@@ -14,7 +15,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import type { McpDeclaration } from "../src/declaration.ts"
-import { PROBE_VERSION, cacheEntryOf, createProbeCache, fingerprintOf } from "../src/host/cache.ts"
+import { PROBE_VERSION, cacheEntryOf, createProbeCache } from "../src/host/cache.ts"
 import { probeDeclaration } from "../src/host/probe.ts"
 import { createRecordStore } from "../src/host/records.ts"
 import { readMcpCall } from "../src/probe.ts"
@@ -154,62 +155,47 @@ async function main(): Promise<void> {
     offline.error
   )
 
-  console.log("the fingerprint")
-
-  const target = { name: "fixture", declaration: stdio(), scope: "workspace" as const, cwd: null }
-  check("the same server fingerprints the same", fingerprintOf(target) === fingerprintOf({ ...target }))
-  check(
-    "a changed argument changes it",
-    fingerprintOf(target) !== fingerprintOf({ ...target, declaration: stdio({}, [FIXTURE, "--x"]) })
-  )
-  check("a changed working directory changes it", fingerprintOf(target) !== fingerprintOf({ ...target, cwd: "D:/ws" }))
-  check("another scope changes it", fingerprintOf(target) !== fingerprintOf({ ...target, scope: "global" }))
-  const orderA: McpDeclaration = { transport: "stdio", command: "c", args: [], env: { A: "1", B: "2" } }
-  const orderB: McpDeclaration = { transport: "stdio", command: "c", args: [], env: { B: "2", A: "1" } }
-  check(
-    "key order does not change it",
-    fingerprintOf({ ...target, declaration: orderA }) === fingerprintOf({ ...target, declaration: orderB })
-  )
-
   console.log("the cache")
 
+  const target = { name: "fixture", declaration: stdio(), scope: "workspace" as const }
   const home = await mkdtemp(path.join(os.tmpdir(), "hub-mcp-cache-"))
   try {
     const cache = createProbeCache({ home })
     const entry = cacheEntryOf(target, report, 1234)
     await cache.record("fixture", entry, ["fixture"])
-    check("a recorded answer comes back", (await cache.compare([target])).fixture?.at === 1234)
-    check("and carries the probe version", (await cache.compare([target])).fixture?.probe === PROBE_VERSION)
-    check(
-      "another declaration misses",
-      (await cache.compare([{ ...target, declaration: stdio({}, [FIXTURE, "--x"]) }])).fixture === null
-    )
-    check("another scope misses", (await cache.compare([{ ...target, scope: "global" }])).fixture === null)
-    check("an unknown name misses", (await cache.compare([{ ...target, name: "other" }])).other === null)
+    check("a recorded answer comes back", (await cache.compare(["fixture"])).fixture?.at === 1234)
+    check("and carries the probe version", (await cache.compare(["fixture"])).fixture?.probe === PROBE_VERSION)
+    /* A name is what an answer is asked for by: the declaration, the scope and
+       the workspace it was probed in are not consulted, so a server whose
+       files moved since keeps the answer it has until a person checks again. */
+    check("a name with no answer misses", (await cache.compare(["other"])).other === null)
 
     const file = path.join(cache.root, "cache.json")
     const document = JSON.parse(await readFile(file, "utf8")) as {
       version: number
       servers: Record<string, unknown>
     }
-    check("the document is versioned", document.version === 1)
+    check("the document is versioned", document.version === 2)
     check("and holds the fixture", "fixture" in document.servers)
 
-    const stray = cacheEntryOf({ ...target, name: "stray" }, report, 99)
+    const stray = cacheEntryOf({ declaration: stdio(), scope: "global" }, report, 99)
     await cache.record("stray", stray, ["fixture", "stray"])
-    check(
-      "a second name is kept while it is listed",
-      (await cache.compare([{ ...target, name: "stray" }])).stray?.at === 99
-    )
+    check("a second name is kept while it is listed", (await cache.compare(["stray"])).stray?.at === 99)
     await cache.record("fixture", entry, ["fixture"])
-    check("an unlisted name is pruned", (await cache.compare([{ ...target, name: "stray" }])).stray === null)
+    check("an unlisted name is pruned", (await cache.compare(["stray"])).stray === null)
 
+    await writeFile(
+      file,
+      JSON.stringify({ version: 2, servers: { fixture: { ...entry, probe: PROBE_VERSION - 1 } } }),
+      "utf8"
+    )
+    check("an answer an older probe wrote misses", (await cache.compare(["fixture"])).fixture === null)
     await writeFile(file, "{ not json", "utf8")
-    check("a document this build cannot read is dropped", (await cache.compare([target])).fixture === null)
-    await writeFile(file, JSON.stringify({ version: 1, servers: { fixture: { probe: "x" } } }), "utf8")
-    check("an entry of the wrong shape is dropped", (await cache.compare([target])).fixture === null)
-    await writeFile(file, JSON.stringify({ version: 1, servers: { fixture: entry } }), "utf8")
-    check("an entry of the right shape reads back", (await cache.compare([target])).fixture?.at === 1234)
+    check("a document this build cannot read is dropped", (await cache.compare(["fixture"])).fixture === null)
+    await writeFile(file, JSON.stringify({ version: 2, servers: { fixture: { probe: "x" } } }), "utf8")
+    check("an entry of the wrong shape is dropped", (await cache.compare(["fixture"])).fixture === null)
+    await writeFile(file, JSON.stringify({ version: 2, servers: { fixture: entry } }), "utf8")
+    check("an entry of the right shape reads back", (await cache.compare(["fixture"])).fixture?.at === 1234)
   } finally {
     await rm(home, { recursive: true, force: true })
   }
@@ -287,10 +273,7 @@ async function main(): Promise<void> {
 
   check(
     "a cache call reads",
-    readMcpCall({
-      action: "cache",
-      servers: [{ name: "x", declaration: { transport: "stdio", command: "c" }, scope: "global" }],
-    }).action === "cache"
+    readMcpCall({ action: "cache", names: ["github"] }).action === "cache"
   )
   check(
     "a probe call reads",
@@ -314,14 +297,12 @@ async function main(): Promise<void> {
     "a stdio declaration without a command is refused",
     throws(() => readMcpCall({ action: "probe", declaration: { transport: "stdio" }, scope: "global" }))
   )
+  check("a cache call without names is refused", throws(() => readMcpCall({ action: "cache" })))
   check(
-    "a query without a name is refused",
-    throws(() =>
-      readMcpCall({
-        action: "cache",
-        servers: [{ declaration: { transport: "stdio", command: "c" }, scope: "global" }],
-      })
-    )
+    "and the names it does carry are the ones kept",
+    JSON.stringify(
+      (readMcpCall({ action: "cache", names: ["github", 7, ""] }) as { names: string[] }).names
+    ) === '["github"]'
   )
 
   console.log(`\n${checked - failures}/${checked} checks passed`)

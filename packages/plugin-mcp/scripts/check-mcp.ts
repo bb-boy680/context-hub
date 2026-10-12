@@ -210,7 +210,6 @@ async function main(): Promise<void> {
       ms: 1,
       at: 1,
       probe: 1,
-      fingerprint: "sha256:x",
       target: "npx",
       scope: "workspace",
       ...fields,

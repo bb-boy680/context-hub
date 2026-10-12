@@ -13,9 +13,6 @@ import { hostFolder } from "@workspace/core/host/fs-browse"
 import { resolveHubHome } from "@workspace/core/host/home"
 import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
 
-import type { AssetScope } from "@workspace/core/place-files"
-
-import type { McpDeclaration } from "./src/declaration.ts"
 import { cacheEntryOf, createProbeCache } from "./src/host/cache.ts"
 import { probeDeclaration } from "./src/host/probe.ts"
 import { createRecordStore } from "./src/host/records.ts"
@@ -98,25 +95,24 @@ export function mcpProbe(options: { home?: string } = {}) {
               return
             }
 
-            const cwd = await startFolder()
-            const subjectOf = (query: { declaration: McpDeclaration; scope: AssetScope }) => ({
-              declaration: query.declaration,
-              scope: query.scope,
-              cwd,
-            })
-
             if (call.action === "cache") {
-              const targets = call.servers.map((query) => ({ name: query.name, ...subjectOf(query) }))
-              sendJson(response, 200, { entries: await cache.compare(targets) })
+              /* An answer is asked for by name; nothing else decides whether it is there. */
+              sendJson(response, 200, { entries: await cache.compare(call.names) })
               return
             }
 
+            /* The folder a stdio server starts in is what a probe itself needs. */
+            const cwd = await startFolder()
             const report = await probeDeclaration({
               declaration: call.declaration,
               cwd,
               ...(call.timeoutMs === undefined ? {} : { timeoutMs: call.timeoutMs }),
             })
-            const entry = cacheEntryOf(subjectOf(call), report, Date.now())
+            const entry = cacheEntryOf(
+              { declaration: call.declaration, scope: call.scope },
+              report,
+              Date.now()
+            )
             /* A tryout from the add dialog carries no name and leaves no trace. */
             if (call.save !== false && call.name !== undefined) {
               await cache.record(call.name, entry, call.names ?? [call.name])
