@@ -72,6 +72,11 @@ export interface McpLibrary {
   catalog: McpCatalog | null
   /** Every client file an enabled extension described. */
   places: McpAgentPlace[]
+  /**
+   * The hub's own records file, as a person reads it; empty while this form
+   * cannot reach a host, which is the only source that knows it.
+   */
+  recordsFile: string
   /** Servers whose probe is running right now. */
   testing: readonly string[]
   /** Scan every file again and rebuild the rows. */
@@ -85,6 +90,12 @@ export interface McpLibrary {
   testDraft(declaration: McpDeclaration): Promise<McpProbeReport>
   /** Record a server; nothing is written into a client file yet. */
   create(draft: McpDraft): Promise<void>
+  /**
+   * Record the servers a client file declares and the hub does not hold, taken
+   * as the files stand. It writes one document for the whole batch, so a menu
+   * that adds several never leaves the file half updated.
+   */
+  adopt(ids: readonly string[]): Promise<void>
   /** Rewrite one server's record, carrying its declarations along when it is renamed. */
   update(id: string, patch: McpPatch): Promise<void>
   /** Drop one server's record; the declarations client files hold stay where they are. */
@@ -165,6 +176,9 @@ export function useMcpLibrary(): McpLibrary {
      answer for is null until its own probe lands. */
   const [checks, setChecks] = React.useState<Record<string, McpCacheEntry | null>>({})
   const [testing, setTesting] = React.useState<readonly string[]>([])
+  /* Where the hub's own records live, as the host names it; empty until a read
+     answers, which is the only place the page is told. */
+  const [recordsFile, setRecordsFile] = React.useState("")
   const [canProbe, setCanProbe] = React.useState(false)
   const [busy, setBusy] = React.useState(files !== null)
   const [failure, setFailure] = React.useState<string | null>(null)
@@ -177,7 +191,9 @@ export function useMcpLibrary(): McpLibrary {
   /** Read the records file once, naming its failure as the store's own. */
   const loadRecords = React.useCallback(async (): Promise<McpRecord[]> => {
     try {
-      return readRecords(await store.read())
+      const answer = await store.read()
+      if (answer.file !== "") setRecordsFile(answer.file)
+      return readRecords(answer.document)
     } catch (error) {
       throw new McpError(
         "mcp.error.records",
@@ -358,13 +374,24 @@ export function useMcpLibrary(): McpLibrary {
     )
   }, [scan, records, service, revision, iconFor, t, checks])
 
-  /** Write the records file, then show the rows as the file now holds them. */
-  const keep = React.useCallback(
-    async (next: McpRecord[]) => {
+  /**
+   * Change the records file, starting from what it holds right now, then show
+   * the rows it holds after the change.
+   *
+   * The document is read again rather than taken from this page's copy: another
+   * window writes the same file, and a change built from a copy that missed
+   * that write would drop what it never saw. Reading inside the write queue is
+   * what keeps the read and the write one step.
+   */
+  const edit = React.useCallback(
+    async (change: (current: McpRecord[]) => McpRecord[]): Promise<void> => {
+      const current = await loadRecords()
+      const next = change(current)
+      if (next === current) return
       await store.save(next.map(documentOf))
       setRecords(next)
     },
-    [store]
+    [loadRecords, store]
   )
 
   /** One row of the catalog, or a failure naming the server that is not there. */
@@ -413,6 +440,7 @@ export function useMcpLibrary(): McpLibrary {
     failure,
     catalog,
     places,
+    recordsFile,
     testing,
 
     async refresh() {
@@ -451,34 +479,60 @@ export function useMcpLibrary(): McpLibrary {
     },
 
     async create(draft) {
+      if (declarationOf(draft.declaration) === null) throw new McpError("mcp.error.incomplete")
       await run(async () => {
-        if (records.some((record) => record.name === draft.name)) {
-          throw new McpError("mcp.error.duplicate", { name: draft.name })
-        }
-        if (declarationOf(draft.declaration) === null) throw new McpError("mcp.error.incomplete")
-        await keep(
-          upsert(records, {
+        await edit((current) => {
+          if (current.some((record) => record.name === draft.name)) {
+            throw new McpError("mcp.error.duplicate", { name: draft.name })
+          }
+          return upsert(current, {
             name: draft.name,
             declaration: draft.declaration,
             description: draft.description ?? "",
             tags: draft.tags ?? [],
           })
-        )
+        })
+      })
+    },
+
+    async adopt(ids) {
+      await run(async () => {
+        let refused = 0
+        let added = 0
+        await edit((current) => {
+          let next = current
+          for (const id of ids) {
+            if (next.some((record) => record.name === id)) continue
+            const declaration = rowOf(id).detail.declaration
+            if (declaration === null) {
+              refused += 1
+              continue
+            }
+            /* The declaration is taken as the file wrote it, and the sentence
+               the server publishes is left where it is: a record's own
+               description is a person's words, not the server's. */
+            next = upsert(next, { name: id, declaration, description: "", tags: [] })
+            added += 1
+          }
+          return next
+        })
+        /* Nothing was taken in and something could not be read, so the person
+           is told why rather than left with a button that appears to do nothing. */
+        if (added === 0 && refused > 0) throw new McpError("mcp.error.incomplete")
       })
     },
 
     async update(id, patch) {
+      const held = records.find((record) => record.name === id)
+      const name = patch.name ?? id
+      const declaration = patch.declaration ?? held?.declaration ?? rowOf(id).detail.declaration
+      if (declaration === null || declarationOf(declaration) === null) {
+        throw new McpError("mcp.error.incomplete")
+      }
+      if (name !== id && records.some((record) => record.name === name)) {
+        throw new McpError("mcp.error.duplicate", { name })
+      }
       await run(async () => {
-        const held = records.find((record) => record.name === id)
-        const name = patch.name ?? id
-        const declaration = patch.declaration ?? held?.declaration ?? rowOf(id).detail.declaration
-        if (declaration === null || declarationOf(declaration) === null) {
-          throw new McpError("mcp.error.incomplete")
-        }
-        if (name !== id && records.some((record) => record.name === name)) {
-          throw new McpError("mcp.error.duplicate", { name })
-        }
-
         /* Rewriting the declaration is what a save means: it reaches every file
            that already holds this server, and a rename moves the key with it so
            no client is left pointing at a name the hub no longer uses. */
@@ -488,9 +542,12 @@ export function useMcpLibrary(): McpLibrary {
           await found.provider.install(io, install.place, name, declaration)
         }
 
-        await keep(
-          upsert(
-            records.filter((record) => record.name !== id),
+        await edit((current) => {
+          if (name !== id && current.some((record) => record.name === name)) {
+            throw new McpError("mcp.error.duplicate", { name })
+          }
+          return upsert(
+            current.filter((record) => record.name !== id),
             {
               name,
               declaration,
@@ -498,16 +555,18 @@ export function useMcpLibrary(): McpLibrary {
               tags: patch.tags ?? held?.tags ?? [],
             }
           )
-        )
+        })
       })
     },
 
     async remove(id) {
       await run(async () => {
-        if (!records.some((record) => record.name === id)) {
-          throw new McpError("mcp.error.noRecord", { name: id })
-        }
-        await keep(records.filter((record) => record.name !== id))
+        await edit((current) => {
+          if (!current.some((record) => record.name === id)) {
+            throw new McpError("mcp.error.noRecord", { name: id })
+          }
+          return current.filter((record) => record.name !== id)
+        })
       })
     },
 

@@ -122,10 +122,17 @@ export function upsert(records: readonly McpRecord[], next: McpRecord): McpRecor
   return [...records.filter((record) => record.name !== next.name), next]
 }
 
+/** What the hub's own records file answers with. */
+export interface McpRecordsAnswer {
+  /** The stored document, or null when there is no file yet; the caller validates it. */
+  document: unknown
+  /** The file as a person reads it, which the library's own place names. */
+  file: string
+}
+
 /** What the page calls to read and write the records file. */
 export interface McpRecordsPort {
-  /** The stored document, or null when there is no file yet; the caller validates it. */
-  read(): Promise<unknown>
+  read(): Promise<McpRecordsAnswer>
   /** Replace the file with these records. */
   save(document: readonly McpRecordDocument[]): Promise<void>
 }
@@ -134,8 +141,11 @@ export interface McpRecordsPort {
 export function createRemoteRecords(): McpRecordsPort {
   return {
     async read() {
-      const answer = (await callMcp({ action: "records" })) as { value?: unknown }
-      return answer.value ?? null
+      const answer = (await callMcp({ action: "records" })) as { value?: unknown; file?: unknown }
+      return {
+        document: answer.value ?? null,
+        file: typeof answer.file === "string" ? answer.file : "",
+      }
     },
     async save(document) {
       await callMcp({ action: "save-records", records: document })

@@ -86,7 +86,7 @@ export function mcpProbe(options: { home?: string } = {}) {
             const call = readMcpCall(body)
 
             if (call.action === "records") {
-              sendJson(response, 200, { value: await records.read() })
+              sendJson(response, 200, { value: await records.read(), file: records.file })
               return
             }
             if (call.action === "save-records") {

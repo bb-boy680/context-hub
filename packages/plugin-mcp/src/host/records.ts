@@ -15,7 +15,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 
 import { writeFileAtomic } from "@workspace/core/host/atomic"
-import { resolveHubHome } from "@workspace/core/host/home"
+import { displayPath, resolveHubHome } from "@workspace/core/host/home"
 
 import type { McpRecordDocument } from "../records.ts"
 import { documentOf, recordsFromState } from "../records.ts"
@@ -31,6 +31,11 @@ const LEGACY_DIR = "state"
 export interface McpRecordStore {
   /** Where the document lives, for a person reading the host's files. */
   readonly root: string
+  /**
+   * The document itself, as a person reads it, with the home directory
+   * abbreviated. The page names this file as the library's own place.
+   */
+  readonly file: string
   /**
    * The stored document, or null when there is none.
    *
@@ -85,6 +90,7 @@ export function createRecordStore(options: { home?: string } = {}): McpRecordSto
 
   return {
     root,
+    file: displayPath(file),
 
     async read() {
       return run(async () => {
