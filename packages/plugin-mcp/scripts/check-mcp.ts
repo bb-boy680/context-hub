@@ -75,8 +75,8 @@ function provider(options: {
 }
 
 const PLACES: McpPlace[] = [
-  { id: "a-global", label: "A", scope: "global", file: ".a.json", order: 30 },
-  { id: "a-project", label: "A", scope: "workspace", file: ".a.json", order: 10 },
+  { id: "a-global", label: "A", scope: "global", file: ".a.json", order: 30, switchable: false },
+  { id: "a-project", label: "A", scope: "workspace", file: ".a.json", order: 10, switchable: true },
 ]
 
 const STDIO = { transport: "stdio", command: "npx", args: ["-y", "@x/github"], env: {} } as const
@@ -113,11 +113,7 @@ async function main(): Promise<void> {
   check("a place reads as a person would see it", places[0]?.place.path === "~/.a.json")
   check("a workspace place keeps its relative path", places[1]?.place.path === ".a.json")
   check("a client with no switch is marked as such", places[0]?.place.switchable === false)
-  check(
-    "one that has a switch is marked too",
-    placesOf([{ ...provider({ id: "c", places: PLACES, entries: {} }), async setEnabled() {} }], () => MARK)[0]?.place
-      .switchable === true
-  )
+  check("one that has a switch is marked too", places[1]?.place.switchable === true)
 
   console.log("scanning")
 

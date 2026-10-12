@@ -143,6 +143,7 @@ async function main(): Promise<void> {
         ?.manifest.icon
   )
   check("it offers no switch, because its client has none", provider?.setEnabled === undefined)
+  check("and its place says so", provider?.places[0]?.switchable === false)
   check("enabling it reported no failure", problems.length === 0, problems)
 
   console.log("what it can reach without importing")

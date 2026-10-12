@@ -49,8 +49,9 @@ const TABS: { id: DetailTab; key: string }[] = [
 /**
  * What one place's row offers beyond its name: whether the client connects this
  * server, and whether the hub writes the declaration into that client's file at
- * all. A client whose extension offers no way to record the first says so
- * instead of showing a control that would mean nothing.
+ * all. A place its extension declares unswitchable says so instead of showing a
+ * control that would mean nothing — one client can be switchable in a workspace
+ * and not machine-wide.
  */
 function PlaceControls({
   state,
@@ -68,9 +69,8 @@ function PlaceControls({
   return (
     <>
       {/* The switch means "this client connects it", so it only appears where
-          the client's own extension offers a way to record that and there is a
-          declaration to switch. A client that keeps the state itself says so
-          instead. */}
+          the place is declared switchable and there is a declaration to switch.
+          A place the client keeps the state for itself says so instead. */}
       {!place.switchable ? (
         <span className="flex h-5 w-[38px] shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] text-muted-foreground">
           {t("mcp.detail.place.self")}

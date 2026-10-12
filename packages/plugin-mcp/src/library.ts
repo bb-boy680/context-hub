@@ -495,8 +495,13 @@ export function useMcpLibrary(): McpLibrary {
     async setEnabled(id, place, enabled) {
       await run(async () => {
         const { found, io } = providerAt(place)
-        if (found.provider.setEnabled === undefined) throw new McpError("mcp.error.selfManaged")
-        await found.provider.setEnabled(io, place, id, enabled)
+        /* The place's own scope is what the switch is about: it is the root the
+           person was looking at when they flipped it. */
+        const { scope } = found.place
+        if (!found.place.switchable || found.provider.setEnabled === undefined) {
+          throw new McpError("mcp.error.selfManaged")
+        }
+        await found.provider.setEnabled(io, place, scope, id, enabled)
       })
     },
 

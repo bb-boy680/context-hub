@@ -10,8 +10,10 @@
  * there.
  *
  * The switch is a third thing again: a project's `disabledMcpServers` list in
- * the top-level document, keyed by the project's path. Both places write it,
- * because a project can disable a server either scope declared.
+ * the top-level document, keyed by the project's path. It belongs to a project
+ * rather than to a file, so a server declared in either place is disabled
+ * through the workspace place, and the machine-wide place declares no switch at
+ * all.
  */
 /* Types only, and they come from the MCP module because that module owns the
    contract a client file is written against. A type import is erased, so at run
@@ -121,8 +123,22 @@ export function createClaudeCodeMcp(tools: McpTools): McpProvider {
   return {
     id: CLAUDE_CODE_ID,
     places: [
-      { id: "claude-code-global", label: "Claude Code", order: 10, ...FILES.global },
-      { id: "claude-code", label: "Claude Code", order: 20, ...FILES.workspace },
+      /* Only a project's record holds the switch, so a server declared in the
+         machine-wide file is one the hub may not switch off. */
+      {
+        id: "claude-code-global",
+        label: "Claude Code",
+        order: 10,
+        switchable: false,
+        ...FILES.global,
+      },
+      {
+        id: "claude-code",
+        label: "Claude Code",
+        order: 20,
+        switchable: true,
+        ...FILES.workspace,
+      },
     ],
 
     async read(io, place) {
@@ -163,11 +179,14 @@ export function createClaudeCodeMcp(tools: McpTools): McpProvider {
       await write(io, file, editJson(text, [CLAUDE_CODE_MCP_KEY, name], undefined))
     },
 
-    async setEnabled(io, place, name, enabled) {
-      /* Both places share one list: a project disables a server, whichever
-         scope declared it, so the place id does not change where the switch
-         lands — naming one is still how a caller says which client it means. */
+    async setEnabled(io, place, scope, name, enabled) {
+      /* The list belongs to a project whichever place declared the server, so
+         the place id does not change where the switch lands — naming one is
+         still how a caller says which client it means. The scope does decide:
+         a project is what the workspace scope names, and a machine-wide one has
+         no record to write the switch into. */
       fileOf(place)
+      if (scope !== "workspace") throw new McpError("claudeCode.error.machineScope")
       const text = await read(io, STATE)
       const document = readJsonObject(text)
       const key = await existingProjectKey(io, document)

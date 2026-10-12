@@ -83,7 +83,7 @@ export function createCodexMcp(tools: McpTools): McpProvider {
 
   return {
     id: "hub.target.codex",
-    places: [{ id: "codex-global", label: "Codex", order: 20, ...FILE }],
+    places: [{ id: "codex-global", label: "Codex", order: 20, switchable: true, ...FILE }],
 
     async read(io, place) {
       assertPlace(place)
@@ -112,7 +112,9 @@ export function createCodexMcp(tools: McpTools): McpProvider {
       await io.files.write(FILE, edit(() => clearTomlEntry(text, TABLE, name)))
     },
 
-    async setEnabled(io, place, name, enabled) {
+    /* Codex records the state on the entry itself rather than under a root, so
+       the scope the caller names does not change what is written. */
+    async setEnabled(io, place, _scope, name, enabled) {
       assertPlace(place)
       const text = await readFile(io)
       await io.files.write(FILE, edit(() => setTomlField(text, TABLE, name, ENABLED, enabled)))

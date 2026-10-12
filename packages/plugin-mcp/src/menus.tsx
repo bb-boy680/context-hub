@@ -114,12 +114,19 @@ export function InstallToMenu({
 }
 
 /**
- * The line under a client's name in the enabled menu: which scope and client
- * state the row is about, or the word of a client the hub may not speak for.
+ * The line under a client's name in the enabled menu: which scope the row is
+ * about and whether that scope connects the server, or the word of a place the
+ * hub may not speak for.
+ *
+ * A row is about a scope, not about a file: a client that declared the server
+ * outside this scope still connects it here, and this scope may switch that
+ * connection off.
  *
  * @param t — the active locale's lookup.
  * @param place — the client this row stands for.
- * @param held — what the hub recorded for this server in that place.
+ * @param held — what the client recorded for this server, counted across its
+ * places: one client can hold a declaration in one place and its switch in
+ * another.
  * @returns the row's second line.
  */
 function enabledNote(
@@ -133,7 +140,15 @@ function enabledNote(
     .replace("{state}", t(held?.enabled === true ? "mcp.place.on" : "mcp.place.off"))
 }
 
-/** Which clients will connect a server, and which the hub may not speak for. */
+/**
+ * Which clients will connect a server, and which of those the hub may not speak
+ * for.
+ *
+ * A client is listed once it holds the declaration somewhere, and then every
+ * place it declares appears — its workspace file and its machine-wide one — so
+ * the two switch states can be told apart. A client that never installed the
+ * server has nothing to switch and is left out.
+ */
 export function EnabledMenu({
   server,
   places,
@@ -148,6 +163,17 @@ export function EnabledMenu({
   const { t } = useI18n()
   const state = new Map(server.detail.installs.map((install) => [install.place, install]))
   const byId = new Map(places.map((place) => [place.id, place]))
+  /* A client holds one switch for one server, wherever its declaration sits, so
+     a place with no declaration of its own reads the state its client recorded
+     in the place that has one. */
+  const held = (place: McpAgentPlace): McpInstall | undefined =>
+    state.get(place.id) ??
+    server.detail.installs.find((install) => byId.get(install.place)?.client === place.client)
+  const installed = new Set(
+    server.detail.installs
+      .filter((install) => install.installed)
+      .map((install) => byId.get(install.place)?.client)
+  )
 
   return (
     <DropdownMenu>
@@ -170,6 +196,7 @@ export function EnabledMenu({
         words={{
           ...placeWords(t),
           count: (total) => t("mcp.menu.enabled.tally").replace("{count}", String(total)),
+          empty: t("mcp.menu.enabled.empty"),
         }}
         /* The tally is how many clients connect it, not how many rows the list
            holds, so it is the page's number rather than the list's. */
@@ -180,8 +207,8 @@ export function EnabledMenu({
         activation="control"
         trailing={(option) => {
           const place = byId.get(option.id)
-          /* A client whose extension offers no switch is the hub's business to
-             install for and nobody's to toggle: its row says so instead of
+          /* A place its extension declares unswitchable is the hub's business
+             to install for and nobody's to toggle: its row says so instead of
              showing a control that would not mean anything. */
           if (place === undefined || !place.switchable) {
             return (
@@ -192,7 +219,7 @@ export function EnabledMenu({
           }
           return (
             <Switch
-              checked={state.get(option.id)?.enabled === true}
+              checked={held(place)?.enabled === true}
               onCheckedChange={(next) => onSetPlaceEnabled(option.id, next)}
               aria-label={option.label}
               className="data-unchecked:bg-secondary"
@@ -202,12 +229,12 @@ export function EnabledMenu({
         groups={MCP_SCOPES.map((scope) => ({
           label: t(`mcp.detail.group.${scope}`),
           options: places
-            .filter((place) => place.scope === scope)
+            .filter((place) => place.scope === scope && installed.has(place.client))
             .map((place) => ({
               id: place.id,
               icon: place.icon,
               label: place.label,
-              note: enabledNote(t, place, state.get(place.id)),
+              note: enabledNote(t, place, held(place)),
             })),
         })).filter((group) => group.options.length > 0)}
       />

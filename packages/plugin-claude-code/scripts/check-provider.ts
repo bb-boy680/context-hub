@@ -112,6 +112,14 @@ async function main(): Promise<void> {
       claudeCodeMcpProvider.places[1]?.file === ".mcp.json"
   )
   check("the client can be switched off through it", claudeCodeMcpProvider.setEnabled !== undefined)
+  check(
+    "the switch belongs to the workspace place",
+    claudeCodeMcpProvider.places[1]?.switchable === true
+  )
+  check(
+    "and the machine-wide one declares none",
+    claudeCodeMcpProvider.places[0]?.switchable === false
+  )
 
   console.log("reads")
 
@@ -159,7 +167,7 @@ async function main(): Promise<void> {
 
   console.log("switching a project off")
 
-  await claudeCodeMcpProvider.setEnabled(io, WORKSPACE_PLACE, "shared", false)
+  await claudeCodeMcpProvider.setEnabled(io, WORKSPACE_PLACE, "workspace", "shared", false)
   const off = await bytesOf(globalFile)
   check("the name lands in the project's list", off.includes('"disabledMcpServers"') && off.includes('"shared"'))
   check("the declaration file is not touched", (await bytesOf(projectFile)) === installed)
@@ -168,16 +176,29 @@ async function main(): Promise<void> {
   const offProject = await claudeCodeMcpProvider.read(io, WORKSPACE_PLACE)
   check("the server reads back switched off", offProject[0]?.enabled === false, offProject)
 
-  await claudeCodeMcpProvider.setEnabled(io, WORKSPACE_PLACE, "shared", false)
+  await claudeCodeMcpProvider.setEnabled(io, WORKSPACE_PLACE, "workspace", "shared", false)
   check(
     "switching it off twice writes the same thing",
     (await bytesOf(globalFile)) === off
   )
 
-  await claudeCodeMcpProvider.setEnabled(io, WORKSPACE_PLACE, "shared", true)
+  await claudeCodeMcpProvider.setEnabled(io, WORKSPACE_PLACE, "workspace", "shared", true)
   const on = await bytesOf(globalFile)
   check("switching it back on takes the name out", !on.includes('"disabledMcpServers"'))
   check("the other project is still there", on.includes('"their-cli"'))
+
+  console.log("a machine-wide place")
+  /* The list is a project's, so a switch asked for under the machine-wide scope
+     has nowhere to land and must be refused rather than written somewhere. */
+  const machineWide = await refusalOf(() =>
+    claudeCodeMcpProvider.setEnabled?.(io, GLOBAL_PLACE, "global", "remote", false) ?? Promise.resolve()
+  )
+  check(
+    "the switch is refused",
+    (machineWide ?? "").includes("claudeCode.error.machineScope"),
+    machineWide
+  )
+  check("and nothing was written", (await bytesOf(globalFile)) === on)
 
   console.log("a project Claude Code never opened")
 
@@ -188,8 +209,13 @@ async function main(): Promise<void> {
   await fs.mkdir(fresh, { recursive: true })
   const loner = createFsPlaceFiles({ home: path.join(root, "other-hub"), folder: fresh, userHome })
   const refused = await refusalOf(() =>
-    claudeCodeMcpProvider.setEnabled?.({ files: loner, log: () => undefined }, WORKSPACE_PLACE, "shared", false) ??
-    Promise.resolve()
+    claudeCodeMcpProvider.setEnabled?.(
+      { files: loner, log: () => undefined },
+      WORKSPACE_PLACE,
+      "workspace",
+      "shared",
+      false
+    ) ?? Promise.resolve()
   )
   check("the switch is refused, not invented", (refused ?? "").includes("claudeCode.error.noProject"), refused)
   check(

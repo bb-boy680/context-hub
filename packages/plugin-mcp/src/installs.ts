@@ -48,6 +48,16 @@ export function isEnabled(server: McpServer): boolean {
   return server.detail.installs.some((install) => install.installed && install.enabled)
 }
 
+/**
+ * Whether any client holds this server's declaration at all.
+ *
+ * A server no file holds is not switched off — there is nothing to switch — so
+ * the row's off chip asks for both facts.
+ */
+export function isInstalled(server: McpServer): boolean {
+  return server.detail.installs.some((install) => install.installed)
+}
+
 /** How many clients hold the declaration and are set to connect, which a switch reads. */
 export function onCount(installs: readonly McpInstall[]): number {
   return installs.filter((install) => install.installed && install.enabled).length

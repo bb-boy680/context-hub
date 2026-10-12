@@ -73,6 +73,7 @@ async function main(): Promise<void> {
   check("one place is described", codexMcpProvider.places.length === 1)
   check("it is the machine-wide config", codexMcpProvider.places[0]?.file === ".codex/config.toml")
   check("the client can be switched off through it", codexMcpProvider.setEnabled !== undefined)
+  check("and its place says so", codexMcpProvider.places[0]?.switchable === true)
 
   console.log("a client with no config yet")
 
@@ -115,7 +116,7 @@ async function main(): Promise<void> {
 
   console.log("switching one off")
 
-  await codexMcpProvider.setEnabled(io, PLACE, "ctx", false)
+  await codexMcpProvider.setEnabled(io, PLACE, "global", "ctx", false)
   const off = await fs.readFile(config, "utf8")
   check("the field is written into that entry", off.includes("[mcp_servers.ctx]\nenabled = false"))
   check("the declaration stays", off.includes('command = "npx"'))
@@ -138,7 +139,7 @@ async function main(): Promise<void> {
   })
   check("writing it again keeps it switched off", (await fs.readFile(config, "utf8")).includes("enabled = false"))
 
-  await codexMcpProvider.setEnabled(io, PLACE, "ctx", true)
+  await codexMcpProvider.setEnabled(io, PLACE, "global", "ctx", true)
   check("switching it on says so", (await fs.readFile(config, "utf8")).includes("enabled = true"))
   check("the entry is otherwise the one it was", (await codexMcpProvider.read(io, PLACE)).length === 2)
 

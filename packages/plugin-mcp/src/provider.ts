@@ -10,7 +10,7 @@
  * This is a service, not a contribution: a contribution carries data for the
  * screen to render, while a provider carries behavior another plugin calls.
  */
-import type { PlaceFiles, PlaceRef } from "@workspace/core/place-files"
+import type { AssetScope, PlaceFiles, PlaceRef } from "@workspace/core/place-files"
 
 import type { McpDeclaration } from "./declaration.ts"
 import type { McpTools } from "./toolkit.ts"
@@ -26,6 +26,14 @@ export interface McpPlace extends PlaceRef {
   label: string
   /** Sort rank among the places of its own scope. */
   order: number
+  /**
+   * Whether the hub may write this client's on/off state for this place.
+   *
+   * A client that keeps the state in a file of its own — or keeps it per
+   * project and only this place names a project — says false wherever the state
+   * cannot be written, and that place is listed as one the client manages.
+   */
+  switchable: boolean
 }
 
 /** One declaration a client file holds. */
@@ -79,10 +87,23 @@ export interface McpProvider {
   uninstall(io: McpIo, place: string, name: string): Promise<void>
   /**
    * Keep the declaration but tell the client whether to connect it. A client
-   * with no such field leaves this out, and its places are shown as ones the
-   * client itself manages.
+   * with no such field leaves this out, and its places declare themselves
+   * unswitchable instead.
+   *
+   * @param place — {@link McpPlace.id} to switch.
+   * @param scope — the root the switch is about: a client that keeps its state
+   * per project writes only the scope that names a project and refuses the rest.
+   * @param name — the server's name, as that file keys it.
+   * @param enabled — whether the client should connect it.
+   * @throws {McpError} when that scope's state is not this client's to write.
    */
-  setEnabled?(io: McpIo, place: string, name: string, enabled: boolean): Promise<void>
+  setEnabled?(
+    io: McpIo,
+    place: string,
+    scope: AssetScope,
+    name: string,
+    enabled: boolean
+  ): Promise<void>
   /**
    * The lines one entry occupies in that file, for a pane that reads it apart
    * from the rest. Absent, or null, when the file cannot be pointed at.

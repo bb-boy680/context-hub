@@ -75,7 +75,7 @@ export function placesOf(
         place: {
           ...place,
           path: place.scope === "global" ? `~/${place.file}` : place.file,
-          switchable: provider.setEnabled !== undefined,
+          client: provider.id,
           icon: iconFor(provider.id),
         },
       })

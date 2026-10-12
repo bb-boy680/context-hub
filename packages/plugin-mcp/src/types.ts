@@ -4,9 +4,9 @@
  * a place's icon is the one its own extension declares.
  *
  * A place is the kernel's `McpPlace` — a client file an agent extension knows
- * how to read — plus what only this module can say about it: how its path
- * reads, whether its client can be switched off from here, and the mark of the
- * extension that registered it.
+ * how to read, and whether the hub may write that client's switch for it — plus
+ * what only this module can say about it: how its path reads, and the mark of
+ * the extension that registered it.
  */
 import type { ExtensionIcon } from "@workspace/extensions"
 import type { McpDeclaration, McpPlace, McpTransport } from "./contract.ts"
@@ -37,10 +37,11 @@ export interface McpAgentPlace extends McpPlace {
   /** The file as a person reads it, with the home directory abbreviated. */
   path: string
   /**
-   * Whether that client can be switched off from here. A client whose file
-   * carries no such field is one the page lists but cannot toggle.
+   * The extension that registered it. Every place of one client carries the
+   * same id, which is what tells "this client has no switch" apart from "this
+   * client has no declaration here".
    */
-  switchable: boolean
+  client: string
   /** The mark of the extension that registered it, from its own manifest. */
   icon: ExtensionIcon
 }

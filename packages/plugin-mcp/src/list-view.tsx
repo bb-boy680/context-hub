@@ -11,7 +11,7 @@ import { PlugZapIcon } from "lucide-react"
 
 import { cn } from "cn"
 
-import { isEnabled } from "./installs.ts"
+import { isEnabled, isInstalled } from "./installs.ts"
 import { InstallToMenu, ServerControls, type ServerActions } from "./menus.tsx"
 import {
   CheckNote,
@@ -132,8 +132,10 @@ export function ServerListView({
         <div className="flex items-center gap-2">
           <StatusPill status={server.status} />
           {/* The canvas tells "off" apart from "failing" by a second chip, so a
-              server no client connects keeps the check's own verdict beside it. */}
-          {isEnabled(server) ? null : <OffChip />}
+              server a client holds and none connects keeps the check's own
+              verdict beside it. A server no file holds has no state to report:
+              the place column already says it is installed nowhere. */}
+          {isInstalled(server) && !isEnabled(server) ? <OffChip /> : null}
         </div>
       ),
     },

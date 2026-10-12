@@ -126,6 +126,7 @@ export const mcpMessages: Record<string, string> = {
   "mcp.menu.enabled.title": "Enable",
   "mcp.menu.enabled.tally": "{count} on",
   "mcp.menu.enabled.note": "{scope} · {state}",
+  "mcp.menu.enabled.empty": "No client has this server installed yet.",
   "mcp.detail.place.installed": "{count} installed",
   "mcp.detail.place.count": "{count} places",
   "mcp.detail.section.places": "Places",

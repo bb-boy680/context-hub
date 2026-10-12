@@ -9,4 +9,6 @@ export const claudeCodeMessages: Record<string, string> = {
   "claudeCode.error.noProject":
     "Claude Code has no record for this folder in {file}, so it has nowhere to keep the switch.",
   "claudeCode.error.noWorkspace": "No workspace is open, so there is no project to switch.",
+  "claudeCode.error.machineScope":
+    "Claude Code keeps the switch in a project's record, so a machine-wide place has none.",
 }
