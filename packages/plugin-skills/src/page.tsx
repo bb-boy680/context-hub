@@ -1,15 +1,19 @@
 import {
-  CompassIcon,
   ChevronDownIcon,
+  CircleArrowUpIcon,
+  CompassIcon,
   ContainerIcon,
   DownloadIcon,
   FileTextIcon,
   FolderOpenIcon,
   FolderPlusIcon,
   GlobeIcon,
+  InboxIcon,
   LayoutGridIcon,
   LibraryIcon,
   ListIcon,
+  LoaderCircleIcon,
+  PackagePlusIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchXIcon,
@@ -23,7 +27,7 @@ import * as React from "react"
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
-import { holdsOf, inLibrary, placePath, skillKey, tokenLabel, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, outdated, placePath, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
@@ -47,6 +51,8 @@ import {
 import { Button } from "@workspace/ui/components/button"
 import {
   DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 import {
@@ -64,24 +70,36 @@ const SCOPES: readonly AssetScope[] = ["workspace", "global"]
    by scope: the ones in the workspace in use, and the machine-wide ones of the
    agents chosen in the sidebar. A scope can hold several places, so it says
    which with an icon stack rather than a count: the count is what the stack
-   answers, and printing both would say it twice. */
+   answers, and printing both would say it twice.
+
+   The last two entries stand for what is missing rather than for where anything
+   is: a skill a place holds that the library does not, and one whose source has
+   moved on. Each carries the one batch action its set is for, so the toolbar
+   stays about the page as a whole. */
 const SHELL_TABS: { value: SkillTab; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "skills.tab.all", icon: LayoutGridIcon },
   { value: "library", labelKey: "skills.tab.library", icon: LibraryIcon },
+  { value: "unstored", labelKey: "skills.tab.unstored", icon: InboxIcon },
+  { value: "updates", labelKey: "skills.tab.updates", icon: CircleArrowUpIcon },
   /* Not a folder: the stack beside this label already draws the places' own
      marks, and the workspace place among them IS a folder. */
   { value: "workspace", labelKey: "skills.tab.workspace", icon: ContainerIcon },
   { value: "global", labelKey: "skills.tab.global", icon: GlobeIcon },
 ]
 
+/** The tabs that group places by scope, which are the ones that open a menu. */
+const SCOPE_TABS: SkillTab[] = ["workspace", "global"]
+
 /** Which rows a tab shows. */
-type SkillTab = "all" | "library" | AssetScope
+type SkillTab = "all" | "library" | "unstored" | "updates" | AssetScope
 
 /** Which rows one tab holds, before the category filter. A place narrows a
-    scope to that one place; the shell's own two tabs have no places to narrow. */
+    scope to that one place; the shell's own tabs have no places to narrow. */
 function rowsForTab(rows: Skill[], value: SkillTab, place: string | null): Skill[] {
   if (value === "all") return rows
   if (value === "library") return rows.filter(inLibrary)
+  if (value === "unstored") return rows.filter(unstored)
+  if (value === "updates") return rows.filter(outdated)
   return rows.filter((row) =>
     holdsOf(row).some(
       (hold) => hold.scope === value && (place === null || hold.id === place)
@@ -887,6 +905,98 @@ function useSettled(value: string, delay = 180) {
   return settled
 }
 
+/**
+ * A screen tab that carries its own batch action: pressing it shows the set, and
+ * the one action the set is for opens while the pointer rests on the tab.
+ *
+ * The tab is itself the trigger, so the whole pill is the area that opens the
+ * menu. A press opens nothing — on this tab a press is the tab's own switch —
+ * which is why the guard reads the reason the menu is opening rather than the
+ * click that reaches the trigger.
+ *
+ * While the set's batch runs the tab's mark becomes a spinner: the menu closes
+ * on the press that starts it, and this is what says the work is under way.
+ */
+function ActionTab({
+  icon: Icon,
+  label,
+  count,
+  action,
+  state,
+  active,
+  onTab,
+  onAction,
+}: {
+  icon: ExtensionIcon
+  label: string
+  count: number
+  /** What the menu offers for the whole set, e.g. 一键收录. */
+  action: string
+  /** Whether this set's batch is idle, running here, or held up by another. */
+  state: "idle" | "running" | "blocked"
+  active: boolean
+  onTab: () => void
+  onAction: () => void
+}) {
+  const [open, setOpen] = React.useState(false)
+
+  return (
+    <DropdownMenu
+      open={open}
+      onOpenChange={(next, details) => {
+        /* The pointer and the keyboard may open the action; a press may not. */
+        if (next && details.reason === "trigger-press") return
+        setOpen(next)
+      }}
+    >
+      <DropdownMenuTrigger
+        openOnHover
+        /* Long enough to cross the gap between the tab and the menu. */
+        closeDelay={140}
+        render={
+          <button
+            type="button"
+            /* The pill is the screen's own control rather than a tab panel, so
+               being the screen on show is a current state. */
+            aria-current={active ? "true" : undefined}
+            aria-busy={state === "running" ? true : undefined}
+            onClick={onTab}
+            className={`flex h-9 flex-none shrink-0 items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              active
+                ? "bg-foreground text-background dark:bg-accent dark:text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {state === "running" ? (
+              <LoaderCircleIcon className="size-3.5 shrink-0 animate-spin" aria-hidden />
+            ) : (
+              <Icon className="size-3.5 shrink-0" aria-hidden />
+            )}
+            {label}
+            <span className="font-mono text-[13px]">{count}</span>
+          </button>
+        }
+      />
+      <DropdownMenuContent
+        align="start"
+        sideOffset={6}
+        onClick={(event) => event.stopPropagation()}
+        className="w-[220px] p-1"
+      >
+        <DropdownMenuItem
+          className="gap-2.5 py-2"
+          disabled={state !== "idle"}
+          onClick={onAction}
+        >
+          <PackagePlusIcon className="size-3.5" />
+          <span className="text-[13.5px] leading-[18px] font-semibold">{action}</span>
+          <span className="ml-auto font-mono text-[12.5px] text-muted-foreground">{count}</span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 function ViewButton({
   icon: Icon,
   label,
@@ -938,6 +1048,9 @@ export function SkillsPage() {
   const [refusal, setRefusal] = React.useState<string | null>(null)
   /* A batch check clones every recorded source; the toolbar says it is busy. */
   const [checking, setChecking] = React.useState(false)
+  /* A batch a tab's menu started, which holds the menu's item disabled until the
+     run it stands for has finished. */
+  const [batch, setBatch] = React.useState<"adopt" | "update" | null>(null)
   /* The open lightbox is a row key, because the same id can be two rows. */
   const [detailKey, setDetailKey] = React.useState<string | null>(null)
 
@@ -1006,26 +1119,38 @@ export function SkillsPage() {
     () => ({
       all: rowsForTab(onTag, "all", null).length,
       library: rowsForTab(onTag, "library", null).length,
+      unstored: rowsForTab(onTag, "unstored", null).length,
+      updates: rowsForTab(onTag, "updates", null).length,
     }),
     [onTag]
   )
 
+  /* A screen holding nothing leaves the row rather than opening empty, and the
+     row is read before the filters: a category that happens to match none of
+     them must not make the tab itself disappear under the pointer. */
+  const screenTab: SkillTab =
+    (tab === "unstored" && library.counts.unstored === 0) ||
+    (tab === "updates" && library.counts.updates === 0)
+      ? "all"
+      : tab
+
   /* A choice from the tab's menu only means something while the scope it belongs
      to is the one on screen; anywhere else the scope is whole. */
   const chosen =
-    narrowed !== null && places.some((place) => place.scope === tab && place.id === narrowed)
+    narrowed !== null && places.some((place) => place.scope === screenTab && place.id === narrowed)
       ? narrowed
       : null
   const matching = React.useMemo(
-    () => rowsForTab(onTag, tab, chosen),
-    [onTag, tab, chosen]
+    () => rowsForTab(onTag, screenTab, chosen),
+    [onTag, screenTab, chosen]
   )
 
   /* A scope tab holds nothing for one of four reasons, and each needs its own
      words: a workspace the hub cannot read, one holding no skills, a
      machine-wide scope with no agent chosen, or one whose agents hold nothing. */
   const scopeEmpty = ((): { icon: LucideIcon; title: string; hint: string; note: string | null } | null => {
-    if (tab === "all" || tab === "library") return null
+    if (!SCOPE_TABS.includes(screenTab)) return null
+    const tab = screenTab as AssetScope
     const held = library.places.filter((place) => place.scope === tab)
     /* Narrowed to one place, only that place's own directory answers. */
     if (chosen !== null) {
@@ -1143,6 +1268,45 @@ export function SkillsPage() {
     }
   }
 
+  /** The rows the two batch screens act on, read from the whole catalog rather
+      than from what a category chip happens to leave on screen. */
+  const unstoredRows = React.useMemo(() => rows.filter(unstored), [rows])
+  const outdatedRows = React.useMemo(() => rows.filter(outdated), [rows])
+
+  /**
+   * Take in every skill a place wrote, one at a time: each link is a write of
+   * its own, and the first refusal names the skill it was about, so a run that
+   * stops says which one stopped it.
+   */
+  const adoptAll = async () => {
+    setBatch("adopt")
+    setRefusal(null)
+    try {
+      for (const skill of unstoredRows) {
+        const hold = holdsOf(skill)[0]
+        if (hold === undefined) continue
+        await library.adopt(skill.id, { scope: hold.scope, dir: hold.dir })
+      }
+    } catch (failure) {
+      setRefusal(reasonOf(failure))
+    } finally {
+      setBatch(null)
+    }
+  }
+
+  /** Install the source's current revision over every copy that fell behind. */
+  const updateAll = async () => {
+    setBatch("update")
+    setRefusal(null)
+    try {
+      for (const skill of outdatedRows) await library.update(skill.id)
+    } catch (failure) {
+      setRefusal(reasonOf(failure))
+    } finally {
+      setBatch(null)
+    }
+  }
+
   const setTags = (skill: Skill, tags: string[]) =>
     void applyTo(() => library.store?.update(skill.id, { tags }) ?? Promise.resolve())
 
@@ -1196,7 +1360,7 @@ export function SkillsPage() {
     <div className="flex flex-1 flex-col gap-8">
       <PageHeading />
       <Tabs
-        value={tab}
+        value={screenTab}
         onValueChange={(value) => {
           setTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
           setPage(0)
@@ -1206,13 +1370,39 @@ export function SkillsPage() {
       >
         <div className="flex items-center justify-between gap-6">
           <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
-            {SHELL_TABS.map((item) => {
-              const scope = item.value === "all" || item.value === "library" ? null : item.value
+            {SHELL_TABS.filter(
+              (item) =>
+                (item.value !== "unstored" || library.counts.unstored > 0) &&
+                (item.value !== "updates" || library.counts.updates > 0)
+            ).map((item) => {
+              const scope = SCOPE_TABS.includes(item.value) ? (item.value as AssetScope) : null
               const stack = scope === null ? null : scopePlaces[scope]
               const count = counts[item.value as keyof typeof counts]
-              const active = tab === item.value
-              /* A scope opens through its place list; the shell's own two tabs
-                 are screens already and open on the press. */
+              const active = screenTab === item.value
+              /* A scope opens through its place list, and the two screens that
+                 stand for a missing set open through the one action that set is
+                 for; the rest are screens already and open on the press. */
+              if (item.value === "unstored" || item.value === "updates") {
+                const own = item.value === "unstored" ? "adopt" : "update"
+                return (
+                  <ActionTab
+                    key={item.value}
+                    icon={item.icon}
+                    label={t(item.labelKey)}
+                    count={count}
+                    action={t(own === "adopt" ? "skills.action.adoptAll" : "skills.action.updateAll")}
+                    /* The run is this tab's to show; another one only holds it up. */
+                    state={batch === null ? "idle" : batch === own ? "running" : "blocked"}
+                    active={active}
+                    onTab={() => {
+                      setTab(item.value)
+                      setPage(0)
+                      setChecked([])
+                    }}
+                    onAction={() => void (own === "adopt" ? adoptAll() : updateAll())}
+                  />
+                )
+              }
               if (scope === null || stack === null) {
                 return (
                   <TabsTrigger
@@ -1313,7 +1503,7 @@ export function SkillsPage() {
         {refusal === null ? null : (
           <span className="text-xs leading-[15px] text-destructive">{refusal}</span>
         )}
-        <TabsContent value={tab} className="flex flex-col">
+        <TabsContent value={screenTab} className="flex flex-col">
           <PageBody footer={footer}>
             {library.store === null ? (
               /* No library at all is a different answer from an empty one: the

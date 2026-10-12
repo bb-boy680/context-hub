@@ -166,6 +166,26 @@ export function inLibrary(skill: Skill): boolean {
 }
 
 /**
+ * A skill a place holds and the library does not, which is what 收录 is for. A
+ * place's own row is out when the library already holds that name: taking it in
+ * would collide with the copy already there rather than add anything.
+ */
+export function unstored(skill: Skill): boolean {
+  return skill.inLibrary !== true && !inLibrary(skill) && holdsOf(skill).length > 0
+}
+
+/**
+ * Whether the last check found the skill's source ahead of the files here. Only
+ * a check that recorded an answer says so: a row with no recorded source, or one
+ * nobody has asked about, is not ahead of anything.
+ */
+export function outdated(skill: Skill): boolean {
+  const latest = skill.checked?.latest
+  if (latest === undefined || skill.upstream === undefined) return false
+  return latest !== skill.upstream.hash
+}
+
+/**
  * How one place's directory reads to a person. A place is a directory inside a
  * scope, and the scope's root is the part a person already knows: inside a
  * workspace that root is the folder in use, and outside every workspace it is
@@ -665,10 +685,14 @@ export function useSkillLibrary(
     }
   }
   /* A skill in the library and in a place counts under each tab; only its
-     absence from a side excludes it there. */
+     absence from a side excludes it there. The two screens that stand for an
+     absence — not taken in yet, and a source that moved on — are counted the
+     same way, so the tab that says "three" and the list it opens agree. */
   const counts: Record<string, number> = {
     all: rows.length,
     library: rows.filter(inLibrary).length,
+    unstored: rows.filter(unstored).length,
+    updates: rows.filter(outdated).length,
   }
   for (const [id] of targets) {
     counts[id] = rows.filter((row) => holdsOf(row).some((hold) => hold.id === id)).length
