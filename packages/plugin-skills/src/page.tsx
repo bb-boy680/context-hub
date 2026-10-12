@@ -40,7 +40,7 @@ import {
   PlaceScopePicker,
   type PlaceOption,
   type PlaceWords,
-} from "@workspace/extensions/components/place-picker"
+} from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"

@@ -4,7 +4,7 @@
  * here and "技能位置" there without either module reaching into the other's
  * namespace.
  */
-import type { PlaceWords } from "@workspace/extensions/components/place-picker"
+import type { PlaceWords } from "@workspace/extensions/components"
 
 /**
  * The MCP module's strings for a place list.

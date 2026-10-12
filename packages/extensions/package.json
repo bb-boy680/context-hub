@@ -30,7 +30,6 @@
     ".": "./src/index.ts",
     "./react": "./src/react.tsx",
     "./builtin": "./src/builtin/index.ts",
-    "./components/avatar-stack": "./src/components/avatar-stack.tsx",
-    "./components/place-picker": "./src/components/place-picker.tsx"
+    "./components": "./src/components/index.ts"
   }
 }

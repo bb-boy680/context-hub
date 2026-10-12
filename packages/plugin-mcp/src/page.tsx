@@ -42,7 +42,7 @@ import { useI18n } from "@workspace/extensions/react"
 import {
   PlaceScopePicker,
   type PlaceOption,
-} from "@workspace/extensions/components/place-picker"
+} from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import { Kbd } from "@workspace/ui/components/kbd"
 

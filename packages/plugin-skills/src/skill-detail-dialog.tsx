@@ -48,7 +48,7 @@ import type {
 
 import { useI18n } from "@workspace/extensions/react"
 import type { AssetScope } from "@workspace/extensions"
-import { PlaceList } from "@workspace/extensions/components/place-picker"
+import { PlaceList } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
