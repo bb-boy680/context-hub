@@ -6,7 +6,7 @@
  * share a shape but never a state: one writes files, the other writes the
  * client's own disable list.
  */
-import { CheckIcon, ChevronDownIcon, PowerIcon } from "lucide-react"
+import { ChevronDownIcon, PowerIcon } from "lucide-react"
 import * as React from "react"
 
 import { cn } from "cn"
@@ -17,7 +17,6 @@ import type { McpAgentPlace, McpInstall, McpScope, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import { PlaceMenu } from "@workspace/extensions/components/place-picker"
 import { Button } from "@workspace/ui/components/button"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import { DropdownMenu, DropdownMenuTrigger } from "@workspace/ui/components/dropdown-menu"
 import { Switch } from "@workspace/ui/components/switch"
 
@@ -89,20 +88,6 @@ export function InstallToMenu({
            mark in place, so the menu stays up. */
         closeOnClick={false}
         onPick={onToggle}
-        /* Written in, the row shows a check; not written, an empty box, which is
-           what the canvas draws for each state. */
-        trailing={(option) =>
-          option.selected === true ? (
-            <CheckIcon className="size-[18px] shrink-0 text-foreground" />
-          ) : (
-            <Checkbox
-              checked={false}
-              aria-hidden
-              tabIndex={-1}
-              className="size-[18px] shrink-0"
-            />
-          )
-        }
         groups={MCP_SCOPES.map((scope) => ({
           label: t(`mcp.detail.group.${scope}`),
           options: places
