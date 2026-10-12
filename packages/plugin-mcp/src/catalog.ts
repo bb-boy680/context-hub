@@ -54,13 +54,14 @@ export interface McpScan {
 
 /**
  * Every provider's every place, in the order the page lists them: global places
- * first, then workspace ones, each group by the rank its extension gave it.
+ * first, then workspace ones, and inside a group the order the registry holds —
+ * the plugins as they registered, and each one's places as it declared them.
  *
  * A place carries no mark of its own. Its provider is named by the extension
  * that registered it, and that extension's manifest already declares the icon —
  * one declaration per client, which is what `iconFor` reads.
  *
- * @param providers — the providers registered right now.
+ * @param providers — the providers registered right now, in registration order.
  * @param iconFor — the mark of the extension with that id.
  */
 export function placesOf(
@@ -81,15 +82,13 @@ export function placesOf(
       })
     }
   }
-  return places.sort(
-    (left, right) =>
-      rank(left.place) - rank(right.place) || left.place.id.localeCompare(right.place.id)
-  )
+  /* Stable sort: one rank per scope, so a group keeps the order it arrived in. */
+  return places.sort((left, right) => scopeRank(left.place) - scopeRank(right.place))
 }
 
-/** Global places before workspace ones; each group by its own rank. */
-function rank(place: McpAgentPlace): number {
-  return (place.scope === "global" ? 0 : 1000) + place.order
+/** Global places before workspace ones. */
+function scopeRank(place: McpAgentPlace): number {
+  return place.scope === "global" ? 0 : 1
 }
 
 /**

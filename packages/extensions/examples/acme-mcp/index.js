@@ -88,7 +88,7 @@ export function activate(scope) {
         /* The id names this plugin, which is how the page finds the icon its
            manifest declares — a place carries no mark of its own. */
         id: "acme.mcp",
-        places: [{ ...PLACE, label: "Acme", order: 30, switchable: false }],
+        places: [{ ...PLACE, label: "Acme", switchable: false }],
 
         async read(io, place) {
           const held = serversIn(await read(io, place))

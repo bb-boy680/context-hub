@@ -4,7 +4,7 @@
  * partial pack still renders a usable interface.
  */
 export const messages: Record<string, string> = {
-  "nav.group.manage": "管理",
+  "nav.group.assets": "资产",
   "nav.group.operate": "运维",
   "nav.overview": "概览",
   "nav.skills": "技能",
@@ -36,12 +36,16 @@ export const messages: Record<string, string> = {
   "extensions.description": "通过代理集成与语言包扩展 Context Hub。",
   "extensions.searchPlaceholder": "搜索扩展",
   "extensions.language": "语言",
+  "extensions.category.agent": "Agents",
+  "extensions.category.asset": "资产",
   "extensions.category.integration": "集成",
   "extensions.category.language": "语言",
   "extensions.category.appearance": "外观",
   "extensions.category.source": "资产源",
   "extensions.category.storage": "存储",
-  "extensions.category.integration.description": "每个代理从不同的位置读取资产。集成告诉 Context Hub 如何把你的资产交付给该代理。",
+  "extensions.category.agent.description": "每个代理从不同的位置读取资产。代理集成说明那个位置在哪，并把你的资产交付过去。",
+  "extensions.category.asset.description": "Hub 自己管的资产：留在这里的技能，和代理可以用的 MCP 服务器。",
+  "extensions.category.integration.description": "给 Hub 增加界面、但不属于某一类资产的模块。",
   "extensions.category.language.description": "语言包会翻译整个界面。安装后在语言菜单中选择，卸载后自动回退到英文。",
   "extensions.category.appearance.description": "界面的主题与外观选项。",
   "extensions.category.source.description": "接入更多可获取资产的位置。",

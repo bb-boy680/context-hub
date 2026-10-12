@@ -3820,6 +3820,40 @@ Body = Source Wrap 96 + Divider 1 + Results 224   ← 3 行 × 68 + padding[8,0,
 > ① 全局 token 照改（此前已确认「改全局 token」）；② Codex 的 `skillLocation` 本轮不补（画板里它只是"插件未启用"的反例，属新功能）；
 > ③ **不提交 commit**（工作区有大量已暂存改动）。画布读不到，改用本文件里已记录的逐块实测数据推进。
 
+### 分类与分组统一到「Agents / 资产」（2026-10-12，用户反馈）
+
+用户两轮要求：① 「Agent 的分组是 Agents，和侧边栏要对应」；② 「mcp、skills 的插件分组是资产，
+然后这个地方应该也是资产」。落成一套词表，两处同名同序：
+
+| 概念 | 扩展页分类 | 侧边栏分组 |
+| --- | --- | --- |
+| 交付目标（13 个 agent 集成） | `agent`「Agents」 | `Agents`（`AgentGroup`，读 `target`） |
+| hub 自己管的资产 | `asset`「资产」——MCP servers + Skills | `assets`「资产」——概览 / 技能 / MCP 服务器 / 插件 |
+| 从外面拉资产 | `source`「资产源」——skills.sh | — |
+| 语言 / 外观 / 存储 | `language` / `appearance` / `storage` | — |
+| 通用模块桶 | `integration`「集成」（目前无内置成员） | — |
+
+改动：
+
+- `ExtensionCategoryId` 增 `agent`、`asset`；`NavGroupId` 的 `manage` 改名 `assets`，
+  键 `nav.group.manage` → `nav.group.assets`（en `Assets` / zh `资产`）。
+- **补上一处漏掉的出处**：`PluginManifestFile.category` 与 `CATEGORIES` 是同一套词表的第二份拷贝，
+  先前只改了 `ExtensionCategoryId`，于是下载来的插件声明 `agent`/`asset` 会被 manifest 校验拒掉。
+- 13 个 agent 包 `category` 改 `agent`；`plugin-mcp` 由 `integration` → `asset`，
+  `plugin-skills` 由 `source` → `asset`。
+- `contributions()` 原先按**激活顺序**返回（注释却写着 catalog order）：先开 Cursor 再开 Cline，
+  侧边栏顺序就和扩展页对不上。改成按 catalog（装配）顺序遍历，两个界面从此恒定同序，
+  与开关顺序无关。
+
+**验证**：`check-plugins.ts` 全过、`check-services.ts`、`check-mcp.ts` 61/61、
+`check-messages.ts` 429/429 键对齐；workspace 全量 `typecheck` / `lint` 除既有
+`@workspace/agent-cline` 失败外全绿。真机 `/extensions`：Agents（13）→ 资产（Skills、MCP servers）
+→ 语言 → 资产源（skills.sh）；侧边栏首组标题「资产」。Console 干净。
+
+**留给用户定**：`integration`（集成）现在没有内置成员（只有 `examples/acme-mcp/plugin.json` 用它），
+是留作第三方模块的通用桶，还是连词表一起删掉。
+
+---
 ## P0 基线（2026-10-09）
 
 - `pnpm typecheck` → **8/8 成功**。

@@ -34,7 +34,7 @@ export interface PluginManifestFile {
   icon?: string
   /** Module file inside the plugin directory that exports `activate`; defaults to index.js. */
   entry?: string
-  category?: "integration" | "language" | "appearance" | "source" | "storage"
+  category?: "agent" | "asset" | "integration" | "language" | "appearance" | "source" | "storage"
   permissions?: ExtensionPermission[]
   /** Service names this plugin requires; it stays waiting until each is provided. */
   inject?: string[]
@@ -85,7 +85,7 @@ const PERMISSIONS: readonly ExtensionPermission[] = [
   "network",
 ]
 
-const CATEGORIES = ["integration", "language", "appearance", "source", "storage"] as const
+const CATEGORIES = ["agent", "asset", "integration", "language", "appearance", "source", "storage"] as const
 
 function requireString(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim() === "") {

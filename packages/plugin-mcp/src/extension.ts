@@ -37,7 +37,7 @@ export function mcpExtensionWith(page: ComponentType): ExtensionDefinition {
       version: "0.1.0",
       apiVersion: "^0.1",
       kind: "code",
-      category: "integration",
+      category: "asset",
       description: "Declare the MCP servers agents may use, and where each is installed.",
       icon: ServerIcon,
       defaultEnabled: true,
@@ -51,7 +51,7 @@ export function mcpExtensionWith(page: ComponentType): ExtensionDefinition {
         path: "/mcp-servers",
         labelKey: "nav.mcpServers",
         icon: ServerIcon,
-        group: "manage",
+        group: "assets",
         order: 20,
       })
       scope.contribute("route", { path: "/mcp-servers", Component: page })

@@ -128,14 +128,12 @@ export function createClaudeCodeMcp(tools: McpTools): McpProvider {
       {
         id: "claude-code-global",
         label: "Claude Code",
-        order: 10,
         switchable: false,
         ...FILES.global,
       },
       {
         id: "claude-code",
         label: "Claude Code",
-        order: 20,
         switchable: true,
         ...FILES.workspace,
       },

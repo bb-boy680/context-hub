@@ -31,7 +31,7 @@ export const minimaxCodeExtension: ExtensionDefinition = {
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
-    category: "integration",
+    category: "agent",
     description: "Deliver skills to MiniMax Code.",
     icon: MinimaxCodeIcon,
     defaultEnabled: true,

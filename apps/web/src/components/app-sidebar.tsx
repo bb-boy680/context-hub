@@ -115,7 +115,7 @@ function AgentGroup() {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navGroups = useNavGroups()
-  const manage = navGroups.find((group) => group.id === "manage")
+  const assets = navGroups.find((group) => group.id === "assets")
   const operate = navGroups.find((group) => group.id === "operate")
 
   return (
@@ -129,7 +129,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </div>
       </SidebarHeader>
       <SidebarContent className="gap-5 px-4 pt-5 pb-5">
-        {manage === undefined ? null : <NavGroup group={manage} />}
+        {assets === undefined ? null : <NavGroup group={assets} />}
         <WorkspaceGroup />
         <AgentGroup />
         {operate === undefined ? null : <NavGroup group={operate} />}

@@ -160,11 +160,23 @@ export class ExtensionService extends Service {
     return on ? this.enable(id) : this.disable(id)
   }
 
-  /** Every contribution at one point, in catalog order. */
+  /**
+   * Every contribution at one point, in catalog order: the extensions as the
+   * build composed them, and each one's contributions as it made them.
+   *
+   * Catalog order, not the order the extensions happened to activate: one
+   * switched on later activates later, and a list that moved its rows on every
+   * toggle would not read as the same list.
+   */
   contributions<P extends ExtensionPointId>(point: P): ContributionMap[P][] {
     const byExtension = this.points.get(point)
     if (byExtension === undefined) return []
-    return [...byExtension.values()].flat() as ContributionMap[P][]
+    const values: ContributionMap[P][] = []
+    for (const id of this.entries.keys()) {
+      const held = byExtension.get(id)
+      if (held !== undefined) values.push(...(held as ContributionMap[P][]))
+    }
+    return values
   }
 
   /** Contributions one extension currently makes at one point. */

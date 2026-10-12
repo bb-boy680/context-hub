@@ -59,7 +59,7 @@ await writePlugin(
   }),
   `export function activate(scope) {
      globalThis.__scope = { react: typeof scope.react?.createElement === "function", icons: typeof scope.icons?.sparkles, icon: typeof scope.icon("server"), ui: scope.ui !== undefined }
-     scope.contribute("nav", { path: "/hello", labelKey: "nav.hello", icon: scope.icon("sparkles"), group: "manage", order: 25 })
+     scope.contribute("nav", { path: "/hello", labelKey: "nav.hello", icon: scope.icon("sparkles"), group: "assets", order: 25 })
    }\n`
 )
 await writePlugin(

@@ -32,7 +32,7 @@ export const geminiCliExtension: ExtensionDefinition = {
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
-    category: "integration",
+    category: "agent",
     description: "Deliver skills to Gemini CLI.",
     icon: GeminiCliIcon,
     defaultEnabled: true,

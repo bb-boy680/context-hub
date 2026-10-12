@@ -8,7 +8,7 @@ import type { ExtensionDefinition } from "../types.ts"
 
 /** Keys every pack resolves; the UI reads them through `ctx.i18n.t`. */
 const en: Record<string, string> = {
-  "nav.group.manage": "Manage",
+  "nav.group.assets": "Assets",
   "nav.group.operate": "Operate",
   "nav.overview": "Overview",
   "nav.skills": "Skills",
@@ -40,12 +40,16 @@ const en: Record<string, string> = {
   "extensions.description": "Extend Context Hub with agent integrations and language packs.",
   "extensions.searchPlaceholder": "Search extensions",
   "extensions.language": "Language",
+  "extensions.category.agent": "Agents",
+  "extensions.category.asset": "Assets",
   "extensions.category.integration": "Integrations",
   "extensions.category.language": "Languages",
   "extensions.category.appearance": "Appearance",
   "extensions.category.source": "Sources",
   "extensions.category.storage": "Storage",
-  "extensions.category.integration.description": "Each agent reads its assets from a different place. An integration tells Context Hub how to deliver yours to that agent.",
+  "extensions.category.agent.description": "Each agent reads its assets from a different place. An agent integration says where that place is, and delivers yours there.",
+  "extensions.category.asset.description": "The hub's own assets: the skills it keeps and the MCP servers agents may use.",
+  "extensions.category.integration.description": "Modules that add a surface to the hub without belonging to one asset kind.",
   "extensions.category.language.description": "A language pack translates the whole interface. Install one, pick it from the language menu, uninstall it to fall back to English.",
   "extensions.category.appearance.description": "Themes and visual options for the interface.",
   "extensions.category.source.description": "Extra places Context Hub can pull assets from.",

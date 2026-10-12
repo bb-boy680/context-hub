@@ -34,6 +34,8 @@ export type ExtensionKind = "builtin" | "declarative" | "code"
 
 /** Catalog grouping on the Extensions page. */
 export type ExtensionCategoryId =
+  | "agent"
+  | "asset"
   | "integration"
   | "language"
   | "appearance"
@@ -98,7 +100,7 @@ export interface AgentTargetDescriptor {
 }
 
 /** Sidebar groups the shell renders, in order. */
-export type NavGroupId = "manage" | "operate"
+export type NavGroupId = "assets" | "operate"
 
 /** One sidebar entry contributed by an extension. */
 export interface NavContribution {

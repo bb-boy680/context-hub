@@ -32,7 +32,7 @@ export const cursorExtension: ExtensionDefinition = {
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
-    category: "integration",
+    category: "agent",
     description: "Deliver skills to Cursor.",
     icon: CursorIcon,
     defaultEnabled: true,

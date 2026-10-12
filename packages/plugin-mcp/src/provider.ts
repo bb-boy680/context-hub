@@ -24,8 +24,6 @@ export interface McpPlace extends PlaceRef {
   id: string
   /** The client's name, as a menu row lists it. */
   label: string
-  /** Sort rank among the places of its own scope. */
-  order: number
   /**
    * Whether the hub may write this client's on/off state for this place.
    *

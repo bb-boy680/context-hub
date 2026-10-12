@@ -75,8 +75,15 @@ function provider(options: {
 }
 
 const PLACES: McpPlace[] = [
-  { id: "a-global", label: "A", scope: "global", file: ".a.json", order: 30, switchable: false },
-  { id: "a-project", label: "A", scope: "workspace", file: ".a.json", order: 10, switchable: true },
+  { id: "a-global", label: "A", scope: "global", file: ".a.json", switchable: false },
+  { id: "a-project", label: "A", scope: "workspace", file: ".a.json", switchable: true },
+]
+
+/* A second client, whose workspace place is declared before its global one: the
+   scope decides where each lands, never the order its extension wrote. */
+const OTHER: McpPlace[] = [
+  { id: "c-project", label: "C", scope: "workspace", file: ".c.json", switchable: false },
+  { id: "c-global", label: "C", scope: "global", file: ".c.json", switchable: false },
 ]
 
 const STDIO = { transport: "stdio", command: "npx", args: ["-y", "@x/github"], env: {} } as const
@@ -109,11 +116,24 @@ async function main(): Promise<void> {
 
   const places = placesOf([provider({ id: "b", places: PLACES, entries: {} })], () => MARK)
   check("global places come first", places[0]?.place.id === "a-global", places.map((entry) => entry.place.id))
-  check("each scope is ranked by its own order", places[1]?.place.id === "a-project")
+  check("the workspace place follows it", places[1]?.place.id === "a-project")
   check("a place reads as a person would see it", places[0]?.place.path === "~/.a.json")
   check("a workspace place keeps its relative path", places[1]?.place.path === ".a.json")
   check("a client with no switch is marked as such", places[0]?.place.switchable === false)
   check("one that has a switch is marked too", places[1]?.place.switchable === true)
+
+  const merged = placesOf(
+    [
+      provider({ id: "b", places: PLACES, entries: {} }),
+      provider({ id: "c", places: OTHER, entries: {} }),
+    ],
+    () => MARK
+  )
+  check(
+    "each scope keeps the registry's order",
+    merged.map((entry) => entry.place.id).join(",") === "a-global,c-global,a-project,c-project",
+    merged.map((entry) => entry.place.id)
+  )
 
   console.log("scanning")
 

@@ -3,6 +3,8 @@ import type { ExtensionCategoryId } from "@workspace/extensions"
 
 /** Catalog order of the sections; a category with no entries is skipped. */
 export const categoryOrder: ExtensionCategoryId[] = [
+  "agent",
+  "asset",
   "integration",
   "language",
   "appearance",
@@ -12,6 +14,8 @@ export const categoryOrder: ExtensionCategoryId[] = [
 
 /** Icon tile tint per category; borrows the skill tag palette so the modules read as one system. */
 export const categoryTile: Record<ExtensionCategoryId, string> = {
+  agent: "bg-chip-integrations",
+  asset: "bg-chip-integrations",
   integration: "bg-chip-integrations",
   language: "bg-chip-documents",
   appearance: "bg-chip-design",

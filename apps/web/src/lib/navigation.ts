@@ -32,8 +32,8 @@ export type NavGroup = {
 /** Entries the shell ships; extensions add to the same groups through the `nav` point. */
 export const navGroups: NavGroup[] = [
   {
-    id: "manage",
-    labelKey: "nav.group.manage",
+    id: "assets",
+    labelKey: "nav.group.assets",
     items: [
       { labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon, order: 10 },
       { labelKey: "nav.plugins", path: "/plugins", icon: PlugIcon, order: 30 },

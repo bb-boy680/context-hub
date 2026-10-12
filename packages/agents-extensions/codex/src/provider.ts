@@ -83,7 +83,7 @@ export function createCodexMcp(tools: McpTools): McpProvider {
 
   return {
     id: "hub.target.codex",
-    places: [{ id: "codex-global", label: "Codex", order: 20, switchable: true, ...FILE }],
+    places: [{ id: "codex-global", label: "Codex", switchable: true, ...FILE }],
 
     async read(io, place) {
       assertPlace(place)

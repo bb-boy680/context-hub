@@ -32,13 +32,24 @@ export const clineExtension: ExtensionDefinition = {
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
-    category: "integration",
+    category: "agent",
     description: "Deliver skills to Cline.",
     icon: ClineIcon,
     defaultEnabled: true,
     permissions: ["assets.read"],
   },
   activate(scope) {
+    scope.inject(["mcp"], (ctx, plugins) => {
+      const { registry, tools } = plugins.mcp
+      ctx.effect(() => registry.register({
+        id: CLINE_ID,
+        places: [
+          { id: "cline", label: "Cline", scope: "workspace", file: ".mcp.json", switchable: false },
+          { id: "claude.global", label: "Cline", scope: "global", file: ".cline.json", switchable: false },
+        ],
+      }))
+    })
+
     /* The place comes first: the target below names it, so a consumer that
        reads one side always finds the other. */
     scope.contribute("skillLocation", {

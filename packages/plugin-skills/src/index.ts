@@ -35,7 +35,7 @@ export const skillsExtension: ExtensionDefinition = {
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
-    category: "source",
+    category: "asset",
     description:
       "Browse, import and install skills, and keep them in this workspace.",
     icon: SparklesIcon,
@@ -47,7 +47,7 @@ export const skillsExtension: ExtensionDefinition = {
       path: "/skills",
       labelKey: "nav.skills",
       icon: SparklesIcon,
-      group: "manage",
+      group: "assets",
       order: 15,
     })
     scope.contribute("route", {
