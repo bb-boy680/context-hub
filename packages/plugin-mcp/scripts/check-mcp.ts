@@ -15,7 +15,9 @@ import type { McpEntry, McpPlace, McpProvider } from "../src/contract.ts"
 import type { PlaceFiles } from "@workspace/core/place-files"
 
 import { RECORDS_KEY, buildCatalog, placesOf, readRecords, scanPlaces, upsert } from "../src/catalog.ts"
+import type { McpCacheEntry } from "../src/probe.ts"
 import { createMcpService } from "../src/registry.ts"
+import { toolTree } from "../src/schema-tree.ts"
 
 /** A stand-in for the icon a contributing extension declares. */
 const MARK: ExtensionIcon = () => null
@@ -200,6 +202,63 @@ async function main(): Promise<void> {
   check("copies that differ are counted", conflicted?.conflicts === 2, conflicted?.conflicts)
   check("and the row fails", conflicted?.status === "failed")
   check("a row with no record still shows a declaration", conflicted?.declaration !== "")
+
+  /* What a row says about the server: the record's sentence, else what the
+     probe heard the server say about itself. */
+  console.log("the description a row shows")
+
+  const probed = (fields: Partial<McpCacheEntry>): Record<string, McpCacheEntry | null> => ({
+    github: {
+      ok: true,
+      ms: 1,
+      at: 1,
+      probe: 1,
+      fingerprint: "sha256:x",
+      target: "npx",
+      scope: "workspace",
+      ...fields,
+    },
+  })
+  const rowDescription = (description: string, fields: Partial<McpCacheEntry>) =>
+    buildCatalog(
+      [{ name: "github", declaration: STDIO, description, tags: [] }],
+      split,
+      places,
+      [],
+      1,
+      probed(fields)
+    ).servers[0]?.description
+
+  const described = { serverInfo: { name: "github", version: "1", description: "The server's own sentence" } }
+  check("the recorded sentence wins over the server's", rowDescription("Written here", described) === "Written here")
+  check("the server's own description fills in", rowDescription("", described) === "The server's own sentence")
+  check("the instructions fill in when nothing else does", rowDescription("", { instructions: "A hint" }) === "A hint")
+  check("and with nothing to say the row stays empty", rowDescription("", {}) === "")
+
+  console.log("the tool tree")
+
+  const tree = toolTree({
+    name: "sum",
+    title: "Sum",
+    description: "Adds two numbers.",
+    inputSchema: {
+      type: "object",
+      description: "what goes in",
+      properties: { message: { type: "string", title: "The message" } },
+      required: ["message"],
+    },
+    outputSchema: {
+      type: "object",
+      properties: { total: { type: "number", description: "The sum" } },
+    },
+  })
+  check("the input schema's own sentence is kept", tree.inputDescription === "what goes in")
+  check("a field's title stands in for its missing description", tree.input[0]?.description === "The message")
+  check("a field's description wins over a title", tree.output[0]?.description === "The sum")
+  check(
+    "a schema that says nothing about itself is an empty sentence",
+    toolTree({ name: "x", inputSchema: { type: "object", properties: {} } }).outputDescription === ""
+  )
 
   console.log("the records a form stores")
 

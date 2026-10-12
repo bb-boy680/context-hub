@@ -5,10 +5,12 @@
  * them only decide placement.
  */
 import { ArrowRightLeftIcon, ServerIcon } from "lucide-react"
+import * as React from "react"
 
 import { cn } from "cn"
 
 import { markImage } from "./marks.ts"
+import type { McpProbeIcon } from "./probe.ts"
 import type { McpMark, McpPlaceKind, McpServer, McpStatus, McpTransport } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 
@@ -24,8 +26,24 @@ export function ServerMark({ mark, className }: { mark: McpMark; className?: str
   return <ServerIcon className={cn("size-[18px] text-foreground", className)} />
 }
 
-/** The tile a row or a card puts its mark on. */
-export function ServerTile({ mark, size = 36 }: { mark: McpMark; size?: number }) {
+/**
+ * The tile a row or a card puts its mark on. A server that showed an icon of
+ * its own during a probe wears that instead of the generic mark — drawn
+ * through an `img`, never inlined, because a server's SVG is not this build's
+ * markup to trust.
+ */
+export function ServerTile({
+  mark,
+  icon,
+  size = 36,
+}: {
+  mark: McpMark
+  icon?: McpProbeIcon
+  size?: number
+}) {
+  const [broken, setBroken] = React.useState(false)
+  const shown = icon === undefined || broken ? null : icon
+
   return (
     <span
       className={cn(
@@ -33,7 +51,18 @@ export function ServerTile({ mark, size = 36 }: { mark: McpMark; size?: number }
         size === 36 ? "size-9 rounded-sm" : "size-10 rounded-md"
       )}
     >
-      <ServerMark mark={mark} className={size === 36 ? undefined : "size-6"} />
+      {shown === null ? (
+        <ServerMark mark={mark} className={size === 36 ? undefined : "size-6"} />
+      ) : (
+        /* A URL an icon could not be fetched from falls back to the mark: the
+           tile says the same thing it did before the probe. */
+        <img
+          src={shown.src}
+          alt=""
+          onError={() => setBroken(true)}
+          className={cn("object-contain", size === 36 ? "size-[18px]" : "size-6")}
+        />
+      )}
     </span>
   )
 }

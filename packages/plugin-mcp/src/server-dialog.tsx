@@ -9,6 +9,7 @@
  */
 import {
   CheckIcon,
+  ExternalLinkIcon,
   PlusIcon,
   PlugIcon,
   PlugZapIcon,
@@ -23,7 +24,9 @@ import { cn } from "cn"
 import { installedCount, MCP_SCOPES, placesInScope, placesOf, type McpPlaceState } from "./installs.ts"
 import { FilesPane } from "./detail-files.tsx"
 import { ToolsPane } from "./detail-tools.tsx"
-import { ServerMark, StatusPill } from "./parts.tsx"
+import { failureText } from "./library.ts"
+import { ServerTile, StatusPill } from "./parts.tsx"
+import type { McpCacheEntry } from "./probe.ts"
 import { ServerForm, valuesOf, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
 import type { McpAgentPlace, McpConfigFile, McpServer, McpTag } from "./types.ts"
@@ -249,6 +252,53 @@ function Places({
   )
 }
 
+/**
+ * What the last probe adds under the check's own rows: the source the server
+ * named, as the line itself, and — when the probe failed — the sentence, the
+ * platform's own words and the last thing its process wrote.
+ */
+function ProbeSection({ check }: { check: McpCacheEntry }) {
+  const { t } = useI18n()
+  const error = check.error
+  const site = check.serverInfo?.websiteUrl
+
+  return (
+    <>
+      {site === undefined ? null : (
+        <a
+          href={site}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-[26px] min-w-0 items-center gap-1.5 font-mono text-[12px] leading-[1.3] text-foreground hover:underline"
+        >
+          <span className="truncate">{site}</span>
+          <ExternalLinkIcon className="size-[13px] shrink-0" />
+        </a>
+      )}
+      {check.ok || error === undefined ? null : (
+        <div className="flex flex-col gap-1.5 pt-1">
+          <span className="text-[12.5px] leading-[1.4] text-destructive">
+            {failureText(t, { key: `mcp.check.error.${error.kind}`, params: error.params })}
+          </span>
+          <span className="font-mono text-[11px] leading-[1.5] break-words text-muted-foreground">
+            {error.message}
+          </span>
+          {check.stderr === undefined ? null : (
+            <>
+              <span className="text-[11.5px] leading-[1.3] text-muted-soft">
+                {t("mcp.check.stderr")}
+              </span>
+              <pre className="max-h-[120px] overflow-auto rounded-sm bg-muted p-2 font-mono text-[10.5px] leading-[1.5] whitespace-pre-wrap text-copy">
+                {check.stderr}
+              </pre>
+            </>
+          )}
+        </div>
+      )}
+    </>
+  )
+}
+
 /** The right-hand panel: what the server is, where it lives, and its state. */
 function ServerPanel({
   server,
@@ -280,9 +330,7 @@ function ServerPanel({
   return (
     <aside className="flex max-h-full min-w-0 shrink grow-0 basis-[360px] flex-col overflow-hidden bg-card">
       <header className="flex h-[84px] shrink-0 items-center gap-3 border-b border-border px-5">
-        <span className="flex size-10 shrink-0 items-center justify-center overflow-clip rounded-md bg-muted ring-1 ring-border ring-inset">
-          <ServerMark mark={server.mark} className="size-6" />
-        </span>
+        <ServerTile mark={server.mark} icon={server.check?.icon} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <span className="truncate text-[16px] leading-[1.3] font-semibold text-foreground">
             {server.name}
@@ -355,6 +403,7 @@ function ServerPanel({
           <div className="flex h-[26px] items-center text-[11.5px] leading-[1.3] text-muted-soft">
             {t("mcp.detail.check.lastChecked").replace("{age}", age)}
           </div>
+          {server.check === undefined ? null : <ProbeSection check={server.check} />}
           <Rule />
           <div className="flex h-[26px] items-center justify-between">
             <span className="text-[12px] leading-[1.3] text-muted-foreground">
@@ -363,7 +412,7 @@ function ServerPanel({
             <span className="text-[12px] leading-[1.3] font-medium text-foreground">
               {t("mcp.detail.row.toolsValue").replace(
                 "{count}",
-                String(server.detail.tools)
+                String(server.detail.tools.length)
               )}
             </span>
           </div>
@@ -490,7 +539,18 @@ export function ServerDialog({
                       notice={t("mcp.form.notice")}
                     />
                   ) : null}
-                  {tab === "tools" ? <ToolsPane tools={tools} /> : null}
+                  {tab === "tools" ? (
+                    <ToolsPane
+                      tools={tools}
+                      empty={t(
+                        server.check === undefined
+                          ? "mcp.detail.tools.empty"
+                          : server.check.ok
+                            ? "mcp.detail.tools.none"
+                            : "mcp.detail.tools.failed"
+                      )}
+                    />
+                  ) : null}
                 </div>
               </div>
             )}

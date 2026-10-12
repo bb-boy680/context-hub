@@ -22,6 +22,7 @@ import type {
   McpService,
 } from "./contract.ts"
 import { McpError, mcpFailure } from "./contract.ts"
+import { createRemoteProbe, probeAvailable, type McpCacheEntry, type McpProbeQuery, type McpProbeReport } from "./probe.ts"
 import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
 
 import {
@@ -41,10 +42,15 @@ import type {
   McpConfigFile,
   McpDraft,
   McpPatch,
+  McpPlaceKind,
   McpRecord,
   McpScanProblem,
+  McpServer,
   McpTag,
 } from "./types.ts"
+
+/** How many probes run side by side; a stdio server takes seconds to answer. */
+const PROBE_CONCURRENCY = 3
 
 /** Every tag a server may carry; the first is the row's "any tag" chip. */
 export const MCP_TAGS: readonly string[] = [
@@ -77,6 +83,8 @@ export function failureText(t: (key: string) => string, failure: McpFailure): st
 export interface McpLibrary {
   /** Whether this form can reach client files at all. */
   available: boolean
+  /** Whether this form can run probes, which needs a host behind the page. */
+  canProbe: boolean
   /** A call is in flight, so its controls are disabled. */
   busy: boolean
   /** The last failure, ready to show; null when the last call settled clean. */
@@ -85,8 +93,17 @@ export interface McpLibrary {
   catalog: McpCatalog | null
   /** Every client file an enabled extension described. */
   places: McpAgentPlace[]
+  /** Servers whose probe is running right now. */
+  testing: readonly string[]
   /** Scan every file again and rebuild the rows. */
   refresh(): Promise<void>
+  /** Prove one server now, cache and all; a failed probe is a result, not an error. */
+  test(id: string): Promise<void>
+  /**
+   * Prove a declaration that is not recorded yet, which the add dialog uses to
+   * try it out. Nothing is kept: a draft has no name to keep an answer under.
+   */
+  testDraft(declaration: McpDeclaration): Promise<McpProbeReport>
   /** Record a server; nothing is written into a client file yet. */
   create(draft: McpDraft): Promise<void>
   /** Rewrite one server's record, carrying its declarations along when it is renamed. */
@@ -137,9 +154,51 @@ export function useMcpLibrary(): McpLibrary {
   /* The scan and the moment it ran travel together: the page says how long ago
      it checked, and both are replaced by the same read. */
   const [scan, setScan] = React.useState<{ answer: McpScan; at: number } | null>(null)
+  /* What the probe cache answered, by server name; a name the cache cannot
+     answer for is null until its own probe lands. */
+  const [checks, setChecks] = React.useState<Record<string, McpCacheEntry | null>>({})
+  const [testing, setTesting] = React.useState<readonly string[]>([])
+  const [canProbe, setCanProbe] = React.useState(false)
   const [busy, setBusy] = React.useState(files !== null)
   const [failure, setFailure] = React.useState<string | null>(null)
   const generation = React.useRef(0)
+  const availability = React.useRef<Promise<boolean> | null>(null)
+  const probing = React.useRef(new Map<string, Promise<McpCacheEntry>>())
+  const port = React.useMemo(() => createRemoteProbe(), [])
+
+  /** Whether a host answers for probes; asked once, remembered for the session. */
+  const reachable = React.useCallback(async (): Promise<boolean> => {
+    availability.current ??= probeAvailable()
+    const ok = await availability.current
+    if (ok) setCanProbe(true)
+    return ok
+  }, [])
+
+  /**
+   * One probe per server at a time. Two reads that overlap — the development
+   * build mounts its effects twice, and a scope change reschedules one — share
+   * a single probe instead of starting a second one against the same server.
+   */
+  const probeOnce = React.useCallback(
+    (target: McpProbeQuery, names: readonly string[]): Promise<McpCacheEntry> => {
+      const held = probing.current.get(target.name)
+      if (held !== undefined) return held
+      const running = port.probe({
+        name: target.name,
+        declaration: target.declaration,
+        scope: target.scope,
+        names,
+        save: true,
+      })
+      probing.current.set(target.name, running)
+      void running.then(
+        () => probing.current.delete(target.name),
+        () => probing.current.delete(target.name)
+      )
+      return running
+    },
+    [port]
+  )
 
   const log = React.useCallback<McpLog>(
     (level, message) => {
@@ -148,25 +207,104 @@ export function useMcpLibrary(): McpLibrary {
     [ctx]
   )
 
-  /** Read every place's file through the provider that described it. */
-  const read = React.useCallback(async () => {
-    if (files === null) return
-    /* Which places exist is a reload key: it decides what the scan reads. */
-    void placeKey
-    const current = ++generation.current
-    try {
-      const answer = await scanPlaces(currentPlaces(service, iconFor), files, log)
-      /* A slower earlier scan must not overwrite a newer one. */
+  /**
+   * Probe the servers one scan found. With `force` false the cache answers
+   * first and only the misses run; with it true every server runs again, which
+   * is what a manual check means. Each answer lands on its own row as it
+   * arrives, three probes at a time, so a server that takes seconds to wake up
+   * never holds up the ones beside it.
+   */
+  const probeAll = React.useCallback(
+    async (answer: McpScan, at: number, force: boolean, current: number) => {
+      if (!(await reachable())) return
       if (current !== generation.current) return
-      setScan({ answer, at: Date.now() })
-      setFailure(null)
-    } catch (error) {
-      if (current !== generation.current) return
-      setFailure(failureText(t, mcpFailure(error, "mcp.error.scan")))
-    } finally {
-      if (current === generation.current) setBusy(false)
-    }
-  }, [service, iconFor, placeKey, files, log, t])
+      const places = currentPlaces(service, iconFor)
+      /* The records are read from the store rather than from state: this runs
+         inside a callback that must not be rebuilt every time they change. */
+      const servers = buildCatalog(
+        readRecords(ctx.host.storage.read(RECORDS_KEY)),
+        answer,
+        places,
+        [],
+        at
+      ).servers
+      const targets = probeTargets(servers, places)
+      if (targets.length === 0) return
+      const names = targets.map((target) => target.name)
+
+      let known: Readonly<Record<string, McpCacheEntry | null>> | null = null
+      if (!force) {
+        try {
+          known = await port.cache(targets)
+        } catch (error) {
+          setFailure(failureText(t, mcpFailure(error, "mcp.error.probe")))
+          return
+        }
+        if (current !== generation.current) return
+        setChecks({ ...known })
+      }
+
+      const queue = targets.filter((target) => force || known?.[target.name] === null)
+      const worker = async (): Promise<void> => {
+        for (;;) {
+          /* A newer scan owns the screen from here on; it starts its own run. */
+          if (current !== generation.current) return
+          const next = queue.shift()
+          if (next === undefined) return
+          setTesting((all) => [...all, next.name])
+          try {
+            const entry = await probeOnce(next, names)
+            if (current !== generation.current) return
+            setChecks((all) => ({ ...all, [next.name]: entry }))
+          } catch (error) {
+            if (current !== generation.current) return
+            setFailure(failureText(t, mcpFailure(error, "mcp.error.probe")))
+          } finally {
+            if (current === generation.current) {
+              setTesting((all) => all.filter((name) => name !== next.name))
+            }
+          }
+        }
+      }
+      await Promise.all(
+        Array.from({ length: Math.min(PROBE_CONCURRENCY, queue.length) }, worker)
+      )
+    },
+    [service, iconFor, ctx, port, probeOnce, reachable, t]
+  )
+
+  /**
+   * Read every place's file through the provider that described it, then bring
+   * the probe cache up to date: a server whose answer no longer applies is
+   * probed once, and one the cache still answers for waits for a person.
+   */
+  const read = React.useCallback(
+    async (force = false) => {
+      if (files === null) return
+      /* Which places exist is a reload key: it decides what the scan reads. */
+      void placeKey
+      const current = ++generation.current
+      /* Probes belong to the scan that asked for them; a new one starts over. */
+      setTesting([])
+      try {
+        const answer = await scanPlaces(currentPlaces(service, iconFor), files, log)
+        /* A slower earlier scan must not overwrite a newer one. */
+        if (current !== generation.current) return
+        const at = Date.now()
+        setScan({ answer, at })
+        setFailure(null)
+        /* The list is readable now; its probes run beside it, not before it. */
+        setBusy(false)
+        await probeAll(answer, at, force, current)
+      } catch (error) {
+        if (current !== generation.current) return
+        setFailure(failureText(t, mcpFailure(error, "mcp.error.scan")))
+      } finally {
+        if (current === generation.current) setBusy(false)
+      }
+    },
+    [service, iconFor, placeKey, files, log, t, probeAll]
+  )
 
   React.useEffect(() => {
     /* Deferred a microtask: the scan's state change belongs to the read that
@@ -187,9 +325,10 @@ export function useMcpLibrary(): McpLibrary {
       scan.answer,
       placesOf(currentProviders(service), iconFor),
       problems,
-      scan.at
+      scan.at,
+      checks
     )
-  }, [scan, records, service, revision, iconFor, t])
+  }, [scan, records, service, revision, iconFor, t, checks])
 
   /** Save the records and hand them to the form's own state store. */
   const keep = React.useCallback(
@@ -222,15 +361,14 @@ export function useMcpLibrary(): McpLibrary {
     },
     [service, iconFor, files, log]
   )
-
-  /** Run one change, then read every file again. */
+  /** Run one change, then read every file again. `force` re-probes as well. */
   const run = React.useCallback(
-    async (action: () => Promise<void>) => {
+    async (action: () => Promise<void>, force = false) => {
       setBusy(true)
       setFailure(null)
       try {
         await action()
-        await read()
+        await read(force)
       } catch (error) {
         setFailure(failureText(t, mcpFailure(error, "mcp.error.action")))
       } finally {
@@ -242,13 +380,46 @@ export function useMcpLibrary(): McpLibrary {
 
   return {
     available: files !== null,
+    canProbe,
     busy,
     failure,
     catalog,
     places,
+    testing,
 
     async refresh() {
-      await run(async () => undefined)
+      await run(async () => undefined, true)
+    },
+
+    async test(id) {
+      /* A probe that cannot reach the server is a result, so only a call that
+         never got to run one is a failure here. */
+      setFailure(null)
+      setTesting((all) => [...all, id])
+      try {
+        const server = rowOf(id)
+        const declaration = server.detail.declaration
+        if (declaration === null) throw new McpError("mcp.error.incomplete")
+        if (!(await reachable())) throw new McpError("mcp.error.noProbe")
+        const entry = await probeOnce(
+          {
+            name: id,
+            declaration,
+            scope: targetScope(server, currentPlaces(service, iconFor)),
+          },
+          (catalog?.servers ?? []).map((held) => held.id)
+        )
+        setChecks((all) => ({ ...all, [id]: entry }))
+      } catch (error) {
+        setFailure(failureText(t, mcpFailure(error, "mcp.error.probe")))
+      } finally {
+        setTesting((all) => all.filter((name) => name !== id))
+      }
+    },
+
+    async testDraft(declaration) {
+      if (!(await reachable())) throw new McpError("mcp.error.noProbe")
+      return port.probe({ declaration, scope: "workspace", save: false })
     },
 
     async create(draft) {
@@ -357,6 +528,30 @@ function currentProviders(service: McpService | null): readonly McpProvider[] {
 /** The places those providers describe, read at call time. */
 function currentPlaces(service: McpService | null, iconFor: (id: string) => ExtensionIcon): ScannedPlace[] {
   return placesOf(currentProviders(service), iconFor)
+}
+
+/**
+ * The scope a server is probed under: the scope of the first place that holds
+ * it, which is where its declaration came from. A server that only exists as a
+ * record runs under the workspace.
+ */
+function targetScope(server: McpServer, places: readonly ScannedPlace[]): McpPlaceKind {
+  const held = server.detail.installs.find((install) => install.installed)
+  return places.find((entry) => entry.place.id === held?.place)?.place.scope ?? "workspace"
+}
+
+/** What a probe would run for each row. Rows with no readable declaration are left out. */
+function probeTargets(
+  servers: readonly McpServer[],
+  places: readonly ScannedPlace[]
+): McpProbeQuery[] {
+  const targets: McpProbeQuery[] = []
+  for (const server of servers) {
+    const declaration = server.detail.declaration
+    if (declaration === null) continue
+    targets.push({ name: server.id, declaration, scope: targetScope(server, places) })
+  }
+  return targets
 }
 
 /** Whether a declaration says enough to be written into a file. */

@@ -10,6 +10,8 @@
  */
 import type { ExtensionIcon } from "@workspace/extensions"
 import type { McpDeclaration, McpPlace, McpTransport } from "./contract.ts"
+import type { McpCacheEntry } from "./probe.ts"
+import type { McpTool } from "./tools.ts"
 
 export type { McpDeclaration, McpTransport } from "./contract.ts"
 
@@ -125,8 +127,8 @@ export interface McpDetail {
   tags: string[]
   /** This server's state in every place the catalog lists. */
   installs: McpInstall[]
-  /** How many tools the server exposes; 0 until a connection proves otherwise. */
-  tools: number
+  /** The tools the last probe listed; empty until one proves what they are. */
+  tools: McpTool[]
 }
 
 /** One MCP server as the list and the cards present it. */
@@ -150,8 +152,17 @@ export interface McpServer {
   unreadable: number
   /** How many places declare it, which the check column and the panel count. */
   installed: number
-  /** The verdict the last scan reached. */
+  /**
+   * The row's one verdict: a declaration another file disagrees with, an entry
+   * this build cannot read, or a probe that could not connect.
+   */
   status: McpStatus
+  /**
+   * What the last probe of this server found, when one has run and the cache
+   * still applies. It is kept apart from {@link status}, which is about the
+   * client files rather than about reaching the server.
+   */
+  check?: McpCacheEntry
   mark: McpMark
   /** The primary tag id; empty when untagged. */
   tag: string

@@ -55,7 +55,7 @@ const NOWHERE: McpServer = {
   status: "ready",
   mark: "generic",
   tag: "",
-  detail: { declaration: null, tags: [], installs: [], tools: 0 },
+  detail: { declaration: null, tags: [], installs: [], tools: [] },
 }
 
 /** One row's action cluster: test, enablement, and the install target. */
@@ -67,13 +67,14 @@ function RowActionCluster({ server, actions }: { server: McpServer; actions: Ser
       <button
         type="button"
         aria-label={t("mcp.action.testConnection")}
+        disabled={actions.testing}
         onClick={(event) => {
           event.stopPropagation()
           actions.onTest()
         }}
         className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-secondary transition-colors hover:bg-muted"
       >
-        <PlugZapIcon className="size-[15px] text-copy" />
+        <PlugZapIcon className={cn("size-[15px] text-copy", actions.testing && "animate-spin")} />
       </button>
       <ServerControls server={server} actions={actions} />
     </>
@@ -114,7 +115,7 @@ function ServerRow({
       </span>
 
       <div className={cn("flex flex-col justify-center", COLUMNS.server)}>
-        <div className="flex min-w-0 items-center gap-4">
+        <div className="flex min-w-0 itemicon={server.check?.icon} s-center gap-4">
           <ServerTile mark={server.mark} />
           <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
             <div className="flex items-center gap-2">

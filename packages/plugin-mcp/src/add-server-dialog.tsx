@@ -2,12 +2,20 @@
  * The add-server dialog: the shared server form in a dialog of its own, opened
  * on the transport the caller asked for. The dialog owns the values and hands
  * them on as a draft, so the page decides what recording one means.
+ *
+ * The test button proves the form's declaration without recording anything:
+ * a draft has no name, so its answer is shown here and kept nowhere.
  */
 import { PlugZapIcon, XIcon } from "lucide-react"
 import * as React from "react"
 
+import { cn } from "cn"
+
+import { mcpFailure } from "./contract.ts"
+import { failureText } from "./library.ts"
+import type { McpProbeReport } from "./probe.ts"
 import { ServerForm, declarationOf, type ServerFormValues } from "./server-form.tsx"
-import type { McpDraft } from "./types.ts"
+import type { McpDeclaration, McpDraft } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@workspace/ui/components/dialog"
@@ -26,12 +34,18 @@ const NEW_SERVER: ServerFormValues = {
 export function AddServerDialog({
   remote = false,
   busy = false,
+  canProbe = false,
+  onTest,
   onSubmit,
   onClose,
 }: {
   /** Open the form on a remote transport rather than the stdio template. */
   remote?: boolean
   busy?: boolean
+  /** Whether this form can run a probe at all. */
+  canProbe?: boolean
+  /** Prove one declaration without recording it. */
+  onTest: (declaration: McpDeclaration) => Promise<McpProbeReport>
   /** Record the draft; a thrown error keeps the dialog open with its reason. */
   onSubmit: (draft: McpDraft) => Promise<void>
   onClose: () => void
@@ -41,6 +55,25 @@ export function AddServerDialog({
     remote ? { ...NEW_SERVER, transport: "sse" } : NEW_SERVER
   )
   const [failure, setFailure] = React.useState<string | null>(null)
+  const [testing, setTesting] = React.useState(false)
+  const [probe, setProbe] = React.useState<McpProbeReport | null>(null)
+
+  const test = () => {
+    const declaration = declarationOf(values)
+    setProbe(null)
+    if (declaration === null) {
+      setFailure(t("mcp.error.incomplete"))
+      return
+    }
+    setFailure(null)
+    setTesting(true)
+    void onTest(declaration)
+      .then(setProbe)
+      .catch((error: unknown) => {
+        setFailure(failureText(t, mcpFailure(error, "mcp.error.probe")))
+      })
+      .finally(() => setTesting(false))
+  }
 
   const submit = () => {
     setFailure(null)
@@ -96,6 +129,21 @@ export function AddServerDialog({
           {failure === null ? null : (
             <p className="pt-3 text-[12.5px] leading-[1.4] text-destructive">{failure}</p>
           )}
+          {probe === null ? null : (
+            <p
+              className={cn(
+                "pt-3 text-[12.5px] leading-[1.4]",
+                probe.ok ? "text-copy" : "text-destructive"
+              )}
+            >
+              {probe.ok
+                ? t("mcp.check.ok").replace("{ms}", String(probe.ms))
+                : failureText(t, {
+                    key: `mcp.check.error.${probe.error?.kind ?? "unknown"}`,
+                    params: probe.error?.params,
+                  })}
+            </p>
+          )}
         </div>
 
         <div className="flex h-[72px] shrink-0 items-center justify-between gap-3 border-t border-border px-6">
@@ -112,10 +160,12 @@ export function AddServerDialog({
             </Button>
             <Button
               variant="outline"
+              onClick={test}
+              disabled={testing || !canProbe}
               className="h-9 gap-2 rounded-full px-4 text-[13px] font-medium"
             >
-              <PlugZapIcon className="size-[15px]" />
-              {t("mcp.action.testConnection")}
+              <PlugZapIcon className={cn("size-[15px]", testing && "animate-spin")} />
+              {t(testing ? "mcp.action.connecting" : "mcp.action.testConnection")}
             </Button>
             <Button
               onClick={submit}

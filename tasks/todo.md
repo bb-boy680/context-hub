@@ -1,3 +1,168 @@
+# MCP 连接探测（2026-10-12）
+
+## 目标
+
+把 MCP 页的「测试连接」从空操作变成真握手（官方 `@modelcontextprotocol/sdk`，进程内），
+并把探测结果缓存：**发现 MCP → 比对缓存 → 未命中才自动探测一次；命中就不探测，等用户手动操作。**
+探测所得（serverInfo/图标/capabilities/instructions/tools）驱动卡片图标、详情弹窗与「工具」页签。
+
+## 规则（用户 2026-10-12 确认）
+
+- **命中** = 缓存里有这个名字，**且声明指纹一致**。声明改了（命令/参数/URL/headers/env/作用域）
+  等于「没找到」，自动重探一次；只改注释、空白、键顺序不影响。
+- **失败条目也算命中**：上次连不上不会每次开页面自动重试，用户点「测试连接」才重试。
+- 手动「测试连接」= 忽略缓存重探这一条；重探结果照常写回缓存。
+- 探测范围 = 一次会话里 `initialize` → `notifications/initialized` → `tools/list`（拿「详细信息」）。
+- 探测只发生在 MCP 页打开、发现跑完之后（发现照旧每次都真读文件；只缓存昂贵的探测）。
+
+## 存储
+
+`<home>/mcp/cache.json`（宿主写，浏览器只读；纯派生缓存，删掉会重建）：
+
+```jsonc
+{ "version": 1,
+  "servers": { "<name>": {
+    "probe": 1,                    // 探测实现版本；以后想多收内容就 +1，旧条目自动失效
+    "fingerprint": "sha256:…",     // 原始声明 + scope + 解析后 cwd 的哈希（值不进文件）
+    "target": "npx -y …",          // declarationLine()，凭据脱敏
+    "scope": "workspace", "at": 0, "ms": 0,
+    "ok": true,
+    "protocolVersion": "2025-06-18",
+    "serverInfo": { "name": "…", "title": "…", "version": "…", "websiteUrl": "…" },
+    "icon": { "src": "data:…", "mimeType": "image/svg+xml", "sizes": "any" },
+    "capabilities": {}, "instructions": "…（≤2KB）",
+    "tools": [ { "name": "…", "title": "…", "description": "…", "inputSchema": {}, "outputSchema": {} } ],
+    "error": { "kind": "spawn|auth|timeout|protocol|env", "message": "…", "code": "…" },  // 失败时
+    "stderr": "…（最后 4KB，仅 stdio 失败）"
+  } } }
+```
+
+- 为什么不在 `state/`：`state/` 会被 App 启动全量读进内存、每次整份 PUT；几十~几百 KB 的派生数据不走那条路
+  （先例：技能库的派生数据在 `<home>/skills/index.json` 自己的目录下）。
+- 上限（防病态服务器）：icon ≤ 32 KB、instructions ≤ 2 KB、stderr ≤ 4 KB、tools 序列化 ≤ 256 KB。
+- 不存：env/headers 明文（只进哈希）、完整日志、原始报文。
+- 清理：每次落盘顺带删掉不在当前目录里的名字（与本次写入合并成一次）。
+- 宿主是唯一写者；浏览器只收本次 probe 的 entry，不信自己拼的整份文档。
+
+## 改动
+
+- 依赖：`@modelcontextprotocol/sdk` 加进 `plugin-mcp`，只被 `src/host/**` 与 `vite.ts` 引用（`contract.ts` 的无 `node:*` 约束不破）。
+- `packages/plugin-mcp/src/host/probe.ts`（新）：SDK 探测。`new Client({name,version})` +
+  `StdioClientTransport` / `StreamableHTTPClientTransport` / `SSEClientTransport`；`${VAR}`/`$VAR` 按
+  Claude Code 语义在**探测时**展开（缺变量报 `kind:"env"`），展开结果绝不写回文件；超时 stdio 30s / 远程 15s；
+  核对 Windows 下 npx 型命令的孙进程是否残留（必要时 `taskkill /T` 兜底）。
+- `packages/plugin-mcp/src/host/cache.ts`（新）：cache.json 读写（原子写，复用 `@workspace/core/host/atomic`）。
+- `packages/plugin-mcp/vite.ts`（新，恢复 `"./vite"` export）：`POST /hub/mcp?action=probe|cache`；
+  probe 体 = `{declaration, scope|cwd, cache, timeoutMs?}`（`cache:false` 供添加弹窗试用、不落盘）；
+  `apps/web/vite.config.ts` 注册。
+- `packages/plugin-mcp/src/probe.ts`（新，浏览器侧）：`probeAvailable()` + `createRemoteProbe()`，无 `node:*`。
+- `packages/plugin-mcp/src/types.ts`：新增 `McpCheck`（浏览器可读的条目）；`McpServer.check?`；
+  `McpDetail.tools: number → McpTool[]`。
+- `packages/plugin-mcp/src/schema-tree.ts`（新）：JSON Schema → `McpField[]`（渲染期转换，缓存保真存原始 schema）。
+- `packages/plugin-mcp/src/library.ts`：读缓存 → 未命中入队（并发 3）→ 结果并入 catalog；手动重探动作。
+- 页面：卡片/列表图标优先 `check.icon.src`（`<img>`，SVG 绝不内联）；「测试连接」出进行中/成功（耗时、协议版本）/
+  失败（原因 + stderr 尾巴）；详情弹窗加「连接」段；「工具」页签接真数据；无宿主形态按钮禁用并说明。
+- 文案：`mcp.check.*` 等新键；en + zh 同步（`check-messages.ts` 兜底相等）。
+
+## 执行顺序（边做边勾）
+
+- [x] 0. 装依赖并核对 API：`@modelcontextprotocol/sdk@1.32.1` 已进 plugin-mcp（仅宿主侧引用）；
+  核对结果：`icons`/`websiteUrl` 已在 SDK 类型里；stdio 可 `stderr:"pipe"` 且启动前就能挂监听；
+  `close()` 是 SIGTERM→SIGKILL，**只作用于直接子进程**（npx 型孙进程留给检查脚本观察）；
+  **SDK 不暴露协商后的 protocolVersion** → probe 用 transport 包装在 initialize 回包上取值。
+- [x] 1. `src/host/probe.ts`：一个会话完成 initialize + tools/list；`${VAR}`/`${VAR:-default}` 展开（缺变量 → `kind:"env"`）；
+  错误分类 env|spawn|auth|network|timeout|protocol|unknown（"Connection closed" 归 spawn）；上限截断。
+- [x] 2. `src/host/cache.ts`：指纹（原始声明 + scope + cwd，sha256、键序无关）、`<home>/mcp/cache.json`
+  原子写 + 写队列、读回校验、prune、`PROBE_VERSION`。
+- [x] 3. 桥：`plugin-mcp/vite.ts`（`"./vite"` export）+ `apps/web/vite.config.ts`；`GET /hub/mcp` = 探活，
+  `POST …?action=probe|cache`；probe 支持 `save:false`（添加弹窗试用不落盘）。
+- [x] 4. `scripts/check-probe.ts` + `scripts/fixture-server.mjs`：**43/43**（真实起进程、真连端口、真写盘）。
+- [x] 5. 浏览器侧：`src/probe.ts`（类型 + 线上校验 + 客户端 + 探活）+ `types.ts`（`McpServer.check?`、
+  `McpDetail.tools: McpTool[]`）+ `schema-tree.ts`（JSON Schema → 树）。
+- [x] 6. `library.ts`：读完文件 → compare → 未命中自动探测（并发 3、同名去重防双跑）→ 并入 catalog；
+  `test(id)` 单条重探；`refresh()`（检查全部）强制重探；`testDraft()` 供添加弹窗试用。
+- [x] 7. UI：瓦片优先画服务器自己的 icon（`<img>`，加载失败回落品牌 mark）、
+  **卡片检查块 = 声明字段本身**（http/sse：URL + 请求头；stdio：命令 + 参数 + 环境变量；
+  args/env/headers 为空时值显示「无需」`mcp.check.none`，**不再显示「位置」行** —— 用户明确要求）、
+  **「就绪/失败」胶囊是唯一的状态指示（2026-10-12 用户第四轮）**：卡片上**完全不出现探测结果行**——
+  成功不写「已连接 · N ms」（用户："已连接也没有啊 我都已经有就绪了"），失败也不写「连接 · 原因」
+  （用户："还有这个也是多余"）；原因只在详情弹窗的检查块里（句子 + 原始报错 + stderr 尾巴），
+  卡片只展示配置字段与状态胶囊。连带删除 `checkVerdict`、`mcp.card.connection`、`mcp.check.kind.*`
+  （14 个中英键）。`status` 现在 = 配置冲突/不可读 **或** 探测失败。
+  详情弹窗检查块里多一行 `websiteUrl`（等宽、ink、左对齐、外链图标、`h-[26px]`，**没有标签**）、
+  失败时才出现的报错块（句子 + 原始报错 + stderr 尾巴）、
+  工具页签接真数据（空态分「未探测 / 无工具 / 上次失败」）、添加弹窗可试用探测、无宿主禁用。
+- [x] 8. 文案 en+zh；`pnpm typecheck` 10/10；plugin-mcp lint 干净；`check-messages.ts` 417/417。
+- [x] 9. 真机验证：见下。
+
+## 第七轮修正（2026-10-12，用户："我不要这个最大字符上限" + "Tools 为什么获取不到 output 的描述"）
+
+- **描述类文本不再截断**：删除 `DESCRIPTION_LIMIT`/`INSTRUCTIONS_LIMIT` 与 `head()`；
+  `serverInfo.description` 与 `instructions` 原样入缓存（详情弹窗本来就是完整展示的地方）。
+  保留的只剩真正的防护上限：icon 32KB、stderr 4KB、tools 256KB/500 条。
+  `PROBE_VERSION` 3 → 4（旧缓存里可能存在被截断的值）。
+- **工具树的两个真实解析缺口（本次修复）**：
+  1. `schema-tree` 从不读 schema 的 `title` —— 钉钉的全部字段用的是 `title`（"待办任务 taskId"），
+     以前整列描述都空白；现在 `schemaText` = `description` 优先、`title` 回落。
+  2. input/output schema 的**根描述**被写死文案（"入参"/"返回信息"）覆盖 —— 现在根行显示服务器写的内容，
+     服务器没写才回落 i18n；`McpTool` 增加 `inputDescription`/`outputDescription`。
+- **output 为空的真相与呈现**：context7 与两个钉钉服务器的工具**都没有 `outputSchema`**（原始 tools/list 为证）——
+  MCP 的 outputSchema 是可选字段。现在 output 既无字段又无描述时显示「服务器没有声明输出结构。」
+  （`mcp.detail.tools.noOutput`），而不是一个空树。
+- 验证：check-mcp 51/51（含 4 条工具树断言）、check-probe 44/44、消息 410/410；浏览器实测
+  context7 与钉钉待办的入参树完整显示、出参显示说明。
+
+## 描述与图标（2026-10-12 用户两问）
+
+- **图标**：钉钉端点在 `2025-11-25` 下返回的 `serverInfo` 只有 `name`/`version` —— 无 `icons`/`title`/`websiteUrl`；
+  图标是 SEP-973 的可选字段，服务器不实现就没有，hub 按设计回落通用图标（已用原始 initialize 请求作证）。
+- **描述（本次补的真实缺口）**：原探测**没读 `serverInfo.description`**，且 `instructions` 只存不显。
+  现在：探测读 `description`（≤1KB 上限）+ 卡片/弹窗按「记录 → serverInfo.description → instructions」回落（`descriptionOf`）。
+  `PROBE_VERSION` 2 → 3（探测多收字段，旧判定退休、各服务器自动重探一次）。
+- 实测：context7 的 `serverInfo.description`（"Context7 provides up-to-date documentation..."）一直存在，
+  修前不显示、修后上卡片；钉钉服务器自身两个字段都不提供（原始响应为证），描述仍为空
+  —— 若要让这类服务器也有描述，需要一个「手写描述」的表单字段（尚未做，待用户决定）。
+- 覆盖：`check-probe.ts` 44/44（夹具服务器加了 description）、`check-mcp.ts` 47/47（4 条回落断言）。
+
+## 真机验证（2026-10-12）
+
+- **真实远端**：`context7`（`~/.claude.json`、Streamable HTTP）自动探测成功 → 指纹/图标（https）/
+  serverInfo（Context7 4.3.0）/协议 2025-11-25/tools 2 个全部落盘；图标 URL 在本机拉不到时回落品牌 mark；
+  卡片的收尾形态是「就绪」胶囊 + 配置字段（不再有「已连接 · N ms」行）。
+- **失败与 auth 分类修正（同日第四轮）**：用户新增的「钉钉 AI 表格」返回 `HTTP 401`，而 SDK 的
+  `StreamableHTTPError` **把 401 放在 `code` 上、消息里没有数字**，原分类落到 unknown → 显示「探测失败」。
+  已修：`classify` 现在也认 `code === "401"/"403"`，显示「需要授权」；**`PROBE_VERSION` 1 → 2**
+  （报错分类也是探测实现的一部分，干脆退休全部旧判定、各服务器自动重探一次）。
+  注意：**改宿主侧代码必须重启 dev server**（Vite 插件模块不会热更，旧进程仍跑旧的分类与版本号）。
+- **手动重探**：卡片「测试连接」→ 按钮禁用旋转 → 结果刷新（2282 ms）；「检查全部」强制重探全部（3402 ms）
+  并 prune 掉已消失的名字。
+- **试用（save:false）**：添加弹窗「测试连接」显示「已连接 · 139 ms」，缓存文件不变。
+- **失败路径**：`ctx-hub-no-such-command-xyz` → 卡片「连接 · 进程失败」；弹窗显示完整句子 +
+  `MCP error -32000: Connection closed` + 服务器日志（cmd.exe 原文）；工具页签「上次连接失败，还不知道这个服务器有哪些工具」。
+- **清理**：测试记录（fixture-check / broken-check）已删除，`state/mcp.json` 为空，`cache.json` 只剩 context7。
+
+## 已知偏差 / 后续
+
+- 缓存条目在**下一次落盘时**才 prune；某服务器消失后若之后没有任何探测，旧条目会留在文件里（无害）。
+- `check-mcp-tools.ts` 的「无 Node 内置模块」断言现在跳过 `src/host/`（那半部本来就在宿主进程里跑）。
+- 平台报错原文（cmd.exe/系统语言）按原样显示，不翻译。
+
+## 验证
+
+- `packages/plugin-mcp/scripts/check-probe.ts`（新）：指纹命中/失效规则、缓存读写与清理、
+  用仓库自带的 stdio 夹具服务器跑通 probe 全链路（initialize + tools/list + 失败路径）。
+- 真机成对验证：探测一个真实 stdio 服务器（成功、有 tools）、一个不存在的命令（失败、有 reason）；
+  cache.json 与 UI 一致；重开页面不重探（进程/网络无痕）。
+- 收尾：`pnpm run typecheck`、相关包 lint、`locale-zh-cn/scripts/check-messages.ts`。
+
+## 未决
+
+- 批量「重新检测」按钮：本轮先做单条手动重探 + 打开页面时自动补缺；工具栏全量重探看需要再加。
+- `${VAR}` 展开语义以 Claude Code 为准；Codex TOML 的行为后补。
+- 目录里只有记录、未写进任何文件的行是否参与自动探测：按本计划**参与**（cwd 用当前工作区）。
+
+---
+
 # 插件机制：两条轨道 + MCP 由 Agent 插件自持（2026-10-11；2026-10-12 归位）
 
 ## 目标

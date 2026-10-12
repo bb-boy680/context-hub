@@ -12,6 +12,8 @@ import type { McpEntry, McpFailure, McpIo, McpProvider } from "./contract.ts"
 import { declarationLine, mcpFailure } from "./contract.ts"
 import type { PlaceFiles } from "@workspace/core/place-files"
 import type { ExtensionIcon } from "@workspace/extensions"
+import type { McpCacheEntry } from "./probe.ts"
+import { toolTree } from "./schema-tree.ts"
 
 import type {
   McpAgentPlace,
@@ -155,15 +157,20 @@ export async function scanPlaces(
  *
  * A server's declaration is the hub's own when it has a record, and otherwise
  * the first client file that holds a readable one; the copy count, the conflict
- * count and the verdict are derived here rather than stored, so nothing the hub
- * remembers can disagree with the files it just read.
+ *
+ * `checks` is the probe cache as the last compare left it: an entry that still
+ * applies is attached to its row, and a server the cache cannot answer for
+ * carries none.
+ *
+ * @param checks — answers by server name; empty when no cache answered.
  */
 export function buildCatalog(
   records: readonly McpRecord[],
   scan: McpScan,
   places: readonly ScannedPlace[],
   problems: McpScanProblem[],
-  scannedAt: number
+  scannedAt: number,
+  checks: Readonly<Record<string, McpCacheEntry | null>> = {}
 ): McpCatalog {
   const names = new Set<string>(records.map((record) => record.name))
   for (const entries of scan.entries.values()) {
@@ -171,7 +178,9 @@ export function buildCatalog(
   }
 
   const servers = [...names]
-    .map((name) => rowOf(name, records.find((record) => record.name === name), scan, places))
+    .map((name) =>
+      rowOf(name, records.find((record) => record.name === name), scan, places, checks[name] ?? null)
+    )
     .sort((left, right) => left.name.localeCompare(right.name))
   return { servers, scannedAt, problems }
 }
@@ -181,7 +190,8 @@ function rowOf(
   name: string,
   record: McpRecord | undefined,
   scan: McpScan,
-  places: readonly ScannedPlace[]
+  places: readonly ScannedPlace[],
+  check: McpCacheEntry | null
 ): McpServer {
   const installs: McpInstall[] = []
   const declarations: McpDeclaration[] = []
@@ -207,23 +217,48 @@ function rowOf(
   /* Two copies that name the same endpoint agree; the count is only a conflict
      when the copies really differ. */
   const conflicts = endpoints.size > 1 ? endpoints.size : 0
-  const detail: McpDetail = { declaration, tags: record?.tags ?? [], installs, tools: 0 }
+  const detail: McpDetail = {
+    declaration,
+    tags: record?.tags ?? [],
+    installs,
+    tools: (check?.tools ?? []).map(toolTree),
+  }
+  /* One verdict for the row: a file that disagrees with another, an entry this
+     build cannot read, and a probe that could not connect all mean the same
+     thing to whoever reads the pill, and keeping them apart let a row say both
+     "ready" and "process failed" at once. */
+  const failed = conflicts > 0 || unreadable > 0 || (check !== null && !check.ok)
 
   return {
     id: name,
     name,
     transport: declaration?.transport ?? "stdio",
     declaration: declaration === null ? "" : declarationLine(declaration),
-    description: record?.description ?? "",
+    description: descriptionOf(record, check),
     places: [...scopes],
     ...(conflicts > 0 ? { conflicts } : {}),
     unreadable,
     installed: installs.length,
-    status: conflicts > 0 || unreadable > 0 ? "failed" : "ready",
+    status: failed ? "failed" : "ready",
+    ...(check === null ? {} : { check }),
     mark: markOf(name, declaration),
     tag: record?.tags[0] ?? "",
     detail,
   }
+}
+
+/**
+ * What a row says about the server: the sentence the hub recorded, or failing
+ * that the server's own words — the description it published, or the
+ * instructions it handed the client, which is the only prose many servers
+ * write about themselves.
+ */
+function descriptionOf(record: McpRecord | undefined, check: McpCacheEntry | null): string {
+  const written = record?.description
+  if (written !== undefined && written !== "") return written
+  const described = check?.serverInfo?.description
+  if (described !== undefined && described !== "") return described
+  return check?.instructions ?? ""
 }
 
 /** The brand a server is drawn with, from its name and what it runs. */

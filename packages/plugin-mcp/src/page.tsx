@@ -456,10 +456,10 @@ export function McpServersPage() {
     }
   }, [library, openId, placesKey])
 
-  const run = (action: () => Promise<void>) => {
+  const run = React.useCallback((action: () => Promise<void>) => {
     setNotice(null)
     return action()
-  }
+  }, [])
 
   const rowActions = React.useCallback(
     (server: McpServer): ServerActions => ({
@@ -475,9 +475,12 @@ export function McpServersPage() {
       onSetPlaceEnabled: (place, enabled) => {
         void run(() => library.setEnabled(server.id, place, enabled))
       },
-      onTest: () => {},
+      testing: library.testing.includes(server.id),
+      onTest: () => {
+        void library.test(server.id)
+      },
     }),
-    [library, places]
+    [library, places, run]
   )
 
   const toggle = React.useCallback((id: string) => {
@@ -515,7 +518,7 @@ export function McpServersPage() {
         })
       )
     },
-    [library, open, t]
+    [library, open, t, run]
   )
 
   const problem = catalog?.problems[0]
@@ -627,15 +630,17 @@ export function McpServersPage() {
           places={places}
           tags={tags}
           files={files}
-          tools={[]}
-          age={age}
+          tools={open.detail.tools}
+          age={ageText(open.check?.at ?? catalog?.scannedAt ?? null, t)}
           busy={library.busy}
           onClose={() => setOpenId(null)}
           onTogglePlace={(place) => rowActions(open).onTogglePlace(place)}
           onSetPlaceEnabled={(place, enabled) =>
             rowActions(open).onSetPlaceEnabled(place, enabled)
           }
-          onTest={() => {}}
+          onTest={() => {
+            void library.test(open.id)
+          }}
           onSave={save}
           onDelete={() => run(() => library.remove(open.id).then(() => setOpenId(null)))}
         />
@@ -643,6 +648,8 @@ export function McpServersPage() {
       {adding ? (
         <AddServerDialog
           busy={library.busy}
+          canProbe={library.canProbe}
+          onTest={library.testDraft}
           onSubmit={(draft) => library.create(draft)}
           onClose={() => setAdding(false)}
         />

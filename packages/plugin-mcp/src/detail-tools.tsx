@@ -167,18 +167,36 @@ function ToolCard({ tool }: { tool: McpTool }) {
             <Tree
               root="input"
               fields={tool.input}
-              description={t("mcp.detail.tools.inputDesc")}
+              description={
+                tool.inputDescription === ""
+                  ? t("mcp.detail.tools.inputDesc")
+                  : tool.inputDescription
+              }
             />
           </div>
           <div className="flex flex-col gap-1.5">
             <span className="text-[11.5px] leading-[1.3] font-semibold text-muted-foreground">
               {t("mcp.detail.tools.output")}
             </span>
-            <Tree
-              root="output"
-              fields={tool.output}
-              description={t("mcp.detail.tools.outputDesc")}
-            />
+            {/* The output schema is optional, and many servers never write one.
+                A bare root row would read as "nothing to see", so a server that
+                declared neither fields nor a sentence gets told apart from one
+                whose output is simply not described here. */}
+            {tool.output.length === 0 && tool.outputDescription === "" ? (
+              <span className="text-[12px] leading-[1.4] text-muted-soft">
+                {t("mcp.detail.tools.noOutput")}
+              </span>
+            ) : (
+              <Tree
+                root="output"
+                fields={tool.output}
+                description={
+                  tool.outputDescription === ""
+                    ? t("mcp.detail.tools.outputDesc")
+                    : tool.outputDescription
+                }
+              />
+            )}
           </div>
         </div>
       ) : null}
@@ -187,7 +205,7 @@ function ToolCard({ tool }: { tool: McpTool }) {
 }
 
 /** The tools pane: a section head with the count, then the tool cards. */
-export function ToolsPane({ tools }: { tools: McpTool[] }) {
+export function ToolsPane({ tools, empty }: { tools: McpTool[]; empty: string }) {
   const { t } = useI18n()
 
   return (
@@ -203,9 +221,7 @@ export function ToolsPane({ tools }: { tools: McpTool[] }) {
       {/* The cards stack in the pane's own scroll, so this list keeps no
           scroller of its own and every tab's scrollbar sits in one place. */}
       {tools.length === 0 ? (
-        <span className="text-[12.5px] leading-[1.5] text-muted-foreground">
-          {t("mcp.detail.tools.empty")}
-        </span>
+        <span className="text-[12.5px] leading-[1.5] text-muted-foreground">{empty}</span>
       ) : (
         <div className="flex flex-col gap-1.5">
           {tools.map((tool) => (

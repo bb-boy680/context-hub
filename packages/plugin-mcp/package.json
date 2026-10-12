@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@workspace/core": "workspace:*",
     "@workspace/extensions": "workspace:*",
     "@workspace/ui": "workspace:*",
@@ -32,6 +33,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./contract": "./src/contract.ts"
+    "./contract": "./src/contract.ts",
+    "./vite": "./vite.ts"
   }
 }

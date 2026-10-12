@@ -33,33 +33,41 @@ function CardMeta({ server, tag }: { server: McpServer; tag?: McpTag }) {
 }
 
 /**
- * The check block's lines: what the declaration says, and how many files hold
- * it. A conflict or an unreadable entry takes the place of the count, because
- * that is the finding a person has to act on.
+ * The check block's lines: the declaration as the fields it is made of — the
+ * endpoint for a remote server, the command for a stdio one — with "none"
+ * where a list-valued field carries nothing, so the block reads as the whole
+ * configuration rather than its first line.
  */
-function checkRows(server: McpServer, t: (key: string) => string) {
+function checkRows(
+  server: McpServer,
+  t: (key: string) => string
+): { label: string; value: string; bad?: boolean }[] {
   const declaration = server.detail.declaration
-  const rows: { label: string; value: string; bad?: boolean }[] = []
   if (declaration === null) {
-    rows.push({ label: t("mcp.column.server"), value: t("mcp.line.missing"), bad: true })
-  } else if (declaration.transport === "stdio") {
-    rows.push({ label: t("mcp.detail.field.command"), value: declaration.command })
-    rows.push({
-      label: t("mcp.detail.field.arguments"),
-      value: declaration.args.length === 0 ? "—" : declaration.args.join(" "),
-    })
-  } else {
-    rows.push({ label: t("mcp.add.url"), value: declaration.url })
+    return [{ label: t("mcp.column.server"), value: t("mcp.line.missing"), bad: true }]
   }
-  rows.push({
-    label: t("mcp.column.place"),
-    value:
-      server.conflicts === undefined
-        ? t("mcp.check.places").replace("{count}", String(server.installed))
-        : t("mcp.check.conflict").replace("{count}", String(server.conflicts)),
-    ...(server.conflicts === undefined ? {} : { bad: true }),
-  })
-  return rows
+  if (declaration.transport === "stdio") {
+    const variables = Object.keys(declaration.env)
+    return [
+      { label: t("mcp.detail.field.command"), value: declaration.command },
+      {
+        label: t("mcp.check.field.arguments"),
+        value: declaration.args.length === 0 ? t("mcp.check.none") : declaration.args.join(" "),
+      },
+      {
+        label: t("mcp.check.field.environment"),
+        value: variables.length === 0 ? t("mcp.check.none") : variables.join(", "),
+      },
+    ]
+  }
+  const headers = Object.keys(declaration.headers)
+  return [
+    { label: t("mcp.add.url"), value: declaration.url },
+    {
+      label: t("mcp.check.field.headers"),
+      value: headers.length === 0 ? t("mcp.check.none") : headers.join(", "),
+    },
+  ]
 }
 
 /** One server as a card. */
@@ -90,7 +98,7 @@ function ServerCard({
       onClick={onOpen}
     >
       <div className="flex h-10 shrink-0 items-center gap-3">
-        <ServerTile mark={server.mark} size={40} />
+        <ServerTile mark={server.mark} icon={server.check?.icon} size={40} />
         <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
           <div className="flex min-w-0 items-center gap-2">
             <span className="truncate text-[13.5px] leading-[1.3] font-semibold text-foreground">
@@ -116,13 +124,16 @@ function ServerCard({
         <button
           type="button"
           aria-label={t("mcp.action.testConnection")}
+          disabled={actions.testing}
           onClick={(event) => {
             event.stopPropagation()
             actions.onTest()
           }}
           className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-card transition-colors hover:bg-muted"
         >
-          <PlugZapIcon className="size-[15px] text-copy" />
+          <PlugZapIcon
+            className={cn("size-[15px] text-copy", actions.testing && "animate-spin")}
+          />
         </button>
       </div>
 
@@ -152,6 +163,8 @@ function ServerCard({
             </span>
           </div>
         ))}
+        {/* What a probe found is the status pill's to say, and why it failed is
+            the detail panel's; the card only ever shows the configuration. */}
       </div>
 
       <div className="flex h-8 shrink-0 items-center gap-2">

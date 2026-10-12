@@ -10,6 +10,7 @@ import {
   workspaceList,
 } from "@workspace/core/vite"
 import { skillLibrary } from "@workspace/plugin-skills/vite"
+import { mcpProbe } from "@workspace/plugin-mcp/vite"
 import { defineConfig } from "vite"
 
 // https://vite.dev/config/
@@ -26,6 +27,7 @@ export default defineConfig({
     netProxy(),
     skillLibrary(),
     placeFiles(),
+    mcpProbe(),
   ],
   resolve: {
     alias: {

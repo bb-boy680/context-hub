@@ -101,6 +101,8 @@ export interface ServerActions {
   places: readonly McpAgentPlace[]
   onTogglePlace: (place: string) => void
   onSetPlaceEnabled: (place: string, enabled: boolean) => void
+  /** A probe of this server is running right now. */
+  testing: boolean
   onTest: () => void
 }
 

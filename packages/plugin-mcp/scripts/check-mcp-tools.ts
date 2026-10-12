@@ -9,7 +9,7 @@
  *
  * Run from the package: `node scripts/check-mcp-tools.ts`
  */
-import { readFileSync, readdirSync } from "node:fs"
+import { readFileSync, readdirSync, statSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -239,7 +239,11 @@ console.log("surface")
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const MODULE_DIR = path.resolve(HERE, "../src")
-const files = readdirSync(MODULE_DIR)
+/* `src/host` is the half that runs in the process owning the disk, so only the
+   files beside it are the surface a browser reads. */
+const files = readdirSync(MODULE_DIR).filter((file) =>
+  statSync(path.join(MODULE_DIR, file)).isFile()
+)
 check(
   "the module has no Node built-in in it",
   files.every((file) => !readFileSync(path.join(MODULE_DIR, file), "utf8").includes('from "node:'))

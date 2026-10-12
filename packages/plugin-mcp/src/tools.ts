@@ -23,6 +23,10 @@ export interface McpTool {
   description: string
   /** The arguments it takes. */
   input: McpField[]
+  /** What the server says the input is, as the tree's root line reads; empty when it said nothing. */
+  inputDescription: string
   /** What it answers with. */
   output: McpField[]
+  /** What the server declared about the output; empty when it declared none. */
+  outputDescription: string
 }
