@@ -50,6 +50,10 @@
 - **刻意不抽的部分**（2026-10-12 用户确认"先不动，等真的加第三个页面时再抽"）：「位置」小节的外框仍是各页自己写 ——
   小节标题（skills 13/12.5px、mcp 12/12px）、外层 `<ul>`（skills `gap-2.5`、mcp 无间隔）、技能侧那行「技能库」。
   共享的是列表体：分组标题、place 行、两组间发丝线、折叠。
+- **侧栏 Agents 列表也刻意不共享**（同日确认）：`apps/web/src/components/app-sidebar.tsx` 的 `AgentGroup` 自带
+  `AGENTS_VISIBLE = 8` 与自己的折叠行（键 `agents.group.expand/collapse`），是侧栏列（`SidebarRow` + 直接切换 + 折叠），
+  不是下拉也不是搜索，且唯一调用方在 shell 里。于是全仓库现有**三个 8**：组件的 `PLACE_SEARCH_MIN`（菜单搜索）、
+  组件的 `PLACES_VISIBLE`（详情列表折叠）、侧栏的 `AGENTS_VISIBLE`（侧栏折叠）。共享组件里那条折叠行的样式是照侧栏手工对齐的。
 - 视觉/行为保持：菜单宽度 280、≥8 项搜索、菜单行 `items-start gap-2.5 py-2`、列表行 `h-14` 与 28px 图标牌、折叠阈值 8、行尾动作与禁用原因全部照旧；
   只有两处刻意的统一：行图标统一 16px（原 14/15/17/18）、MCP 详情两组之间的分隔从 17px 带变成 1px 发丝线（与技能侧一致）。
 - 新增能力：MCP 详情弹窗的 place 列表现在也有折叠（此前没有），文案 `mcp.place.expand/collapse`。
