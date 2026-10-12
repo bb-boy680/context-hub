@@ -11,12 +11,14 @@
   "dependencies": {
     "@lobehub/icons": "^5.23.0",
     "@workspace/extensions": "workspace:*",
+    "@workspace/plugin-mcp": "workspace:*",
     "react": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10",
     "@types/node": "^24",
     "@types/react": "^19",
+    "@workspace/core": "workspace:*",
     "eslint": "^10",
     "globals": "^17",
     "typescript": "~6",

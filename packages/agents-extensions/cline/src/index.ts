@@ -14,6 +14,7 @@ import Cline from "@lobehub/icons/es/Cline"
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
 
 import { clineMessages } from "./messages.ts"
+import { createClineMcp } from "./provider.ts"
 
 /** This integration's id; the kernel matches it against the manifest. */
 export const CLINE_ID = "hub.target.cline"
@@ -33,21 +34,15 @@ export const clineExtension: ExtensionDefinition = {
     apiVersion: "^0.1",
     kind: "code",
     category: "agent",
-    description: "Deliver skills to Cline.",
+    description: "Deliver skills and MCP servers to Cline.",
     icon: ClineIcon,
     defaultEnabled: true,
-    permissions: ["assets.read"],
+    permissions: ["assets.read", "filesystem"],
   },
   activate(scope) {
     scope.inject(["mcp"], (ctx, plugins) => {
       const { registry, tools } = plugins.mcp
-      ctx.effect(() => registry.register({
-        id: CLINE_ID,
-        places: [
-          { id: "cline", label: "Cline", scope: "workspace", file: ".mcp.json", switchable: false },
-          { id: "claude.global", label: "Cline", scope: "global", file: ".cline.json", switchable: false },
-        ],
-      }))
+      ctx.effect(() => registry.register(createClineMcp(tools)))
     })
 
     /* The place comes first: the target below names it, so a consumer that
@@ -64,10 +59,11 @@ export const clineExtension: ExtensionDefinition = {
       id: CLINE_ID,
       displayName: "Cline",
       icon: ClineIcon,
-      supports: ["skill"],
+      supports: ["skill", "mcp"],
       locations: [
         { label: "Skills", path: "~/.agents/skills/<name>/SKILL.md" },
         { label: "Skills", path: ".agents/skills/<name>/SKILL.md" },
+        { label: "MCP", path: "~/.cline/data/settings/cline_mcp_settings.json" },
       ],
       format: "Markdown skills with YAML frontmatter",
       globalSkillLocation: CLINE_GLOBAL_PLACE,

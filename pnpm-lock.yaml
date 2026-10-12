@@ -147,6 +147,9 @@ importers:
       '@workspace/extensions':
         specifier: workspace:*
         version: link:../../extensions
+      '@workspace/plugin-mcp':
+        specifier: workspace:*
+        version: link:../../plugin-mcp
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -160,6 +163,9 @@ importers:
       '@types/react':
         specifier: ^19
         version: 19.2.18
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../../core
       eslint:
         specifier: ^10
         version: 10.10.0(jiti@2.7.0)
