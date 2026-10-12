@@ -139,8 +139,17 @@ function ServerCard({
       </div>
 
       {/* One line, ellipsis past that: every card keeps the same height and the
-          check block below never moves. */}
-      <p className="line-clamp-1 text-[12.5px] leading-[1.5] text-copy">{server.description}</p>
+          check block below never moves. A server that says nothing about itself
+          reads as the sentence saying so, in the muted colour an absent value
+          wears everywhere else. */}
+      <p
+        className={cn(
+          "line-clamp-1 text-[12.5px] leading-[1.5]",
+          server.description ? "text-copy" : "text-muted-foreground"
+        )}
+      >
+        {server.description || t("mcp.description.missing")}
+      </p>
 
       <div className="flex min-h-0 flex-1 flex-col gap-1">
         <div className="flex h-4 shrink-0 items-center justify-between">

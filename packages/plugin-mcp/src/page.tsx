@@ -41,6 +41,7 @@ import {
   type PlaceOption,
 } from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
+import { toast } from "@workspace/ui/components/toast"
 
 /** Which axis the tab row is filtering on. */
 type TabId = "all" | "ready" | "failed" | "workspace" | "global"
@@ -292,7 +293,6 @@ export function McpServersPage() {
   const [selected, setSelected] = React.useState<ReadonlySet<string>>(new Set())
   const [openId, setOpenId] = React.useState<string | null>(null)
   const [adding, setAdding] = React.useState(false)
-  const [notice, setNotice] = React.useState<string | null>(null)
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
 
@@ -385,36 +385,28 @@ export function McpServersPage() {
   )
   const open = servers.find((server) => server.id === openId) ?? null
 
-  const run = React.useCallback((action: () => Promise<void>) => {
-    setNotice(null)
-    return action()
-  }, [])
-
   const rowActions = React.useCallback(
     (server: McpServer): ServerActions => ({
       places,
       onTogglePlace: (place) => {
         const held = server.detail.installs.find((install) => install.place === place)
-        void run(() =>
-          held?.installed === true
-            ? library.uninstall(server.id, place)
-            : library.install(server.id, place)
-        )
+        void (held?.installed === true
+          ? library.uninstall(server.id, place)
+          : library.install(server.id, place))
       },
       onSetPlaceEnabled: (place, enabled) => {
-        void run(() => library.setEnabled(server.id, place, enabled))
+        void library.setEnabled(server.id, place, enabled)
       },
       testing: library.testing.includes(server.id),
       onTest: () => {
         void library.test(server.id)
       },
     }),
-    [library, places, run]
+    [library, places]
   )
 
   const installSelected = React.useCallback(
     (place: string) => {
-      setNotice(null)
       void Promise.all(
         [...selected].map((id) => library.install(id, place).catch(() => undefined))
       )
@@ -426,26 +418,31 @@ export function McpServersPage() {
     (values: ServerFormValues) => {
       if (open === null) return
       const declaration = declarationOf(values)
-      void run(() =>
-        library.update(open.id, { name: values.name.trim(), declaration }).then(() => {
-          setNotice(t("mcp.form.saved"))
-        })
-      )
+      void library.update(open.id, { name: values.name.trim(), declaration }).then(() => {
+        toast.add({ type: "success", title: t("mcp.form.saved") })
+      })
     },
-    [library, open, t, run]
+    [library, open, t]
   )
 
   const problem = catalog?.problems[0]
-  /* One line under the filters: a failed write first, then what the last check
-     found that a person has to act on. */
-  const status =
+  /* What went wrong, in one sentence: a call the hub could not complete first,
+     then a client file this scan could not read. It is said in a toast, so a
+     stale sentence never stands over the list as if it were its state. */
+  const failed =
     library.failure ??
-    notice ??
     (problem === undefined
       ? null
       : t("mcp.scan.problem")
           .replace("{path}", placePath(places, problem.place))
           .replace("{message}", problem.message))
+  const said = React.useRef<string | null>(null)
+
+  React.useEffect(() => {
+    if (failed === null || failed === said.current) return
+    said.current = failed
+    toast.add({ type: "error", title: failed })
+  }, [failed])
 
   return (
     /* The same shell the skills page uses: a 32px gap between the heading, the
@@ -512,10 +509,6 @@ export function McpServersPage() {
             }}
           />
         </>
-      )}
-
-      {status === null ? null : (
-        <span className="text-[12.5px] leading-[1.4] text-destructive">{status}</span>
       )}
 
       <PageBody
@@ -589,9 +582,12 @@ export function McpServersPage() {
             void library.test(open.id)
           }}
           onSave={save}
-          onDelete={() => run(() => library.remove(open.id).then(() => setOpenId(null)))}
+          onDelete={() => library.remove(open.id).then(() => setOpenId(null))}
           onSetTags={(tags) => {
-            void run(() => library.update(open.id, { tags }))
+            void library.update(open.id, { tags })
+          }}
+          onSetDescription={(description) => {
+            void library.update(open.id, { description })
           }}
         />
       )}

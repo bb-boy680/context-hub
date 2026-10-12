@@ -103,8 +103,10 @@ export function ServerListView({
               <TransportChip transport={server.transport} />
               {server.conflicts ? <SyncChip count={server.conflicts} /> : null}
             </div>
+            {/* A server that says nothing about itself reads as the sentence
+                saying so, rather than an empty line that looks unloaded. */}
             <span className="truncate text-[11.5px] leading-[1.3] text-muted-soft">
-              {server.description}
+              {server.description || t("mcp.description.missing")}
             </span>
           </div>
         </div>

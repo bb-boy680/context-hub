@@ -7,6 +7,8 @@ export const mcpMessages: Record<string, string> = {
   "mcp.title": "MCP servers",
   "mcp.description":
     "Declare the servers your agents may use, and choose which config files each one is written into.",
+  "mcp.description.missing":
+    "This server says nothing about itself. Double-click here to write its description.",
   "mcp.tab.all": "All",
   "mcp.tab.ready": "Ready",
   "mcp.tab.failed": "Failed",
@@ -136,6 +138,8 @@ export const mcpMessages: Record<string, string> = {
   "mcp.detail.tag.add": "Add type",
   "mcp.detail.tag.remove": "Remove {tag}",
   "mcp.detail.tag.placeholder": "New type name",
+  "mcp.detail.description.edit": "Double-click to edit the description",
+  "mcp.detail.description.placeholder": "What is this server for?",
   "mcp.detail.check.lastChecked": "Last checked {age}",
   "mcp.detail.row.tools": "Tools",
   "mcp.detail.row.toolsValue": "{count}",

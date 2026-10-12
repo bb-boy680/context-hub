@@ -19,6 +19,8 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
+import { cn } from "cn"
+
 import { installedCount, MCP_SCOPES, placesInScope, placesOf, type McpPlaceState } from "./installs.ts"
 import { FilesPane } from "./detail-files.tsx"
 import { ToolsPane } from "./detail-tools.tsx"
@@ -36,6 +38,7 @@ import { Dialog, DialogClose, DialogTitle } from "@workspace/ui/components/dialo
 import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
 import { Switch } from "@workspace/ui/components/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import { Textarea } from "@workspace/ui/components/textarea"
 
 /** The three panes the dialog can show. */
 export type DetailTab = "config" | "tools" | "files"
@@ -301,6 +304,81 @@ function ProbeSection({ check }: { check: McpCacheEntry }) {
   )
 }
 
+/**
+ * The description line, which a double click turns into a field to write one
+ * in. A server that says nothing about itself — no description it published and
+ * no instructions it handed the client — reads as the sentence saying so, so an
+ * empty line never looks like a page that failed to load.
+ *
+ * The field starts from what the line shows, so editing the server's own words
+ * is editing them rather than retyping them; what it commits is the hub's
+ * record, which is what the catalog reads first from then on.
+ */
+function DescriptionLine({
+  text,
+  missing,
+  onWrite,
+}: {
+  /** What the server says about itself; empty when it says nothing. */
+  text: string
+  /** The sentence shown, and offered as the field's hint, when `text` is empty. */
+  missing: string
+  onWrite: (description: string) => void
+}) {
+  const { t } = useI18n()
+  const [draft, setDraft] = React.useState<string | null>(null)
+  /* Escape unmounts the field, and the removal raises a blur that must not
+     commit what the person just threw away. */
+  const thrown = React.useRef(false)
+
+  if (draft !== null) {
+    return (
+      <Textarea
+        autoFocus
+        value={draft}
+        aria-label={t("mcp.detail.description.edit")}
+        placeholder={t("mcp.detail.description.placeholder")}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => {
+          setDraft(null)
+          if (thrown.current) {
+            thrown.current = false
+            return
+          }
+          const written = draft.trim()
+          if (written !== text) onWrite(written)
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation()
+            thrown.current = true
+            setDraft(null)
+          }
+          /* The dialog's own Escape is the one that closes it, and a click
+             elsewhere is what commits, so Enter only newlines. */
+          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+            event.currentTarget.blur()
+          }
+        }}
+        className="min-h-[62px] text-[12.5px] leading-[1.5]"
+      />
+    )
+  }
+
+  return (
+    <p
+      onDoubleClick={() => setDraft(text)}
+      title={t("mcp.detail.description.edit")}
+      className={cn(
+        "text-[12.5px] leading-[1.5]",
+        text ? "text-copy" : "text-muted-foreground"
+      )}
+    >
+      {text || missing}
+    </p>
+  )
+}
+
 /** The right-hand panel: what the server is, where it lives, and its state. */
 function ServerPanel({
   server,
@@ -313,6 +391,7 @@ function ServerPanel({
   onSave,
   onDelete,
   onSetTags,
+  onSetDescription,
   busy,
 }: {
   server: McpServer
@@ -326,6 +405,7 @@ function ServerPanel({
   onSave: () => void
   onDelete: () => Promise<void>
   onSetTags: (tags: string[]) => void
+  onSetDescription: (description: string) => void
   busy: boolean
 }) {
   const { t } = useI18n()
@@ -363,7 +443,11 @@ function ServerPanel({
       </header>
 
       <div className="flex min-h-0 flex-1 scrollbar-gutter-stable flex-col gap-[18px] overflow-y-auto p-5">
-        <p className="text-[12.5px] leading-[1.5] text-copy">{server.description}</p>
+        <DescriptionLine
+          text={server.description}
+          missing={t("mcp.description.missing")}
+          onWrite={onSetDescription}
+        />
 
         <TagEditor
           tags={server.detail.tags}
@@ -443,6 +527,7 @@ export function ServerDialog({
   onSave,
   onDelete,
   onSetTags,
+  onSetDescription,
 }: {
   server: McpServer
   places: readonly McpAgentPlace[]
@@ -458,6 +543,7 @@ export function ServerDialog({
   onSave: (values: ServerFormValues) => void
   onDelete: () => Promise<void>
   onSetTags: (tags: string[]) => void
+  onSetDescription: (description: string) => void
 }) {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<DetailTab>("config")
@@ -567,6 +653,7 @@ export function ServerDialog({
             onSave={save}
             onDelete={onDelete}
             onSetTags={onSetTags}
+            onSetDescription={onSetDescription}
           />
         }
       />
