@@ -1203,7 +1203,7 @@ const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 /**
  * Every place this skill could live, with the row's own action on each: the way
  * into a place that does not hold it yet is here, not only the way out of the
- * ones that do. A place is a property of the skill ? the card reads how many
+ * ones that do. A place is a property of the skill — the card reads how many
  * hold it, and this section is what that count means.
  */
 function PlacesSection({
@@ -1258,7 +1258,7 @@ function PlacesSection({
   const soft = `${pill} bg-secondary text-foreground hover:bg-accent`
   const outlinePill = `${pill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`
 
-  /* Held, the row offers the way out; not held, the way in ? unless the place
+  /* Held, the row offers the way out; not held, the way in — unless the place
      cannot take it: a workspace with no folder to write into, or a name another
      skill already holds there. */
   const rowAction = (id: string) => {

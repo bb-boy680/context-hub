@@ -163,7 +163,7 @@ function TagPill({ tag }: { tag: string }) {
  * The words every place list on this page draws, resolved in the active locale.
  * The lists themselves know no keys: a module hands them the strings it owns.
  *
- * @param t ? the active locale's lookup.
+ * @param t — the active locale's lookup.
  * @returns the strings a place menu and a list of places draw.
  */
 function placeWords(t: (key: string) => string): PlaceWords {
