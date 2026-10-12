@@ -1,3 +1,36 @@
+# Cline 的 MCP provider（2026-10-13，用户问「这个报错合理吗」）
+
+用户看到 MCP 页报「`~/.cline.json`：读不到这个客户端的配置文件。」，问这是否合理、以及安装 Agent 会不会
+自动生成客户端 JSON。
+
+- **报错不合理，但根因不是"文件不存在"**：`packages/agents-extensions/cline/src/index.ts` 用
+  `registry.register({id, places})` **只注册了位置、没有实现 `read`/`install`/`uninstall`**
+  （`pnpm --filter @workspace/agent-cline typecheck` 当时报 3 条错，连 `plugins.mcp` 都解析不到 —— 因为
+  该包没声明 `@workspace/plugin-mcp` 依赖）。扫描时 `provider.read()` 抛 TypeError，被 `scanPlaces` 兜成
+  「读不到这个客户端的配置文件」。**按契约，缺文件应当返回空列表**（claude-code 就是这么做的）。
+- **顺带纠正三处写错的路径**：`~/.cline.json` 不是 Cline 的文件；Cline **没有**项目级 MCP 文件（那个
+  workspace place 是凭空的）；官方文档给的是 CLI 的 `~/.cline/data/settings/cline_mcp_settings.json`
+  （`CLINE_MCP_SETTINGS_PATH` 可覆盖），IDE 扩展各存各的 globalStorage、没有跨平台统一定位
+  → **只写 CLI 那一个**（家目录相对，`PlaceRef.file` 允许子目录，两平台都成立）。
+- **条目形状**：`mcpServers[name] = {command,args,env,disabled,autoApprove}`；远程是
+  `{type:"streamableHttp"|"sse", url, headers, disabled}`。两个与其它 JSON 客户端不同的约定**在本 provider 里处理**：
+  ① `type: "streamableHttp"` 是 Cline 的拼法（共享 reader 只认 `"http"`/`"sse"`）；
+  ② **没有 `type` 的条目是 legacy SSE**，而共享 reader 会读成 `http`。
+- **`switchable: true`**（原先写 false 是错的）：条目自带 `disabled`，所以能"保留声明地停用"。
+- **不属声明的字段要留住**：改写条目时先 `keptOf(entry)`（排除 `command/args/env/url/headers/type`）
+  再合并新声明，`autoApprove` 与 Cline 自己记的 `disabled` 因此跨重写保留（JSON 条目是一个节点，
+  重写会让该节点自身重排，属预期）。
+- 新增 `scripts/check-provider.ts`（34/34，含"文件不存在 → 空列表"、两种传输拼法、开关往返、
+  重写保留 autoApprove、以及四种拒绝），`package.json` 补 `@workspace/plugin-mcp` + 开发期 `@workspace/core`。
+- 真机：位置显示为 Cline 的设置路径、加载无报错；装/关/卸三个路径都实测通过；
+  装完的目录（本机原先没有 `~/.cline`）已删除，`~/.claude.json`、仓库 `.mcp.json`、记录文件均未被污染。
+
+## 回答用户的两个问题（写在这里备查）
+
+- **安装 Agent 不会创建任何客户端文件**：安装扩展只是内核里 `ctx.plugin()` 启用一个插件，不碰磁盘上的客户端文件。
+- **客户端 JSON 只在两种时机出现**：① 客户端自己保存设置时；② 在「安装到」里把某个 MCP 写进那个位置时
+  （只写一条条目，文件不存在就建）。「创建 MCP」那一步只写 hub 自己的记录（`<home>/mcp/mcp.json`）。
+
 # 描述兜底 + 就地编辑 + 失败改走 toast（2026-10-12）
 
 用户报告：「有些 MCP 它是没有注释的」→ 要在代码里给一句默认注释，并**双击就地改成 textarea**；
