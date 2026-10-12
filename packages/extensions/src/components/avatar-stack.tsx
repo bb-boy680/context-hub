@@ -1,15 +1,17 @@
 /**
  * A row of marks where each one overlaps the one before it, with a count when
- * the row runs out of room — the control the design canvas calls an Agent Stack.
+ * the row runs out of room. The marks are round, like the avatars they stand
+ * for, and the count sits in a muted disc of its own size.
  *
  * It is geometry, not an avatar: a mark may be a brand icon a plugin contributes
  * or a picture, and the stack draws whichever it is at the size the canvas
- * fixes. Its seam is drawn in the colour of the surface behind it, because a
- * mark sitting on a pill has to look cut out of that pill rather than framed.
+ * fixes. The ring around each mark is drawn in the colour of the surface behind
+ * it, because a mark sitting on a pill has to look cut out of that pill rather
+ * than framed.
  */
 import type { ExtensionIcon } from "../types.ts"
 
-/** The 20px tile each mark occupies, and the 13px step between them. */
+/** The 20px disc each mark occupies, and the 13px step between them. */
 const TILE = 20
 const STEP = 13
 
@@ -43,8 +45,8 @@ export function AvatarStack({
   const shown = marks.slice(0, max)
   const more = marks.length - shown.length
   const slots = more === 0 ? shown.length : max + 1
-  const tile = "absolute top-0 flex items-center justify-center overflow-hidden rounded-[6px]"
-  const seam = `pointer-events-none absolute inset-0 rounded-[6px] ring-2 ring-inset ${
+  const tile = "absolute top-0 flex items-center justify-center overflow-hidden rounded-full"
+  const seam = `pointer-events-none absolute inset-0 rounded-full ring-2 ring-inset ${
     active ? "ring-foreground dark:ring-accent" : "ring-secondary"
   }`
   const at = (index: number) => ({ left: STEP * index, width: TILE, height: TILE })
@@ -64,7 +66,11 @@ export function AvatarStack({
         )
       })}
       {more === 0 ? null : (
-        <span key="more" className={`${tile} bg-current/15`} style={at(max)}>
+        <span
+          key="more"
+          className={`${tile} bg-muted text-muted-foreground`}
+          style={at(max)}
+        >
           <span className="font-mono text-[10px] leading-none">{`+${more}`}</span>
           <span className={seam} aria-hidden />
         </span>
