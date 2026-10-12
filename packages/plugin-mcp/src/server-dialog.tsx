@@ -31,6 +31,7 @@ import { ServerForm, valuesOf, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
 import type { McpAgentPlace, McpConfigFile, McpServer, McpTag } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
+import { PlaceList } from "@workspace/extensions/components/place-picker"
 import { Button } from "@workspace/ui/components/button"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@workspace/ui/components/dialog"
 import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@workspace/ui/components/popover"
@@ -45,8 +46,13 @@ const TABS: { id: DetailTab; key: string; width: number }[] = [
   { id: "files", key: "mcp.detail.tab.files", width: 56 },
 ]
 
-/** One client place, with the control the hub may offer and the file action. */
-function PlaceRow({
+/**
+ * What one place's row offers beyond its name: whether the client connects this
+ * server, and whether the hub writes the declaration into that client's file at
+ * all. A client whose extension offers no way to record the first says so
+ * instead of showing a control that would mean nothing.
+ */
+function PlaceControls({
   state,
   onToggle,
   onSetEnabled,
@@ -60,18 +66,7 @@ function PlaceRow({
   const installed = install?.installed === true
 
   return (
-    <div className="flex h-14 items-center gap-2.5">
-      <span className="flex size-7 shrink-0 items-center justify-center overflow-clip rounded-sm bg-muted ring-1 ring-border ring-inset">
-        <place.icon className="size-[18px]" aria-hidden />
-      </span>
-      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="truncate text-[12.5px] leading-[1.3] font-semibold text-foreground">
-          {place.label}
-        </span>
-        <span className="truncate font-mono text-[10.5px] leading-[1.3] text-muted-foreground">
-          {place.path}
-        </span>
-      </div>
+    <>
       {/* The switch means "this client connects it", so it only appears where
           the client's own extension offers a way to record that and there is a
           declaration to switch. A client that keeps the state itself says so
@@ -107,7 +102,7 @@ function PlaceRow({
           </>
         )}
       </Button>
-    </div>
+    </>
   )
 }
 
@@ -207,6 +202,7 @@ function Places({
   onSetEnabled: (place: string, enabled: boolean) => void
 }) {
   const { t } = useI18n()
+  const byId = new Map(states.map((state) => [state.place.id, state]))
 
   return (
     <div className="flex flex-col">
@@ -225,29 +221,35 @@ function Places({
           {t("mcp.place.none")}
         </span>
       ) : null}
-      {MCP_SCOPES.map((scope, index) => {
-        const group = placesInScope(states, scope)
-        if (group.length === 0) return null
-        return (
-          <React.Fragment key={scope}>
-            {/* Two scopes are two different answers — a file this workspace
-                owns, and one every workspace shares — so a rule keeps them
-                apart. The first needs none. */}
-            {index === 0 ? null : <Rule />}
-            <span className="flex h-[22px] items-center text-[11px] leading-[1.3] font-semibold text-muted-soft">
-              {t(`mcp.detail.group.${scope}`)}
-            </span>
-            {group.map((state) => (
-              <PlaceRow
-                key={state.place.id}
+      <ul className="flex flex-col">
+        <PlaceList
+          groups={MCP_SCOPES.map((scope) => ({
+            label: t(`mcp.detail.group.${scope}`),
+            options: placesInScope(states, scope).map((state) => ({
+              id: state.place.id,
+              icon: state.place.icon,
+              label: state.place.label,
+              where: state.place.path,
+              selected: state.install?.installed === true,
+            })),
+          })).filter((group) => group.options.length > 0)}
+          words={{
+            expand: (rest) => t("mcp.place.expand").replace("{count}", String(rest)),
+            collapse: t("mcp.place.collapse"),
+          }}
+          action={(option) => {
+            const state = byId.get(option.id)
+            if (state === undefined) return null
+            return (
+              <PlaceControls
                 state={state}
                 onToggle={() => onToggle(state.place.id)}
                 onSetEnabled={(enabled) => onSetEnabled(state.place.id, enabled)}
               />
-            ))}
-          </React.Fragment>
-        )
-      })}
+            )
+          }}
+        />
+      </ul>
     </div>
   )
 }

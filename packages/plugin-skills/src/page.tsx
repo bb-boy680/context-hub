@@ -1,5 +1,4 @@
 import {
-  CheckIcon,
   CompassIcon,
   ChevronDownIcon,
   ContainerIcon,
@@ -8,7 +7,6 @@ import {
   FolderOpenIcon,
   FolderPlusIcon,
   GlobeIcon,
-  LayersIcon,
   LayoutGridIcon,
   LibraryIcon,
   ListIcon,
@@ -37,17 +35,18 @@ import type { Skill } from "./types.ts"
 
 import { useContributions, useI18n } from "@workspace/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
+import {
+  PlaceMenu,
+  PlaceScopePicker,
+  type PlaceOption,
+  type PlaceWords,
+} from "@workspace/extensions/components/place-picker"
 import { Button } from "@workspace/ui/components/button"
 import { Card } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Kbd } from "@workspace/ui/components/kbd"
 import {
   DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 import {
@@ -68,6 +67,9 @@ import {
 
 const cardSurface =
   "[--card-spacing:1.5rem] rounded-xl ring-1 ring-border"
+
+/** The two scopes, in the order a list of places reads them. */
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
 /* The tab row carries one dimension: where a skill's files are. Two entries are
    the shell's own — everything, and the hub's library — and two group the places
@@ -96,349 +98,6 @@ function rowsForTab(rows: Skill[], value: SkillTab, place: string | null): Skill
     holdsOf(row).some(
       (hold) => hold.scope === value && (place === null || hold.id === place)
     )
-  )
-}
-
-/** The 20px tile and the 13px step the tab row's icon stacks are drawn at. */
-const STACK_TILE = 20
-const STACK_STEP = 13
-
-/** Past this many places a stack keeps the first few and counts the rest. */
-const STACK_MAX = 5
-
-/** The two scopes, in the order a list of places reads them. */
-const SCOPES: readonly AssetScope[] = ["workspace", "global"]
-
-/**
- * Past this many places a scope's menu searches its own list and caps its
- * height. How many agents a person enables is their own business, so the menu
- * has to stay usable at any number of them.
- */
-const PLACE_SEARCH_MIN = 8
-
-/** One place a scope tab stands for, as its stack and its menu name it. */
-interface StackPlace {
-  id: string
-  icon: ExtensionIcon
-  /** The place's name, resolved in the active locale. */
-  label: string
-  /** The directory as a person reads it. */
-  where: string
-  /** How many skills the place holds; `null` when it could not be read. */
-  count: number | null
-}
-
-/**
- * The places of one scope, as its tab shows them: a 20px mark each — the mark
- * itself, not a glyph inside a box — stepping 13px so every one overlaps the one
- * before it, with a 2px seam in the colour behind the stack drawn inside the
- * tile the mark has to give up. The number of agents follows from the
- * integrations a person enabled, so a scope can hold more than fits; past
- * {@link STACK_MAX} the last tile carries the count.
- */
-function PlaceStack({
-  places,
-  active,
-}: {
-  places: readonly StackPlace[]
-  /** Whether the tab this stack belongs to is the one on screen. */
-  active: boolean
-}) {
-  const shown = places.slice(0, STACK_MAX)
-  const more = places.length - shown.length
-  const slots = more === 0 ? shown.length : STACK_MAX + 1
-  const tile = "absolute top-0 flex items-center justify-center overflow-hidden rounded-[6px]"
-  const seam = `pointer-events-none absolute inset-0 rounded-[6px] ring-2 ring-inset ${
-    active ? "ring-foreground dark:ring-accent" : "ring-secondary"
-  }`
-  const at = (index: number) => ({ left: STACK_STEP * index, width: STACK_TILE, height: STACK_TILE })
-
-  return (
-    <span
-      className="relative shrink-0"
-      style={{ width: STACK_STEP * (slots - 1) + STACK_TILE, height: STACK_TILE }}
-    >
-      {shown.map((place, index) => {
-        const Mark = place.icon
-        return (
-          <span key={place.id} className={tile} style={at(index)}>
-            <Mark className="size-5" aria-hidden />
-            <span className={seam} aria-hidden />
-          </span>
-        )
-      })}
-      {more === 0 ? null : (
-        <span key="more" className={`${tile} bg-current/15`} style={at(STACK_MAX)}>
-          <span className="font-mono text-[10px] leading-none">{`+${more}`}</span>
-          <span className={seam} aria-hidden />
-        </span>
-      )}
-    </span>
-  )
-}
-
-/** One place as a menu offers it. */
-interface PlaceChoice {
-  id: string
-  icon: ExtensionIcon
-  label: string
-  where: string
-  /** Taken already, so the row shows its check. */
-  checked?: boolean
-  /** Why the row cannot be taken right now; nothing when it can. */
-  blocked?: string | null
-  /** How many skills the place holds; omitted where the menu does not count. */
-  count?: number | null
-}
-
-/**
- * The places a menu lists, as its whole content: a header naming what the list
- * is for, a search field once the list is longer than a glance, and one row per
- * place. Three menus ask the same question — which place — so they all show the
- * same answer: the scope tab's own list, a row's install menu, and the batch
- * bar's.
- */
-function PlaceMenu({
-  title,
-  groups,
-  leading,
-  closeOnClick = true,
-  onPick,
-}: {
-  /** What the list is for, e.g. "Install into". */
-  title: string
-  groups: readonly { label: string; choices: readonly PlaceChoice[] }[]
-  /** A row above the groups that names the whole list rather than one place. */
-  leading?: { choice: PlaceChoice; onPick: () => void }
-  /** Whether taking a place dismisses the menu. */
-  closeOnClick?: boolean
-  onPick: (id: string) => void
-}) {
-  const { t } = useI18n()
-  const [query, setQuery] = React.useState("")
-  const all = groups.flatMap((group) => group.choices)
-  const searchable = all.length >= PLACE_SEARCH_MIN
-  const needle = query.trim().toLowerCase()
-  const showing = groups
-    .map((group) => ({
-      label: group.label,
-      choices:
-        needle === ""
-          ? group.choices
-          : group.choices.filter(
-              (choice) =>
-                choice.label.toLowerCase().includes(needle) ||
-                choice.where.toLowerCase().includes(needle)
-            ),
-    }))
-    .filter((group) => group.choices.length > 0)
-  const found = showing.reduce((sum, group) => sum + group.choices.length, 0)
-
-  const row = "items-start gap-2.5 py-2"
-  const plate =
-    "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary ring-1 ring-border ring-inset"
-  const name = "text-[13.5px] leading-[18px] font-semibold"
-  const whereClass = "truncate font-mono text-[12px] leading-[16px] text-muted-foreground"
-  const tally = "mt-0.5 shrink-0 font-mono text-[12.5px] text-muted-foreground"
-
-  const renderRow = (choice: PlaceChoice, pick: () => void) => {
-    const Mark = choice.icon
-    const blocked = choice.blocked ?? null
-    return (
-      <DropdownMenuItem
-        key={choice.id}
-        /* Taking one place should not dismiss the menu: an install can go to
-           several, and the row just taken shows its check in place. */
-        closeOnClick={closeOnClick}
-        disabled={blocked !== null}
-        title={blocked ?? undefined}
-        onClick={pick}
-        className={row}
-      >
-        <span className={plate}>
-          <Mark className="size-3.5" aria-hidden />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col text-left">
-          <span className={name}>{choice.label}</span>
-          <span className={whereClass}>{choice.where}</span>
-        </span>
-        {choice.count === undefined ? null : (
-          <span className={tally}>{choice.count ?? "—"}</span>
-        )}
-        {choice.checked === true ? <CheckIcon className="mt-1 size-4 shrink-0" /> : null}
-      </DropdownMenuItem>
-    )
-  }
-
-  return (
-    <DropdownMenuContent
-      align="start"
-      sideOffset={6}
-      /* A menu drawn in a portal is still a React child of whatever opened it,
-         so its clicks bubble to that element's own handler: on a card, choosing
-         a place would also open the skill it belongs to. */
-      onClick={(event) => event.stopPropagation()}
-      /* A searchable menu scrolls its own list, under a field that stays put,
-         so the popup itself must not be the scroller. */
-      className={`w-[280px] ${searchable ? "overflow-hidden p-0" : ""}`}
-    >
-      {searchable ? (
-        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3">
-          <SearchIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          <input
-            value={query}
-            aria-label={t("skills.place.search")}
-            placeholder={t("skills.place.search")}
-            onChange={(event) => setQuery(event.target.value)}
-            /* A menu keeps focus on its own items, which would send typing to
-               its typeahead instead of here; the field takes focus itself. */
-            onMouseDown={(event) => {
-              event.stopPropagation()
-              event.currentTarget.focus()
-            }}
-            onClick={(event) => event.stopPropagation()}
-            /* Typing belongs to this field once it has focus: the menu reads
-               the same keys for its own navigation. */
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && query !== "") {
-                event.preventDefault()
-                event.stopPropagation()
-                setQuery("")
-                return
-              }
-              if (event.key !== "Escape") event.stopPropagation()
-            }}
-            className="min-w-0 flex-1 bg-transparent text-[13px] outline-none placeholder:text-muted-foreground/70"
-          />
-          {query === "" ? null : (
-            <button
-              type="button"
-              aria-label={t("skills.place.searchClear")}
-              onClick={() => setQuery("")}
-              className="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
-            >
-              <XIcon className="size-3" />
-            </button>
-          )}
-        </div>
-      ) : null}
-      <div className={searchable ? "max-h-[400px] overflow-y-auto p-1" : "p-1"}>
-        <DropdownMenuGroup>
-          <DropdownMenuLabel className="flex items-center justify-between gap-2">
-            <span>{title}</span>
-            <span className="font-mono text-[11px] font-normal">
-              {t("skills.location.count").replace("{count}", String(all.length))}
-            </span>
-          </DropdownMenuLabel>
-          {/* A row that names the whole list is the answer to no query, so a
-             search sets it aside. */}
-          {leading !== undefined && needle === ""
-            ? renderRow(leading.choice, leading.onPick)
-            : null}
-          {showing.map((group, index) => (
-            <React.Fragment key={group.label}>
-              {/* Two groups are two different answers — a folder the hub was
-                  pointed at, and a machine-wide directory of a chosen agent —
-                  so a rule keeps them apart. The first needs none. */}
-              {index === 0 ? null : <DropdownMenuSeparator />}
-              <DropdownMenuLabel className="text-[11.5px] font-semibold text-muted-soft">
-                {group.label}
-              </DropdownMenuLabel>
-              {group.choices.map((choice) => renderRow(choice, () => onPick(choice.id)))}
-            </React.Fragment>
-          ))}
-        </DropdownMenuGroup>
-        {found === 0 ? (
-          <p className="px-2 py-3 text-center text-[12.5px] text-muted-foreground">
-            {t("skills.place.searchEmpty")}
-          </p>
-        ) : null}
-      </div>
-    </DropdownMenuContent>
-  )
-}
-
-/**
- * One scope, as the tab row offers it: one pill holding the scope's name and the
- * marks of the places it stands for, which is the whole control. Pressing it
- * opens the list of places; choosing one is what opens the scope, so a person
- * never lands on a scope without having said which place they meant.
- */
-function PlacePicker({
-  scopeIcon: ScopeIcon,
-  scopeLabel,
-  places,
-  chosen,
-  active,
-  onChoose,
-}: {
-  scopeIcon: ExtensionIcon
-  /** The scope's own name, which the menu's first row takes whole. */
-  scopeLabel: string
-  places: readonly StackPlace[]
-  /** The place the scope is narrowed to; `null` when it is whole. */
-  chosen: string | null
-  /** Whether this scope is the one on screen. */
-  active: boolean
-  onChoose: (id: string | null) => void
-}) {
-  const { t } = useI18n()
-  /* Narrowed to one place, the marks are that one place's. */
-  const marks = chosen === null ? places : places.filter((place) => place.id === chosen)
-  const total = places.reduce((sum, place) => sum + (place.count ?? 0), 0)
-  const pill = `flex h-9 flex-none shrink-0 items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-    active
-      ? "bg-foreground text-background dark:bg-accent dark:text-foreground"
-      : "text-muted-foreground hover:text-foreground"
-  }`
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            aria-label={`${scopeLabel} · ${places.map((place) => place.label).join(", ")}`}
-            /* The pill is the scope's own control rather than a tab, so being
-               the scope on screen is a current state, not a tab selection. */
-            aria-current={active ? "true" : undefined}
-            className={pill}
-          >
-            <ScopeIcon className="size-3.5 shrink-0" aria-hidden />
-            {scopeLabel}
-            <PlaceStack places={marks} active={active} />
-          </button>
-        }
-      />
-      <PlaceMenu
-        title={t("skills.place.which")}
-        groups={[
-          {
-            label: scopeLabel,
-            choices: places.map((place) => ({
-              id: place.id,
-              icon: place.icon,
-              label: place.label,
-              where: place.where,
-              count: place.count,
-              checked: place.id === chosen,
-            })),
-          },
-        ]}
-        leading={{
-          choice: {
-            id: "",
-            icon: LayersIcon,
-            label: t("skills.place.all"),
-            where: scopeLabel,
-            count: total,
-            checked: chosen === null,
-          },
-          onPick: () => onChoose(null),
-        }}
-        onPick={(id) => onChoose(id)}
-      />
-    </DropdownMenu>
   )
 }
 
@@ -498,6 +157,22 @@ const pillSurface =
 
 function TagPill({ tag }: { tag: string }) {
   return <span className={pillSurface}>{tag}</span>
+}
+
+/**
+ * The words every place list on this page draws, resolved in the active locale.
+ * The lists themselves know no keys: a module hands them the strings it owns.
+ *
+ * @param t ? the active locale's lookup.
+ * @returns the strings a place menu and a list of places draw.
+ */
+function placeWords(t: (key: string) => string): PlaceWords {
+  return {
+    search: t("skills.place.search"),
+    searchClear: t("skills.place.searchClear"),
+    searchEmpty: t("skills.place.searchEmpty"),
+    count: (total) => t("skills.location.count").replace("{count}", String(total)),
+  }
 }
 
 /**
@@ -601,17 +276,18 @@ function SkillActionButton({
       />
       <PlaceMenu
         title={t("skills.action.installInto")}
+        words={placeWords(t)}
         closeOnClick={false}
         groups={SCOPES.map((scope) => ({
           label: t(`skills.group.${scope}`),
-          choices: writable
+          options: writable
             .filter((place) => place.scope === scope)
             .map((place) => ({
               id: place.id,
               icon: place.icon,
               label: t(place.labelKey),
               where: placePath(place),
-              checked: holds.some((hold) => hold.id === place.id),
+              selected: holds.some((hold) => hold.id === place.id),
               blocked:
                 (place.scope === "workspace" ? blocked : null) ??
                 (!holds.some((hold) => hold.id === place.id) &&
@@ -619,7 +295,7 @@ function SkillActionButton({
                   ? t("skills.workspace.taken")
                   : null),
             })),
-        })).filter((group) => group.choices.length > 0)}
+        })).filter((group) => group.options.length > 0)}
         onPick={(id) => {
           const place = writable.find((entry) => entry.id === id)
           if (place === undefined) return
@@ -1078,9 +754,10 @@ function BulkBar({
         />
         <PlaceMenu
           title={t("skills.action.installInto")}
+          words={placeWords(t)}
           groups={SCOPES.map((scope) => ({
             label: t(`skills.group.${scope}`),
-            choices: writable
+            options: writable
               .filter((place) => place.scope === scope)
               .map((place) => ({
                 id: place.id,
@@ -1089,7 +766,7 @@ function BulkBar({
                 where: placePath(place),
                 blocked: place.scope === "workspace" ? blocked : null,
               })),
-          })).filter((group) => group.choices.length > 0)}
+          })).filter((group) => group.options.length > 0)}
           onPick={(id) => {
             const place = writable.find((entry) => entry.id === id)
             if (place !== undefined) onInstall({ scope: place.scope, dir: place.dir })
@@ -1472,7 +1149,7 @@ export function SkillsPage() {
      them is a count of places rather than of skills; the same list, with what
      each place holds, is what hovering the stack shows. */
   const scopePlaces = React.useMemo(() => {
-    const byScope: Record<AssetScope, StackPlace[]> = { workspace: [], global: [] }
+    const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
     for (const place of places) {
       const view = library.places.find((held) => held.id === place.id)?.view ?? null
       byScope[place.scope].push({
@@ -1728,13 +1405,16 @@ export function SkillsPage() {
                 )
               }
               return (
-                <PlacePicker
+                <PlaceScopePicker
                   key={item.value}
                   scopeIcon={item.icon}
                   scopeLabel={t(item.labelKey)}
                   places={stack}
                   chosen={active ? chosen : null}
                   active={active}
+                  allLabel={t("skills.place.all")}
+                  title={t("skills.place.which")}
+                  words={placeWords(t)}
                   onChoose={(id) => {
                     setTab(scope)
                     setNarrowed(id)

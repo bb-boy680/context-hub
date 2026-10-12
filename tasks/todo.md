@@ -1,3 +1,61 @@
+# 公共 PlacePicker 控件（2026-10-12）
+
+## 目标
+
+把「选哪个 Agent / 装到哪个 place」的列表收成一个共享控件，操作由调用方开放，
+放在 `packages/extensions/src/components/place-picker.tsx`（用户选定：extensions 已是 React 侧契约包）。
+
+## 现状（同一件事 5 份实现）
+
+- skills `page.tsx`：`PlaceStack` / `PlaceMenu` / `PlacePicker`（私有，埋在 1989 行里）+ `SkillActionButton` + `BulkBar`
+- skills `skill-detail-dialog.tsx`：`PlacesSection`（平铺 + 按 scope 折叠）
+- mcp `place-picker.tsx`：`PlaceStack` / `PlaceMenu` / `PlacePicker`（与 skills 92% 逐行相同）
+- mcp `menus.tsx`：`InstallToMenu` / `EnabledMenu`（又各写一份行样式）
+- mcp `server-dialog.tsx`：`Places` / `PlaceRow`（平铺，无折叠）
+
+## 组件 API（数据与操作开放）
+
+- 类型：`PlaceOption { id, icon, label, where?, note?, count?, selected?, blocked? }`、`PlaceGroup`、`PlaceWords`、`PlaceListWords`
+- `PlaceStack`：图标栈 + 溢出计数
+- `PlaceMenu`：下拉内容（标题 / 搜索 / 分组 / `leading` / 尾部件 / 行是否整行可点 / `onPick`）
+- `PlaceScopePicker`：作用域 pill + 菜单（含「全部 place」leading）
+- `PlaceList`：平铺行 + 折叠，每行尾部动作由 `action(option)` 渲染
+
+## 执行顺序（边做边勾）
+
+- [x] 1. `packages/extensions/src/components/place-picker.tsx` + `./components/place-picker` export + `@workspace/ui` 依赖
+- [x] 2. skills `page.tsx`：删本地三件套（343 行），改用共享件；`SkillActionButton` / `BulkBar` 用 `PlaceMenu`，页签用 `PlaceScopePicker`
+- [x] 3. skills `skill-detail-dialog.tsx`：`PlacesSection` 用 `PlaceList`（库行保留在页面侧）
+- [x] 4. mcp：删 `place-picker.tsx`（353 行）；`menus.tsx` 两个菜单用 `PlaceMenu`（安装用 checkbox 尾部件、启用用 `activation="control"` + Switch）；`server-dialog.tsx` 用 `PlaceList`（顺带获得折叠）
+- [x] 5. mcp 文案补 `mcp.place.expand` / `mcp.place.collapse`（en + zh-cn）
+- [x] 6. 验证：`pnpm typecheck` 10/10、4 个包 lint 干净、`check-messages` 412/412、`check-services` 16/16、`check-plugin`（mcp）29/29、`check-package`（skills）全过、`pnpm build` 成功；真机走查 /skills 与 /mcp-servers
+
+## 组件 API（最终）
+
+```tsx
+<PlaceScopePicker scopeIcon scopeLabel places chosen active allLabel title words onChoose />   // 作用域 pill
+<PlaceMenu title groups words leading closeOnClick trailing activation align count onPick />   // 下拉内容（自渲染 popup）
+<PlaceList groups words action visibleCount />                                                 // 详情平铺 + 折叠，返回 <li>
+<PlaceStack places active />                                                                   // 图标栈 + 溢出计数
+```
+
+- 数据：`PlaceOption { id, icon, label, where?, note?, count?, selected?, blocked? }`，不含领域类型
+- 操作：`onPick(id)`（行=动作）、`action(option)`（列表每行尾部，调用方自渲染）、`trailing(option)`（菜单尾部）、
+  `activation: "row" | "control"`（行是否可点）、`count(all)`（表头计数口径）
+- 文案：调用方按自己命名空间注入（skills.place.* / mcp.place.*），组件不知道任何 i18n key
+- 触发器仍由调用方自己写（各自的尺寸/填充不同），组件只持 popup：`<DropdownMenu><DropdownMenuTrigger render={…} /><PlaceMenu … /></DropdownMenu>`
+
+## 回顾
+
+- **刻意不抽的部分**（2026-10-12 用户确认"先不动，等真的加第三个页面时再抽"）：「位置」小节的外框仍是各页自己写 ——
+  小节标题（skills 13/12.5px、mcp 12/12px）、外层 `<ul>`（skills `gap-2.5`、mcp 无间隔）、技能侧那行「技能库」。
+  共享的是列表体：分组标题、place 行、两组间发丝线、折叠。
+- 视觉/行为保持：菜单宽度 280、≥8 项搜索、菜单行 `items-start gap-2.5 py-2`、列表行 `h-14` 与 28px 图标牌、折叠阈值 8、行尾动作与禁用原因全部照旧；
+  只有两处刻意的统一：行图标统一 16px（原 14/15/17/18）、MCP 详情两组之间的分隔从 17px 带变成 1px 发丝线（与技能侧一致）。
+- 新增能力：MCP 详情弹窗的 place 列表现在也有折叠（此前没有），文案 `mcp.place.expand/collapse`。
+- 反例记录：**不要**在这两个包里跑 `pnpm format`（prettier 会把大量未改动文件按 80 列重排；本次改完已 `git checkout` 撤销 80 个文件的连带改动）。
+
+
 # MCP 连接探测（2026-10-12）
 
 ## 目标

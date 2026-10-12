@@ -32,14 +32,17 @@ import { AddServerDialog } from "./add-server-dialog.tsx"
 import { ServerCardView } from "./card-view.tsx"
 import { MCP_TAGS, tagList, useMcpLibrary } from "./library.ts"
 import { ServerListView } from "./list-view.tsx"
-import type { StackPlace } from "./place-picker.tsx"
-import { PlacePicker } from "./place-picker.tsx"
+import { placeWords } from "./place-words.ts"
 import type { ServerActions } from "./menus.tsx"
 import { ServerDialog } from "./server-dialog.tsx"
 import type { ServerFormValues } from "./server-form.tsx"
 import { declarationOf } from "./server-form.tsx"
 import type { McpAgentPlace, McpConfigFile, McpPlaceKind, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
+import {
+  PlaceScopePicker,
+  type PlaceOption,
+} from "@workspace/extensions/components/place-picker"
 import { Button } from "@workspace/ui/components/button"
 import { Kbd } from "@workspace/ui/components/kbd"
 
@@ -150,7 +153,7 @@ function FilterTabs({
   onTab: (tab: TabId) => void
   counts: Record<ShellTab, number>
   /** The places each scope holds, which its own pill draws as a stack. */
-  scopePlaces: Record<McpPlaceKind, readonly StackPlace[]>
+  scopePlaces: Record<McpPlaceKind, readonly PlaceOption[]>
   /** The place the scope on screen is narrowed to; `null` when it is whole. */
   chosen: string | null
   onChoose: (scope: McpPlaceKind, place: string | null) => void
@@ -171,13 +174,16 @@ function FilterTabs({
         if (id === "workspace" || id === "global") {
           const active = tab === id
           return (
-            <PlacePicker
+            <PlaceScopePicker
               key={id}
               scopeIcon={Icon}
               scopeLabel={t(`mcp.tab.${id}`)}
               places={scopePlaces[id]}
               chosen={active ? chosen : null}
               active={active}
+              allLabel={t("mcp.place.all")}
+              title={t("mcp.place.which")}
+              words={placeWords(t)}
               onChoose={(place) => onChoose(id, place)}
             />
           )
@@ -382,7 +388,7 @@ export function McpServersPage() {
      counts what each place declares, so a person can tell two client files
      apart before opening one. */
   const scopePlaces = React.useMemo(() => {
-    const byScope: Record<McpPlaceKind, StackPlace[]> = { workspace: [], global: [] }
+    const byScope: Record<McpPlaceKind, PlaceOption[]> = { workspace: [], global: [] }
     for (const place of places) {
       byScope[place.scope].push({
         id: place.id,

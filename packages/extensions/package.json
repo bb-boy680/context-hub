@@ -11,6 +11,7 @@
   "dependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
     "@workspace/core": "workspace:*",
+    "@workspace/ui": "workspace:*",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8"
   },
@@ -28,6 +29,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./react": "./src/react.tsx",
-    "./builtin": "./src/builtin/index.ts"
+    "./builtin": "./src/builtin/index.ts",
+    "./components/place-picker": "./src/components/place-picker.tsx"
   }
 }

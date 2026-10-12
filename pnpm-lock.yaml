@@ -135,6 +135,9 @@ importers:
       '@workspace/core':
         specifier: workspace:*
         version: link:../core
+      '@workspace/ui':
+        specifier: workspace:*
+        version: link:../ui
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)

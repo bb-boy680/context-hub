@@ -300,6 +300,8 @@ export const messages: Record<string, string> = {
   "mcp.place.search": "搜索位置",
   "mcp.place.searchClear": "清除搜索",
   "mcp.place.searchEmpty": "没有匹配的位置。",
+  "mcp.place.expand": "再展开 {count} 个",
+  "mcp.place.collapse": "收起",
   "mcp.place.chip.workspace": "项目",
   "mcp.place.chip.global": "全局",
   "mcp.check.conflict": "{count} 处同名（端点不同）",

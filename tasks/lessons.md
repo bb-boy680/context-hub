@@ -44,3 +44,14 @@
   `localStorage` 只适合"这台机器这个浏览器"的偏好（主题）；扩展启停、界面语言这类属于 **hub 自己的状态**，
   要落在 `<home>` 里（现在统一放 `<home>/state/<name>.json`）。内核接口同步、磁盘异步时，
   由**表单**在启动前读进内存并回写，是这套代码里惯用的解法（技能库、状态文档都是这个形状）。
+
+## 改动与格式化
+
+- **不要在这个仓库跑 `pnpm format`**：根 `.prettierrc` 是 80 列，而仓库里大量文件从来没按它重排过
+  （`plugin-skills/src/page.tsx`、`messages.ts` 等都有上百列的长行）。跑一次会把 80 个未改动文件一起重排，
+  提交前必须 `git checkout --` 逐个撤回。改完只保证 `pnpm typecheck` + `pnpm lint` 干净即可，格式化留给原文件自己的风格。
+- 共享控件优先放 **`packages/extensions/src/components/`**（React 侧契约包，已有 react.tsx 与 react-hooks lint），
+  而不是 `packages/core`（那是宿主/Node 侧内核，零 React 依赖）。子路径导出写进该包 `exports` 的 `./components/<name>`。
+- 抽共享控件时**领域类型留在各插件**：控件的输入用 `{ id, icon, label, where?, … }` 这种无领域含义的结构，
+  文案由调用方注入（`PlaceWords`/`PlaceListWords`），i18n key 不跨模块共享。
+

@@ -1,6 +1,5 @@
 import {
   ArrowLeftIcon,
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardPasteIcon,
@@ -24,7 +23,6 @@ import {
   XIcon,
 } from "lucide-react"
 import * as React from "react"
-import { Fragment } from "react"
 import { Navigation, Thumbs } from "swiper/modules"
 import { Swiper, SwiperSlide } from "swiper/react"
 import type { SwiperClass } from "swiper/react"
@@ -50,6 +48,7 @@ import type {
 
 import { useI18n } from "@workspace/extensions/react"
 import type { AssetScope } from "@workspace/extensions"
+import { PlaceList } from "@workspace/extensions/components/place-picker"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -1202,16 +1201,9 @@ function SourceSection({
 const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
 /**
- * How many places of one scope the panel lists before it offers the rest. A
- * person may enable more agents than this panel can show beside the skill it
- * describes.
- */
-const PLACES_VISIBLE = 8
-
-/**
  * Every place this skill could live, with the row's own action on each: the way
  * into a place that does not hold it yet is here, not only the way out of the
- * ones that do. A place is a property of the skill — the card reads how many
+ * ones that do. A place is a property of the skill ? the card reads how many
  * hold it, and this section is what that count means.
  */
 function PlacesSection({
@@ -1247,35 +1239,65 @@ function PlacesSection({
     () => new Map(contributed.map((place) => [place.id, place.icon])),
     [contributed]
   )
-
-  /* Each scope folds on its own: the machine-wide list grows with every agent a
-     person enables, while the workspace holds only the folders this hub knows. */
-  const [unfolded, setUnfolded] = React.useState<readonly AssetScope[]>([])
-  const fold = (scope: AssetScope) =>
-    setUnfolded((current) =>
-      current.includes(scope)
-        ? current.filter((one) => one !== scope)
-        : [...current, scope]
-    )
+  const byId = React.useMemo(
+    () => new Map(places.map((place) => [place.id, place])),
+    [places]
+  )
 
   /* Rows are told apart by their marks and names; the one rule in this list
      separates the two scopes. */
   const row = "flex h-14 items-center gap-2.5"
-  /* The fold reads as the sidebar's own fold row: a 40px row with an 18px
-     chevron in the mark column and no plate, since it stands for the rows
-     under it rather than for a place. */
-  const foldRow =
-    "flex h-10 w-full items-center gap-2.5 rounded-md pr-3 pl-[5px] text-left text-sm font-medium text-copy outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-  const groupHead = "py-0.5 text-[11.5px] leading-[16px] font-semibold text-muted-soft"
   const plate =
     "flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-surface-raised ring-1 ring-border ring-inset"
   const label = "truncate text-[12.5px] leading-[15px] font-semibold"
   const where = "truncate font-mono text-[10.5px] leading-[14px] text-muted-foreground"
+  /* One size for every row action: the design's 30px pill. */
+  const pill = "h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
   /* Installing is the row's own action, so it reads as a soft fill; undoing it
      is what the row offers once the place holds the skill, and reads as one. */
-  const pill = "h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
   const soft = `${pill} bg-secondary text-foreground hover:bg-accent`
   const outlinePill = `${pill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`
+
+  /* Held, the row offers the way out; not held, the way in ? unless the place
+     cannot take it: a workspace with no folder to write into, or a name another
+     skill already holds there. */
+  const rowAction = (id: string) => {
+    const place = byId.get(id)
+    if (place === undefined) return null
+    const held = holds.some((hold) => hold.id === place.id)
+    if (held) {
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          aria-label={`${t("skills.action.remove")} ${skill.name}`}
+          onClick={() => onRemove({ scope: place.scope, dir: place.dir })}
+          className={outlinePill}
+        >
+          <MinusIcon className="size-[13px]" />
+          {t("skills.action.remove")}
+        </Button>
+      )
+    }
+    const taken = skill.takenAt?.includes(place.id) === true
+    /* A workspace place has nothing to write into without a folder; a
+       machine-wide one never needs one. */
+    const unavailable = place.scope === "workspace" ? blocked : null
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        aria-label={`${t("skills.action.install")} ${skill.name}`}
+        disabled={taken || unavailable !== null}
+        title={taken ? t("skills.workspace.taken") : (unavailable ?? undefined)}
+        onClick={() => onInstall({ scope: place.scope, dir: place.dir })}
+        className={soft}
+      >
+        <PlusIcon className="size-[13px]" />
+        {t("skills.action.install")}
+      </Button>
+    )
+  }
 
   return (
     <section className="flex flex-col gap-2.5">
@@ -1316,92 +1338,27 @@ function PlacesSection({
             </Button>
           )}
         </li>
-        {/* The two scopes answer different questions — a folder this hub was
-            pointed at, and a machine-wide directory of a chosen agent — so each
-            group is named, and a rule keeps them apart. */}
-        {SCOPES.map((scope) => {
-          const inScope = places.filter((place) => place.scope === scope)
-          if (inScope.length === 0) return null
-          const open = unfolded.includes(scope)
-          const rest = inScope.length - PLACES_VISIBLE
-          const group = open || rest <= 0 ? inScope : inScope.slice(0, PLACES_VISIBLE)
-          return (
-            <Fragment key={scope}>
-              {scope === "global" ? (
-                <li aria-hidden className="h-px shrink-0 bg-border" />
-              ) : null}
-              <li className={groupHead}>{t(`skills.group.${scope}`)}</li>
-              {group.map((place) => {
-                const held = holds.some((hold) => hold.id === place.id)
-                const Icon = icons.get(place.id) ?? LibraryIcon
-                const taken = !held && skill.takenAt?.includes(place.id) === true
-                /* A workspace place has nothing to write into without a folder;
-                   a machine-wide one never needs one. */
-                const unavailable =
-                  held || place.scope !== "workspace" ? null : blocked
-                const why = taken ? t("skills.workspace.taken") : unavailable
-                return (
-                  <li key={place.id} className={row}>
-                    <span className={plate}>
-                      <Icon className="size-[15px]" aria-hidden />
-                    </span>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className={label}>{t(place.labelKey)}</span>
-                      <span className={where}>{placePath(place)}</span>
-                    </span>
-                    {held ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        aria-label={`${t("skills.action.remove")} ${skill.name}`}
-                        onClick={() => onRemove({ scope: place.scope, dir: place.dir })}
-                        className={outlinePill}
-                      >
-                        <MinusIcon className="size-[13px]" />
-                        {t("skills.action.remove")}
-                      </Button>
-                    ) : (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        aria-label={`${t("skills.action.install")} ${skill.name}`}
-                        disabled={taken || unavailable !== null}
-                        title={why ?? undefined}
-                        onClick={() => onInstall({ scope: place.scope, dir: place.dir })}
-                        className={soft}
-                      >
-                        <PlusIcon className="size-[13px]" />
-                        {t("skills.action.install")}
-                      </Button>
-                    )}
-                  </li>
-                )
-              })}
-              {rest <= 0 ? null : (
-                <li>
-                  <button
-                    type="button"
-                    aria-expanded={open}
-                    onClick={() => fold(scope)}
-                    className={foldRow}
-                  >
-                    <span className="flex size-[18px] shrink-0 items-center justify-center">
-                      <ChevronDownIcon
-                        className={`size-[18px] shrink-0 transition-transform ${
-                          open ? "rotate-180" : ""
-                        }`}
-                        aria-hidden
-                      />
-                    </span>
-                    {open
-                      ? t("skills.place.collapse")
-                      : t("skills.place.expand").replace("{count}", String(rest))}
-                  </button>
-                </li>
-              )}
-            </Fragment>
-          )
-        })}
+        {/* Every scope this build reads, drawn by the same list the menus use:
+            a person who has learned one place list has learned them all. */}
+        <PlaceList
+          groups={SCOPES.map((scope) => ({
+            label: t(`skills.group.${scope}`),
+            options: places
+              .filter((place) => place.scope === scope)
+              .map((place) => ({
+                id: place.id,
+                icon: icons.get(place.id) ?? LibraryIcon,
+                label: t(place.labelKey),
+                where: placePath(place),
+                selected: holds.some((hold) => hold.id === place.id),
+              })),
+          }))}
+          words={{
+            expand: (rest) => t("skills.place.expand").replace("{count}", String(rest)),
+            collapse: t("skills.place.collapse"),
+          }}
+          action={(option) => rowAction(option.id)}
+        />
       </ul>
     </section>
   )

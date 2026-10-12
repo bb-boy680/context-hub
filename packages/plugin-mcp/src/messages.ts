@@ -52,6 +52,8 @@ export const mcpMessages: Record<string, string> = {
   "mcp.place.search": "Search places",
   "mcp.place.searchClear": "Clear the search",
   "mcp.place.searchEmpty": "No place matches.",
+  "mcp.place.expand": "Show {count} more",
+  "mcp.place.collapse": "Show fewer",
   "mcp.place.chip.workspace": "Project",
   "mcp.place.chip.global": "Global",
   "mcp.check.conflict": "{count} copies differ",
