@@ -320,7 +320,7 @@ function indentIn(source: string, parent: Node): string {
     const cell = columnAt(source, first.offset)
     /* A property that starts its own line keeps that line's indentation; one that
        shares a line is aligned under the property it follows. */
-    return cell === "" ? INDENT : cell
+    return cell || INDENT
   }
   /* No property to read a layout from, so the line the object's brace sits on
      decides: a brace that opens its own line is at the indent already, while one

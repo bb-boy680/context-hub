@@ -172,11 +172,7 @@ function ToolCard({ tool }: { tool: McpTool }) {
             <Tree
               root="input"
               fields={tool.input}
-              description={
-                tool.inputDescription === ""
-                  ? t("mcp.detail.tools.inputDesc")
-                  : tool.inputDescription
-              }
+              description={tool.inputDescription || t("mcp.detail.tools.inputDesc")}
             />
           </div>
           {/* The output schema is optional, and many servers never write one.
@@ -190,11 +186,7 @@ function ToolCard({ tool }: { tool: McpTool }) {
               <Tree
                 root="output"
                 fields={tool.output}
-                description={
-                  tool.outputDescription === ""
-                    ? t("mcp.detail.tools.outputDesc")
-                    : tool.outputDescription
-                }
+                description={tool.outputDescription || t("mcp.detail.tools.outputDesc")}
               />
             </div>
           )}

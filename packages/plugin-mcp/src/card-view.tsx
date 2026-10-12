@@ -221,7 +221,7 @@ export function ServerCardView({
           <ServerCard
             key={server.id}
             server={server}
-            tag={server.tag === "" ? undefined : server.tag}
+            tag={server.tag || undefined}
             age={age(server)}
             actions={actions}
             onOpen={() => onOpen(server)}
