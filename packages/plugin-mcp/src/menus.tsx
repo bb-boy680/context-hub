@@ -6,10 +6,8 @@
  * share a shape but never a state: one writes files, the other writes the
  * client's own disable list.
  */
-import { ChevronDownIcon, PowerIcon } from "lucide-react"
+import { ChevronDownIcon, DownloadIcon, PowerIcon } from "lucide-react"
 import * as React from "react"
-
-import { cn } from "cn"
 
 import { MCP_SCOPES, onCount } from "./installs.ts"
 import { placeWords } from "./place-words.ts"
@@ -29,10 +27,15 @@ const stop = (event: React.MouseEvent) => event.stopPropagation()
 /**
  * The two triggers carry their own classes rather than a wrapper component: a
  * `render` element IS the trigger, and base-ui hands it `aria-haspopup`, the
- * open state and the click that toggles the menu ? a wrapper that destructures
+ * open state and the click that toggles the menu — a wrapper that destructures
  * only its own props would drop every one of them and the menu would never open.
+ *
+ * They carry the row action's own measurements too — the 32px pill, the 13px
+ * semibold label, the 14px mark, the 12px chevron the skills page gives an
+ * install — so a row's controls read as one family on both pages.
  */
-const TRIGGER = "h-8 rounded-full px-3 text-[12.5px] font-medium text-foreground bg-secondary"
+const TRIGGER =
+  "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold text-foreground bg-secondary hover:bg-accent"
 
 /** The scope word a note names, e.g. 本项目 for a workspace place. */
 function scopeWord(scope: McpScope): string {
@@ -73,10 +76,11 @@ export function InstallToMenu({
             variant="secondary"
             aria-label={t("mcp.action.installTo")}
             onClick={stop}
-            className={cn(TRIGGER, "gap-[5px]")}
+            className={TRIGGER}
           >
+            <DownloadIcon className="size-3.5" />
             {t("mcp.action.installTo")}
-            <ChevronDownIcon className="size-[13px] text-muted-foreground" />
+            <ChevronDownIcon className="size-3" />
           </Button>
         }
       />
@@ -109,9 +113,9 @@ export function InstallToMenu({
  * The line under a client's name in the enabled menu: which scope and client
  * state the row is about, or the word of a client the hub may not speak for.
  *
- * @param t ? the active locale's lookup.
- * @param place ? the client this row stands for.
- * @param held ? what the hub recorded for this server in that place.
+ * @param t — the active locale's lookup.
+ * @param place — the client this row stands for.
+ * @param held — what the hub recorded for this server in that place.
  * @returns the row's second line.
  */
 function enabledNote(
@@ -149,11 +153,11 @@ export function EnabledMenu({
             variant="secondary"
             aria-label={t("mcp.action.enabled")}
             onClick={stop}
-            className={cn(TRIGGER, "gap-1.5")}
+            className={TRIGGER}
           >
-            <PowerIcon className="size-[14px]" />
+            <PowerIcon className="size-3.5" />
             {t("mcp.action.enabled")}
-            <ChevronDownIcon className="size-[13px] text-muted-foreground" />
+            <ChevronDownIcon className="size-3" />
           </Button>
         }
       />
