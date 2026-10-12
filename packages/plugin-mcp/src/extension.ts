@@ -7,11 +7,22 @@
 import type { ComponentType } from "react"
 import { ServerIcon } from "lucide-react"
 
+import type { WorkspaceService } from "@workspace/core/workspace"
 import type { ExtensionDefinition } from "@workspace/extensions"
 import { MCP_SERVICE } from "./contract.ts"
 
 import { mcpMessages } from "./messages.ts"
 import { createMcpService } from "./registry.ts"
+
+declare module "@deepseek-ai/cordis" {
+  interface Context {
+    /**
+     * The form-owned workspace list; a workspace place is read inside the folder
+     * this names, so the page rescans when it changes.
+     */
+    "hub.workspaces"?: WorkspaceService
+  }
+}
 
 /**
  * The MCP module, with the page to mount at its route.

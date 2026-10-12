@@ -99,6 +99,35 @@ export interface McpLibrary {
   file(id: string, place: string): Promise<McpConfigFile | null>
 }
 
+/**
+ * Nothing to follow when this form provides no workspace list.
+ */
+const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
+
+/**
+ * The workspace in use, as the form keeps it.
+ *
+ * A workspace place is read inside the folder in use, so switching workspaces
+ * changes what every one of those files holds — the rows, the installs and the
+ * probes are all about the folder the person is looking at. The id is therefore
+ * a reload key rather than context a read may ignore.
+ *
+ * @returns the current workspace's id, or `null` when this form has none.
+ */
+function useCurrentWorkspace(): string | null {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(
+    () => workspaces?.current()?.current ?? null,
+    [workspaces]
+  )
+  return React.useSyncExternalStore(subscribe, read)
+}
+
 /** Read and write MCP state for the form in use. */
 export function useMcpLibrary(): McpLibrary {
   const ctx = useHub()
@@ -106,6 +135,7 @@ export function useMcpLibrary(): McpLibrary {
   const snapshot = useExtensionSnapshot()
   const revision = snapshot.revision
   const service = React.useMemo(() => ctx.get("mcp") ?? null, [ctx])
+  const workspace = useCurrentWorkspace()
   const files = ctx.host.files
 
   /* A place carries no mark of its own: it shows the icon its own extension
@@ -270,8 +300,10 @@ export function useMcpLibrary(): McpLibrary {
   const read = React.useCallback(
     async (force = false) => {
       if (files === null) return
-      /* Which places exist is a reload key: it decides what the scan reads. */
+      /* Which places exist and which folder is in use are reload keys: together
+         they decide which files this scan reads. */
       void placeKey
+      void workspace
       const current = ++generation.current
       /* Probes belong to the scan that asked for them; a new one starts over. */
       setTesting([])
@@ -296,7 +328,7 @@ export function useMcpLibrary(): McpLibrary {
         if (current === generation.current) setBusy(false)
       }
     },
-    [service, iconFor, placeKey, files, log, t, loadRecords, probeAll]
+    [service, iconFor, placeKey, workspace, files, log, t, loadRecords, probeAll]
   )
 
   React.useEffect(() => {
