@@ -186,6 +186,17 @@ export function outdated(skill: Skill): boolean {
 }
 
 /**
+ * Whether the files here differ from the revision they were installed from — a
+ * person's own edit, which an update would overwrite. This holds even when the
+ * source has not moved on, so it is asked apart from `outdated`.
+ */
+export function modified(skill: Skill): boolean {
+  const current = skill.checked?.currentHash
+  if (current === undefined || skill.upstream === undefined) return false
+  return current !== skill.upstream.hash
+}
+
+/**
  * How one place's directory reads to a person. A place is a directory inside a
  * scope, and the scope's root is the part a person already knows: inside a
  * workspace that root is the folder in use, and outside every workspace it is

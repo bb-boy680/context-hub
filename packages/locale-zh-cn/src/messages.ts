@@ -189,6 +189,7 @@ export const messages: Record<string, string> = {
   "skills.update.checkAll": "检查更新",
   "skills.update.checkingAll": "正在检查…",
   "skills.update.badge": "有更新",
+  "skills.update.editedBadge": "有改动",
   "skills.update.lastChecked": "上次检查：{age}",
   "skills.footer.count": "显示 {shown} / {total} 个技能",
   "skills.range": "1–12，共 42 个技能",

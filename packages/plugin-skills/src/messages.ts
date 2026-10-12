@@ -102,6 +102,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.update.checkAll": "Check updates",
   "skills.update.checkingAll": "Checking sources…",
   "skills.update.badge": "Update available",
+  "skills.update.editedBadge": "Edited since install",
   "skills.update.lastChecked": "Last checked {age}",
   "skills.footer.count": "Showing {shown} of {total} skills",
   "skills.range": "1–12 of 42 skills",

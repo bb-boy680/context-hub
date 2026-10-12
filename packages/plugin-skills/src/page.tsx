@@ -27,7 +27,7 @@ import * as React from "react"
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { AutoplayVideo } from "./autoplay-video.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
-import { holdsOf, inLibrary, outdated, placePath, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, modified, outdated, placePath, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
@@ -399,18 +399,19 @@ function FileTreeCover({ skill, store }: { skill: Skill; store: SkillStore | nul
 const FALLBACK_RATIO = 16 / 9
 
 /**
- * The marker a row carries when the last check found its source ahead of the
- * files here. Nothing is rendered until a check recorded an answer.
+ * The markers a row carries for what the last check found: the source is ahead
+ * of the files here, the files were changed after the install, or both. Nothing
+ * is rendered until a check recorded an answer.
  */
-function UpdateBadge({ skill }: { skill: Skill }) {
+function CheckBadge({ skill }: { skill: Skill }) {
   const { t } = useI18n()
-  const latest = skill.checked?.latest
-  if (latest === undefined || skill.upstream === undefined || latest === skill.upstream.hash) {
-    return null
-  }
+  const marks: string[] = []
+  if (outdated(skill)) marks.push(t("skills.update.badge"))
+  if (modified(skill)) marks.push(t("skills.update.editedBadge"))
+  if (marks.length === 0) return null
   return (
     <span className="shrink-0 text-[11px] leading-[14px] font-semibold text-amber-600 dark:text-amber-400">
-      {t("skills.update.badge")}
+      {marks.join(" · ")}
     </span>
   )
 }
@@ -498,7 +499,7 @@ function SkillCard({
             <span className="truncate font-mono text-[14px] leading-[19px] font-semibold">
               {skill.name}
             </span>
-            <UpdateBadge skill={skill} />
+            <CheckBadge skill={skill} />
           </span>
           {/* A skill the hub does not hold has no recorded age; nothing goes here. */}
           {skill.updated === "" ? null : (
@@ -798,7 +799,7 @@ function SkillTable({
               <span className="truncate text-[14px] leading-[18px] font-semibold">
                 <Highlighted text={skill.name} needle={needle} />
               </span>
-              <UpdateBadge skill={skill} />
+              <CheckBadge skill={skill} />
             </span>
             <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
               <Highlighted text={skill.description} needle={needle} />
@@ -923,6 +924,7 @@ function ActionTab({
   label,
   count,
   action,
+  actionIcon: ActionIcon,
   state,
   active,
   onTab,
@@ -933,6 +935,8 @@ function ActionTab({
   count: number
   /** What the menu offers for the whole set, e.g. 一键收录. */
   action: string
+  /** The mark that action carries, which is the action's own and not the tab's. */
+  actionIcon: LucideIcon
   /** Whether this set's batch is idle, running here, or held up by another. */
   state: "idle" | "running" | "blocked"
   active: boolean
@@ -989,7 +993,7 @@ function ActionTab({
           disabled={state !== "idle"}
           onClick={onAction}
         >
-          <PackagePlusIcon className="size-3.5" />
+          <ActionIcon className="size-3.5" aria-hidden />
           <span className="text-[13.5px] leading-[18px] font-semibold">{action}</span>
           <span className="ml-auto font-mono text-[12.5px] text-muted-foreground">{count}</span>
         </DropdownMenuItem>
@@ -1398,6 +1402,7 @@ export function SkillsPage() {
                     label={t(item.labelKey)}
                     count={count}
                     action={t(own === "adopt" ? "skills.action.adoptAll" : "skills.action.updateAll")}
+                    actionIcon={own === "adopt" ? PackagePlusIcon : DownloadIcon}
                     /* The run is this tab's to show; another one only holds it up. */
                     state={batch === null ? "idle" : batch === own ? "running" : "blocked"}
                     active={active}
