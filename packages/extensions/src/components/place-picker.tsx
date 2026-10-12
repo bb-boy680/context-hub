@@ -19,6 +19,7 @@ import * as React from "react"
 
 import type { ExtensionIcon } from "../types.ts"
 
+import { AvatarStack, type AvatarMark } from "./avatar-stack.tsx"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,13 +29,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
-
-/** The 20px tile and the 13px step a scope's icon stack is drawn at. */
-const STACK_TILE = 20
-const STACK_STEP = 13
-
-/** Past this many places a stack keeps the first few and counts the rest. */
-const STACK_MAX = 5
 
 /**
  * Past this many places a menu searches its own list and caps its height. How
@@ -80,9 +74,7 @@ const FOLD =
   "flex h-10 w-full items-center gap-2.5 rounded-md pr-3 pl-[5px] text-left text-sm font-medium text-copy outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
 
 /** One place as every list here offers it: its mark, its name, and where it is. */
-export interface PlaceOption {
-  id: string
-  icon: ExtensionIcon
+export interface PlaceOption extends AvatarMark {
   /** The place's name, resolved in the active locale. */
   label: string
   /** The file or directory it stands for, as a person reads it; drawn monospaced. */
@@ -124,68 +116,6 @@ export interface PlaceListWords {
   expand: (rest: number) => string
   /** The fold row once the rest is shown. */
   collapse: string
-}
-
-/**
- * The places of one scope, as its tab shows them: a 20px mark each — the mark
- * itself, not a glyph inside a box — stepping 13px so every one overlaps the one
- * before it, with a 2px seam in the colour behind the stack drawn inside the
- * tile the mark has to give up. Past {@link STACK_MAX} the last tile carries the
- * count.
- *
- * @param places — the scope's places, in the order the menu lists them.
- * @param active — whether the tab this stack belongs to is the one on screen.
- */
-export function PlaceStack({
-  places,
-  active,
-}: {
-  places: readonly PlaceOption[]
-  active: boolean
-}) {
-  const shown = places.slice(0, STACK_MAX)
-  const more = places.length - shown.length
-  const slots = more === 0 ? shown.length : STACK_MAX + 1
-  const tile =
-    "absolute top-0 flex items-center justify-center overflow-hidden rounded-[6px]"
-  const seam = `pointer-events-none absolute inset-0 rounded-[6px] ring-2 ring-inset ${
-    active ? "ring-foreground dark:ring-accent" : "ring-secondary"
-  }`
-  const at = (index: number) => ({
-    left: STACK_STEP * index,
-    width: STACK_TILE,
-    height: STACK_TILE,
-  })
-
-  return (
-    <span
-      className="relative shrink-0"
-      style={{
-        width: STACK_STEP * (slots - 1) + STACK_TILE,
-        height: STACK_TILE,
-      }}
-    >
-      {shown.map((place, index) => {
-        const Mark = place.icon
-        return (
-          <span key={place.id} className={tile} style={at(index)}>
-            <Mark className="size-5" aria-hidden />
-            <span className={seam} aria-hidden />
-          </span>
-        )
-      })}
-      {more === 0 ? null : (
-        <span
-          key="more"
-          className={`${tile} bg-current/15`}
-          style={at(STACK_MAX)}
-        >
-          <span className="font-mono text-[10px] leading-none">{`+${more}`}</span>
-          <span className={seam} aria-hidden />
-        </span>
-      )}
-    </span>
-  )
 }
 
 /**
@@ -485,7 +415,7 @@ export function PlaceScopePicker({
           >
             <ScopeIcon className="size-3.5 shrink-0" aria-hidden />
             {scopeLabel}
-            <PlaceStack places={marks} active={active} />
+            <AvatarStack marks={marks} active={active} />
           </button>
         }
       />

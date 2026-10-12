@@ -36,10 +36,10 @@
 <PlaceScopePicker scopeIcon scopeLabel places chosen active allLabel title words onChoose />   // 作用域 pill
 <PlaceMenu title groups words leading closeOnClick trailing activation align count onPick />   // 下拉内容（自渲染 popup）
 <PlaceList groups words action visibleCount />                                                 // 详情平铺 + 折叠，返回 <li>
-<PlaceStack places active />                                                                   // 图标栈 + 溢出计数
+<AvatarStack marks active max />                                                               // 图标堆叠 + 溢出计数（单独文件 avatar-stack.tsx）
 ```
 
-- 数据：`PlaceOption { id, icon, label, where?, note?, count?, selected?, blocked? }`，不含领域类型
+- 数据：`PlaceOption { id, icon, label, where?, note?, count?, selected?, blocked? }`（extends `AvatarMark { id, icon }`），不含领域类型
 - 操作：`onPick(id)`（行=动作）、`action(option)`（列表每行尾部，调用方自渲染）、`trailing(option)`（菜单尾部）、
   `activation: "row" | "control"`（行是否可点）、`count(all)`（表头计数口径）
 - 文案：调用方按自己命名空间注入（skills.place.* / mcp.place.*），组件不知道任何 i18n key
