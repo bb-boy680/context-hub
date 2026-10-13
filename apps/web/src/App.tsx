@@ -5,13 +5,12 @@ import { useNavGroups } from "@/lib/navigation"
 import { ExtensionsPage } from "@/pages/extensions"
 import { OverviewPage } from "@/pages/overview"
 import { PlaceholderPage } from "@/pages/placeholder"
-import { PluginsPage } from "@/pages/plugins"
 import { RepositoryPage } from "@/pages/repository"
 import { useContributions } from "@workspace/extensions/react"
 import { Toaster } from "@workspace/ui/components/toast"
 
 /** Pages the shell owns; every other route comes from an extension. */
-const designedPaths = ["/", "/plugins", "/extensions", "/repository"]
+const designedPaths = ["/", "/extensions", "/repository"]
 
 export function App() {
   const contributed = useContributions("route")
@@ -28,7 +27,6 @@ export function App() {
         <Routes>
           <Route element={<AppLayout />}>
             <Route index element={<OverviewPage />} />
-            <Route path="/plugins" element={<PluginsPage />} />
             <Route path="/extensions" element={<ExtensionsPage />} />
             <Route path="/repository" element={<RepositoryPage />} />
             {contributed.map((route) => {

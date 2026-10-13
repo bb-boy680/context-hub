@@ -32,6 +32,7 @@ import {
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { claudeCodeExtension } from "@workspace/plugin-claude-code"
 import { mcpExtension } from "@workspace/plugin-mcp"
+import { pluginsExtension } from "@workspace/plugin-plugins"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import { skillsShExtension } from "@workspace/plugin-skills-sh"
 import * as ui from "./ui-kit.ts"
@@ -176,6 +177,7 @@ export async function startHub(): Promise<HubKernel> {
       ...builtinExtensions,
       skillsExtension,
       mcpExtension,
+      pluginsExtension,
       claudeCodeExtension,
       codexExtension,
       clineExtension,

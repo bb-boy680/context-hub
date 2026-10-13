@@ -2,7 +2,6 @@ import {
   BlocksIcon,
   GitBranchIcon,
   LayoutDashboardIcon,
-  PlugIcon,
   SettingsIcon,
 } from "lucide-react"
 import * as React from "react"
@@ -34,10 +33,7 @@ export const navGroups: NavGroup[] = [
   {
     id: "assets",
     labelKey: "nav.group.assets",
-    items: [
-      { labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon, order: 10 },
-      { labelKey: "nav.plugins", path: "/plugins", icon: PlugIcon, order: 30 },
-    ],
+    items: [{ labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon, order: 10 }],
   },
   {
     id: "operate",

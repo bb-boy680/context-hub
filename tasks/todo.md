@@ -1,3 +1,132 @@
+# 插件模块的界面（2026-10-13，用户：「先只实现 UI，可以全部复制 skills 模块」）
+
+## 第四轮：详情弹窗（用户：「点击打开弹窗，和 skills 那个差不多：左边上传资源图片，右边功能区，
+还可以查看文件」）
+
+- 新文件 `src/detail-dialog.tsx`：`PluginDetailDialog` = `Dialog` + 共享的 `DialogSplit`
+  （1136×740，与 skills 同一个外壳）。里面按包拆出一个 `PackLightbox`，**以包 id 作 key**，
+  于是换一个包时媒体与选中的文件都从头开始（不用 effect 同步状态）。
+  - 左 = `MediaPane`：舞台（按图片自身比例 `object-contain`，无图时是「插件图标 + N 个技能 · M 个命令
+    + 描述」的占位块）、`1 / N` 计数胶囊与左右箭头（仅 >1 时）、72×44 缩略图条 + `+` 上传格
+    （Popover 三个入口：选择文件 / 从 URL 导入 / 粘贴）、拖放遮罩、粘贴提示胶囊、底部提示行。
+    **有意不用 swiper**：这一层只有几张图，`active` 一个 state + 两个箭头等价且没有 swiper 的四个坑；
+    上传的图用 `URL.createObjectURL`，卸载时统一 `revokeObjectURL`（不落盘 —— 还没有宿主能写）。
+  - 右 = `InfoPanel`：h84 头部（等宽名字 + `v版本 · 来源` + 关闭）、滚动区（描述 / `TagEditor` /
+    「包含」分组的 技能 / 命令 / 更新时间 三行）、h64 页脚（主按钮 `查看文件` + `安装`/`卸载`，
+    按当前安装态切换）。
+  - 覆盖层 = `bg-scrim` + 从右侧滑入的 `FilesPanel`（880 宽）：`PluginFileTree` + `CodeCard`，
+    默认选中 `README.md`，读取中显示 spinner。
+- `src/file-tree.tsx`：照 skills 的同一实现（`@headless-tree/react`，默认只展开根、点击文件夹展开、
+  `fileTreeKey` 强制重挂载），两个包各持一份（跨包共享要改内核，暂不做）。为此给本包加
+  `@headless-tree/core` + `@headless-tree/react` 依赖。
+- 页面接入：卡片与列表行都能打开弹窗（卡片是 `role="button"` + Enter/Space，行是 `Ledger` 的 `onOpen`），
+  行内动作按钮 `stopPropagation` 不会连带打开；`catalog` 提升为页面的 state，弹窗里改标签会写回该行。
+- 示例文件：`sampleFiles(plugin)` 由行自身拼出 `plugin.json` / `README.md` / `skills/<x>/SKILL.md` /
+  `commands/run.md`，**每一层目录都要列出来**（少了中间目录，headless-tree 里那个文件夹永远展不开 —— 这次踩到）。
+
+实测（浏览器，zh-CN）：弹窗 1136×740、pane 776 / panel 360；媒体区三块 605 / 44 / 15 总高不溢出；
+上传一张 PNG → 缩略图 2 枚、计数 `2 / 2`、舞台切到 blob；点第一枚回到封面；移除后恢复 1 枚；
+文件面板滑入（`translate` 100% → 0）、树展开到三级、选 `SKILL.md` 后内容与标题跟着变、返回后 `aria-hidden`；
+页脚 `卸载` → 已安装 6→5 / 未安装 5→6，再点 `安装` 复原；列表行与卡片 Enter 都能打开；关闭后无对话框。
+检查：全仓 typecheck、web + 新包 lint、`pnpm --filter web build`、`check-messages.ts` 529/529 全绿。
+
+## 第三轮：瀑布流看起来不像瀑布流（用户：「卡片布局是不对的，skills 那个是响应式瀑布流，一行最多 5 个」）
+
+**根因在数据，不在 CSS。** 网格代码与 skills 是同一套（容器查询 556/846/1136/1426），实测容器 1138 →
+4 列 / 卡宽 266，与 skills 逐像素相同。真正的问题是：示例行**都没有封面**，回落封面统一 16:9，
+于是 11 张卡全是 291px 高 —— 看起来就是普通等高网格。
+
+改法：`src/sample.ts` 给 5 行不同比例的内联 SVG 封面（`flatCover(w, h)` → `data:image/svg+xml` 的
+两条平色带，4:3 / 16:9 / 1:1 / 2:1 / 3:4），其余行仍走「插件图标 + N 个技能 · M 个命令」的封面。
+
+实测（把 `@container` 元素宽度依次设成下表值）：
+
+| 容器宽 | 480 | 700 | 900 | 1200 | 1500 | 1800 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 列数 | 1 | 2 | 3 | 4 | 5 | 5（封顶） |
+| 卡宽 | 480 | 338 | 284 | 282 | 281 | 341 |
+
+同一宽度下卡片出现 5 档高度（1138 容器：274 / 291 / 341 / 407 / 496）= 真正的瀑布流。
+（把容器硬设得比视口宽会让 `body.scrollWidth` 溢出，那是测量伪影；真实 1138 下溢出为 0。）
+
+**教训**：用户说「布局不对」时先量基准值（列数 / 卡宽 / 卡高）再动 CSS —— 这次 CSS 一行都没改。
+
+## 第二轮：工具条两个按钮 + 添加弹窗（用户：「第一个按钮是检测更新，第二个按钮是添加 plugins，
+添加 plugins 得有一个弹窗」）
+
+- 工具条右边只剩两个：`检测更新`（outline + `RefreshCwIcon` / `plugins.action.checkUpdates`）与
+  `添加插件`（primary + `PlusIcon` / `plugins.action.add`，打开弹窗）；原来的「导入 / 浏览市场」两键已删。
+- 新文件 `src/add-plugin-dialog.tsx`：照 skills 的 `add-skill-dialog.tsx` 的壳（640 宽、header + 分段段
+  标 + 内容 + 列表，无 footer）。两段 **市场 / 本地**（主按钮默认开市场）：
+  - 市场 = 源字段（`border-input`，空时 `列出` 禁用）+ `列出` 胶囊；
+  - 本地 = 拖放区（`h-56`、`FolderUp`、`选择文件夹`）→ 选过之后换成文件夹条（`h-16`、mono 名字、
+    `这个文件夹里有 N 个插件包`、`更换`）；
+  - 列表 = 68px 行（`ScrollTextIcon` 瓦片 + mono 名字 + `安装` 胶囊），未选/空态是一行中性说明。
+- **本地只做了浏览器能说的那点**：`webkitdirectory` 的 `FileList` 按 `webkitRelativePath` 首段分组 =
+  文件夹里的顶层插件包；不判定「是不是插件包」（那要读清单）。点一行的安装只把它加进页面的 `installed`。
+- 实测：640 宽、市场段 302 高 / 选完文件夹 381 高、`scrollWidth === clientWidth`；段切换、`列出` 随输入启用、
+  中性说明行、文件夹条 + alpha-pack / beta-pack 两行都核对过；关掉后弹窗从 DOM 移除。
+- 检查：全仓 typecheck、web + 新包 lint、`pnpm --filter web build`、`check-messages.ts` 495/495 全绿。
+
+## 第一轮：新包与页面（见下）
+
+## 做了什么
+
+**新工作区包 `packages/plugin-plugins`（`@workspace/plugin-plugins`）**，界面照 `plugin-skills` 的
+`page.tsx` 复制，把功能逻辑整段摘掉：
+
+- `src/page.tsx`：页面外壳（标题块 + 工具条 + 页签 + `FilterBar` + `PageBody` 页脚）、瀑布流卡片网格
+  （`@container` + `columns-1 @min-[556px]:2 @min-[846px]:3 @min-[1136px]:4 @min-[1426px]:5`，
+  按封面自身比例排版的 `aspectRatio` + 比例缓存）、`Ledger` 列表（列份额 2.9/43.1/19.3/16.1/10.1/8.5）、
+  批量条、`TablePagination`、空状态。
+- `src/types.ts`（`PluginRow` / `PluginSource`）、`src/sample.ts`（11 条临时示例行 + 初始已安装集合）、
+  `src/messages.ts`（`plugins.*` 英文兜底 34 键）。
+- `src/index.ts`：`pluginsExtension` —— 用内核的 `nav`（assets 组、order 30）+ `route` 贡献 `/plugins`。
+- 接入：`apps/web/package.json` 加 `workspace:*`、`lib/hub.ts` 的 `extensions: [...]` 注册。
+- **shell 侧旧 mock 插件模块整份删除**：`pages/plugins.tsx`、`components/plugin-detail-dialog.tsx`、
+  `components/install-plugin-dialog.tsx`、`lib/plugins.ts`（只被 `App.tsx` 引用，删得干净），
+  `navigation.ts` 的静态 `nav.plugins` 项与 `App.tsx` 的 `/plugins` 路由一并去掉 —— 现在这条路由由插件包提供。
+
+## 有意没做的（等下一步）
+
+- 详情弹窗、远程市场搜索弹窗**已做**（见第四轮）；弹窗里上传的图片只活在这个窗口（没有宿主可写），
+  上传段与文件段读的都是示例数据。
+- 添加弹窗里的 `检测更新`、`列出`、拖放后的判定、以及行上的 `安装` 都**还没有真逻辑**：
+  市场段列出不了任何东西（没有注册表源），本地段只按浏览器给的路径分组。
+- 页签轴是「全部 / 已安装 / 未安装」（示例集自身的状态），skills 那套「位置 / 作用域（工作区 / 全局）」
+  与安装到具体 Agent 的菜单要等插件的位置模型定下来再说。
+- `src/sample.ts` 是**临时假数据**，只为把两个视图撑起来；读真实插件目录的实现落地时整份删除
+  （示例数据不得留成"读不到时的兜底"）。
+
+## 与 skills 的实测对照（1205px 视口 / 容器 901px）
+
+| 项 | skills | plugins |
+|---|---|---|
+| 卡片宽 / 网格列数 | 284 / 3 列 | 284 / 3 列（列起点 272 / 580 / 889） |
+| 列表列宽 | 26 / 388 / 174 / 145 / 91 / 77 | 同左（逐像素相同） |
+| 行高 | 66 | 66 |
+| 动作列溢出 | 单元格 77px、内容 105px（溢出 28） | 77px、内容 87px（溢出 10） |
+
+动作列在窄容器下溢出是**共享 `Ledger` + 同一套列份额的既有行为**（skills 更严重），不是这次引入的。
+瀑布流容器是真的，但示例行都没有封面 → 回落封面统一 16:9，所以现在三列等高；真封面进了才有参差。
+
+## 验证
+
+- `pnpm typecheck`（22/22）、`pnpm --filter web lint`、`pnpm --filter @workspace/plugin-plugins lint`、
+  `pnpm --filter web build` 全绿；`node packages/locale-zh-cn/scripts/check-messages.ts` 478/478
+  （新增 `plugins.*` 中英键各 34 个，`plugin-plugins: 34 keys`）。
+- 浏览器（http://localhost:5173/plugins）：侧栏「插件」由插件包贡献（概览 / 技能 / MCP 服务器 / 插件 顺序正确）、
+  页签 全部 11 / 已安装 6 / 未安装 5；列表视图 11 行 66px；点「卸载」该行离开已安装页签且未安装变 6；
+  点标签胶囊 `docs` 收窄到 1 行；查询 `data` + `docs` 组合命中筛选空态（「没有找到匹配的插件」+「清除筛选」）；
+  两个视图切换与页脚分页正常；全程 `bodyOverflow 0`。
+- 重启 dev server 是必须的（新增工作区包 + `hub.ts` 改动），已按老办法杀 5173 监听进程、删
+  `apps/web/node_modules/.vite`、`Start-Process` 脱离终端重启。
+
+## 未决
+
+- `designs/plugins.pen` 还是旧那版（列表列 16/362/222/150/170/96、网格卡 266x246、详情弹窗 5 页签），
+  与这次照 skills 重做的界面**不一致**，需要用户确认是改画板还是改实现。
+
 # Cline 的 MCP provider（2026-10-13，用户问「这个报错合理吗」）
 
 用户看到 MCP 页报「`~/.cline.json`：读不到这个客户端的配置文件。」，问这是否合理、以及安装 Agent 会不会
