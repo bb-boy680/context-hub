@@ -1,3 +1,116 @@
+# 插件模块的实施计划（2026-10-13，用户：「列一个详细的一个实施计划，计划是有阶段执行的，每个阶段需要有一个验收目标」）
+
+界面（`packages/plugin-plugins` 的 page / 两个弹窗）前四轮已完成，本计划只做**数据与行为**：
+把 pack 收进 hub、检测上游、分发给各 Agent。全部判定都建立在这几轮实测出来的事实上（见
+`/memories/repo/agent-plugin-install.md`）：客户端不回答"有没有更新"；远端是每个插件一条记录，
+不是每个市场一条；本机 Claude Code / Codex 的市场都能吃**本地路径**；安装是"注册引用 + 拷贝一份"。
+
+**顺序为什么是这样**：0 定义"记什么"（不然后面每一步都没得比）→ 1 让库里真的有东西 →
+2 让"有更新"可判 → 3 让东西出得去 → 4 把"更新后重发"这个闭环补上 → 5 第二个宿主与库同步。
+每一阶段都能单独跑、单独验收，不依赖后面的阶段。
+
+## 阶段 0 — 契约与记录（无网络、无宿主、纯类型与纯函数）
+
+- [ ] `src/contract.ts`（唯一导出面）：`PackOrigin`（`git`/`npm`/`archive`/`command`/`path`）、
+      `PackUpstream`（origin + marketplace 指针 + 采集时的 `hash`）、`PackCheck{at,latest?,currentHash}`。
+- [ ] `src/revision.ts`：`originRevision(origin): string | null`（git→子目录 commit sha / npm→version /
+      archive→etag / command·path→null）+ `hasUpstream(origin)`。**浏览器与宿主共用同一份**（两个平面同一套判定）。
+- [ ] `src/records.ts`（共用）：`<home>/packs/index.json` 的文档形状 + `readRecords`/`upsert`/`remove`。
+- [ ] `src/host/hash.ts`：把 `skillFolderHash` 从 `plugin-skills` 提出来复用（不复制第二份实现）。
+- [ ] `scripts/check-pack-records.ts`：假数据下 `originRevision` 各形态、`outdated`/`modified` 派生、
+      记录读写往返、坏 JSON 拒绝。
+
+**验收**：`node packages/plugin-plugins/scripts/check-pack-records.ts` 全绿；`pnpm typecheck` 干净；
+**没有任何网络调用与文件写入**（本阶段不落盘、不碰宿主）。
+
+## 阶段 1 — 收录：把 pack 收进 hub
+
+- [ ] `src/inspect.ts`：spec → `PackOrigin`（照 DSH 的 `parseInstallSpec`：**强制绝对路径**、
+      git 简写/URL/本地路径/tarball 四形态收敛、拒绝相对路径与非法包名）。
+- [ ] `src/host/fetch.ts`：`git clone --depth 1`（可带 `subdir`）/ npm 下载 / 本地路径复制 → 临时目录，
+      **不带 `.git`**（与客户端缓存一致）。
+- [ ] `src/host/packs-fs.ts`：原子写 + 尾队列（照 `workspaces-fs` 的教训），落 `<home>/packs/<id>/`；
+      写 `index.json`；**幂等**：同 id 已存在时拒绝并说清"已收录"。
+- [ ] `src/host/marketplace.ts`：在**库根**生成 `.claude-plugin/marketplace.json`
+      （`{name, owner, plugins:[{name, source:"./<id>", description}]}`）—— 库自带可安装性。
+- [ ] 桥 `vite.ts`：`POST /hub/packs?action=inspect|add|records|list`；宿主侧改完**必须重启 dev server**。
+- [ ] UI：添加弹窗的 Marketplace / Local 两个分段接真数据（现在是 `sample.ts`），
+      成功后列表刷新、失败走 toast（skills 已定的规矩）。
+
+**验收**：三种来源各收一个真 pack（本地夹具仓库 / 一个真 GitHub repo / 一个本地目录）→
+磁盘上 `<home>/packs/<id>/` 内容与来源逐字节一致（无 `.git`）、`index.json` 记全 `upstream`、库根索引合法
+（`claude plugin validate <home>/packs` 通过）；重复收录被拒；`sample.ts` 可删。
+
+## 阶段 2 — 检测更新（便宜探针 + 内容哈希终审）
+
+- [ ] `src/host/probe.ts`：按 origin 分支 —— 有 market 指针先读上游 `marketplace.json`
+      （entry 的钉 sha / version 变了吗）→ `git ls-remote HEAD` → 子目录 commit
+      （有 clone 用 `git log -1 -- <subdir>`，没有用 GitHub commits API）；npm 用 `pnpm view`。
+      **按仓库分组**，一组一次探针，并发 2–3；`CHECK_VERSION` 换代即让旧 `checked` 失效。
+- [ ] 凭证与安全：洗过的父环境 + `GIT_TERMINAL_PROMPT=0` / `GIT_ASKPASS=''`，绝不弹认证框（照 DSH）。
+- [ ] `command` / `path` 两种来源**显式回答"无法检查"**，不转圈。
+- [ ] `checked` 落盘（重启保留）；`outdated`/`modified` 仍是派生值，不存字段。
+- [ ] UI：「检查更新」按钮 + 卡片/列表的「有更新」徽标 + 详情里那行"上次检查"（键名沿用 skills 的读法）。
+- [ ] `scripts/check-pack-updates.ts`：**本机 `file://` git 仓库当离线上游**（skills 的 `check-updates.ts` 已证明可行）。
+
+**验收**：脚本覆盖「推进一版 → outdated → 再检查 → 归零」以及「钉 sha 的市场：pin 没变不算更新 /
+子目录动了才算」（假 marketplace 夹具覆盖两条分支）；浏览器实测：首次自动查一次、之后只有点按钮才发请求
+（用页面内 `fetch` 劫持 + 网络监听双份证据，照 MCP 缓存那轮的配方）；`command`/`path` 显示"无法检查"。
+
+## 阶段 3 — 分发安装（Claude Code 打通，其它宿主同构）
+
+- [ ] 内核契约 `PackInstaller`：`{id, label, icon, accepts: PackOrigin["kind"][], scopes, inspect(), install(plan), remove(), setEnabled(id, scope, on)}`
+      —— 写进 `packages/extensions` 的贡献点，**内核不含任何插件格式知识**（与 MCP 归位同一条规则）。
+- [ ] `installer-claude-code`（放 `packages/plugin-claude-code`）：
+      ① 确保库根索引 → ② `claude plugin marketplace add <home>/packs --json`（幂等）→
+      ③ `claude plugin install <id>@<hub> -s user|project|local --json`；卸载 `uninstall`；启停 `enable|disable`。
+      **不写它的 `installed_plugins.json` / cache**（实测它会拷一份，那是它的私有格式）。
+- [ ] `installer-link`（技能 / 规则目录）：已有的 link 能力复用，包成同一契约（skill / rules 两种投影）。
+- [ ] UI：卡片与列表的「安装到 ⌄」菜单（按 `工作区` / `全局 Agent` 分组，勾选=写进哪个位置），
+      与 MCP 那个菜单同构；作用域语义 = Claude Code 的 user / project / local。
+- [ ] `scripts/check-pack-install.ts`（假安装器）+ 真机成对验证（装 → 卸 → 核对状态逐字节复原）。
+
+**验收**：浏览器上从库里把一个 pack 装到 Claude Code（三个作用域各试一次）→ `claude plugin list --json`
+看得到、`~/.claude/plugins/cache/<hub>/<id>/` 出现；卸载后 `installed_plugins.json` 与 `settings.json`
+与操作前**逐字节相同**（本轮实测的收尾配方）；启动 `claude` 能列出该插件的命令。
+
+## 阶段 4 — 更新动作与冲突处理（闭环）
+
+- [ ] `src/host/update.ts`：下载新修订到 `.<id>.updating/` → 算哈希 → **与装时记的相同就丢弃并回"其实没变"**
+      → 换目录（`.previous` 过渡）→ 记新 revision 与新 hash → 清 `checked` → 失败整体回滚。
+- [ ] `modified === true` 时更新前把"本地被改过、会被覆盖"摆出来（skills 的 `outdated && modified` 是先例）。
+- [ ] 更新收尾：对**当前持有它的每个位置**重发（Claude Code = `claude plugin update <id>`）。
+- [ ] 批量入口与 skills 一致：页签上的 `一键更新`（悬浮菜单）+ 失败走 toast。
+
+**验收**：离线夹具下「改一字节 → modified=true 且更新前有提示 → 更新 → 归零」；
+真机：库里的 pack 推进一版 → 检查出「有更新」→ 更新 → 客户端那本同步变化、库哈希与记录一致；
+一次故意失败的更新（拔网/坏修订）后库与客户端都回到操作前状态。
+
+## 阶段 5 — 第二个宿主与库同步（用户明确要的"存到 GitHub 或别处"）
+
+- [ ] `installer-codex`：先实测它认的索引文件名（`.codex-plugin/marketplace.json` 还是
+      `.agents/plugins/marketplace.json`）与 `codex plugin add` 的 JSON 输出，再照阶段 3 的骨架实现。
+- [ ] 库同步：`<home>/packs` 作为 git 仓库（`git init` / remote / commit / push），
+      或复用仓库模块已有的同步能力（先看 `apps/web/src/pages/repository.tsx` 是不是还只是壳）。
+- [ ] 只读投影：从别人的库 `add marketplace <owner>/<repo>` 直接装，不需要先收进本地库。
+
+**验收**：Codex 上一次装/卸往返且状态文件复原；库 push 到远端后再 clone 到另一台机器，
+`claude plugin marketplace add <owner>/<repo>` + 装一个 pack 成功（证明"库自带可安装性"成立）。
+
+## 仍未定（开始前需要拍板，或到那一步再定）
+
+- 库根的 `.claude-plugin/marketplace.json` 是 hub 每次改 pack 就重生成，还是只在人点"同步/发布"时生成？
+  （倾向：收录/更新时自动重生成，因为它只是索引。）
+- 更新后是否**自动**重发到已持有的位置，还是列出来让人勾（破坏性动作倾向后者）。
+- `<home>/plugins` 被 Extensions 占用，本模块用 `<home>/packs`（已按此写计划）。
+
+## 验证配方（每次收尾都跑）
+
+- 改宿主侧（`src/host/**`、`vite.ts`）**必须重启 dev server**；
+- `pnpm --filter @workspace/plugin-plugins typecheck`、`pnpm lint` 干净；
+- 涉及宿主写盘/装到客户端的验证**必须成对做**（备份哈希 → 操作 → 反向操作 → 逐字节比对）；
+- 对话里现有的真插件/真市场不许被污染（上一轮临时市场探针已彻底清理，可作模板）。
+
 # 插件模块的界面（2026-10-13，用户：「先只实现 UI，可以全部复制 skills 模块」）
 
 ## 第四轮：详情弹窗（用户：「点击打开弹窗，和 skills 那个差不多：左边上传资源图片，右边功能区，
