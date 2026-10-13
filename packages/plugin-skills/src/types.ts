@@ -10,14 +10,14 @@ import type { SkillUpstream, SkillCheck } from "./store.ts"
  * skills. `"both"` and `"library"` are the hub's own two cases; everything else
  * is the id of a place, the way the extension that contributed it named it.
  */
-export type SkillLocation = "library" | "both" | SkillPlace
+export type SkillLocation = "library" | "both" | SkillPlaceId
 
-/** One place an agent keeps skills in, named by the extension that contributed it. */
-export type SkillPlace = string
+/** One place an agent keeps skills in, named by the extension that registers it. */
+export type SkillPlaceId = string
 
 /** One place holding a row's files, with where to find them. */
 export interface SkillHold {
-  id: SkillPlace
+  id: SkillPlaceId
   /** Which root the directory sits under. */
   scope: AssetScope
   /** The place's directory inside that root, `/`-separated. */
@@ -53,12 +53,12 @@ export type Skill = {
    * that holds a link into the library. Taking the link back is what an action
    * on such a row does.
    */
-  linkAt?: "library" | SkillPlace
+  linkAt?: "library" | SkillPlaceId
   /**
    * The places holding a skill of their own under this id, so the name is taken
    * there: installing the library's copy into one of them is not possible.
    */
-  takenAt?: SkillPlace[]
+  takenAt?: SkillPlaceId[]
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
   stale?: boolean
   /**

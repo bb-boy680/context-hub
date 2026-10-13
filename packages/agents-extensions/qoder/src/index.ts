@@ -2,28 +2,38 @@
  * Qoder as a Context Hub integration: the machine-wide skills directory it
  * reads, and the place this hub delivers skills to.
  *
- * Nothing here renders. The plugin declares an agent target and the place it
- * reads outside any workspace; the shell does the rest: the sidebar's agent
- * rows, the skills page's place menu, and the extension catalog entry all read
- * these. This plugin declares the machine-wide place only; nothing delivers
- * into the agent's own project directory yet.
+ * Nothing here renders. The plugin registers the place it reads outside any
+ * workspace and declares an agent target; the shell does the rest: the
+ * sidebar's agent rows, the skills page's place menu, and the extension catalog
+ * entry all read these. This plugin registers the machine-wide place only;
+ * nothing delivers into the agent's own project directory yet.
  */
 import Qoder from "@lobehub/icons/es/Qoder"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import { qoderMessages } from "./messages.ts"
 
 /** This integration's id; the kernel matches it against the manifest. */
 export const QODER_ID = "hub.target.qoder"
 
-/** The place Qoder reads this machine's skills from, outside any workspace. */
-export const QODER_GLOBAL_PLACE = "qoder-global"
-
 /** The brand mark in its own colours. */
 const QoderIcon: ExtensionIcon = Qoder.Color
 
-/** Qoder: the machine-wide skills directory, and the target that names it. */
+/** The place Qoder reads this machine's skills from, outside any workspace. */
+const QODER_PLACES: SkillPlace[] = [
+  {
+    id: "qoder-global",
+    labelKey: "qoder.tab",
+    icon: QoderIcon,
+    scope: "global",
+    dir: ".qoder/skills",
+    order: 100,
+  },
+]
+
+/** Qoder: the machine-wide skills directory, and the target beside it. */
 export const qoderExtension: ExtensionDefinition = {
   manifest: {
     id: QODER_ID,
@@ -38,15 +48,11 @@ export const qoderExtension: ExtensionDefinition = {
     permissions: ["assets.read"],
   },
   activate(scope) {
-    /* The place comes first: the target below names it, so a consumer that
-       reads one side always finds the other. */
-    scope.contribute("skillLocation", {
-      id: QODER_GLOBAL_PLACE,
-      labelKey: "qoder.tab",
-      icon: QoderIcon,
-      scope: "global",
-      dir: ".qoder/skills",
-      order: 100,
+    /* The places register into the skills module, which is what makes this
+       agent one the sidebar lists and the skills page reads. */
+    scope.inject(["skills"], (ctx, plugins) => {
+      const { registry } = plugins.skills
+      ctx.effect(() => registry.register({ id: QODER_ID, places: QODER_PLACES }))
     })
     scope.contribute("target", {
       id: QODER_ID,
@@ -58,7 +64,6 @@ export const qoderExtension: ExtensionDefinition = {
         { label: "Skills", path: ".qoder/skills/<name>/SKILL.md" },
       ],
       format: "Markdown skills with YAML frontmatter",
-      globalSkillLocation: QODER_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",

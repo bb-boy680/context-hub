@@ -2,28 +2,38 @@
  * MiniMax Code as a Context Hub integration: the machine-wide skills directory
  * it reads, and the place this hub delivers skills to.
  *
- * Nothing here renders. The plugin declares an agent target and the place it
- * reads outside any workspace; the shell does the rest: the sidebar's agent
- * rows, the skills page's place menu, and the extension catalog entry all read
- * these. This plugin declares the machine-wide place only; nothing delivers
- * into the agent's own project directory yet.
+ * Nothing here renders. The plugin registers the place it reads outside any
+ * workspace and declares an agent target; the shell does the rest: the
+ * sidebar's agent rows, the skills page's place menu, and the extension catalog
+ * entry all read these. This plugin registers the machine-wide place only;
+ * nothing delivers into the agent's own project directory yet.
  */
 import Minimax from "@lobehub/icons/es/Minimax"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import { minimaxCodeMessages } from "./messages.ts"
 
 /** This integration's id; the kernel matches it against the manifest. */
 export const MINIMAX_CODE_ID = "hub.target.minimax-code"
 
-/** The place MiniMax Code reads this machine's skills from, outside any workspace. */
-export const MINIMAX_CODE_GLOBAL_PLACE = "minimax-code-global"
-
 /** The brand mark in its own colours. */
 const MinimaxCodeIcon: ExtensionIcon = Minimax.Color
 
-/** MiniMax Code: the machine-wide skills directory, and the target that names it. */
+/** The place MiniMax Code reads this machine's skills from, outside any workspace. */
+const MINIMAX_CODE_PLACES: SkillPlace[] = [
+  {
+    id: "minimax-code-global",
+    labelKey: "minimaxCode.tab",
+    icon: MinimaxCodeIcon,
+    scope: "global",
+    dir: ".minimax/skills",
+    order: 110,
+  },
+]
+
+/** MiniMax Code: the machine-wide skills directory, and the target beside it. */
 export const minimaxCodeExtension: ExtensionDefinition = {
   manifest: {
     id: MINIMAX_CODE_ID,
@@ -38,15 +48,11 @@ export const minimaxCodeExtension: ExtensionDefinition = {
     permissions: ["assets.read"],
   },
   activate(scope) {
-    /* The place comes first: the target below names it, so a consumer that
-       reads one side always finds the other. */
-    scope.contribute("skillLocation", {
-      id: MINIMAX_CODE_GLOBAL_PLACE,
-      labelKey: "minimaxCode.tab",
-      icon: MinimaxCodeIcon,
-      scope: "global",
-      dir: ".minimax/skills",
-      order: 110,
+    /* The places register into the skills module, which is what makes this
+       agent one the sidebar lists and the skills page reads. */
+    scope.inject(["skills"], (ctx, plugins) => {
+      const { registry } = plugins.skills
+      ctx.effect(() => registry.register({ id: MINIMAX_CODE_ID, places: MINIMAX_CODE_PLACES }))
     })
     scope.contribute("target", {
       id: MINIMAX_CODE_ID,
@@ -58,7 +64,6 @@ export const minimaxCodeExtension: ExtensionDefinition = {
         { label: "Skills", path: ".minimax/skills/<name>/SKILL.md" },
       ],
       format: "Markdown skills with YAML frontmatter",
-      globalSkillLocation: MINIMAX_CODE_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",

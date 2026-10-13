@@ -551,8 +551,8 @@ MCP 是**功能**，不是内核机制，所以它的契约与工具集不能留
 
 ## 未决 / 已知
 
-- **skills 还没迁到同一条缝**：`skillLocation` 仍是贡献点 + 自带 codec 的过渡形状，下一轮按同一模型
-  （`SkillProvider` 服务）迁移。
+- **skills 已迁到同一条缝**（2026-10-13，见本文开头一节）：`skillLocation` 贡献点已删，
+  改由 `skills` 服务上的 `SkillProvider` 注册表承载。
 - 仍缺：测试连接（stdio/http 真握手）、工具页签读真实 `tools/list`、检查结果落盘。
 - 10 个模拟 Agent 插件未做（用户已改口：后面一个个真做）。
 
@@ -2882,6 +2882,45 @@ idle 且有过检查时显示 `上次检查：<age>`。更新成功后 checked �
 2. 页面壳（侧栏、顶栏）一并改成白底 + 发丝线：因为要改全局 token，其他模块会跟着变。
 3. 卡片封面显示文档正文而非 frontmatter；列表里的描述仍是前两行。
 4. 落地时是否同步改 `packages/ui` 的 token（`globals.css`）与 shadcn 组件的圆角 / 配色默认值。
+
+# Agent 的 SKILL 位置改走服务（2026-10-13，用户：「Agent 插件的 SKILL 功能还是使用的旧方法，希望他和 MCP 注册的方式一样」）
+
+`skillLocation` 是唯一还留在内核的「功能贡献点」：Agent 插件把位置当数据交上来，技能页再自己拼。
+本轮把它换成与 MCP 同一条服务轨道 —— **服务名是发布者命名的，注册进注册表，停用即撤销**。
+
+## 改动
+
+- **契约与注册表归发布者（`@workspace/plugin-skills`）**：新增 `src/provider.ts`（`SKILL_SERVICE`、
+  `SkillPlace`、`SkillProvider`、`SkillProviderRegistry`、`SkillService`、纯函数 `readablePlaces`）、
+  `src/service.ts`（`createSkillService`）、`src/contract.ts`（子路径导出 `./contract`，Node 下的检查脚本可加载）。
+  类型按 MCP 的做法由发布者合并进 `ExtensionServices`（`skills`）。
+- **内核删掉 `skillLocation` 贡献点**：`SkillLocationContribution`、`ContributionMap.skillLocation`
+  与 `AgentTargetDescriptor` 的 `skillLocation` / `globalSkillLocation` 两个字段一并删除；
+  现在「谁是 Agent」由**是否注册了 provider** 回答（服务轨道），不再由 target 上的两个字符串回答。
+- **技能模块自己也是第一个 provider**：工作区共享的 `.agents/skills` 由 `skillsExtension` 注册进自己的注册表，
+  与 Agent 插件走同一条路，不再占一个贡献点。`manifest.provides` 加 `["skills"]`。
+- **读的地方改走注册表**：`library.ts` 的 `useReadablePlaces` / `useSkillAgents` 读
+  `ctx.get("skills").registry.providers()`，以目录快照的 revision 作重读信号；
+  「工作区位置一律读、机器级位置只在侧栏选中该 Agent 时读」这条规则移进 `provider.ts` 的 `readablePlaces`（纯函数，可离线检查）。
+- **10 个 Agent 插件 + claude-code 改法一致**：`scope.inject(["skills"], …)` →
+  `registry.register({ id: <自己的 id>, places: [...] })`，位置常量从导出字符串改成包内数组；
+  target 贡献保留（侧栏那一行仍要 displayName/icon/format）。各包 `package.json` 补 `@workspace/plugin-skills`。
+- **侧栏 Agent 菜单**：`AgentGroup` 由「target 带 skillLocation」改为「id 出现在注册表里」。
+- 命名冲突：`plugin-skills/src/registry.ts`（远程技能来源）已占用 `SkillRegistry`，故新接口叫
+  `SkillProviderRegistry`。
+
+## 验收
+
+- `pnpm typecheck` 21/21；改动包 `eslint` 干净。
+- 新增 `plugin-skills/scripts/check-registry.ts`（12/12：注册/按注册顺序返回/撤销/重复撤销无副作用，
+  以及 `readablePlaces` 的四条：工作区位置无条件读、机器级位置需选中、不读未选中者的位置、按 order 排序）。
+- 既有检查重跑：`extensions/scripts/check-services.ts` 16/16、`check-plugins.ts` 全过、
+  `plugin-skills` 的 `check-place-skills`/`check-store`/`check-package` 全过、`locale-zh-cn/check-messages` 446/446。
+- 真机浏览器（重启前 dev server + 整页刷新，本次改了 `exports` 必须重启）：技能页页签 全部 14 / 技能库 9 /
+  未收录 3 / 需要更新 3 正常；「全局」位置菜单列出 11 个位置（Claude Code `~/.claude/skills` 1 条、
+  Cline `~/.agents/skills` 1 条，其余 0 条）；侧栏取消勾选 Qoder → 位置 11→10、药丸 `+6`→`+5`，
+  重新勾选即复原（证明注册表撤销与选择联动都是活的）。
+- 未做：技能按位置写入的端到端重测（本轮没动 `SkillPlaceRef` 与 host 侧的读写路径）。
 
 ## 追问：一件技能被多个 Agent 装了怎么显示（2026-10-09，用户「很纠结」）
 

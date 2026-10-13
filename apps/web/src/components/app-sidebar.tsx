@@ -8,6 +8,7 @@ import * as React from "react"
 import { useLocation } from "react-router"
 
 import { useContributions, useI18n } from "@workspace/extensions/react"
+import { useSkillAgents } from "@workspace/plugin-skills"
 import { Sidebar, SidebarContent, SidebarHeader } from "@workspace/ui/components/sidebar"
 
 import { SidebarGroup, SidebarRow } from "@/components/sidebar-rows"
@@ -44,20 +45,22 @@ function NavGroup({ group }: { group: NavGroupData }) {
 const AGENTS_VISIBLE = 8
 
 /**
- * The agents this hub delivers to: an integration that reads a machine's or a
- * workspace's skills is one. The list is a contribution, so it exists exactly
- * while such an integration is enabled, and each row wears the mark that
- * integration ships. Choosing one is what puts its skills place on the skills
- * page, so several can be chosen at once.
+ * The agents this hub delivers to: an integration that registers a place for
+ * the skills module to read is one. A row exists exactly while such an
+ * integration is enabled, and wears the mark that integration ships. Choosing
+ * one is what puts its machine-wide place on the skills page, so several can be
+ * chosen at once.
  */
 function AgentGroup() {
   const { t } = useI18n()
   const { page, setAgent } = useWorkspaces()
   const [expanded, setExpanded] = React.useState(false)
   const chosen = page?.agents ?? []
-  const targets = useContributions("target").filter(
-    (entry) =>
-      entry.skillLocation !== undefined || entry.globalSkillLocation !== undefined
+  /* An agent is one this hub reads skills from: a target has a row while its
+     own integration registered a place, which is what the skills page reads. */
+  const agents = useSkillAgents()
+  const targets = useContributions("target").filter((entry) =>
+    agents.includes(entry.id)
   )
 
   if (targets.length === 0) return null

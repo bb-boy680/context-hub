@@ -6,8 +6,6 @@
 import type { Context } from "@deepseek-ai/cordis"
 import type { ComponentType } from "react"
 
-import type { AssetScope } from "@workspace/core/place-files"
-
 import type { PlatformHost } from "./host.ts"
 import type { I18nService } from "./i18n.ts"
 import type { SkillRegistry } from "./skill-registry.ts"
@@ -83,20 +81,6 @@ export interface AgentTargetDescriptor {
   locations: AgentTargetLocation[]
   /** Serialized format the target expects, as a display-ready note. */
   format: string
-  /**
-   * The `skillLocation` contribution this agent reads a workspace's skills
-   * from. An agent without one cannot take skills into a project, so the
-   * workspace menu leaves it out rather than offering a choice that does
-   * nothing.
-   */
-  skillLocation?: string
-  /**
-   * The `skillLocation` contribution this agent reads skills from outside any
-   * workspace, under the home directory. It is a separate place because it is
-   * a separate directory: nothing links the two, and an agent may offer only
-   * one of them.
-   */
-  globalSkillLocation?: string
 }
 
 /** Sidebar groups the shell renders, in order. */
@@ -118,29 +102,6 @@ export interface NavContribution {
 }
 
 /**
- * One place an agent keeps skills: the directory itself, plus how the skills
- * module names it. The module reads that directory, lists its tab, and offers
- * it as an install target, so an agent integration is a contribution rather
- * than code inside the skills module.
- */
-export interface SkillLocationContribution {
-  /** Stable id; the tab row's key and the target a row's install names. */
-  id: string
-  /** Message key for the entry's label. */
-  labelKey: string
-  icon: ExtensionIcon
-  /**
-   * The root `dir` is read under: the workspace in use, or the home directory
-   * every workspace shares.
-   */
-  scope: AssetScope
-  /** The directory inside that root, `/`-separated, e.g. ".claude/skills". */
-  dir: string
-  /** Sort rank among the places of its own scope. */
-  order: number
-}
-
-/**
  * One page contributed by an extension; a UI shell mounts it at its path.
  */
 export interface RouteContribution {
@@ -155,8 +116,6 @@ export interface ContributionMap {
   locale: LocaleContribution
   /** One coding agent's consumption contract. */
   target: AgentTargetDescriptor
-  /** One place an agent keeps skills, in a workspace or outside every one. */
-  skillLocation: SkillLocationContribution
   /** One searchable remote skill catalog. */
   skillRegistry: SkillRegistry
   /** A sidebar entry. */

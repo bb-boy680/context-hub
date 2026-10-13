@@ -134,3 +134,14 @@
 - 要真机验证又不想动用户正在用的 5173：另起一个 `pnpm exec vite --port <其它端口>` 的临时实例，
   验证完 `Stop-Process -Id <pid>` 停掉（注意该实例只监听 `::1`，用 `localhost` 而不是 `127.0.0.1` 访问）。
 
+## 批量改动
+
+- **一次改十几个包时，边改边验证，别攒到最后**：本轮把 `skillLocation` 换成服务轨道，改完 14 个文件才跑
+  typecheck，结果 `app-sidebar.tsx` 里一段 `replace_string_in_file` 只替换掉了多行表达式的**前两行**，
+  留下一行裸表达式（`entry.skillLocation !== undefined` 悬在 `agents.includes(entry.id)` 下面）,
+  Vite 直接把解析错误甩给用户。教训：① 多行表达式要用**整段**（含收尾括号）做 oldString；
+  ② 每改完一个「面」（内核 / 模块 / 各插件 / 应用）就 `pnpm typecheck`，用户不想当我的编译器。
+- **改了包的 `exports` 或新增服务后必须整页刷新/重启 dev server**：本轮新增
+  `@workspace/plugin-skills/contract` 子路径导出与 `skills` 服务，HMR 之后看起来正常，
+  但按老规矩（Vite 缓存 package.json 解析结果、插件模块只在组合时加载一次）重启并整页刷新才算数。
+

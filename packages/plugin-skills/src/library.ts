@@ -6,10 +6,11 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useContributions, useHub, useI18n } from "@workspace/extensions/react"
-import type { AssetScope, SkillLocationContribution } from "@workspace/extensions"
+import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
+import type { AssetScope } from "@workspace/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
+import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
 import type {
   PlaceSkill,
   PlaceSkillsView,
@@ -26,7 +27,7 @@ import type {
   Skill,
   SkillHold,
   SkillLocation,
-  SkillPlace,
+  SkillPlaceId,
   SkillSource,
 } from "./types.ts"
 
@@ -35,7 +36,7 @@ const NO_AGENTS: string[] = []
 
 /** One place an agent keeps skills in, with what it holds right now. */
 export interface SkillPlaceView {
-  id: SkillPlace
+  id: SkillPlaceId
   /** Message key the provenance line resolves for this place. */
   labelKey: string
   /** Which root the place's directory sits under. */
@@ -111,32 +112,35 @@ export function useChosenAgents(): string[] {
 }
 
 /**
- * The places this build reads, in the order their contributions ask for.
- *
- * Every workspace-scope place an enabled integration contributes is read: a
- * workspace is a folder the hub was pointed at, so its directories are a fact
- * about it rather than a choice. A machine-wide place belongs to one agent, so
- * it is read only while the sidebar has that agent chosen — the choice is what
- * says which of the machine's agents this hub delivers to.
- *
- * @returns the places to read, sorted by their contributions' order.
+ * Every provider the skills registry holds, re-read on each catalog change: an
+ * agent extension registers the places it reads while it activates, and gives
+ * them back when it is disabled.
  */
-export function useReadablePlaces(): SkillLocationContribution[] {
-  const contributions = useContributions("skillLocation")
-  const targets = useContributions("target")
-  const chosen = useChosenAgents()
+function useSkillProviders(): readonly SkillProvider[] {
+  const ctx = useHub()
+  useExtensionSnapshot()
+  return ctx.get("skills")?.registry.providers() ?? []
+}
 
-  return React.useMemo(() => {
-    const machineWide = new Set(
-      targets
-        .filter((target) => chosen.includes(target.id))
-        .map((target) => target.globalSkillLocation)
-        .filter((id): id is string => id !== undefined)
-    )
-    return [...contributions]
-      .filter((place) => place.scope === "workspace" || machineWide.has(place.id))
-      .sort((left, right) => left.order - right.order)
-  }, [contributions, targets, chosen])
+/**
+ * The places this build reads, in the order their own extensions ask for; see
+ * {@link readablePlaces} for which of them a given set of agents makes readable.
+ */
+export function useReadablePlaces(): SkillPlace[] {
+  const providers = useSkillProviders()
+  const chosen = useChosenAgents()
+  return readablePlaces(providers, chosen)
+}
+
+/**
+ * The agents this hub reads skills from: one id per registered provider. A
+ * `target` reads as an agent row while its own id is one of these, because a
+ * provider and a target are two halves of one integration.
+ *
+ * @returns the registered agents' ids, in registration order.
+ */
+export function useSkillAgents(): string[] {
+  return useSkillProviders().map((provider) => provider.id)
 }
 
 /**
@@ -149,7 +153,7 @@ export function useReadablePlaces(): SkillLocationContribution[] {
 export function placeOf(
   skill: Skill,
   places: readonly SkillPlaceView[]
-): { id: SkillPlace; ref: SkillPlaceRef; display: string } | null {
+): { id: SkillPlaceId; ref: SkillPlaceRef; display: string } | null {
   const hold = holdsOf(skill)[0]
   if (hold === undefined) return null
   const display = places.find((place) => place.id === hold.id)?.view?.display
@@ -222,7 +226,7 @@ export function placePath(place: { scope: AssetScope; dir: string }): string {
 export function locationLabel(
   location: SkillLocation,
   t: (key: string) => string,
-  places: readonly { id: SkillPlace; labelKey: string }[]
+  places: readonly { id: SkillPlaceId; labelKey: string }[]
 ): string {
   if (location === "library") return t("skills.location.library")
   if (location === "both") return t("skills.location.both")
@@ -242,7 +246,7 @@ export function locationLabel(
 export function placeLabel(
   skill: Skill,
   t: (key: string) => string,
-  places: readonly { id: SkillPlace; labelKey: string }[]
+  places: readonly { id: SkillPlaceId; labelKey: string }[]
 ): string {
   const holds = holdsOf(skill)
   if (holds.length === 0) return t("skills.location.library")
@@ -416,25 +420,16 @@ function placeRow(skill: PlaceSkill, place: SkillHold): Skill {
   }
 }
 
-/** One place as a contribution describes it, which is all the loader needs. */
-export interface SkillPlaceSpec {
-  id: SkillPlace
-  labelKey: string
-  scope: AssetScope
-  /** The place's directory inside that scope's root, `/`-separated. */
-  dir: string
-}
-
 /**
  * Load the whole catalog and what every place holds, and follow the library's
  * change notifications. The page filters and pages what it gets, so a row that
  * lives in more than one of them is still one list with one meaning.
  *
- * @param specs — the places to read, as the contributions describe them.
+ * @param places — the places to read, as their providers describe them.
  * @param query — the filter row's text; the store narrows the catalog with it.
  */
 export function useSkillLibrary(
-  specs: readonly SkillPlaceSpec[],
+  places: readonly SkillPlace[],
   query = ""
 ): SkillLibrary {
   const ctx = useHub()
@@ -443,14 +438,14 @@ export function useSkillLibrary(
   const store = React.useMemo(() => ctx.get("hub.skills") ?? null, [ctx])
   const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
 
-  /* A contribution list is rebuilt on every render, so the loads follow the
-     places it names rather than the array that carried them. */
-  const specKey = JSON.stringify(
-    specs.map((spec) => [spec.id, spec.scope, spec.dir])
+  /* A registry's list is what a re-render reads, so the loads follow the place
+     ids it names rather than the array that carried them. */
+  const placeKey = JSON.stringify(
+    places.map((place) => [place.id, place.scope, place.dir])
   )
   const targets = React.useMemo(
-    () => JSON.parse(specKey) as [SkillPlace, AssetScope, string][],
-    [specKey]
+    () => JSON.parse(placeKey) as [SkillPlaceId, AssetScope, string][],
+    [placeKey]
   )
 
   const subscribeWorkspaces = React.useCallback(
@@ -527,10 +522,16 @@ export function useSkillLibrary(
   }, [store, reload, loadTags])
 
   /** Each place with what it holds right now, for the tabs and the rows. */
-  const places = React.useMemo(
+  const placeViews = React.useMemo(
     (): SkillPlaceView[] =>
-      specs.map((spec) => ({ ...spec, view: held[spec.id] ?? null })),
-    [specs, held]
+      places.map((place) => ({
+        id: place.id,
+        labelKey: place.labelKey,
+        scope: place.scope,
+        dir: place.dir,
+        view: held[place.id] ?? null,
+      })),
+    [places, held]
   )
 
   const rows = React.useMemo((): Skill[] => {
@@ -559,8 +560,8 @@ export function useSkillLibrary(
        * that is the side an action takes back.
        */
       const holding: SkillHold[] = []
-      let linkAt: "library" | SkillPlace | undefined
-      const takenAt: SkillPlace[] = []
+      let linkAt: "library" | SkillPlaceId | undefined
+      const takenAt: SkillPlaceId[] = []
       for (const place of roots) {
         const own = place.byId.get(item.id)
         const adopted = reachedFrom(item, place.root)
@@ -712,7 +713,7 @@ export function useSkillLibrary(
     store,
     rows,
     counts,
-    places,
+    places: placeViews,
     workspaceId,
     loading,
     error,

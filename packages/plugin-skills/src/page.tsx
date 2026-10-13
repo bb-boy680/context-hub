@@ -1056,21 +1056,11 @@ export function SkillsPage() {
   /* The open lightbox is a row key, because the same id can be two rows. */
   const [detailKey, setDetailKey] = React.useState<string | null>(null)
 
-  /* The places this build reads: every workspace one an enabled integration
-     contributes, and the machine-wide ones of the agents the sidebar chose. */
+  /* The places this build reads: every workspace one a registered provider
+     names, and the machine-wide ones of the agents the sidebar chose. */
   const places = useReadablePlaces()
-  const placeSpecs = React.useMemo(
-    () =>
-      places.map((place) => ({
-        id: place.id,
-        labelKey: place.labelKey,
-        scope: place.scope,
-        dir: place.dir,
-      })),
-    [places]
-  )
 
-  const library = useSkillLibrary(placeSpecs, needle)
+  const library = useSkillLibrary(places, needle)
   /* A registry plugin answers the search; with none the dialog says so. */
   const registries = useContributions("skillRegistry")
   const registry = registries[0] ?? null

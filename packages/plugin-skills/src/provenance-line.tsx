@@ -6,9 +6,9 @@
  */
 import { HardDriveIcon, PackageIcon, StoreIcon, type LucideIcon } from "lucide-react"
 
-import { useContributions, useI18n } from "@workspace/extensions/react"
+import { useI18n } from "@workspace/extensions/react"
 
-import { placeLabel, sourceLabel } from "./library.ts"
+import { placeLabel, sourceLabel, useReadablePlaces } from "./library.ts"
 import type { Skill, SkillSource } from "./types.ts"
 
 /** The mark for how a skill reached this machine. */
@@ -20,9 +20,9 @@ const SOURCE_ICONS: Record<SkillSource, LucideIcon> = {
 
 export function ProvenanceLine({ skill }: { skill: Skill }) {
   const { t } = useI18n()
-  /* The places are contributions, so this line names them the way their own
-     extension does without every caller passing them down. */
-  const places = useContributions("skillLocation")
+  /* The places come from the skills registry, so this line names them the way
+     their own extension does without every caller passing them down. */
+  const places = useReadablePlaces()
   const Icon = SOURCE_ICONS[skill.source] ?? HardDriveIcon
 
   return (

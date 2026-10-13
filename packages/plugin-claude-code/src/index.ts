@@ -1,19 +1,20 @@
 /**
- * Claude Code as a Context Hub integration: where it reads, the place in a
+ * Claude Code as a Context Hub integration: where it reads, the places in a
  * workspace this hub delivers its skills to, and the provider that reads and
  * writes its two MCP files.
  *
- * Nothing here renders. The integration declares an agent target and the
- * workspace place that target reads, registers its MCP provider into the MCP
- * module's registry, and the shell does the rest: the menu that picks which
- * agent the hub delivers to, the skills page's place tabs and install targets,
- * the MCP page's places, and the extension catalog entry all read these. What
- * this extension does not declare it does not get — and disabling it takes
- * every one of them away, including its MCP files, in the same step.
+ * Nothing here renders. The integration registers the places this agent reads
+ * skills in, adds its MCP provider to the MCP module's registry, and the shell
+ * does the rest: the menu that picks which agent the hub delivers to, the
+ * skills page's place tabs and install targets, the MCP page's places, and the
+ * extension catalog entry all read these. What this extension does not declare
+ * it does not get — and disabling it takes every one of them away, including
+ * its MCP files, in the same step.
  */
 import ClaudeCode from "@lobehub/icons/es/ClaudeCode"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import {
   CLAUDE_CODE_ID,
@@ -37,11 +38,25 @@ import { createClaudeCodeMcp } from "./provider.ts"
  */
 const ClaudeCodeIcon: ExtensionIcon = ClaudeCode.Color
 
-/** The place this agent reads a workspace's skills from; the skills module lists it. */
-export const CLAUDE_CODE_PLACE = "claude-code"
-
-/** The place this agent reads this machine's skills from, outside any workspace. */
-export const CLAUDE_CODE_GLOBAL_PLACE = "claude-code-global"
+/** The places this agent reads skills from: a project's directory, and the one outside it. */
+const CLAUDE_CODE_PLACES: SkillPlace[] = [
+  {
+    id: "claude-code",
+    labelKey: "claudeCode.tab",
+    icon: ClaudeCodeIcon,
+    scope: "workspace",
+    dir: CLAUDE_CODE_SKILL_DIR,
+    order: 20,
+  },
+  {
+    id: "claude-code-global",
+    labelKey: "claudeCode.tab",
+    icon: ClaudeCodeIcon,
+    scope: "global",
+    dir: CLAUDE_CODE_SKILL_DIR,
+    order: 20,
+  },
+]
 
 export { createClaudeCodeMcp } from "./provider.ts"
 
@@ -71,24 +86,15 @@ export const claudeCodeExtension: ExtensionDefinition = {
       ctx.effect(() => registry.register(createClaudeCodeMcp(tools)))
     })
 
-    /* The places come first: the target below names them, so a consumer that
-       reads one side always finds the other. */
-    scope.contribute("skillLocation", {
-      id: CLAUDE_CODE_PLACE,
-      labelKey: "claudeCode.tab",
-      icon: ClaudeCodeIcon,
-      scope: "workspace",
-      dir: CLAUDE_CODE_SKILL_DIR,
-      order: 20,
+    /* The places register into the skills module, which is what makes this
+       agent one the sidebar lists and the skills page reads. */
+    scope.inject(["skills"], (ctx, plugins) => {
+      const { registry } = plugins.skills
+      ctx.effect(() =>
+        registry.register({ id: CLAUDE_CODE_ID, places: CLAUDE_CODE_PLACES })
+      )
     })
-    scope.contribute("skillLocation", {
-      id: CLAUDE_CODE_GLOBAL_PLACE,
-      labelKey: "claudeCode.tab",
-      icon: ClaudeCodeIcon,
-      scope: "global",
-      dir: CLAUDE_CODE_SKILL_DIR,
-      order: 20,
-    })
+
     scope.contribute("target", {
       id: CLAUDE_CODE_ID,
       displayName: "Claude Code",
@@ -99,8 +105,6 @@ export const claudeCodeExtension: ExtensionDefinition = {
         path: location.path,
       })),
       format: "Markdown with YAML frontmatter; JSON for MCP servers and hooks",
-      skillLocation: CLAUDE_CODE_PLACE,
-      globalSkillLocation: CLAUDE_CODE_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",

@@ -2,28 +2,38 @@
  * Command Code as a Context Hub integration: the machine-wide skills directory
  * it reads, and the place this hub delivers skills to.
  *
- * Nothing here renders. The plugin declares an agent target and the place it
- * reads outside any workspace; the shell does the rest: the sidebar's agent
- * rows, the skills page's place menu, and the extension catalog entry all read
- * these. This plugin declares the machine-wide place only; nothing delivers
- * into the agent's own project directory yet.
+ * Nothing here renders. The plugin registers the place it reads outside any
+ * workspace and declares an agent target; the shell does the rest: the
+ * sidebar's agent rows, the skills page's place menu, and the extension catalog
+ * entry all read these. This plugin registers the machine-wide place only;
+ * nothing delivers into the agent's own project directory yet.
  */
 import CommandCode from "@lobehub/icons/es/CommandCode"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import { commandCodeMessages } from "./messages.ts"
 
 /** This integration's id; the kernel matches it against the manifest. */
 export const COMMAND_CODE_ID = "hub.target.command-code"
 
-/** The place Command Code reads this machine's skills from, outside any workspace. */
-export const COMMAND_CODE_GLOBAL_PLACE = "command-code-global"
-
 /** The brand mark in its single form; this icon ships no colour variant. */
 const CommandCodeIcon: ExtensionIcon = CommandCode
 
-/** Command Code: the machine-wide skills directory, and the target that names it. */
+/** The place Command Code reads this machine's skills from, outside any workspace. */
+const COMMAND_CODE_PLACES: SkillPlace[] = [
+  {
+    id: "command-code-global",
+    labelKey: "commandCode.tab",
+    icon: CommandCodeIcon,
+    scope: "global",
+    dir: ".commandcode/skills",
+    order: 120,
+  },
+]
+
+/** Command Code: the machine-wide skills directory, and the target beside it. */
 export const commandCodeExtension: ExtensionDefinition = {
   manifest: {
     id: COMMAND_CODE_ID,
@@ -38,15 +48,11 @@ export const commandCodeExtension: ExtensionDefinition = {
     permissions: ["assets.read"],
   },
   activate(scope) {
-    /* The place comes first: the target below names it, so a consumer that
-       reads one side always finds the other. */
-    scope.contribute("skillLocation", {
-      id: COMMAND_CODE_GLOBAL_PLACE,
-      labelKey: "commandCode.tab",
-      icon: CommandCodeIcon,
-      scope: "global",
-      dir: ".commandcode/skills",
-      order: 120,
+    /* The places register into the skills module, which is what makes this
+       agent one the sidebar lists and the skills page reads. */
+    scope.inject(["skills"], (ctx, plugins) => {
+      const { registry } = plugins.skills
+      ctx.effect(() => registry.register({ id: COMMAND_CODE_ID, places: COMMAND_CODE_PLACES }))
     })
     scope.contribute("target", {
       id: COMMAND_CODE_ID,
@@ -58,7 +64,6 @@ export const commandCodeExtension: ExtensionDefinition = {
         { label: "Skills", path: ".commandcode/skills/<name>/SKILL.md" },
       ],
       format: "Markdown skills with YAML frontmatter",
-      globalSkillLocation: COMMAND_CODE_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",

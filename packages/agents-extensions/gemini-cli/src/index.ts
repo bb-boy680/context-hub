@@ -2,29 +2,39 @@
  * Gemini CLI as a Context Hub integration: the machine-wide skills directory
  * it reads, and the place this hub delivers skills to.
  *
- * Nothing here renders. The plugin declares an agent target and the place it
- * reads outside any workspace; the shell does the rest: the sidebar's agent
- * rows, the skills page's place menu, and the extension catalog entry all read
- * these. A project's skills reach this agent through the shared
+ * Nothing here renders. The plugin registers the place it reads outside any
+ * workspace and declares an agent target; the shell does the rest: the
+ * sidebar's agent rows, the skills page's place menu, and the extension catalog
+ * entry all read these. A project's skills reach this agent through the shared
  * `.agents/skills` directory the skills module already lists, so no workspace
- * place is declared here.
+ * place is registered here.
  */
 import GeminiCLI from "@lobehub/icons/es/GeminiCLI"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import { geminiCliMessages } from "./messages.ts"
 
 /** This integration's id; the kernel matches it against the manifest. */
 export const GEMINI_CLI_ID = "hub.target.gemini-cli"
 
-/** The place Gemini CLI reads this machine's skills from, outside any workspace. */
-export const GEMINI_CLI_GLOBAL_PLACE = "gemini-cli-global"
-
 /** The brand mark in its own colours. */
 const GeminiCliIcon: ExtensionIcon = GeminiCLI.Color
 
-/** Gemini CLI: the machine-wide skills directory, and the target that names it. */
+/** The place Gemini CLI reads this machine's skills from, outside any workspace. */
+const GEMINI_CLI_PLACES: SkillPlace[] = [
+  {
+    id: "gemini-cli-global",
+    labelKey: "geminiCli.tab",
+    icon: GeminiCliIcon,
+    scope: "global",
+    dir: ".gemini/skills",
+    order: 40,
+  },
+]
+
+/** Gemini CLI: the machine-wide skills directory, and the target beside it. */
 export const geminiCliExtension: ExtensionDefinition = {
   manifest: {
     id: GEMINI_CLI_ID,
@@ -39,15 +49,11 @@ export const geminiCliExtension: ExtensionDefinition = {
     permissions: ["assets.read"],
   },
   activate(scope) {
-    /* The place comes first: the target below names it, so a consumer that
-       reads one side always finds the other. */
-    scope.contribute("skillLocation", {
-      id: GEMINI_CLI_GLOBAL_PLACE,
-      labelKey: "geminiCli.tab",
-      icon: GeminiCliIcon,
-      scope: "global",
-      dir: ".gemini/skills",
-      order: 40,
+    /* The places register into the skills module, which is what makes this
+       agent one the sidebar lists and the skills page reads. */
+    scope.inject(["skills"], (ctx, plugins) => {
+      const { registry } = plugins.skills
+      ctx.effect(() => registry.register({ id: GEMINI_CLI_ID, places: GEMINI_CLI_PLACES }))
     })
     scope.contribute("target", {
       id: GEMINI_CLI_ID,
@@ -59,7 +65,6 @@ export const geminiCliExtension: ExtensionDefinition = {
         { label: "Skills", path: ".agents/skills/<name>/SKILL.md" },
       ],
       format: "Markdown skills with YAML frontmatter",
-      globalSkillLocation: GEMINI_CLI_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",

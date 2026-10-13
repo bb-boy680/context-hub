@@ -2,28 +2,38 @@
  * Trae as a Context Hub integration: the machine-wide skills directory it
  * reads, and the place this hub delivers skills to.
  *
- * Nothing here renders. The plugin declares an agent target and the place it
- * reads outside any workspace; the shell does the rest: the sidebar's agent
- * rows, the skills page's place menu, and the extension catalog entry all read
- * these. This plugin declares the machine-wide place only; nothing delivers
- * into the agent's own project directory yet.
+ * Nothing here renders. The plugin registers the place it reads outside any
+ * workspace and declares an agent target; the shell does the rest: the
+ * sidebar's agent rows, the skills page's place menu, and the extension catalog
+ * entry all read these. This plugin registers the machine-wide place only;
+ * nothing delivers into the agent's own project directory yet.
  */
 import Trae from "@lobehub/icons/es/Trae"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import { traeMessages } from "./messages.ts"
 
 /** This integration's id; the kernel matches it against the manifest. */
 export const TRAE_ID = "hub.target.trae"
 
-/** The place Trae reads this machine's skills from, outside any workspace. */
-export const TRAE_GLOBAL_PLACE = "trae-global"
-
 /** The brand mark in its own colours. */
 const TraeIcon: ExtensionIcon = Trae.Color
 
-/** Trae: the machine-wide skills directory, and the target that names it. */
+/** The place Trae reads this machine's skills from, outside any workspace. */
+const TRAE_PLACES: SkillPlace[] = [
+  {
+    id: "trae-global",
+    labelKey: "trae.tab",
+    icon: TraeIcon,
+    scope: "global",
+    dir: ".trae/skills",
+    order: 90,
+  },
+]
+
+/** Trae: the machine-wide skills directory, and the target beside it. */
 export const traeExtension: ExtensionDefinition = {
   manifest: {
     id: TRAE_ID,
@@ -38,15 +48,11 @@ export const traeExtension: ExtensionDefinition = {
     permissions: ["assets.read"],
   },
   activate(scope) {
-    /* The place comes first: the target below names it, so a consumer that
-       reads one side always finds the other. */
-    scope.contribute("skillLocation", {
-      id: TRAE_GLOBAL_PLACE,
-      labelKey: "trae.tab",
-      icon: TraeIcon,
-      scope: "global",
-      dir: ".trae/skills",
-      order: 90,
+    /* The places register into the skills module, which is what makes this
+       agent one the sidebar lists and the skills page reads. */
+    scope.inject(["skills"], (ctx, plugins) => {
+      const { registry } = plugins.skills
+      ctx.effect(() => registry.register({ id: TRAE_ID, places: TRAE_PLACES }))
     })
     scope.contribute("target", {
       id: TRAE_ID,
@@ -58,7 +64,6 @@ export const traeExtension: ExtensionDefinition = {
         { label: "Skills", path: ".trae/skills/<name>/SKILL.md" },
       ],
       format: "Markdown skills with YAML frontmatter",
-      globalSkillLocation: TRAE_GLOBAL_PLACE,
     })
     scope.contribute("locale", {
       id: "en",
