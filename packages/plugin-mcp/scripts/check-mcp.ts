@@ -185,7 +185,10 @@ async function main(): Promise<void> {
   check("a name that reads as a brand gets its mark", github?.mark === "github")
   check("one that does not stays generic", catalog.servers.find((server) => server.name === "ours")?.mark === "generic")
   check("both places count as installs", github?.installed === 2)
-  check("the scopes it is declared in are known", github?.places.join(",") === "global,workspace")
+  check(
+    "each install names the file holding it",
+    github?.detail.installs.map((install) => install.place).join(",") === "a-global,a-project"
+  )
   check(
     "an entry that cannot be read makes the row unreadable",
     catalog.servers.find((server) => server.name === "odd")?.unreadable === 1

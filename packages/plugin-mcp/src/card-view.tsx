@@ -10,14 +10,29 @@ import { ArrowRightLeftIcon, PlugZapIcon } from "lucide-react"
 import { cn } from "cn"
 
 import { ServerControls, type ServerActions } from "./menus.tsx"
-import { ServerTile, StatusPill, TransportChip, UnstoredChip, serverPlaces } from "./parts.tsx"
-import type { McpServer } from "./types.ts"
+import {
+  AgentStack,
+  LibraryChip,
+  ServerTile,
+  StatusPill,
+  TransportChip,
+  UnstoredChip,
+  heldPlaces,
+} from "./parts.tsx"
+import type { McpAgentPlace, McpServer } from "./types.ts"
 import { useI18n } from "@workspace/extensions/react"
 
-/** The tag chip and place summary a card's name column carries. */
-function CardMeta({ server, tag }: { server: McpServer; tag?: string }) {
-  const { t } = useI18n()
-  const places = serverPlaces(server, t).join(" · ")
+/** The tag chip and the holding agents a card's name column carries. */
+function CardMeta({
+  server,
+  places,
+  tag,
+}: {
+  server: McpServer
+  places: readonly McpAgentPlace[]
+  tag?: string
+}) {
+  const held = heldPlaces(server, places)
 
   return (
     <div className="flex min-w-0 items-center gap-1.5">
@@ -28,10 +43,11 @@ function CardMeta({ server, tag }: { server: McpServer; tag?: string }) {
       ) : null}
       {/* The separator belongs to the summary beside it: with nothing to
           introduce it would read as a row whose second half failed to load. */}
-      {tag && places !== "" ? (
+      {tag && (server.stored || held.length > 0) ? (
         <span className="size-[3px] shrink-0 rounded-full bg-muted-soft" />
       ) : null}
-      <span className="truncate text-[11.5px] leading-[1.3] text-muted-soft">{places}</span>
+      {server.stored ? <LibraryChip /> : null}
+      <AgentStack server={server} places={places} />
     </div>
   )
 }
@@ -77,12 +93,14 @@ function checkRows(
 /** One server as a card. */
 function ServerCard({
   server,
+  places,
   tag,
   age,
   actions,
   onOpen,
 }: {
   server: McpServer
+  places: readonly McpAgentPlace[]
   /** The type the card prints, which is the record's first one. */
   tag?: string
   /** How long ago this server was checked, which is what its check block says. */
@@ -112,7 +130,7 @@ function ServerCard({
             <TransportChip transport={server.transport} />
             {server.stored ? null : <UnstoredChip />}
           </div>
-          <CardMeta server={server} tag={tag} />
+          <CardMeta server={server} places={places} tag={tag} />
         </div>
         {server.conflicts ? (
           <button
@@ -208,11 +226,13 @@ const GRID =
 /** The card grid, one to five columns, chosen by the width the page has. */
 export function ServerCardView({
   servers,
+  places,
   age,
   onOpen,
   rowActions,
 }: {
   servers: McpServer[]
+  places: readonly McpAgentPlace[]
   /** How long ago a server was checked, as its own card's line says it. */
   age: (server: McpServer) => string
   onOpen: (server: McpServer) => void
@@ -226,6 +246,7 @@ export function ServerCardView({
           <ServerCard
             key={server.id}
             server={server}
+            places={places}
             tag={server.tag || undefined}
             age={age(server)}
             actions={actions}

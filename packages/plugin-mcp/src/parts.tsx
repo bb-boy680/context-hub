@@ -1,8 +1,8 @@
 /**
  * The small marks the MCP list and cards repeat: a server's tile, its transport
- * chip, the place chips, the sync chip, and the status pill. Each one renders
- * exactly what the design canvas shows for that element, so the views above
- * them only decide placement.
+ * chip, the marks of the clients holding it, the sync chip, and the status
+ * pill. Each one renders exactly what the design canvas shows for that element,
+ * so the views above them only decide placement.
  */
 import { ArrowRightLeftIcon, ServerIcon } from "lucide-react"
 import * as React from "react"
@@ -11,7 +11,8 @@ import { cn } from "cn"
 
 import { markImage } from "./marks.ts"
 import type { McpProbeIcon } from "./probe.ts"
-import type { McpMark, McpServer, McpStatus, McpTransport } from "./types.ts"
+import { displayPlaceFile, type McpAgentPlace, type McpMark, type McpServer, type McpStatus, type McpTransport } from "./types.ts"
+import { AvatarStack } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 
 /** A server's mark: a brand image, or the glyph that stands for everything else. */
@@ -89,34 +90,63 @@ export function SyncChip({ count }: { count: number }) {
 }
 
 /**
- * Where a server lives, in the words the views print. The hub's own library is
- * one home and every client file that declares the server is another; one home
- * is named, and several are counted, so a row reads as a summary and the detail
- * panel stays the place the files themselves are listed. A server held nowhere
- * is a row that cannot exist — a row comes from a record or from a file.
+ * The client files that declare this server, in the catalog's own order. A
+ * place is one file, so a client keeping two of them answers twice — which is
+ * what a person needs to see when a server reached the project's file and the
+ * machine-wide one as well.
  */
-export function serverPlaces(
-  server: Pick<McpServer, "stored" | "places" | "detail">,
-  t: (key: string) => string
-): string[] {
-  const declared = server.detail.installs.filter((install) => install.installed).length
-  const homes = (server.stored ? 1 : 0) + declared
-  if (homes > 1) {
-    return [t("mcp.detail.place.count").replace("{count}", String(homes))]
-  }
-  /* One home: the library, or the one scope that declares it. */
-  if (server.stored) return [t("mcp.place.chip.library")]
-  return server.places.map((place) => t(`mcp.place.chip.${place}`))
+export function heldPlaces(
+  server: Pick<McpServer, "detail">,
+  places: readonly McpAgentPlace[]
+): McpAgentPlace[] {
+  const held = new Set(
+    server.detail.installs
+      .filter((install) => install.installed)
+      .map((install) => install.place)
+  )
+  return places.filter((place) => held.has(place.id))
 }
 
-/** Where a server lives, as the one chip the ledger's place column draws. */
-export function PlaceChips({ server }: { server: McpServer }) {
-  const { t } = useI18n()
-  const [word] = serverPlaces(server, t)
+/**
+ * Which agents have this server, as the marks their own extensions declare: one
+ * tile per client file that declares it, capped the way every other stack in
+ * the app is. The row answers "who has this" at a glance — the scope and the
+ * file itself are the tooltip's and the install menu's to name.
+ */
+export function AgentStack({
+  server,
+  places,
+}: {
+  server: Pick<McpServer, "detail">
+  places: readonly McpAgentPlace[]
+}) {
+  const held = heldPlaces(server, places)
+  if (held.length === 0) return null
 
   return (
-    <span className="inline-flex h-[22px] items-center justify-center rounded-full border border-border px-2 text-[11.5px] leading-[1.3] text-foreground">
-      {word}
+    <AvatarStack
+      marks={held.map((place) => ({ id: place.id, icon: place.icon }))}
+      seam="ring-card"
+      /* One line per file: a client holding two of them would otherwise read as
+         one run of words with no seam between the two. */
+      label={held
+        .map((place) => `${place.label} · ${displayPlaceFile(place)}`)
+        .join("\n")}
+    />
+  )
+}
+
+/**
+ * The hub's own record, as the chip a card and a row wear while it holds one.
+ * It is not an agent and never joins the marks: the hub keeps the record the
+ * installs are written from, which is a different kind of home.
+ */
+export function LibraryChip() {
+  const { t } = useI18n()
+
+  return (
+    <span className="inline-flex h-5 shrink-0 items-center justify-center rounded-full border border-border px-2 text-[11.5px] leading-[1.3] text-foreground">
+      {t("mcp.place.chip.library")}
     </span>
   )
 }

@@ -142,8 +142,6 @@ export interface McpServer {
   declaration: string
   /** What the server offers, when a record carries a sentence; empty otherwise. */
   description: string
-  /** The scopes it is declared under, deduplicated; the row's chips list them. */
-  places: McpPlaceKind[]
   /**
    * How many declarations disagree about the endpoint. Absent when they agree
    * or there are none, which is also when the row shows no sync chip.

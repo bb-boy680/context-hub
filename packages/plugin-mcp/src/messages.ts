@@ -54,8 +54,6 @@ export const mcpMessages: Record<string, string> = {
   "mcp.place.collapse": "Show fewer",
   "mcp.place.chip.library": "Library",
   "mcp.place.body": "Body",
-  "mcp.place.chip.workspace": "Project",
-  "mcp.place.chip.global": "Global",
   "mcp.check.conflict": "{count} copies differ",
   "mcp.check.checked": "Checked {age}",
   "mcp.check.unreadable": "{count} unreadable",

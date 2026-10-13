@@ -415,7 +415,12 @@ export function PlaceScopePicker({
           >
             <ScopeIcon className="size-3.5 shrink-0" aria-hidden />
             {scopeLabel}
-            <AvatarStack marks={marks} active={active} />
+            {/* The marks sit on the trough, or on the ink fill once this pill is
+               the scope on screen, so the seam takes whichever is behind it. */}
+            <AvatarStack
+              marks={marks}
+              seam={active ? "ring-foreground dark:ring-accent" : "ring-secondary"}
+            />
           </button>
         }
       />

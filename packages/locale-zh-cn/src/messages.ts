@@ -327,8 +327,6 @@ export const messages: Record<string, string> = {
   "mcp.place.collapse": "收起",
   "mcp.place.chip.library": "资产库",
   "mcp.place.body": "本体",
-  "mcp.place.chip.workspace": "项目",
-  "mcp.place.chip.global": "全局",
   "mcp.check.conflict": "{count} 处同名（端点不同）",
   "mcp.check.checked": "检测于 {age}",
   "mcp.check.unreadable": "{count} 条读不懂",

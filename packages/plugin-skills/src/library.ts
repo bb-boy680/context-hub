@@ -234,26 +234,6 @@ export function locationLabel(
   return labelKey === undefined ? location : t(labelKey)
 }
 
-/**
- * A row's places as one label. The card reads a count and the detail panel
- * names which ones: a place is a property of the skill, never its identity.
- *
- * @param skill — the row whose places are read.
- * @param t — the active locale's lookup.
- * @param places — the places in use, which carry their own labels.
- * @returns the library's own label, the place's, or how many hold it.
- */
-export function placeLabel(
-  skill: Skill,
-  t: (key: string) => string,
-  places: readonly { id: SkillPlaceId; labelKey: string }[]
-): string {
-  const holds = holdsOf(skill)
-  if (holds.length === 0) return t("skills.location.library")
-  if (holds.length === 1) return locationLabel(holds[0].id, t, places)
-  return t("skills.location.count").replace("{count}", String(holds.length))
-}
-
 /** How a row reached this machine, as its provenance line names it. */
 const SOURCE_KEYS: Record<SkillSource, string> = {
   local: "skills.source.local",

@@ -710,6 +710,7 @@ export function McpServersPage() {
         ) : (
           <ServerCardView
             servers={rows}
+            places={places}
             age={checkedAge}
             onOpen={(server) => setOpenId(server.id)}
             rowActions={rowActions}

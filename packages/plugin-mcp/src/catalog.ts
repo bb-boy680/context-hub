@@ -22,7 +22,6 @@ import type {
   McpDetail,
   McpInstall,
   McpMark,
-  McpPlaceKind,
   McpRecord,
   McpScanProblem,
   McpServer,
@@ -163,7 +162,6 @@ function rowOf(
 ): McpServer {
   const installs: McpInstall[] = []
   const declarations: McpDeclaration[] = []
-  const scopes = new Set<McpPlaceKind>()
   let unreadable = 0
 
   for (const { place } of places) {
@@ -175,7 +173,6 @@ function rowOf(
       enabled: entry.enabled,
       ...(entry.declaration === null ? { unreadable: true } : {}),
     })
-    scopes.add(place.scope)
     if (entry.declaration === null) unreadable += 1
     else declarations.push(entry.declaration)
   }
@@ -203,7 +200,6 @@ function rowOf(
     transport: declaration?.transport ?? "stdio",
     declaration: declaration === null ? "" : declarationLine(declaration),
     description: descriptionOf(record, check),
-    places: [...scopes],
     ...(conflicts > 0 ? { conflicts } : {}),
     unreadable,
     installed: installs.length,

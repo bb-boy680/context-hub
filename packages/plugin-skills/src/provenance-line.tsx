@@ -1,14 +1,15 @@
 /**
  * One row's provenance, as a single quiet line: a small icon, how the skill got
- * here, and where it lives now. The place is the part that differs from row to
- * row, so it carries the weight; the rest stays in the background and a card of
- * these reads as metadata rather than as chrome.
+ * here, and the places that hold it. The marks are the part that differs from
+ * row to row — the same stack the scope tabs wear, capped the same way — so a
+ * row answers "which agents have this" without being opened.
  */
-import { HardDriveIcon, PackageIcon, StoreIcon, type LucideIcon } from "lucide-react"
+import { HardDriveIcon, LibraryIcon, PackageIcon, StoreIcon, type LucideIcon } from "lucide-react"
 
 import { useI18n } from "@workspace/extensions/react"
+import { AvatarStack } from "@workspace/extensions/components"
 
-import { placeLabel, sourceLabel, useReadablePlaces } from "./library.ts"
+import { holdsOf, locationLabel, sourceLabel, useReadablePlaces } from "./library.ts"
 import type { Skill, SkillSource } from "./types.ts"
 
 /** The mark for how a skill reached this machine. */
@@ -24,6 +25,14 @@ export function ProvenanceLine({ skill }: { skill: Skill }) {
      their own extension does without every caller passing them down. */
   const places = useReadablePlaces()
   const Icon = SOURCE_ICONS[skill.source] ?? HardDriveIcon
+  const holds = holdsOf(skill)
+  /* A place this build no longer reads still holds the row's files, so it keeps
+     a mark rather than quietly disappearing from the line. */
+  const icons = new Map(places.map((place) => [place.id, place.icon]))
+  const marks = holds.map((hold) => ({
+    id: hold.id,
+    icon: icons.get(hold.id) ?? LibraryIcon,
+  }))
 
   return (
     /* max-w-full clamps the line to its container: without it a fixed-width
@@ -31,17 +40,26 @@ export function ProvenanceLine({ skill }: { skill: Skill }) {
        ever shrinks and the text paints over the neighbouring column. */
     <span className="inline-flex max-w-full min-w-0 items-center gap-[5px] text-[12px] leading-[15px]">
       <Icon className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
-      <span className="truncate text-muted-foreground">
+      {/* The one part that gives way when the line runs out of room: a card's
+         foot is 128px wide and the marks are 13px apart, so at five places the
+         source is elided, and at six it is gone and the icon says it alone. */}
+      <span className="min-w-0 truncate text-muted-foreground">
         {sourceLabel(skill.source, t)}
+        <span aria-hidden className="text-muted-soft"> · </span>
       </span>
-      <span aria-hidden className="shrink-0 text-muted-soft">
-        ·
-      </span>
-      {/* Shrinks with an ellipsis rather than painting over the next column:
-          a longer label, or another language, must not overlap its neighbour. */}
-      <span className="truncate font-semibold text-foreground">
-        {placeLabel(skill, t, places)}
-      </span>
+      {holds.length === 0 ? (
+        <span className="truncate font-semibold text-foreground">
+          {t("skills.location.library")}
+        </span>
+      ) : (
+        <AvatarStack
+          marks={marks}
+          seam="ring-card"
+          label={holds
+            .map((hold) => locationLabel(hold.id, t, places))
+            .join(" · ")}
+        />
+      )}
     </span>
   )
 }

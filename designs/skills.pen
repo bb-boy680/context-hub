@@ -87864,6 +87864,4378 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "Z8FIx",
+      "x": 3191,
+      "y": 5112,
+      "name": "Skills — 位置图标（五选一）",
+      "clip": true,
+      "width": 1440,
+      "height": 2032,
+      "fill": "$canvas",
+      "layout": "vertical",
+      "gap": 28,
+      "padding": 56,
+      "children": [
+        {
+          "type": "frame",
+          "id": "rfWm8",
+          "name": "Sheet Title",
+          "width": "fill_container",
+          "layout": "vertical",
+          "gap": 8,
+          "children": [
+            {
+              "type": "text",
+              "id": "cwoBZ",
+              "name": "H1",
+              "fill": "$ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "装到哪些 Agent 上：五种画法",
+              "fontFamily": "$font-sans",
+              "fontSize": 24,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "I3WB1",
+              "name": "Text",
+              "fill": "$body",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "卡片脚上今天只写「3 个位置」，看不出是谁、装到哪。下面五版都按真实尺寸画：卡片 264 宽、脚 228 宽；减掉左边的「来源」和右边的「安装 ⌄」，留给位置的只有 132。",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "JULvu",
+          "name": "Row Cards",
+          "width": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "FUf2c",
+              "name": "Col A",
+              "width": 264,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "kRcA4",
+                  "name": "Variant Label",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "A · 脚上堆叠（推荐）",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "v2XZn",
+                  "name": "Card A",
+                  "clip": true,
+                  "width": 264,
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "qBJ9F",
+                      "name": "Cover",
+                      "metadata": {
+                        "type": "unsplash",
+                        "username": "kaboompics",
+                        "link": "https://unsplash.com/@kaboompics",
+                        "author": "Karolina Grabowska"
+                      },
+                      "width": "fill_container",
+                      "height": 148,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "https://images.unsplash.com/photo-1667400104764-a5fd01a919b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDM0ODN8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTE1MzE3OTd8&ixlib=rb-4.1.0&q=80&w=1080",
+                        "mode": "cover"
+                      },
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "Y4JR4c",
+                          "layoutPosition": "absolute",
+                          "x": 12,
+                          "y": 12,
+                          "name": "Tags",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "wOrDa",
+                              "name": "Tag Design",
+                              "height": 20,
+                              "fill": "$canvas",
+                              "cornerRadius": "$radius-pill",
+                              "stroke": "$hairline",
+                              "strokeWidth": 1,
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                9
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "n8NvS",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "Design",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "aYWM1",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": [
+                        16,
+                        18,
+                        18,
+                        18
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "vfeq9",
+                          "name": "Name Row",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "F0MS1",
+                              "name": "Name",
+                              "fill": "$ink",
+                              "content": "impeccable",
+                              "fontFamily": "$font-mono",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "md2dP",
+                              "name": "Age",
+                              "fill": "$muted-soft",
+                              "content": "2 小时前",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "K45P2P",
+                          "name": "Description",
+                          "fill": "$body",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Design, redesign, critique, polish, or audit a frontend interface.",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "b9cUcC",
+                          "name": "Foot",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "XK1Rn",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "ghzTY",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "UtARn",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "uYYmU",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "lXlq5",
+                                  "name": "Agent Stack",
+                                  "width": 46,
+                                  "height": 20,
+                                  "fill": "#00000000",
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "lTo8h",
+                                      "layoutPosition": "absolute",
+                                      "x": 0,
+                                      "y": 0,
+                                      "name": "Tile 1",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/claude_code.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "fqjSn",
+                                      "layoutPosition": "absolute",
+                                      "x": 13,
+                                      "y": 0,
+                                      "name": "Tile 2",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/kode.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "V86qAk",
+                                      "layoutPosition": "absolute",
+                                      "x": 26,
+                                      "y": 0,
+                                      "name": "Tile 3",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/workbuddy.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "r81FvG",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "Dk213",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "IlAGY",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "D81BC",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "IQNCo",
+                  "name": "Rationale",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "o2cXu",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "与页签的堆叠同一套：20px 方块、步进 13、描边取卡片底色 —— 页签学过的规则，卡片不用再学一遍。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "jF1zU",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "上限 5 枚：第 6 枚起收成一枚 +N，N 自己占一格。5 枚是 132 撑出来的硬上限，不是随手定的。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "W3qLIL",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "代价：认得出几个 Agent，看不出它在工作区还是全局 —— 作用域仍然是页签的活。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "wm3SH",
+              "name": "Col B",
+              "width": 264,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Z4nh9V",
+                  "name": "Variant Label",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "B · 脚上单枚 + 计数",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "U0hx7",
+                  "name": "Card B",
+                  "clip": true,
+                  "width": 264,
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "uN8zo",
+                      "name": "Cover",
+                      "metadata": {
+                        "type": "unsplash",
+                        "username": "kaboompics",
+                        "link": "https://unsplash.com/@kaboompics",
+                        "author": "Karolina Grabowska"
+                      },
+                      "width": "fill_container",
+                      "height": 148,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "https://images.unsplash.com/photo-1667400104764-a5fd01a919b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDM0ODN8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTE1MzE3OTd8&ixlib=rb-4.1.0&q=80&w=1080",
+                        "mode": "cover"
+                      },
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "ICmoH",
+                          "layoutPosition": "absolute",
+                          "x": 12,
+                          "y": 12,
+                          "name": "Tags",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "tg9j0",
+                              "name": "Tag Design",
+                              "height": 20,
+                              "fill": "$canvas",
+                              "cornerRadius": "$radius-pill",
+                              "stroke": "$hairline",
+                              "strokeWidth": 1,
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                9
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "piIOn",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "Design",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "YmwV9",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": [
+                        16,
+                        18,
+                        18,
+                        18
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "A7OiDC",
+                          "name": "Name Row",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "cX71I",
+                              "name": "Name",
+                              "fill": "$ink",
+                              "content": "impeccable",
+                              "fontFamily": "$font-mono",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "cafEx",
+                              "name": "Age",
+                              "fill": "$muted-soft",
+                              "content": "2 小时前",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "aImwG",
+                          "name": "Description",
+                          "fill": "$body",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Design, redesign, critique, polish, or audit a frontend interface.",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "S1ASUI",
+                          "name": "Foot",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "kBakX",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "D677j2",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "oYoYd",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "I2cj6f",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "DViR6",
+                                  "name": "Agent Stack",
+                                  "width": 33,
+                                  "height": 20,
+                                  "fill": "#00000000",
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "C9kvg",
+                                      "layoutPosition": "absolute",
+                                      "x": 0,
+                                      "y": 0,
+                                      "name": "Tile 1",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/claude_code.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "SwCFq",
+                                  "name": "More Count",
+                                  "fill": "$muted",
+                                  "content": "+2",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "MfYJ0",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "WtQvo",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "DVYuk",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "a58xIb",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "rcyi9",
+                  "name": "Rationale",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "M2qr6L",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "只画第一枚，其余折成 +2。任何数量都不会挤爆脚，宽屏窄屏都一样。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ViapA",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "数量永远看得见；A 超过 5 枚时就把真实数字换成了 +N。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "hvWl4",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "代价：第二、第三个是谁，要悬停或打开详情才知道。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "MKGB3",
+              "name": "Col C",
+              "width": 264,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "J62Y4n",
+                  "name": "Variant Label",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "C · 封面右上角堆叠",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "U0ChO",
+                  "name": "Card C",
+                  "clip": true,
+                  "width": 264,
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "k2yLxn",
+                      "name": "Cover",
+                      "metadata": {
+                        "type": "unsplash",
+                        "username": "kaboompics",
+                        "link": "https://unsplash.com/@kaboompics",
+                        "author": "Karolina Grabowska"
+                      },
+                      "width": "fill_container",
+                      "height": 148,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "https://images.unsplash.com/photo-1667400104764-a5fd01a919b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDM0ODN8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTE1MzE3OTd8&ixlib=rb-4.1.0&q=80&w=1080",
+                        "mode": "cover"
+                      },
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "ar5ch",
+                          "layoutPosition": "absolute",
+                          "x": 12,
+                          "y": 12,
+                          "name": "Tags",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "tMze7",
+                              "name": "Tag Design",
+                              "height": 20,
+                              "fill": "$canvas",
+                              "cornerRadius": "$radius-pill",
+                              "stroke": "$hairline",
+                              "strokeWidth": 1,
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                9
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "Bylif",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "Design",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "oK7cm",
+                          "layoutPosition": "absolute",
+                          "x": 180,
+                          "y": 12,
+                          "name": "Agent Stack",
+                          "width": 69,
+                          "height": 24,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "ZY932",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 0,
+                              "name": "Tile 1",
+                              "width": 24,
+                              "height": 24,
+                              "fill": {
+                                "type": "image",
+                                "enabled": true,
+                                "url": "agent-icons/claude_code.png",
+                                "mode": "cover"
+                              },
+                              "cornerRadius": 8,
+                              "stroke": "$canvas",
+                              "strokeWidth": 2
+                            },
+                            {
+                              "type": "frame",
+                              "id": "mCYNH",
+                              "layoutPosition": "absolute",
+                              "x": 15,
+                              "y": 0,
+                              "name": "Tile 2",
+                              "width": 24,
+                              "height": 24,
+                              "fill": {
+                                "type": "image",
+                                "enabled": true,
+                                "url": "agent-icons/kode.png",
+                                "mode": "cover"
+                              },
+                              "cornerRadius": 8,
+                              "stroke": "$canvas",
+                              "strokeWidth": 2
+                            },
+                            {
+                              "type": "frame",
+                              "id": "OVokf",
+                              "layoutPosition": "absolute",
+                              "x": 30,
+                              "y": 0,
+                              "name": "Tile 3",
+                              "width": 24,
+                              "height": 24,
+                              "fill": {
+                                "type": "image",
+                                "enabled": true,
+                                "url": "agent-icons/workbuddy.png",
+                                "mode": "cover"
+                              },
+                              "cornerRadius": 8,
+                              "stroke": "$canvas",
+                              "strokeWidth": 2
+                            },
+                            {
+                              "type": "frame",
+                              "id": "sNP6F",
+                              "layoutPosition": "absolute",
+                              "x": 45,
+                              "y": 0,
+                              "name": "Tile 4",
+                              "width": 24,
+                              "height": 24,
+                              "fill": {
+                                "type": "image",
+                                "enabled": true,
+                                "url": "agent-icons/github-copilot-app.png",
+                                "mode": "cover"
+                              },
+                              "cornerRadius": 8,
+                              "stroke": "$canvas",
+                              "strokeWidth": 2
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Ls9Ki",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": [
+                        16,
+                        18,
+                        18,
+                        18
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "EV6Wz",
+                          "name": "Name Row",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "i0nUb",
+                              "name": "Name",
+                              "fill": "$ink",
+                              "content": "impeccable",
+                              "fontFamily": "$font-mono",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "z4m8K",
+                              "name": "Age",
+                              "fill": "$muted-soft",
+                              "content": "2 小时前",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "AAtnA",
+                          "name": "Description",
+                          "fill": "$body",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Design, redesign, critique, polish, or audit a frontend interface.",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "PBQ7S",
+                          "name": "Foot",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "mMkKH",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "GKSBT",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "p2QtUP",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "hzDQu",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "KuQOu",
+                                  "name": "Location",
+                                  "fill": "$ink",
+                                  "content": "3 个位置",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "X1b5z0",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "RpsHP",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "G4Jsc",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "PS3w4",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "GRVW0",
+                  "name": "Rationale",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "t8iWdc",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "不占脚，视觉最强：一屏扫下来就知道哪些卡是「多装的」。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "CaTB5",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "代价：压在照片上。Codex 这种纯黑标记在暗图上消失，白底标记在亮图上消失 —— 同一张卡里两种都可能出现。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "SS0x4",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "左上角已经有标签胶囊，右上角再挂一串，卡片两个角都在喊。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "K9aYDU",
+              "name": "Col D",
+              "width": 264,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "rkKSX",
+                  "name": "Variant Label",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "D · 脚上名字（放弃图标）",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "GrvQT",
+                  "name": "Card D",
+                  "clip": true,
+                  "width": 264,
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "N0bjEU",
+                      "name": "Cover",
+                      "metadata": {
+                        "type": "unsplash",
+                        "username": "kaboompics",
+                        "link": "https://unsplash.com/@kaboompics",
+                        "author": "Karolina Grabowska"
+                      },
+                      "width": "fill_container",
+                      "height": 148,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "https://images.unsplash.com/photo-1667400104764-a5fd01a919b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDM0ODN8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTE1MzE3OTd8&ixlib=rb-4.1.0&q=80&w=1080",
+                        "mode": "cover"
+                      },
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "P5saeb",
+                          "layoutPosition": "absolute",
+                          "x": 12,
+                          "y": 12,
+                          "name": "Tags",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "c45lU",
+                              "name": "Tag Design",
+                              "height": 20,
+                              "fill": "$canvas",
+                              "cornerRadius": "$radius-pill",
+                              "stroke": "$hairline",
+                              "strokeWidth": 1,
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                9
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "l5y3FS",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "Design",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "E3NffI",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": [
+                        16,
+                        18,
+                        18,
+                        18
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "xiHyD",
+                          "name": "Name Row",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "ONNTs",
+                              "name": "Name",
+                              "fill": "$ink",
+                              "content": "impeccable",
+                              "fontFamily": "$font-mono",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "rSABU",
+                              "name": "Age",
+                              "fill": "$muted-soft",
+                              "content": "2 小时前",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "azkvm",
+                          "name": "Description",
+                          "fill": "$body",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Design, redesign, critique, polish, or audit a frontend interface.",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "zBxd1",
+                          "name": "Foot",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "F2amL",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "f9Ls2",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "y9TIM",
+                                  "name": "Source",
+                                  "fill": "$ink",
+                                  "content": "Claude Code",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "n2AqGN",
+                                  "name": "More Count",
+                                  "fill": "$muted",
+                                  "content": "+2",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "WHtMM",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "Z23KZ",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "LtOfx",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "I0ZQR",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "CSX3C",
+                  "name": "Rationale",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "RHIJK",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "不用认图标，名字说的是人话；新 Agent 还没画出标记时也能显示。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "aPnQO",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "代价：只放得下一个名字，来源只好退回成一枚图标。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ZFe0G",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "代价：名字长短不一，中英混排时长时短，卡与卡之间对不齐。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "l69sO",
+          "name": "Row Second",
+          "width": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "mEGa4",
+              "name": "Col E",
+              "width": 264,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "k2cthP",
+                  "name": "Variant Label",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "E · 多一行「位置」",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "FMHJU",
+                  "name": "Card E",
+                  "clip": true,
+                  "width": 264,
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "DWLOi",
+                      "name": "Cover",
+                      "metadata": {
+                        "type": "unsplash",
+                        "username": "kaboompics",
+                        "link": "https://unsplash.com/@kaboompics",
+                        "author": "Karolina Grabowska"
+                      },
+                      "width": "fill_container",
+                      "height": 148,
+                      "fill": {
+                        "type": "image",
+                        "enabled": true,
+                        "url": "https://images.unsplash.com/photo-1667400104764-a5fd01a919b0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDM0ODN8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTE1MzE3OTd8&ixlib=rb-4.1.0&q=80&w=1080",
+                        "mode": "cover"
+                      },
+                      "layout": "vertical",
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "K1v5Ns",
+                          "layoutPosition": "absolute",
+                          "x": 12,
+                          "y": 12,
+                          "name": "Tags",
+                          "gap": 6,
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "C97gj",
+                              "name": "Tag Design",
+                              "height": 20,
+                              "fill": "$canvas",
+                              "cornerRadius": "$radius-pill",
+                              "stroke": "$hairline",
+                              "strokeWidth": 1,
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                9
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "ZuiJv",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "Design",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EcHIF",
+                      "name": "Body",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 10,
+                      "padding": [
+                        16,
+                        18,
+                        18,
+                        18
+                      ],
+                      "children": [
+                        {
+                          "type": "frame",
+                          "id": "aNiKh",
+                          "name": "Name Row",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "JQpwD",
+                              "name": "Name",
+                              "fill": "$ink",
+                              "content": "impeccable",
+                              "fontFamily": "$font-mono",
+                              "fontSize": 14,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "oEv4P",
+                              "name": "Age",
+                              "fill": "$muted-soft",
+                              "content": "2 小时前",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            }
+                          ]
+                        },
+                        {
+                          "type": "text",
+                          "id": "xgdtl",
+                          "name": "Description",
+                          "fill": "$body",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "Design, redesign, critique, polish, or audit a frontend interface.",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 13,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "RWWJ8",
+                          "name": "Location Row",
+                          "width": "fill_container",
+                          "height": 20,
+                          "gap": 6,
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "text",
+                              "id": "hOzBY",
+                              "name": "Scope One",
+                              "fill": "$muted",
+                              "content": "工作区",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 11.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "vX4I4",
+                              "name": "Tile Folder",
+                              "width": 18,
+                              "height": 18,
+                              "fill": "$surface-soft",
+                              "cornerRadius": 5,
+                              "stroke": "$canvas",
+                              "strokeWidth": 2,
+                              "justifyContent": "center",
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "jAfHC",
+                                  "name": "Icon",
+                                  "width": 10,
+                                  "height": 10,
+                                  "icon": "folder",
+                                  "library": "lucide",
+                                  "fill": "$body"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "U8UmO",
+                              "name": "Rule",
+                              "width": 1,
+                              "height": 14,
+                              "fill": "$hairline"
+                            },
+                            {
+                              "type": "text",
+                              "id": "yTwHu",
+                              "name": "Scope Two",
+                              "fill": "$muted",
+                              "content": "全局",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 11.5,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "Trbth",
+                              "name": "Stack Global",
+                              "width": 30,
+                              "height": 18,
+                              "fill": "#00000000",
+                              "layout": "none",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "aM1Uw",
+                                  "layoutPosition": "absolute",
+                                  "x": 0,
+                                  "y": 0,
+                                  "name": "Tile 1",
+                                  "width": 18,
+                                  "height": 18,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 5,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "MRiLP",
+                                  "layoutPosition": "absolute",
+                                  "x": 12,
+                                  "y": 0,
+                                  "name": "Tile 2",
+                                  "width": 18,
+                                  "height": 18,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/kode.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 5,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "type": "frame",
+                          "id": "M0VR3",
+                          "name": "Foot",
+                          "width": "fill_container",
+                          "gap": 8,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "ebT0i",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "RQD1L",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "XoOfB",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "liY2J",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "kKsnE",
+                                  "name": "Location",
+                                  "fill": "$ink",
+                                  "content": "3 个位置",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "600"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "c0fzzX",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "uT5mR",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "ImO7Y",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "ntdP0",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "m4eIGf",
+                  "name": "Rationale",
+                  "width": "fill_container",
+                  "layout": "vertical",
+                  "gap": 6,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "v3Cha",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "唯一能同时说清「哪些 Agent」和「哪个作用域」的一版：两簇，中间一条细线，共享基座（.agents）也有位置。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "BwKVo",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "脚完全不动，来源和「安装 ⌄」都不受影响。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "cFQut",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "代价：卡片 292 → 322，网格不再等高，一屏少放半张卡。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "O5s485",
+              "name": "Col Pressure",
+              "width": 264,
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Z75WVy",
+                  "name": "Variant Label",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "压力测试 · 脚上留 132",
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "R90z1",
+                  "name": "Pressure Panel",
+                  "width": "fill_container",
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-lg",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 12,
+                  "padding": [
+                    14,
+                    16
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "GrbSv",
+                      "name": "Text",
+                      "fill": "$muted-soft",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "每行 = 一条真实的卡片脚（228 宽），右边那枚就是「安装 ⌄」。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 11.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "EpUGC",
+                      "name": "Case 1 个位置",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "Ctby9",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "1 个位置 · 脚上还剩 63",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "TAi7B",
+                          "name": "Strip 1 个位置",
+                          "width": 228,
+                          "height": 32,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "iGQ5o",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "s0bLy",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "G9eDxB",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "WV1rJ",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "XSUJA",
+                                  "name": "Agent Stack",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": "#00000000",
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "b08UmE",
+                                      "layoutPosition": "absolute",
+                                      "x": 0,
+                                      "y": 0,
+                                      "name": "Tile 1",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/claude_code.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "NsWHj",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "dNbsX",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "Ia4Kp",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "hhr7P",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "j62XNl",
+                      "name": "Case 3 个位置",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "veYtc",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "3 个位置 · 脚上还剩 37",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "XWUou",
+                          "name": "Strip 3 个位置",
+                          "width": 228,
+                          "height": 32,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "RJdln",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "tYErT",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "L5Zy4",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "jRzVc",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "LhEtu",
+                                  "name": "Agent Stack",
+                                  "width": 46,
+                                  "height": 20,
+                                  "fill": "#00000000",
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "vB07R",
+                                      "layoutPosition": "absolute",
+                                      "x": 0,
+                                      "y": 0,
+                                      "name": "Tile 1",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/claude_code.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "SY6je",
+                                      "layoutPosition": "absolute",
+                                      "x": 13,
+                                      "y": 0,
+                                      "name": "Tile 2",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/kode.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "q8dqPi",
+                                      "layoutPosition": "absolute",
+                                      "x": 26,
+                                      "y": 0,
+                                      "name": "Tile 3",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/workbuddy.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "k2mYCW",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "U6BSHj",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "eatUI",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "pMrk5",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "D2BNHG",
+                      "name": "Case 6 个位置",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "d4DxD",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "6 个位置 · 脚上只剩 11",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "I0t2L",
+                          "name": "Strip 6 个位置",
+                          "width": 228,
+                          "height": 32,
+                          "justifyContent": "space_between",
+                          "alignItems": "center",
+                          "children": [
+                            {
+                              "type": "frame",
+                              "id": "D02s4",
+                              "name": "Provenance",
+                              "gap": 5,
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "UgGnF",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "hard-drive",
+                                  "library": "lucide",
+                                  "fill": "$muted-soft"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "PP0Hu",
+                                  "name": "Source",
+                                  "fill": "$muted",
+                                  "content": "本地",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "IyE5G",
+                                  "name": "Sep",
+                                  "fill": "$muted-soft",
+                                  "content": "·",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 12,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Z5hdr",
+                                  "name": "Agent Stack",
+                                  "width": 72,
+                                  "height": 20,
+                                  "fill": "#00000000",
+                                  "layout": "none",
+                                  "children": [
+                                    {
+                                      "type": "frame",
+                                      "id": "obuXG",
+                                      "layoutPosition": "absolute",
+                                      "x": 0,
+                                      "y": 0,
+                                      "name": "Tile 1",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/claude_code.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "J3uxK",
+                                      "layoutPosition": "absolute",
+                                      "x": 13,
+                                      "y": 0,
+                                      "name": "Tile 2",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/kode.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "jnaWe",
+                                      "layoutPosition": "absolute",
+                                      "x": 26,
+                                      "y": 0,
+                                      "name": "Tile 3",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/workbuddy.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "o08C5B",
+                                      "layoutPosition": "absolute",
+                                      "x": 39,
+                                      "y": 0,
+                                      "name": "Tile 4",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": {
+                                        "type": "image",
+                                        "enabled": true,
+                                        "url": "agent-icons/github-copilot-app.png",
+                                        "mode": "cover"
+                                      },
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2
+                                    },
+                                    {
+                                      "type": "frame",
+                                      "id": "I7tkac",
+                                      "layoutPosition": "absolute",
+                                      "x": 52,
+                                      "y": 0,
+                                      "name": "More Chip",
+                                      "width": 20,
+                                      "height": 20,
+                                      "fill": "$surface-strong",
+                                      "cornerRadius": 6,
+                                      "stroke": "$canvas",
+                                      "strokeWidth": 2,
+                                      "justifyContent": "center",
+                                      "alignItems": "center",
+                                      "children": [
+                                        {
+                                          "type": "text",
+                                          "id": "RWA63",
+                                          "name": "Label",
+                                          "fill": "$ink",
+                                          "content": "+2",
+                                          "fontFamily": "$font-mono",
+                                          "fontSize": 10,
+                                          "fontWeight": "normal"
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "U5BZqh",
+                              "name": "Action 安装",
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "QccI1",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "I1Ia8",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "huGUD",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "zYTTF",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "6 个位置时是前 4 枚 + 一枚 +2：正好填满脚上留给位置的 132，右下只剩 11px。再加一个位置，就只能把「来源」挤掉了。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 11.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KhT1O",
+              "name": "Col Rules",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "O1kcn",
+                  "name": "Rules Card",
+                  "width": "fill_container",
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": [
+                    20,
+                    24
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "gKZRg",
+                      "name": "Card Title",
+                      "fill": "$ink",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "不管你选哪一版，这几条都成立",
+                      "fontFamily": "$font-sans",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "B2IiKh",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "一枚图标 = 一个安装位置。Agent 用它的标记；.agents/skills 这种共享基座用 folder，因为它不属于任何 Agent。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "z0Ojjy",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "技能库本体不占图标位：卡上看到的，都是「除了技能库，它还装到了哪」。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "YpUr5",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "顺序固定：工作区在前、全局在后，同一作用域内按 Agent 的声明次序 —— 同一张卡每次刷新长得一样。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "N0jJh",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "溢出收成一枚 +N，它自己也压住前一格，与页签的规则完全一致。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "ghbls",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "详情弹窗的「位置」段永远是完整清单，卡片只是摘要：卡片上放不下的，一个都不能丢。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "aIxcD",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "暗色下描边取卡片底色（$surface-dark-elevated），不用白色 —— 白圈在暗底上会漏光。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12.5,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "U2sFN0",
+          "name": "Row Third",
+          "width": "fill_container",
+          "gap": 24,
+          "children": [
+            {
+              "type": "frame",
+              "id": "BYXRe",
+              "name": "Col Stress",
+              "width": 296,
+              "layout": "vertical",
+              "gap": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "SW7db",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "窄卡片实测 · 卡 266（最窄）",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "JxKgQ",
+                  "name": "Text",
+                  "fill": "$body",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "每一条都是真的 230 宽卡脚，右边那枚按钮是真宽 94。灰线就是留给「来源 · 位置」的 128。",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": 12,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "luMVR",
+                  "name": "Stress Panel",
+                  "width": "fill_container",
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-lg",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 16,
+                  "padding": 16,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "clFck",
+                      "name": "Case ① 3 枚 + 本地",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "YTi2i",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "① 3 枚 + 本地   110 / 128，来源词完整",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "nkgBi",
+                          "name": "Strip ① 3 枚 + 本地",
+                          "width": 230,
+                          "height": 32,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "H6iF6m",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -4,
+                              "name": "Budget Rule",
+                              "fill": "$hairline",
+                              "width": 1,
+                              "height": 40
+                            },
+                            {
+                              "type": "icon",
+                              "id": "ccoQb",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 10,
+                              "name": "Icon",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "hard-drive",
+                              "library": "lucide",
+                              "fill": "$muted-soft"
+                            },
+                            {
+                              "type": "text",
+                              "id": "Iuyum",
+                              "layoutPosition": "absolute",
+                              "x": 18,
+                              "y": 8,
+                              "name": "Source",
+                              "fill": "$muted",
+                              "content": "本地",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "jwheo",
+                              "layoutPosition": "absolute",
+                              "x": 47,
+                              "y": 8,
+                              "name": "Sep",
+                              "fill": "$muted-soft",
+                              "content": "·",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "gKPAc",
+                              "layoutPosition": "absolute",
+                              "x": 59,
+                              "y": 6,
+                              "name": "Agent Stack",
+                              "width": 46,
+                              "height": 20,
+                              "fill": "#00000000",
+                              "layout": "none",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "FQDV0",
+                                  "layoutPosition": "absolute",
+                                  "x": 0,
+                                  "y": 0,
+                                  "name": "Tile 1",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "QSiTY",
+                                  "layoutPosition": "absolute",
+                                  "x": 13,
+                                  "y": 0,
+                                  "name": "Tile 2",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/kode.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "YSqw3",
+                                  "layoutPosition": "absolute",
+                                  "x": 26,
+                                  "y": 0,
+                                  "name": "Tile 3",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/workbuddy.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "sPTFc",
+                              "x": 136,
+                              "y": 0,
+                              "name": "Action 安装",
+                              "width": 94,
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "z3cMwp",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "z5TbgM",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "gpwYh",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "kdRIL",
+                      "name": "Case ② 5 枚 + 本地",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "sXxRc",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "② 5 枚 + 本地   136 > 128，来源词被省略号吃掉",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "ue81I",
+                          "name": "Strip ② 5 枚 + 本地",
+                          "width": 230,
+                          "height": 32,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "irZyh",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -4,
+                              "name": "Budget Rule",
+                              "fill": "$hairline",
+                              "width": 1,
+                              "height": 40
+                            },
+                            {
+                              "type": "icon",
+                              "id": "zMKCU",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 10,
+                              "name": "Icon",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "hard-drive",
+                              "library": "lucide",
+                              "fill": "$muted-soft"
+                            },
+                            {
+                              "type": "text",
+                              "id": "aCD03",
+                              "layoutPosition": "absolute",
+                              "x": 18,
+                              "y": 8,
+                              "name": "Source",
+                              "fill": "$ink",
+                              "content": "本…",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "text",
+                              "id": "ymN3N",
+                              "layoutPosition": "absolute",
+                              "x": 39,
+                              "y": 8,
+                              "name": "Sep",
+                              "fill": "$muted-soft",
+                              "content": "·",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "P21VCS",
+                              "layoutPosition": "absolute",
+                              "x": 51,
+                              "y": 6,
+                              "name": "Agent Stack",
+                              "width": 72,
+                              "height": 20,
+                              "fill": "#00000000",
+                              "layout": "none",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "tTFSz",
+                                  "layoutPosition": "absolute",
+                                  "x": 0,
+                                  "y": 0,
+                                  "name": "Tile 1",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "KgZoX",
+                                  "layoutPosition": "absolute",
+                                  "x": 13,
+                                  "y": 0,
+                                  "name": "Tile 2",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/kode.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "q9dlg",
+                                  "layoutPosition": "absolute",
+                                  "x": 26,
+                                  "y": 0,
+                                  "name": "Tile 3",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/workbuddy.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "ApAtV",
+                                  "layoutPosition": "absolute",
+                                  "x": 39,
+                                  "y": 0,
+                                  "name": "Tile 4",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/github-copilot-app.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "LQ0sK",
+                                  "layoutPosition": "absolute",
+                                  "x": 52,
+                                  "y": 0,
+                                  "name": "Tile 5",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "bFWLA",
+                              "x": 136,
+                              "y": 0,
+                              "name": "Action 安装",
+                              "width": 94,
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "N7n5zZ",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "t4Skk",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "k6ymX7",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "Hec7W",
+                      "name": "Case ③ 5 枚 + skill.sh",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "FLLtw",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "③ 5 枚 + skill.sh   170 > 128，来源词整个挤没，图标留着",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "QXTh5",
+                          "name": "Strip ③ 5 枚 + skill.sh",
+                          "width": 230,
+                          "height": 32,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "k8ENWC",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -4,
+                              "name": "Budget Rule",
+                              "fill": "$hairline",
+                              "width": 1,
+                              "height": 40
+                            },
+                            {
+                              "type": "icon",
+                              "id": "Zqobs",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 10,
+                              "name": "Icon",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "hard-drive",
+                              "library": "lucide",
+                              "fill": "$muted-soft"
+                            },
+                            {
+                              "type": "text",
+                              "id": "a8pTM",
+                              "layoutPosition": "absolute",
+                              "x": 18,
+                              "y": 8,
+                              "name": "Sep",
+                              "fill": "$muted-soft",
+                              "content": "·",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "V69zpk",
+                              "layoutPosition": "absolute",
+                              "x": 30,
+                              "y": 6,
+                              "name": "Agent Stack",
+                              "width": 72,
+                              "height": 20,
+                              "fill": "#00000000",
+                              "layout": "none",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "WDyle",
+                                  "layoutPosition": "absolute",
+                                  "x": 0,
+                                  "y": 0,
+                                  "name": "Tile 1",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "Skrtc",
+                                  "layoutPosition": "absolute",
+                                  "x": 13,
+                                  "y": 0,
+                                  "name": "Tile 2",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/kode.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "dLDpy",
+                                  "layoutPosition": "absolute",
+                                  "x": 26,
+                                  "y": 0,
+                                  "name": "Tile 3",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/workbuddy.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "e0JinW",
+                                  "layoutPosition": "absolute",
+                                  "x": 39,
+                                  "y": 0,
+                                  "name": "Tile 4",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/github-copilot-app.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "I8uKnx",
+                                  "layoutPosition": "absolute",
+                                  "x": 52,
+                                  "y": 0,
+                                  "name": "Tile 5",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "kJWIq",
+                              "x": 136,
+                              "y": 0,
+                              "name": "Action 安装",
+                              "width": 94,
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "NoEex",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "i0tLwk",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "s7sNA",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "bASVH",
+                      "name": "Case ④ 6 枚 + +N",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "leaJC",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "④ 6 枚 + +N   115 / 128，同一套让位规则",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "MExJd",
+                          "name": "Strip ④ 6 枚 + +N",
+                          "width": 230,
+                          "height": 32,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "vdoqN",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -4,
+                              "name": "Budget Rule",
+                              "fill": "$hairline",
+                              "width": 1,
+                              "height": 40
+                            },
+                            {
+                              "type": "icon",
+                              "id": "GwqeX",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 10,
+                              "name": "Icon",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "hard-drive",
+                              "library": "lucide",
+                              "fill": "$muted-soft"
+                            },
+                            {
+                              "type": "text",
+                              "id": "WhTjm",
+                              "layoutPosition": "absolute",
+                              "x": 18,
+                              "y": 8,
+                              "name": "Sep",
+                              "fill": "$muted-soft",
+                              "content": "·",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "R9nEif",
+                              "layoutPosition": "absolute",
+                              "x": 30,
+                              "y": 6,
+                              "name": "Agent Stack",
+                              "width": 85,
+                              "height": 20,
+                              "fill": "#00000000",
+                              "layout": "none",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "a9Hiqy",
+                                  "layoutPosition": "absolute",
+                                  "x": 0,
+                                  "y": 0,
+                                  "name": "Tile 1",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "qBoLt",
+                                  "layoutPosition": "absolute",
+                                  "x": 13,
+                                  "y": 0,
+                                  "name": "Tile 2",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/kode.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "BE51r",
+                                  "layoutPosition": "absolute",
+                                  "x": 26,
+                                  "y": 0,
+                                  "name": "Tile 3",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/workbuddy.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "pAj9D",
+                                  "layoutPosition": "absolute",
+                                  "x": 39,
+                                  "y": 0,
+                                  "name": "Tile 4",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/github-copilot-app.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "T0zcW1",
+                                  "layoutPosition": "absolute",
+                                  "x": 52,
+                                  "y": 0,
+                                  "name": "Tile 5",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "u4yy6",
+                                  "layoutPosition": "absolute",
+                                  "x": 65,
+                                  "y": 0,
+                                  "name": "More Chip",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": "$surface-strong",
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2,
+                                  "justifyContent": "center",
+                                  "alignItems": "center",
+                                  "children": [
+                                    {
+                                      "type": "text",
+                                      "id": "OSnnT",
+                                      "name": "Label",
+                                      "fill": "$ink",
+                                      "content": "+2",
+                                      "fontFamily": "$font-mono",
+                                      "fontSize": 10,
+                                      "fontWeight": "normal"
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "q23lYT",
+                              "x": 136,
+                              "y": 0,
+                              "name": "Action 安装",
+                              "width": 94,
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "GwI0t",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "CQSOF",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "R0C2ST",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "N7f3Gb",
+                      "name": "Case ⑤ 今天（没有堆叠）",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QGEmR",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "⑤ 今天（没有堆叠）   146 / 147 —— 余量本来就已经是 0",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "z7czkE",
+                          "name": "Strip ⑤ 今天（没有堆叠）",
+                          "width": 230,
+                          "height": 32,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "iFFtu",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -4,
+                              "name": "Budget Rule",
+                              "fill": "$hairline",
+                              "width": 1,
+                              "height": 40
+                            },
+                            {
+                              "type": "icon",
+                              "id": "pkUiO",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 10,
+                              "name": "Icon",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "hard-drive",
+                              "library": "lucide",
+                              "fill": "$muted-soft"
+                            },
+                            {
+                              "type": "text",
+                              "id": "U9THTd",
+                              "layoutPosition": "absolute",
+                              "x": 18,
+                              "y": 8,
+                              "name": "Source",
+                              "fill": "$muted",
+                              "content": "skill.sh",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "RSsx7",
+                              "layoutPosition": "absolute",
+                              "x": 81,
+                              "y": 8,
+                              "name": "Sep",
+                              "fill": "$muted-soft",
+                              "content": "·",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "V2iIAQ",
+                              "layoutPosition": "absolute",
+                              "x": 93,
+                              "y": 8,
+                              "name": "Place",
+                              "fill": "$ink",
+                              "content": "2 个位置",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "600"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "NT5wH",
+                              "x": 136,
+                              "y": 0,
+                              "name": "Action 安装",
+                              "width": 94,
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "qoUQS",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "k2KM5",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "G5zfw7",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "E5sJC",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "⑥ 塞进 5 枚（72）却不给来源词让位：需要 170，只有 147。实测行的可滚宽度从 147 涨到 160 —— 按钮一动不动，是图标压到了按钮上。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 11.5,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "zTtuY",
+                      "name": "Case ⑥ 溢出长什么样",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 6,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "JBbwr",
+                          "name": "Text",
+                          "fill": "$muted",
+                          "textGrowth": "fixed-width",
+                          "width": "fill_container",
+                          "content": "⑥ 溢出长什么样   29px 压在「安装」下面",
+                          "lineHeight": 1.5,
+                          "fontFamily": "$font-sans",
+                          "fontSize": 11.5,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "frame",
+                          "id": "VdEz0",
+                          "name": "Strip ⑥ 溢出长什么样",
+                          "width": 230,
+                          "height": 32,
+                          "fill": "#00000000",
+                          "layout": "none",
+                          "children": [
+                            {
+                              "type": "rectangle",
+                              "id": "e5Z5ny",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -4,
+                              "name": "Budget Rule",
+                              "fill": "$hairline",
+                              "width": 1,
+                              "height": 40
+                            },
+                            {
+                              "type": "rectangle",
+                              "cornerRadius": 4,
+                              "id": "dsDks",
+                              "layoutPosition": "absolute",
+                              "x": 136,
+                              "y": -2,
+                              "name": "Overlap Mark",
+                              "fill": "#CF202F1F",
+                              "width": 29,
+                              "height": 36
+                            },
+                            {
+                              "type": "icon",
+                              "id": "eq1ca",
+                              "layoutPosition": "absolute",
+                              "x": 0,
+                              "y": 10,
+                              "name": "Icon",
+                              "width": 13,
+                              "height": 13,
+                              "icon": "hard-drive",
+                              "library": "lucide",
+                              "fill": "$muted-soft"
+                            },
+                            {
+                              "type": "text",
+                              "id": "v8uwd",
+                              "layoutPosition": "absolute",
+                              "x": 18,
+                              "y": 8,
+                              "name": "Source",
+                              "fill": "$muted",
+                              "content": "skill.sh",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "text",
+                              "id": "gOO1I",
+                              "layoutPosition": "absolute",
+                              "x": 81,
+                              "y": 8,
+                              "name": "Sep",
+                              "fill": "$muted-soft",
+                              "content": "·",
+                              "fontFamily": "$font-sans",
+                              "fontSize": 12,
+                              "fontWeight": "normal"
+                            },
+                            {
+                              "type": "frame",
+                              "id": "CWxDl",
+                              "layoutPosition": "absolute",
+                              "x": 93,
+                              "y": 6,
+                              "name": "Agent Stack",
+                              "width": 72,
+                              "height": 20,
+                              "fill": "#00000000",
+                              "layout": "none",
+                              "children": [
+                                {
+                                  "type": "frame",
+                                  "id": "y0ZAvZ",
+                                  "layoutPosition": "absolute",
+                                  "x": 0,
+                                  "y": 0,
+                                  "name": "Tile 1",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "KmNhY",
+                                  "layoutPosition": "absolute",
+                                  "x": 13,
+                                  "y": 0,
+                                  "name": "Tile 2",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/kode.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "FxJmU",
+                                  "layoutPosition": "absolute",
+                                  "x": 26,
+                                  "y": 0,
+                                  "name": "Tile 3",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/workbuddy.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "z0htR",
+                                  "layoutPosition": "absolute",
+                                  "x": 39,
+                                  "y": 0,
+                                  "name": "Tile 4",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/github-copilot-app.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "T2gThD",
+                                  "layoutPosition": "absolute",
+                                  "x": 52,
+                                  "y": 0,
+                                  "name": "Tile 5",
+                                  "width": 20,
+                                  "height": 20,
+                                  "fill": {
+                                    "type": "image",
+                                    "enabled": true,
+                                    "url": "agent-icons/claude_code.png",
+                                    "mode": "cover"
+                                  },
+                                  "cornerRadius": 6,
+                                  "stroke": "$canvas",
+                                  "strokeWidth": 2
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "AQvby",
+                              "x": 136,
+                              "y": 0,
+                              "name": "Action 安装",
+                              "width": 94,
+                              "height": 32,
+                              "fill": "$surface-strong",
+                              "cornerRadius": "$radius-pill",
+                              "gap": 6,
+                              "padding": [
+                                0,
+                                12
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "t1M7tj",
+                                  "name": "Icon",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "download",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "IL8JB",
+                                  "name": "Label",
+                                  "fill": "$ink",
+                                  "content": "安装",
+                                  "fontFamily": "$font-sans",
+                                  "fontSize": 13,
+                                  "fontWeight": "600"
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "tX8sC",
+                                  "name": "Chevron",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$ink"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "a4mwG6",
+              "name": "Col Numbers",
+              "width": 296,
+              "layout": "vertical",
+              "gap": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "J8KQr",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "实测数字（浏览器里量的，不是估的）",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "n9Rst2",
+                  "name": "Numbers Card",
+                  "width": "fill_container",
+                  "fill": "$surface-soft",
+                  "cornerRadius": "$radius-md",
+                  "layout": "vertical",
+                  "gap": 8,
+                  "padding": [
+                    16,
+                    18
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "CMwyX",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "卡 285（这台机器的面板宽）→ 脚 249 → 按钮 94 + 间距 8 → 留给左簇 147。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "azO8s",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "卡 266（最窄）→ 脚 230 → 留给左簇 128。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "t9QzQ",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "这一行的固定开销：图标 13 + 4 段 5px 间距 + 「·」7.2 = 40.2。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "r7VZUj",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "来源词：skill.sh 57.6 / 本地 24。一枚瓦片 20，每多一枚 +13。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "w6YfK",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "今天（文字版「2 个位置」）就已经用掉 146.2 / 147 —— 本来就没有余量。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "zP4TZ",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "所以塞进 5 枚的那一刻一定会挤：要么图标压到按钮上，要么来源词让位。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "Z7L5P",
+              "name": "Col Order",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "X0Nn7T",
+                  "name": "Text",
+                  "fill": "$ink",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "挤不下的时候，按这个顺序牺牲",
+                  "lineHeight": 1.5,
+                  "fontFamily": "$font-sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "N0eBV",
+                  "name": "Order Card",
+                  "width": "fill_container",
+                  "fill": "$canvas",
+                  "cornerRadius": "$radius-xl",
+                  "stroke": "$hairline",
+                  "strokeWidth": 1,
+                  "layout": "vertical",
+                  "gap": 10,
+                  "padding": [
+                    18,
+                    22
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "wKDID",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "① 瓦片永不被裁。一个被切掉一半的 Agent 标记比不显示更糟，所以堆叠是 shrink-0，绝不参与收缩。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "tNxTA",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "② 先牺牲来源的词：省略号 → 完全挤没，图标留着。图标本来就在说「怎么来的」，词只是补充。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "jhMZd",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "③ 来源词让位之后还放不下，才动瓦片：封顶 5 枚，第 6 枚起收成 +N，它自己也占一格。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "fMrwI",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "④ 于是这一行只需要一条 CSS 规则：整行 min-w-0，来源词 truncate + min-w-0，其余全部 shrink-0。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "QTJWD",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "⑤ 今天的问题是这一行「谁都不能缩」—— 容器有 max-w-full，里面的词却没有 min-w-0，所以内容直接画到框外。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "oj4rD",
+                      "name": "Text",
+                      "fill": "$body",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "⑥ 卡片只回答「装到了几个 Agent」；「装到哪几个」永远是详情弹窗那一列的事，卡片不放全名单。",
+                      "lineHeight": 1.5,
+                      "fontFamily": "$font-sans",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "HzE3u",
+          "name": "Implementation Facts",
+          "width": "fill_container",
+          "fill": "$surface-soft",
+          "cornerRadius": "$radius-md",
+          "layout": "vertical",
+          "gap": 8,
+          "padding": [
+            18,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "R2zSM",
+              "name": "Note Title",
+              "fill": "$ink",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "实现事实（读代码得到，不是猜的）",
+              "fontFamily": "$font-sans",
+              "fontSize": 13.5,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "FpvQR",
+              "name": "Text",
+              "fill": "$body",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "数据已经在手上：Skill.places 就是安装位置清单（{id, dir, scope}），卡片今天只用了它的 length 去写「3 个位置」。",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": 12.5,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "U6XAg",
+              "name": "Text",
+              "fill": "$body",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "图标不用新加：每个位置由贡献点自带 icon（SkillLocationContribution），没有品牌位图的回落 lucide 字形。",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": 12.5,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "f1QJUz",
+              "name": "Text",
+              "fill": "$body",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "要改的只有一处：卡片脚那条 [hard-drive] skill.sh · 3 个位置 由 ProvenanceLine 渲染，列表的「位置」列与详情弹窗共用同一份数据、各自样式独立。",
+              "lineHeight": 1.5,
+              "fontFamily": "$font-sans",
+              "fontSize": 12.5,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
     }
   ],
   "variables": {

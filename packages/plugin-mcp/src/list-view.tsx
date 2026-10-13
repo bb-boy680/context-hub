@@ -14,9 +14,10 @@ import { cn } from "cn"
 import { isEnabled, isInstalled } from "./installs.ts"
 import { InstallToMenu, ServerControls, type ServerActions } from "./menus.tsx"
 import {
+  AgentStack,
   CheckNote,
+  LibraryChip,
   OffChip,
-  PlaceChips,
   ServerTile,
   StatusPill,
   SyncChip,
@@ -35,7 +36,6 @@ const NOWHERE: McpServer = {
   transport: "stdio",
   declaration: "",
   description: "",
-  places: [],
   unreadable: 0,
   installed: 0,
   stored: false,
@@ -122,7 +122,15 @@ export function ServerListView({
       key: "place",
       label: t("mcp.column.place"),
       width: "13.2%",
-      cell: (server) => <PlaceChips server={server} />,
+      /* Which agents hold it, as their own marks, beside the hub's record when
+         it has one. A server no client file declares keeps the record chip
+         alone, which is what it is. */
+      cell: (server) => (
+        <div className="flex min-w-0 items-center gap-2">
+          {server.stored ? <LibraryChip /> : null}
+          <AgentStack server={server} places={places} />
+        </div>
+      ),
     },
     {
       key: "check",
