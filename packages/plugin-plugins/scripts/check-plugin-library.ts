@@ -19,13 +19,13 @@ import { folderHash } from "@workspace/core/host/folder-hash"
 import {
   hasUpstream,
   installedRevision,
-  type PluginInstallScope,
   type PluginOrigin,
 } from "../src/contract.ts"
 import { formatPluginSource, parsePluginSource } from "../src/inspect.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../src/records.ts"
 import {
   createPluginInstallerRegistry,
+  type PluginHeld,
   type PluginInstaller,
   type PluginTools,
 } from "../src/provider.ts"
@@ -244,6 +244,45 @@ check("an unreadable file reads as empty", readIndex({ plugins: {} }).length ===
 check("an empty index is an empty array", emptyIndex().length === 0)
 check("an empty file is one empty array", serializeIndex(emptyIndex()) === "[]\n")
 
+/* A record written before the two fields were told apart kept the pack's mark
+   among the pictures a person adds. Reading one puts the mark back where it
+   belongs, and leaves a picture somebody added alone. */
+const mixed = readIndex([
+  {
+    name: "old-pack",
+    version: "1",
+    source: { kind: "path", path: "/somewhere" },
+    hash: "h",
+    assets: ["assets/old-pack/logo.png", "https://cdn.test/shot.png"],
+  },
+])[0]
+check(
+  "a mark kept among the assets reads as the icon",
+  mixed?.icon === "assets/old-pack/logo.png",
+  mixed?.icon
+)
+check(
+  "and a picture a person added stays a picture",
+  mixed?.assets.join() === "https://cdn.test/shot.png",
+  mixed?.assets
+)
+const named = readIndex([
+  {
+    name: "named-pack",
+    version: "1",
+    source: { kind: "path", path: "/somewhere" },
+    hash: "h",
+    icon: "assets/named-pack/icon.png",
+    assets: ["assets/named-pack/icon.png", "assets/added-by-hand.png"],
+  },
+])[0]
+check("a declared icon is kept as written", named?.icon === "assets/named-pack/icon.png", named?.icon)
+check(
+  "and a copy of it kept among the assets leaves nothing behind",
+  named?.assets.join() === "assets/added-by-hand.png",
+  named?.assets
+)
+
 console.log("collecting")
 
 const library = createFsPluginLibrary(home)
@@ -255,7 +294,8 @@ check("its version was read from the manifest", collected.record.version === "1.
 check("its description was read", collected.record.description.includes("hello"), collected.record.description)
 check("a local directory is recorded as one", collected.record.source.kind === "path")
 check("its tags start empty", collected.record.tags.length === 0)
-check("it has no assets yet", collected.record.assets.length === 0, collected.record.assets)
+check("it has no pictures of its own", collected.record.icon === "" && collected.record.assets.length === 0, collected.record)
+
 check(
   "the recorded hash is the files' own",
   collected.record.hash === (await folderHash(path.join(home, "plugins", "acme-hello")))
@@ -271,7 +311,7 @@ check("it holds one record", Array.isArray(index) && index.length === 1)
 check(
   "the record's fields are the agreed ones, in order",
   JSON.stringify(Object.keys((index as Record<string, unknown>[])[0] as object)) ===
-    JSON.stringify(["name", "version", "description", "tags", "source", "hash", "assets", "installedAt", "updatedAt"]),
+    JSON.stringify(["name", "version", "description", "tags", "source", "hash", "icon", "assets", "installedAt", "updatedAt"]),
   Object.keys((index as Record<string, unknown>[])[0] as object)
 )
 check(
@@ -603,9 +643,10 @@ const logoLibrary = createFsPluginLibrary(logoHub)
 const first = (await createPluginCollector(logoLibrary).add(logoPack)).record
 check(
   "the record points at the copy, under the pack's own directory",
-  first.assets[0] === "assets/acme-hello/logo.png",
-  first.assets
+  first.icon === "assets/acme-hello/logo.png",
+  first.icon
 )
+check("and it is not filed among what a person added", first.assets.length === 0, first.assets)
 check(
   "and the copy really is in the hub's asset directory",
   (await fs.readFile(path.join(logoHub, "assets", "acme-hello", "logo.png"), "utf8")) === "the logo"
@@ -617,11 +658,11 @@ const otherPack = path.join(root, "other-pack")
 await writePack(otherPack, "2.0.0", "other-pack")
 await writePicture(otherPack, "assets/logo.png", "the other pack's logo")
 const second = (await createPluginCollector(logoLibrary).add(otherPack)).record
-check("a second pack's logo does not collide with the first", second.assets[0] !== first.assets[0], second.assets)
+check("a second pack's logo does not collide with the first", second.icon !== first.icon, second.icon)
 check(
   "each copy is kept under the name of the pack that brought it",
-  second.assets[0] === "assets/other-pack/logo.png",
-  second.assets
+  second.icon === "assets/other-pack/logo.png",
+  second.icon
 )
 check(
   "and the first file is untouched",
@@ -639,7 +680,7 @@ check(
 )
 check(
   "while the other pack's picture stays",
-  (await fs.stat(path.join(logoHub, second.assets[0] as string)).catch(() => null)) !== null
+  (await fs.stat(path.join(logoHub, second.icon)).catch(() => null)) !== null
 )
 
 console.log("a source that moved")
@@ -822,7 +863,7 @@ console.log("delivering")
    registers into, and the tools an installer is handed. */
 const libraryRoot = path.join(home, "plugins")
 const ran: string[][] = []
-const held: Record<string, PluginInstallScope[]> = {}
+const stubHeld: PluginHeld[] = []
 const tools: PluginTools = {
   root: async () => libraryRoot,
   syncMarketplace: async () => {
@@ -833,21 +874,45 @@ const tools: PluginTools = {
     return ""
   },
   has: async (program) => program === "stub",
+  /* Reading a pack's own directory is the hub's job, so an installer asks for
+     it rather than reaching for a disk; the stub answers as a host would. */
+  describe: async (directory) => ({
+    name: "",
+    version: "",
+    description: `a pack at ${directory}`,
+  }),
 }
 const stub: PluginInstaller = {
   id: "hub.target.stub",
   label: "Stub",
   scopes: ["user", "project"],
   available: (given) => given.has("stub"),
-  delivered: async () => held,
+  held: async () => stubHeld,
   install: async (name, scope) => {
-    held[name] = [...(held[name] ?? []), scope]
+    stubHeld.push({
+      name,
+      id: `${name}@stub`,
+      version: "1",
+      scope,
+      enabled: true,
+      marketplace: "stub",
+    })
     return { message: `${name} at ${scope}` }
   },
   remove: async (name, scope) => {
-    held[name] = (held[name] ?? []).filter((one) => one !== scope)
+    const at = stubHeld.findIndex((one) => one.name === name && one.scope === scope)
+    if (at !== -1) stubHeld.splice(at, 1)
     return { message: `${name} out of ${scope}` }
   },
+}
+
+/** The scopes the stub holds one pack in, as the installed list reads them. */
+async function heldScopes(name: string): Promise<string> {
+  const packs = await registered.held(tools)
+  return packs
+    .filter((one) => one.name === name)
+    .map((one) => one.scope)
+    .join()
 }
 
 const registry = createPluginInstallerRegistry()
@@ -858,12 +923,13 @@ const [registered] = registry.installers()
 if (registered === undefined) throw new Error("the registry lost the installer it was given")
 await registered.install("acme-hello", "user", tools)
 await registered.install("acme-hello", "project", tools)
-check(
-  "an installer records both scopes it was given",
-  (await registered.delivered(tools))["acme-hello"]?.join() === "user,project"
-)
+check("an installer records both scopes it was given", (await heldScopes("acme-hello")) === "user,project")
 check("the tools say which program is here", (await tools.has("stub")) === true)
 check("and which is not", (await tools.has("nowhere")) === false)
+check(
+  "an installer can ask what a pack says about itself",
+  (await tools.describe(libraryRoot)).description === `a pack at ${libraryRoot}`
+)
 /* The library root is a person's own directory, so a path with a space is a
    case every installer hits. It travels as one list entry, never re-parsed. */
 await tools.run("stub", [libraryRoot, "one argument"])
@@ -873,10 +939,7 @@ check(
   ran.at(-1)
 )
 await registered.remove("acme-hello", "user", tools)
-check(
-  "removing one scope leaves the other",
-  (await registered.delivered(tools))["acme-hello"]?.join() === "project"
-)
+check("removing one scope leaves the other", (await heldScopes("acme-hello")) === "project")
 unregister()
 check("the disposer takes it back out", registry.installers().length === 0)
 

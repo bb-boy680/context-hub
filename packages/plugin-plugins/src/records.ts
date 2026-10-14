@@ -6,16 +6,33 @@
  * every agent's own marketplace lists it under, so there is nothing else to key
  * on.
  *
+ * A record keeps two kinds of picture, and they are not interchangeable: `icon`
+ * is the pack's own mark, the one file its directory ships to represent it, and
+ * `assets` are the pictures a person adds to show it off. Older records kept the
+ * mark among the assets, so reading one that does — recognisable because the
+ * reference sits under the pack's own directory — puts it where it belongs.
+ *
  * The file is durable JSON a person may edit, so a reader validates what it
  * finds and drops a record it cannot use rather than refusing the whole file.
  * This module imports no Node built-in, so the page and the host share it.
  */
+import { ASSET_DIR } from "@workspace/core"
+
 import type { PluginCheck, PluginOrigin } from "./contract.ts"
 import type { PluginRecord } from "./revision.ts"
 
 /** A home that has never collected anything. */
 export function emptyIndex(): PluginRecord[] {
   return []
+}
+
+/**
+ * The directory under the hub's asset root that holds one pack's own files.
+ *
+ * @param name — the pack's name.
+ */
+export function ownPicturePrefix(name: string): string {
+  return `${ASSET_DIR}/${name}/`
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -75,6 +92,14 @@ export function recordOf(value: unknown): PluginRecord | null {
   if (typeof value.name !== "string" || value.name === "") return null
   const source = originOf(value.source)
   if (source === null || typeof value.hash !== "string") return null
+  const held = Array.isArray(value.assets)
+    ? value.assets.filter((asset): asset is string => typeof asset === "string")
+    : []
+  /* A mark kept among the assets reads as the icon it is; a picture a person
+     added does not, and stays where it is. */
+  const own = ownPicturePrefix(value.name)
+  const kept = held.filter((asset) => !asset.startsWith(own))
+  const declared = typeof value.icon === "string" ? value.icon : ""
   return {
     name: value.name,
     version: typeof value.version === "string" ? value.version : "",
@@ -84,9 +109,8 @@ export function recordOf(value: unknown): PluginRecord | null {
       : [],
     source,
     hash: value.hash,
-    assets: Array.isArray(value.assets)
-      ? value.assets.filter((asset): asset is string => typeof asset === "string")
-      : [],
+    icon: declared === "" ? (held.find((asset) => asset.startsWith(own)) ?? "") : declared,
+    assets: kept,
     installedAt: typeof value.installedAt === "string" ? value.installedAt : "",
     updatedAt: typeof value.updatedAt === "string" ? value.updatedAt : "",
     ...(checkOf(value.checked) === undefined ? {} : { checked: checkOf(value.checked) }),

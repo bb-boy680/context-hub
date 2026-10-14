@@ -17,7 +17,7 @@
  * into and the tools to run a program with arrive through the `plugins` service.
  */
 import type { PluginInstallScope } from "@workspace/plugin-plugins/contract"
-import type { PluginInstaller, PluginTools } from "@workspace/plugin-plugins/provider"
+import type { PluginHeld, PluginInstaller, PluginTools } from "@workspace/plugin-plugins/provider"
 
 import { CLAUDE_CODE_ID } from "./locations.ts"
 
@@ -58,9 +58,79 @@ function reportOf(output: string): { installPath?: string } {
   }
 }
 
-/** Whether a value names a scope this client installs into. */
-function isScope(value: unknown): value is PluginInstallScope {
-  return value === "user" || value === "project" || value === "local"
+/** The first value that is a non-empty string, or nothing. */
+function firstString(...values: unknown[]): string | undefined {
+  for (const value of values) {
+    if (typeof value === "string" && value !== "") return value
+  }
+  return undefined
+}
+
+/**
+ * The pack list this client prints, read into the shape this hub records one by.
+ *
+ * A line this build cannot use is dropped rather than guessed at, and an answer
+ * that is not a list yields nothing: a client that printed prose still exited
+ * with its own code, and inventing packs out of prose would be worse than
+ * reporting none.
+ *
+ * An id reads `<pack>@<marketplace>` — including the client's own words for a
+ * pack that came from no marketplace, such as `skills-dir`. The directory is the
+ * client's own answer to where it loads the pack from: a pack it reads in place
+ * names that folder, and one it copied names the copy.
+ *
+ * What the pack itself carries is not in this answer, so `pack` reads empty
+ * here; {@link PluginInstaller.held} fills it in by reading each directory.
+ *
+ * @param output — what `claude plugin list --json` printed.
+ * @returns one entry per installed pack, in the order the client listed them.
+ */
+export function readHeld(output: string): PluginHeld[] {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(output)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+  const found: PluginHeld[] = []
+  for (const value of parsed) {
+    if (typeof value !== "object" || value === null) continue
+    const entry = value as Record<string, unknown>
+    if (typeof entry.id !== "string" || typeof entry.scope !== "string") continue
+    const at = entry.id.lastIndexOf("@")
+    if (at <= 0 || at === entry.id.length - 1) continue
+    const path = firstString(entry.readFromFolder, entry.installPath)
+    found.push({
+      name: entry.id.slice(0, at),
+      id: entry.id,
+      version: typeof entry.version === "string" ? entry.version : "",
+      scope: entry.scope,
+      enabled: entry.enabled === true,
+      marketplace: entry.id.slice(at + 1),
+      ...(path === undefined ? {} : { source: { kind: "path", path } }),
+      pack: { name: "", version: "", description: "" },
+    })
+  }
+  return found
+}
+
+/**
+ * Fill in what each pack says about itself, reading it where the pack sits.
+ *
+ * The client's own list names packs and directories and nothing more, so the
+ * reading happens here rather than in that answer. A pack whose directory the
+ * client did not name keeps the empty fields it was read with: there is nothing
+ * to read, and saying so is better than failing the whole scan.
+ */
+async function withPacks(tools: PluginTools, packs: PluginHeld[]): Promise<PluginHeld[]> {
+  return Promise.all(
+    packs.map(async (pack) =>
+      pack.source === undefined
+        ? pack
+        : { ...pack, pack: await tools.describe(pack.source.path, pack.name).catch(() => pack.pack) }
+    )
+  )
 }
 
 /** Claude Code, as the plugins module uses it. */
@@ -71,23 +141,8 @@ export const claudeCodeInstaller: PluginInstaller = {
 
   available: (tools) => tools.has(PROGRAM),
 
-  async delivered(tools) {
-    const output = await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG])
-    const parsed: unknown = JSON.parse(output)
-    if (!Array.isArray(parsed)) return {}
-    const held: Record<string, PluginInstallScope[]> = {}
-    for (const value of parsed) {
-      if (typeof value !== "object" || value === null) continue
-      const entry = value as { id?: unknown; scope?: unknown }
-      /* An id reads `<pack>@<marketplace>`; only this hub's own marketplace
-         answers for the packs it delivered. */
-      if (typeof entry.id !== "string" || !isScope(entry.scope)) continue
-      const at = entry.id.lastIndexOf("@")
-      if (at === -1 || entry.id.slice(at + 1) !== MARKETPLACE) continue
-      const id = entry.id.slice(0, at)
-      held[id] = [...(held[id] ?? []), entry.scope]
-    }
-    return held
+  async held(tools) {
+    return withPacks(tools, readHeld(await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG])))
   },
 
   async install(id, scope, tools) {

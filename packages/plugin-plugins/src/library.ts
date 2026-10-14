@@ -7,27 +7,31 @@
  * change more than it named — collecting a pack rewrites the index and the
  * marketplace, and an update can land on agent copies too.
  *
- * Which agents this hub can deliver to is not answered here at all: each agent's
- * own extension registers how it installs a plugin, and this reads that registry.
- *
- * Ages and source words are worded here rather than stored: a row that carried
- * "2 days ago" would be wrong by the next render.
+ * The agents' own answers are folded here, not in the bridge: what each agent
+ * holds is read by that agent's extension, and this side only joins the answers
+ * into the rows the page draws.
  */
 import { PlugIcon } from "lucide-react"
 import * as React from "react"
 
-import { assetUrl } from "@workspace/core"
 import type { ExtensionIcon } from "@workspace/extensions"
 import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
 
 import {
-  installedRevision,
+  PLUGIN_MARKETPLACE_NAME,
   type PluginInstallReport,
   type PluginInstallScope,
 } from "./contract.ts"
-import { PLUGIN_SERVICE, type PluginInstaller, type PluginService, type PluginTools } from "./provider.ts"
+import {
+  PLUGIN_SERVICE,
+  type PluginHeld,
+  type PluginInstaller,
+  type PluginService,
+  type PluginTools,
+} from "./provider.ts"
 import type { PluginRecord, PluginUpdateSummary } from "./revision.ts"
-import type { PluginFileEntry, PluginRow, PluginSource } from "./types.ts"
+import { collectScanned, composeRows, type ScannedAnswer, type ScannedPack } from "./rows.ts"
+import type { PluginFileEntry, PluginRow } from "./types.ts"
 
 /** The route the library answers on. */
 const ENDPOINT = "/hub/plugins"
@@ -68,63 +72,23 @@ export interface PackUploadFile {
   base64: string
 }
 
-/** How long a pack has been at its current revision, in the locale's own words. */
-function ageOf(iso: string, language: string | undefined, t: (key: string) => string): string {
-  if (iso === "") return t("plugins.age.unknown")
-  const then = Date.parse(iso)
-  if (Number.isNaN(then)) return t("plugins.age.unknown")
-  let value = Math.max(0, (Date.now() - then) / 1000)
-  const format = new Intl.RelativeTimeFormat(language ?? "en", { numeric: "auto" })
-  const steps: [number, Intl.RelativeTimeFormatUnit][] = [
-    [60, "second"],
-    [60, "minute"],
-    [24, "hour"],
-    [30, "day"],
-    [12, "month"],
-    [Number.POSITIVE_INFINITY, "year"],
-  ]
-  for (const [size, unit] of steps) {
-    if (value < size) return format.format(-Math.round(value), unit)
-    value /= size
+/** Whether a client's word for a scope is one this hub can deliver into. */
+function isScope(value: string): value is PluginInstallScope {
+  return value === "user" || value === "project" || value === "local"
+}
+
+/**
+ * The packs this hub delivered, as the clients themselves report them: the
+ * marketplace a pack was installed from is the hub's own when this side put it
+ * there.
+ */
+function deliveredOf(packs: readonly PluginHeld[]): Record<string, PluginInstallScope[]> {
+  const held: Record<string, PluginInstallScope[]> = {}
+  for (const pack of packs) {
+    if (pack.marketplace !== PLUGIN_MARKETPLACE_NAME || !isScope(pack.scope)) continue
+    held[pack.name] = [...(held[pack.name] ?? []), pack.scope]
   }
-  return t("plugins.age.unknown")
-}
-
-/** Where a pack came from, in the words the row shows. */
-function sourceOf(record: PluginRecord): PluginSource {
-  return record.source.kind === "path" ? "local" : record.source.kind
-}
-
-/** The revision this copy was collected at, or null when its source cannot be asked. */
-function installedRevisionOf(record: PluginRecord): string | null {
-  return installedRevision(record.source)
-}
-
-/** One record as the row the two views draw. */
-export function toRow(
-  record: PluginRecord,
-  language: string | undefined,
-  t: (key: string) => string
-): PluginRow {
-  const installed = installedRevisionOf(record)
-  const latest = record.checked?.latest
-  const current = record.checked?.currentHash
-  return {
-    id: record.name,
-    name: record.name,
-    version: record.version,
-    description: record.description,
-    tags: record.tags,
-    source: sourceOf(record),
-    updated: ageOf(record.updatedAt, language, t),
-    /* The first asset is the pack's own picture, which the hub copied out of it
-       when it was collected; the rest is whatever a person added. */
-    ...(record.assets[0] === undefined ? {} : { cover: assetUrl(record.assets[0]) }),
-    outdated: installed !== null && latest !== undefined && latest !== installed,
-    modified: current !== undefined && current !== record.hash,
-    hasSource: installed !== null,
-    checkedAt: record.checked?.at ?? "",
-  }
+  return held
 }
 
 /** One pack's files, as the files panel lists them. */
@@ -206,6 +170,14 @@ export interface PluginLibrary {
    */
   add(source: string): Promise<PluginCollected>
   /**
+   * Take a pack an agent holds into the library.
+   *
+   * @param name — the pack to take in, by the name the agent listed it under.
+   * @returns the record that is in the library now, and whether it was already there.
+   * @throws {Error} when no agent holds a pack by that name, or when the one that does named no directory.
+   */
+  adopt(name: string): Promise<PluginCollected>
+  /**
    * Collect one pack from a folder the page read.
    *
    * A page is given a chosen folder's files and nothing about where they were,
@@ -266,6 +238,7 @@ export function usePluginLibrary(): PluginLibrary {
     [snapshot]
   )
   const [records, setRecords] = React.useState<PluginRecord[]>([])
+  const [scanned, setScanned] = React.useState<ScannedPack[]>([])
   const [clients, setClients] = React.useState<PluginClient[]>([])
   const [root, setRoot] = React.useState("")
   const [busy, setBusy] = React.useState(false)
@@ -280,17 +253,25 @@ export function usePluginLibrary(): PluginLibrary {
     setMissing(answer.missing)
     if (service === null) {
       setClients([])
+      setScanned([])
       return
     }
     const found: PluginClient[] = []
+    const answers: ScannedAnswer[] = []
     for (const installer of service.registry.installers()) {
       /* An agent whose program is missing, or which cannot answer, is still
          listed: a person then sees that the hub looked for it rather than
          wondering why an agent they use is absent. */
       const available = await installer.available(service.tools).catch(() => false)
-      const delivered = available
-        ? await installer.delivered(service.tools).catch(() => ({}))
-        : {}
+      const packs = available ? await installer.held(service.tools).catch(() => []) : []
+      if (available) {
+        answers.push({
+          client: installer.id,
+          label: installer.label,
+          icon: iconFor(installer.id),
+          packs,
+        })
+      }
       found.push({
         id: installer.id,
         label: installer.label,
@@ -298,10 +279,11 @@ export function usePluginLibrary(): PluginLibrary {
         scopes: installer.scopes,
         switchable: installer.setEnabled !== undefined,
         available,
-        delivered,
+        delivered: deliveredOf(packs),
       })
     }
     setClients(found)
+    setScanned(collectScanned(answers))
   }, [service, revision, iconFor])
 
   /** Run one write, then read everything again: any write can change more than it named. */
@@ -379,8 +361,24 @@ export function usePluginLibrary(): PluginLibrary {
     call<PluginRecord>(ENDPOINT, { action: "restore", name })
 
   const rows = React.useMemo(
-    () => records.map((record) => toRow(record, state.active, t)),
-    [records, state.active, t]
+    () => composeRows(records, scanned, state.active, t),
+    [records, scanned, state.active, t]
+  )
+
+  /**
+   * Take a pack an agent holds into the library.
+   *
+   * The agent's own answer says where the pack sits, and that directory is what
+   * the library copies — the same collect an address goes through, so nothing
+   * here has to know how a pack is laid out.
+   */
+  const adopt = React.useCallback(
+    (name: string): Promise<PluginCollected> => {
+      const pack = scanned.find((one) => one.name === name)
+      if (pack?.source === undefined) return Promise.reject(new Error(t("plugins.adopt.unknown")))
+      return write<PluginCollected>({ action: "add", source: pack.source.path })
+    },
+    [scanned, write, t]
   )
 
   return {
@@ -397,6 +395,7 @@ export function usePluginLibrary(): PluginLibrary {
     update: (name) => write<PluginUpdateOutcome>({ action: "update", name }),
 
     add: (source) => write<PluginCollected>({ action: "add", source }),
+    adopt,
     addFolder: (name, files) => write<PluginCollected>({ action: "add-folder", name, files }),
     restore,
     remove: (name) => write<void>({ action: "remove", name }),

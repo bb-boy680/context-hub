@@ -53,6 +53,32 @@ export interface PluginCheck {
 /** The scopes a plugin can be installed into, named the way the agents name them. */
 export type PluginInstallScope = "user" | "project" | "local"
 
+/**
+ * What a pack says about itself in its own directory.
+ *
+ * This is what reading a directory answers, whether or not this hub collected
+ * the pack: an agent's own list names a pack and the folder it sits in, and the
+ * pack's manifest is where its description and its picture are written down.
+ * The fields are the record's own, so a pack an agent holds reads the same shape
+ * as one the library holds — which is what makes the two mergeable.
+ */
+export interface PackDescription {
+  /** The pack's own name from its manifest; empty when the manifest gives none. */
+  name: string
+  version: string
+  description: string
+  /**
+   * The pack's own picture, as a reference into the hub's asset library.
+   *
+   * A picture is kept where the hub keeps its files — `<home>/assets/<pack>/` —
+   * whether or not the pack itself has been collected, so a row never points
+   * into an agent's install directory: that path stops resolving the moment the
+   * agent removes the pack. What a row draws is this reference, read back from
+   * the library like any other asset.
+   */
+  icon?: string
+}
+
 /** What one install changed, as the person is told it. */
 export interface PluginInstallReport {
   /** One line naming what happened, already worded for the locale it prints in. */

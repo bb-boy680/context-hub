@@ -6,6 +6,7 @@
  * dev bridge or the host's own server; a desktop form swaps this for one that
  * calls its main process.
  */
+import type { PackDescription } from "./contract.ts"
 import { PluginInstallError, type PluginTools } from "./provider.ts"
 
 /** The route the plugin library answers on. */
@@ -53,6 +54,10 @@ export function createRemotePluginTools(): PluginTools {
     async has(program) {
       const answer = await call<{ present: boolean }>({ action: "program-exists", program })
       return answer.present
+    },
+
+    async describe(directory, name) {
+      return call<PackDescription>({ action: "describe", path: directory, name })
     },
   }
 }

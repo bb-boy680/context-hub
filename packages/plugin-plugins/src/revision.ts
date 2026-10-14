@@ -24,7 +24,14 @@ export interface PluginRecord {
   source: PluginOrigin
   /** Directory hash of the files as they landed, which answers "edited since". */
   hash: string
-  /** Files the hub holds for this pack — the logo read out of it, and whatever a person adds. */
+  /**
+   * The hub's own copy of the picture the pack ships, as an asset reference;
+   * empty when it ships none. It is named apart from {@link assets} because it
+   * is the pack's, not something a person added — and a row draws it as the
+   * cover.
+   */
+  icon: string
+  /** Files the hub holds for this pack that a person added; the pack's own picture is {@link icon}. */
   assets: string[]
   /** ISO timestamp of the collection. */
   installedAt: string

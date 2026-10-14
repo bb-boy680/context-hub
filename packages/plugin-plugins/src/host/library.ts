@@ -26,8 +26,9 @@ import { writeFileAtomic } from "@workspace/core/host/atomic"
 import { folderHash } from "@workspace/core/host/folder-hash"
 import { resolveHubHome } from "@workspace/core/host/home"
 
-import { PLUGIN_INDEX_FILE, PLUGIN_LIBRARY_DIR, PLUGIN_MANIFESTS } from "../contract.ts"
+import { PLUGIN_INDEX_FILE, PLUGIN_LIBRARY_DIR } from "../contract.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../records.ts"
+import { readManifestFields } from "./describe.ts"
 import { assertSafeSegment } from "./names.ts"
 import { findLogo, assetPresent, clearPictures, ownsPicture, storePicture } from "./logo.ts"
 import type { PluginCheck, PluginOrigin } from "../contract.ts"
@@ -120,20 +121,6 @@ async function holdsPack(dir: string, fallbackName: string): Promise<boolean> {
   )
 }
 
-async function readJson(file: string): Promise<Record<string, unknown> | null> {
-  const raw = await fs.readFile(file, "utf8").catch(() => null)
-  if (raw === null) return null
-  try {
-    const parsed: unknown = JSON.parse(raw)
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : null
-  } catch {
-    /* A manifest this build cannot read is not one it can use. */
-    return null
-  }
-}
-
 /**
  * Read what a pack says about itself.
  *
@@ -143,29 +130,22 @@ async function readJson(file: string): Promise<Record<string, unknown> | null> {
  * @throws {Error} when the directory carries no manifest at all, because this hub records a pack by the name its manifest gives it and has nothing else to record it under.
  */
 export async function readPackManifest(dir: string, fallbackName: string): Promise<PackManifest> {
-  let carried = false
-  for (const relative of PLUGIN_MANIFESTS) {
-    const manifest = await readJson(path.join(dir, relative))
-    if (manifest === null) continue
-    carried = true
-    const name =
-      typeof manifest.name === "string" && manifest.name !== "" ? manifest.name : undefined
-    const version = typeof manifest.version === "string" ? manifest.version : ""
-    if (name === undefined && version === "") continue
-    return {
-      name: name ?? fallbackName,
-      version,
-      description: typeof manifest.description === "string" ? manifest.description : "",
-    }
+  const fields = await readManifestFields(dir)
+  if (fields.name === undefined && fields.version === "") {
+    /* A file by that name may still be somebody else's: a repository root carries a
+       `plugin.json` for its own tooling often enough that "no manifest" would be
+       the wrong thing to say about one. */
+    throw new Error(
+      fields.carried
+        ? "the plugin manifest in this directory names no plugin (it needs a name or a version)"
+        : "this directory carries no plugin manifest (.claude-plugin/plugin.json)"
+    )
   }
-  /* A file by that name may still be somebody else's: a repository root carries a
-     `plugin.json` for its own tooling often enough that "no manifest" would be
-     the wrong thing to say about one. */
-  throw new Error(
-    carried
-      ? "the plugin manifest in this directory names no plugin (it needs a name or a version)"
-      : "this directory carries no plugin manifest (.claude-plugin/plugin.json)"
-  )
+  return {
+    name: fields.name ?? fallbackName,
+    version: fields.version,
+    description: fields.description,
+  }
 }
 
 /** Walk one pack's directory, skipping the bookkeeping nothing reads. */
@@ -232,10 +212,21 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
   /** The hub's own files, which a pack's logo is copied into. */
   const assets = createFsAssetLibrary(resolved)
 
-  /** Drop the files a record used to point at and no longer does. */
-  const pruneAssets = async (previous: readonly string[], next: readonly string[]): Promise<void> => {
+  /**
+   * Drop the files a record used to point at and no longer does.
+   *
+   * A pack's own picture is left alone: it lives in the pack's own directory
+   * under the asset root, which is emptied and written afresh whenever the pack
+   * is read in, so anything recorded there is already accounted for by the
+   * record being written now.
+   */
+  const pruneAssets = async (
+    name: string,
+    previous: readonly string[],
+    next: readonly string[]
+  ): Promise<void> => {
     for (const ref of previous) {
-      if (next.includes(ref) || isLink(ref)) continue
+      if (next.includes(ref) || isLink(ref) || ownsPicture(name, ref)) continue
       await assets.remove(ref).catch(() => undefined)
     }
   }
@@ -272,7 +263,8 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
       tags: previous?.tags ?? [],
       source,
       hash,
-      assets: picture === undefined ? kept : [picture, ...kept],
+      icon: picture ?? "",
+      assets: kept,
       installedAt: previous?.installedAt ?? now,
       updatedAt: now,
     }
@@ -391,7 +383,7 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
           throw error
         }
         await fs.rm(aside, { recursive: true, force: true })
-        await pruneAssets(previous.assets, record.assets)
+        await pruneAssets(name, previous.assets, record.assets)
         return record
       })
     },
@@ -407,7 +399,7 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
         /* What the pack brought: its own picture, and anything a person added
            while it was here. The first is removed wholesale, because a record is
            not the only thing that may have put a file in that directory. */
-        await pruneAssets(record?.assets ?? [], [])
+        await pruneAssets(name, record?.assets ?? [], [])
         await forgetAssets(name)
       })
     },

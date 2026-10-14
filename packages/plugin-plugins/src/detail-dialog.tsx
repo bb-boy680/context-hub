@@ -27,6 +27,7 @@ import * as React from "react"
 
 import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { PluginActions } from "./install-actions.tsx"
+import { PluginTile } from "./parts.tsx"
 import { packFile, packFiles, type PluginClient } from "./library.ts"
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
@@ -536,8 +537,9 @@ function InfoPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-[84px] shrink-0 items-start gap-3 border-b border-border px-5 pt-[22px]">
-        <div className="flex min-w-0 flex-1 flex-col gap-[5px]">
+      <div className="flex h-[84px] shrink-0 items-center gap-3 border-b border-border px-5">
+        <PluginTile plugin={plugin} />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
           <DialogTitle className="truncate font-mono text-[16px] leading-[21px] font-semibold">
             {plugin.name}
           </DialogTitle>
@@ -546,7 +548,7 @@ function InfoPanel({
             <span aria-hidden className="text-muted-soft">
               ·
             </span>
-            {t(`plugins.source.${plugin.source}`)}
+            {plugin.source === undefined ? null : t(`plugins.source.${plugin.source}`)}
           </DialogDescription>
         </div>
         <DialogClose
@@ -554,7 +556,7 @@ function InfoPanel({
             <Button
               variant="ghost"
               size="icon"
-              className="mt-1 size-8 rounded-full"
+              className="size-8 shrink-0 rounded-full"
               aria-label={t("plugins.action.close")}
             />
           }

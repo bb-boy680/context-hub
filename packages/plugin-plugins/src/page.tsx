@@ -12,6 +12,7 @@ import {
   FileArchiveIcon,
   GitBranchIcon,
   HardDriveIcon,
+  InboxIcon,
   LayoutGridIcon,
   ListIcon,
   PlugIcon,
@@ -32,6 +33,8 @@ import {
   type PluginClient,
   type PluginCollected,
 } from "./library.ts"
+import { rowsForTab, type PluginTab } from "./rows.ts"
+import { PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import type { PluginInstallScope } from "./contract.ts"
 
@@ -69,13 +72,11 @@ const SCOPE_LABELS: Record<PluginInstallScope, string> = {
   local: "plugins.scope.local",
 }
 
-/** Which rows a tab shows: everything, what is installed, or what is not. */
-type PluginTab = "all" | "installed" | "available"
-
 const SHELL_TABS: { value: PluginTab; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "plugins.tab.all", icon: LayoutGridIcon },
   { value: "installed", labelKey: "plugins.tab.installed", icon: HardDriveIcon },
   { value: "available", labelKey: "plugins.tab.available", icon: StoreIcon },
+  { value: "unstored", labelKey: "plugins.tab.unstored", icon: InboxIcon },
 ]
 
 /** The mark for where a pack came from. */
@@ -92,25 +93,6 @@ function tagsOf(rows: readonly PluginRow[]): string[] {
 
 /** The value the "every tag" chip carries. */
 const ALL_TAGS = "All tags"
-
-/**
- * Which rows a tab holds, before the tag filter and the query.
- *
- * @param rows — the catalog, already narrowed by the filters.
- * @param value — the tab on screen.
- * @param installed — the ids that read as installed.
- * @returns the rows the tab shows.
- */
-function rowsForTab(
-  rows: PluginRow[],
-  value: PluginTab,
-  installed: readonly string[]
-): PluginRow[] {
-  if (value === "all") return rows
-  return rows.filter((row) =>
-    value === "installed" ? installed.includes(row.id) : !installed.includes(row.id)
-  )
-}
 
 /** The three fields the query box reads. */
 function matchesQuery(row: PluginRow, text: string) {
@@ -152,19 +134,40 @@ function TagPill({ tag }: { tag: string }) {
   return <span className={pillSurface}>{tag}</span>
 }
 
-/** Where a pack came from, as one quiet line under the card's body. */
+/**
+ * What a row's own line says about where the pack is: the hub's own word for
+ * the kind of source it collected the pack from, or — for a pack an agent holds
+ * and the hub does not — the agents holding it, because that is where it is.
+ */
 function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
   const { t } = useI18n()
-  const Icon = SOURCE_ICONS[plugin.source]
+  const shell =
+    "inline-flex max-w-full min-w-0 items-center gap-[5px] text-[12px] leading-[15px]"
 
+  if (plugin.source !== undefined) {
+    const Icon = SOURCE_ICONS[plugin.source]
+    return (
+      /* max-w-full clamps the line to its container: without it a fixed-width
+         cell's nowrap text sets the box's minimum to the full line, so nothing
+         ever shrinks and the text paints over the neighbouring column. */
+      <span className={shell}>
+        <Icon className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
+        <span className="min-w-0 truncate text-muted-foreground">
+          {t(`plugins.source.${plugin.source}`)}
+        </span>
+      </span>
+    )
+  }
+
+  const first = plugin.held[0]
+  if (first === undefined) return null
+  const Mark = first.icon
+  const rest = plugin.held.length - 1
   return (
-    /* max-w-full clamps the line to its container: without it a fixed-width
-       cell's nowrap text sets the box's minimum to the full line, so nothing
-       ever shrinks and the text paints over the neighbouring column. */
-    <span className="inline-flex max-w-full min-w-0 items-center gap-[5px] text-[12px] leading-[15px]">
-      <Icon className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
+    <span className={shell}>
+      <Mark className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
       <span className="min-w-0 truncate text-muted-foreground">
-        {t(`plugins.source.${plugin.source}`)}
+        {rest === 0 ? first.label : `${first.label} +${String(rest)}`}
       </span>
     </span>
   )
@@ -179,6 +182,8 @@ interface RowActions {
   onUpdate: (plugin: PluginRow) => void
   onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
   onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  /** Take a pack an agent holds into the library. */
+  onAdopt: (plugin: PluginRow) => void
 }
 
 /** The one action a row carries: the pack's own actions, over the install places. */
@@ -192,6 +197,30 @@ function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowAct
       onInstall={(client, scope) => actions.onInstall(plugin, client, scope)}
       onUninstall={(client, scope) => actions.onUninstall(plugin, client, scope)}
     />
+  )
+}
+
+/** The one action a pack the hub does not hold carries: take it in. */
+function AdoptButton({ plugin, actions }: { plugin: PluginRow; actions: RowActions }) {
+  const { t } = useI18n()
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      disabled={actions.busy}
+      aria-label={`${t("plugins.action.adopt")} ${plugin.name}`}
+      onClick={(event) => {
+        event.stopPropagation()
+        actions.onAdopt(plugin)
+      }}
+      /* A soft fill, like the skills page's adopt: installing is the row's own
+         action, and undoing it is what the menus offer. */
+      className="h-8 gap-1.5 rounded-full bg-secondary px-3 text-[13px] font-semibold text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <PlusIcon className="size-3.5" />
+      {t("plugins.action.adopt")}
+    </Button>
   )
 }
 
@@ -305,19 +334,26 @@ function PluginCard({
 
   return (
     <div
-      role="button"
-      tabIndex={0}
-      aria-label={plugin.name}
-      onClick={onOpen}
+      /* A pack only an agent holds has no files here to open, so the card is
+         plain unless the library holds it. */
+      role={plugin.stored ? "button" : undefined}
+      tabIndex={plugin.stored ? 0 : undefined}
+      aria-label={plugin.stored ? plugin.name : undefined}
+      onClick={plugin.stored ? onOpen : undefined}
       onKeyDown={(event) => {
         /* The card holds its own action button, so it cannot be a real button;
            the two keys a button answers to are handled here instead. */
+        if (!plugin.stored) return
         if (event.key !== "Enter" && event.key !== " ") return
         if (event.target !== event.currentTarget) return
         event.preventDefault()
         onOpen()
       }}
-      className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
+      className={`mb-5 overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none ${
+        plugin.stored
+          ? "cursor-pointer hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
+          : ""
+      }`}
     >
       <div
         className="relative w-full overflow-hidden bg-surface-raised"
@@ -338,24 +374,37 @@ function PluginCard({
         </div>
       </div>
       <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
-        <div className="flex h-[19px] items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate font-mono text-[14px] leading-[19px] font-semibold">
-              {plugin.name}
-            </span>
-            <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
-              {t("plugins.version").replace("{version}", plugin.version)}
-            </span>
-            <UpdateBadge plugin={plugin} />
-          </span>
-          <span className="shrink-0 text-[12px] leading-[15px] text-muted-soft">
+        {/* The title block reads as the MCP cards do: the pack's own mark on a
+            tile, then its name and version, with where it came from beneath. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <PluginTile plugin={plugin} />
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-mono text-[13.5px] leading-[1.3] font-semibold">
+                {plugin.name}
+              </span>
+              <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
+                {t("plugins.version").replace("{version}", plugin.version)}
+              </span>
+              <UpdateBadge plugin={plugin} />
+            </div>
+            <PluginSourceLine plugin={plugin} />
+          </div>
+          <span className="shrink-0 self-start text-[12px] leading-[15px] text-muted-soft">
             {plugin.updated}
           </span>
         </div>
-        <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">{plugin.description}</p>
-        <div className="flex items-center justify-between gap-2">
-          <PluginSourceLine plugin={plugin} />
-          <InstallButton plugin={plugin} actions={actions} />
+        {plugin.description === "" ? null : (
+          <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">
+            {plugin.description}
+          </p>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          {plugin.stored ? (
+            <InstallButton plugin={plugin} actions={actions} />
+          ) : (
+            <AdoptButton plugin={plugin} actions={actions} />
+          )}
         </div>
       </div>
     </div>
@@ -422,21 +471,6 @@ function PluginGrid({
   )
 }
 
-/** The mark a row shows when it has no picture: the pack itself. */
-function PluginThumb({ plugin }: { plugin: PluginRow }) {
-  if (plugin.cover !== undefined) {
-    return (
-      <img src={plugin.cover} alt="" className="size-9 shrink-0 rounded-[12px] object-cover" />
-    )
-  }
-
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-surface-raised">
-      <PlugIcon className="size-4 text-foreground" aria-hidden />
-    </span>
-  )
-}
-
 /**
  * The query's own characters, marked in the accent. Only the table marks them:
  * its rows all look alike, so without the mark there is no way to see which
@@ -486,8 +520,8 @@ function PluginTable({
       label: t("plugins.column.plugin"),
       width: "43.1%",
       cell: (plugin) => (
-        <div className="flex items-center gap-3">
-          <PluginThumb plugin={plugin} />
+        <div className="flex min-w-0 items-center gap-4">
+          <PluginTile plugin={plugin} size={36} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate font-mono text-[14px] leading-[18px] font-semibold">
@@ -535,7 +569,12 @@ function PluginTable({
       key: "action",
       label: t("plugins.column.action"),
       width: "8.5%",
-      cell: (plugin) => <InstallButton plugin={plugin} actions={actions} />,
+      cell: (plugin) =>
+        plugin.stored ? (
+          <InstallButton plugin={plugin} actions={actions} />
+        ) : (
+          <AdoptButton plugin={plugin} actions={actions} />
+        ),
     },
   ]
 
@@ -748,6 +787,7 @@ export function PluginsPage() {
       all: rowsForTab(filtered, "all", installed).length,
       installed: rowsForTab(filtered, "installed", installed).length,
       available: rowsForTab(filtered, "available", installed).length,
+      unstored: rowsForTab(filtered, "unstored", installed).length,
     }),
     [filtered, installed]
   )
@@ -804,6 +844,24 @@ export function PluginsPage() {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
+    onAdopt: (plugin) => {
+      void library.adopt(plugin.name).then(
+        (collected) => {
+          toast.add({
+            type: collected.already ? "info" : "success",
+            title: t(
+              collected.already ? "plugins.notice.already" : "plugins.notice.added"
+            ).replace("{name}", collected.record.name),
+          })
+        },
+        (error: unknown) => {
+          toast.add({
+            type: "error",
+            title: error instanceof Error ? error.message : String(error),
+          })
+        }
+      )
+    },
   }
 
   /**
@@ -845,6 +903,12 @@ export function PluginsPage() {
   /* The pack the lightbox is open on, read from the catalog rather than the
      page: a filter can take its row away while the lightbox is up. */
   const detail = catalog.find((plugin) => plugin.id === detailId) ?? null
+
+  /* Only a pack the library holds opens a detail view: its files panel reads
+     the files here, and a pack an agent holds alone has none. */
+  const openDetail = (plugin: PluginRow) => {
+    if (plugin.stored) setDetailId(plugin.id)
+  }
 
   /* A category edited in the lightbox is that row's own from then on. */
   const setTags = (plugin: PluginRow, tags: string[]) => library.setTags(plugin.name, tags)
@@ -1023,11 +1087,7 @@ export function PluginsPage() {
                 />
               )
             ) : view === "grid" ? (
-              <PluginGrid
-                plugins={plugins}
-                actions={actions}
-                onOpen={(plugin) => setDetailId(plugin.id)}
-              />
+              <PluginGrid plugins={plugins} actions={actions} onOpen={openDetail} />
             ) : (
               <PluginTable
                 plugins={plugins}
@@ -1035,7 +1095,7 @@ export function PluginsPage() {
                 checked={checked}
                 onCheck={setChecked}
                 actions={actions}
-                onOpen={(plugin) => setDetailId(plugin.id)}
+                onOpen={openDetail}
               />
             )}
           </PageBody>

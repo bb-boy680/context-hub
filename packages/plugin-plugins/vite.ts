@@ -14,7 +14,11 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http"
 
+import { createFsAssetLibrary } from "@workspace/core/host"
+import { resolveHubHome } from "@workspace/core/host/home"
+
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
+import { describePack } from "./src/host/describe.ts"
 import { createFsPluginLibrary } from "./src/host/library.ts"
 import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
 import { hasProgram, runProgram } from "./src/host/program.ts"
@@ -71,6 +75,9 @@ export function pluginLibrary(options: { home?: string } = {}) {
   const collector = createPluginCollector(library)
   const probe = createPluginProbe(library)
   const updater = createPluginUpdater(library)
+  /* The pictures a pack ships are kept where the hub keeps every file of its
+     own, which is also where a scanned pack's picture lands. */
+  const assets = createFsAssetLibrary(resolveHubHome(options.home))
 
   return {
     name: "context-hub-plugin-library",
@@ -198,6 +205,20 @@ export function pluginLibrary(options: { home?: string } = {}) {
                 sendJson(response, 200, {
                   present: await hasProgram(requiredString(body.program, "program")),
                 })
+                return
+              /* What a pack says about itself, at a directory an agent named.
+                 Its picture is kept in the hub's asset library, so the answer
+                 carries a reference there rather than a copy of the bytes. */
+              case "describe":
+                sendJson(
+                  response,
+                  200,
+                  await describePack(
+                    requiredString(body.path, "path"),
+                    requiredString(body.name, "name"),
+                    assets
+                  )
+                )
                 return
               default:
                 sendJson(response, 400, { error: `unknown action: ${String(action)}` })

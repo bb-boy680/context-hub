@@ -1,8 +1,70 @@
-# 插件「添加」这一步（2026-10-14 重做，待审核）
+# 插件扫描 + 未收录（2026-10-14，本轮）
 
-> 本计划**只做「添加插件」**：输入地址 → 把包下载进 `~/.context-hub/plugins/` → 记进 `plugins.json`
-> → 包自带 logo 收进资产库。**市场、交付（装到 Agent）都不在本轮**。
-> 上一轮的计划与实测记录保留在本文件下半部分。
+> 扫描各 Agent 里已装的插件，在插件列表里给出「未收录」页签，卡片上点「收录」把它收进 hub 库。
+> **扫描逻辑住在 Agent 插件里**（它认识自己的 CLI 与清单），插件模块只是调用方。
+
+## 落地形状
+
+- **契约**（`packages/plugin-plugins/src/provider.ts`）：`PluginInstaller.delivered()` 删除，
+  换成 `held(tools): Promise<PluginHeld[]>` —— 全量读，"哪些是 hub 交付的"由插件模块按
+  `marketplace === PLUGIN_MARKETPLACE_NAME` 派生（原来这段过滤在每个 installer 里，三份重复）；
+  一次 CLI 调用同时供两个用途（原来 delivered + held 就是两次）。
+- **plugin-claude-code/src/installer.ts**：`readHeld` 解析 `claude plugin list --json`
+  （name/id/version/scope/enabled/marketplace；路径取 `readFromFolder ?? installPath` ——
+  就地读取的插件源头是那个文件夹，不是缓存副本）。纯函数，由检查脚本喂固定 JSON。
+- **agents-extensions/codex/src/installer.ts**：同一契约，读 `codex plugin list --json`。
+- **插件模块**：
+  - `src/rows.ts`（新，纯函数）：库记录 ∪ 扫描结果合成同一个 `PluginRow` 列表
+    （扫描行 `stored: false`），`rowsForTab` 加 `unstored` 档；`collectScanned` 把各客户端的答案
+    折成每个包一条（多客户端 = held 多条）。
+  - 页面：第四个页签「未收录」（计数、空态、过滤）；未收录行的动作按钮是「+ 收录」；
+    未收录行不开详情弹窗（没有库文件可读）。
+  - 收录 = 把扫描到的 `path` 交给既有的地址收集器（`add`），**零新增桥动作**；
+    记录里的来源是 `path`（该路径就是包本身，与"从本地文件夹添加"同一状态，检查更新报"无法检查"）。
+- **文案**：`plugins.tab.unstored` / `plugins.action.adopt` / `plugins.adopt.unknown`（en + zh）。
+
+## 验证
+
+- `node packages/plugin-claude-code/scripts/check-installer.ts`（新：解析夹具）；
+  `node packages/plugin-plugins/scripts/check-plugin-rows.ts`（新：合成与页签判定）；
+  `node packages/locale-zh-cn/scripts/check-messages.ts`；`pnpm typecheck` + 相关包 lint。
+- 浏览器：未收录 2（claude-hud、warp，本机实测）→ 点收录 → 进库、行转入库内视图；
+  库与客户端文件**成对验证**后复原。
+
+## 扫描结果 = 记录形状（2026-10-14 第二轮，用户要求）
+
+**用户要求**：扫描返回 `{name, version, description, tags, source, hash, assets, icon}` 这种记录形状，
+再与 `plugins.json` 合并去重；扫描逻辑仍在 Agent 插件里，plugins 只是调用方。
+
+- **契约**：`PluginInstaller.delivered()` → **`held(tools)`**（全量读；"哪些是 hub 交付的"改由插件模块
+  按 `marketplace === PLUGIN_MARKETPLACE_NAME` 派生，原来三份重复过滤合一处，一次 CLI 调用供两个用途）。
+  `PluginHeld` = `{name,id,version,scope,enabled,marketplace,source?:{kind:"path",path},pack}`。
+- **`PluginTools.describe(directory, name)`**：宿主读**包目录自己的清单**（`src/host/describe.ts`，复用
+  `readManifestFields`），桥动作 `{action:"describe", path, name}`。
+- **图标一律落 `~/.context-hub/assets/<包名>/<文件>`，再从那里取**（2026-10-14 第四轮用户要求：
+  "icon 的保存逻辑不对，是需要保存到 ~/.context-hub/assets 里面，然后再从这里面获取"）：
+  `describePack` 走与收录同一条 `storePicture`，返回 `assets/<name>/<file>` 引用；页面 `heldRow` 用
+  `assetUrl()` 变成 `/hub/files/assets/...`。**不再有 data URL**，`PACK_ICON_LIMIT` 删除
+  （大小限制回到 `storePicture` 的 `assetLimit`）。
+- **记录新增 `icon`**（hub 资产库引用，`""` = 包没带图）；`assets` 从此只放人加的东西
+  （不再把包自己的图塞在 `assets[0]`）。旧记录靠 `records.ts` 的 `recordOf` 归一化（把 `assets` 里指向
+  包自己目录的那张挪进 `icon`），下一次写盘自动补齐。
+  `pruneAssets` 必须跳过 `ownsPicture(name, ref)`，否则 replace 时会删掉刚存进去的图。
+- **合并去重**：`src/rows.ts` 的 `composeRows` 按 **name** 合并（记录优先），扫描独有 → `heldRow`；
+  `rowsForTab` 增 `unstored` 档。页签「未收录」+ 卡片「收录」已落地（未收录行不可点开详情）。
+- 验证：`check-installer.ts` 19 / `check-plugin-rows.ts` 25 / `check-plugin-library.ts` 162 全绿；
+  `pnpm typecheck` 22/22、三包 lint 干净、`pnpm --filter web build` 通过；
+  浏览器实测：未收录行（claude-hud / warp / remotion / hyperframes / ponytail）的 tile 与大图都指向
+  `/hub/files/assets/<包名>/…`，磁盘上真有这些文件（`assets/remotion/icon.png` 与线上取回的字节哈希一致）；
+  收录 warp → 19 个文件与源目录逐条一致 → 移除复原。
+
+## 已知边界（有意不做）
+
+- 「已安装 / 未安装」两档仍是 **hub 交付**视角（`delivered`），没有并入"任何 Agent 装着"；
+  由此，从别的市场装的插件（如 ponytail@ponytail）在库里会落在「未安装」。
+  并入要连带动「安装到」菜单的对勾与卸载目标（要按 `name@marketplace` 操作），下一轮再定。
+- `hash` 没有在扫描时算：它是"库收下这份内容"的哈希，没收录的包没有这一项，收录时才由收集器算。
+- 一键收录（批量）未做，卡片/行上单个收录先落地。
 
 ## 落地进度（2026-10-14 收工）
 

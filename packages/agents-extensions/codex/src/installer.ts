@@ -20,7 +20,7 @@
  * time this extension reads nothing from that package: the registry to register
  * into and the tools to run a program with arrive through the `plugins` service.
  */
-import type { PluginInstaller, PluginTools } from "@workspace/plugin-plugins/provider"
+import type { PluginHeld, PluginInstaller, PluginTools } from "@workspace/plugin-plugins/provider"
 
 /** This integration's id; the kernel matches it against the manifest. */
 const CODEX_ID = "hub.target.codex"
@@ -52,6 +52,61 @@ function listed(output: string): { installed?: unknown } {
   }
 }
 
+/**
+ * The pack list this client prints, read into the shape this hub records one by.
+ *
+ * Codex reports no scope of its own — a pack is installed for the machine — so
+ * every entry reads as `user`, which is the one scope this installer declares.
+ *
+ * What the pack itself carries is not in this answer, so `pack` reads empty
+ * here; {@link PluginInstaller.held} fills it in by reading each directory.
+ *
+ * @param output — what `codex plugin list --json` printed.
+ * @returns one entry per installed pack, in the order the client listed them.
+ */
+export function readHeld(output: string): PluginHeld[] {
+  const { installed } = listed(output)
+  if (!Array.isArray(installed)) return []
+  const found: PluginHeld[] = []
+  for (const value of installed) {
+    if (typeof value !== "object" || value === null) continue
+    const entry = value as Record<string, unknown>
+    if (typeof entry.name !== "string" || entry.name === "") continue
+    const source = entry.source
+    const path =
+      typeof source === "object" && source !== null
+        ? (source as Record<string, unknown>).path
+        : undefined
+    found.push({
+      name: entry.name,
+      id: typeof entry.pluginId === "string" ? entry.pluginId : entry.name,
+      version: typeof entry.version === "string" ? entry.version : "",
+      scope: "user",
+      enabled: entry.enabled !== false,
+      marketplace: typeof entry.marketplaceName === "string" ? entry.marketplaceName : null,
+      ...(typeof path === "string" && path !== "" ? { source: { kind: "path", path } } : {}),
+      pack: { name: "", version: "", description: "" },
+    })
+  }
+  return found
+}
+
+/**
+ * Fill in what each pack says about itself, reading it where the pack sits.
+ *
+ * @param tools — the toolkit the plugins module hands over.
+ * @param packs — what the client's own list reported.
+ */
+async function withPacks(tools: PluginTools, packs: PluginHeld[]): Promise<PluginHeld[]> {
+  return Promise.all(
+    packs.map(async (pack) =>
+      pack.source === undefined
+        ? pack
+        : { ...pack, pack: await tools.describe(pack.source.path, pack.name).catch(() => pack.pack) }
+    )
+  )
+}
+
 /** Codex, as the plugins module uses it. */
 export const codexInstaller: PluginInstaller = {
   id: CODEX_ID,
@@ -61,17 +116,8 @@ export const codexInstaller: PluginInstaller = {
 
   available: (tools) => tools.has(PROGRAM),
 
-  async delivered(tools) {
-    const { installed } = listed(await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG]))
-    if (!Array.isArray(installed)) return {}
-    const held: Record<string, ("user")[]> = {}
-    for (const value of installed) {
-      if (typeof value !== "object" || value === null) continue
-      const entry = value as { name?: unknown; marketplaceName?: unknown }
-      if (typeof entry.name !== "string" || entry.marketplaceName !== MARKETPLACE) continue
-      held[entry.name] = ["user"]
-    }
-    return held
+  async held(tools) {
+    return withPacks(tools, readHeld(await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG])))
   },
 
   async install(id, _scope, tools) {

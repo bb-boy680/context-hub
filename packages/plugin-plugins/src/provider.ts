@@ -12,7 +12,7 @@
  * This is a service, not a contribution: a contribution carries data for the
  * screen to render, while an installer carries behaviour the module calls.
  */
-import type { PluginInstallReport, PluginInstallScope } from "./contract.ts"
+import type { PackDescription, PluginInstallReport, PluginInstallScope } from "./contract.ts"
 
 /** The service name the plugins module publishes and every agent plugin requires. */
 export const PLUGIN_SERVICE = "plugins"
@@ -48,8 +48,56 @@ export interface PluginTools {
    * @throws {PluginInstallError} when it exits non-zero, with its own words.
    */
   run(program: string, args: readonly string[]): Promise<string>
-  /** Whether a program is on this machine. */
+  /**
+   * Whether a program is on this machine.
+   */
   has(program: string): Promise<boolean>
+  /**
+   * Read what a pack says about itself where it sits.
+   *
+   * An agent's own list names a pack and the folder it is in; what the pack
+   * carries — its description and its picture — is written down in that folder,
+   * and reading it is this hub's job rather than any one agent's. A directory
+   * holding no manifest answers with empty fields rather than failing: a pack
+   * may have none, and a row that says nothing is honest where an invented
+   * sentence would not be.
+   *
+   * The picture it ships is copied into the hub's asset library and comes back
+   * as a reference into it, so what a row draws is a file the hub holds.
+   *
+   * @param directory — the pack's directory, as the agent named it.
+   * @param name — the pack's name, which its picture is kept under in the library.
+   */
+  describe(directory: string, name: string): Promise<PackDescription>
+}
+
+/**
+ * One pack a client holds, whether or not this hub had anything to do with it.
+ *
+ * A client's own answer to "what is installed here" is the only source for the
+ * packs this hub never delivered, which is what lets a person adopt them. Every
+ * field is the client's own; which of these the hub delivered is the hub's own
+ * question, answered by whether `marketplace` names its library.
+ */
+export interface PluginHeld {
+  /** The pack's name: what the client lists it by, and the name this hub records it under. */
+  name: string
+  /** The client's full id, `<name>@<marketplace>`, which its own commands take back. */
+  id: string
+  version: string
+  /** The place the client installed it at, in the client's own word — `user`, `project`, and so on. */
+  scope: string
+  /** Whether the client currently switches it on. */
+  enabled: boolean
+  /** The marketplace it came from; `null` when the client names none. */
+  marketplace: string | null
+  /**
+   * The directory the client loads the pack from — its own copy, or the folder
+   * it reads in place — read as the source recording it would name.
+   */
+  source?: { kind: "path"; path: string }
+  /** What the pack says about itself there; the fields are empty when it carries no manifest. */
+  pack: PackDescription
 }
 
 /**
@@ -69,11 +117,13 @@ export interface PluginInstaller {
   /** Whether the agent this installer drives is on this machine. */
   available(tools: PluginTools): Promise<boolean>
   /**
-   * The packs this hub already delivered to this agent, and the scope each one
-   * is in: "installed" is not one state, because a pack can be in a project for
-   * one repository and nowhere else.
+   * Every pack this client holds, including the ones this hub never delivered.
+   *
+   * Which of them came from this hub is not asked separately: it is the ones
+   * whose `marketplace` names the hub's own library, and the caller is the side
+   * that knows that name.
    */
-  delivered(tools: PluginTools): Promise<Record<string, PluginInstallScope[]>>
+  held(tools: PluginTools): Promise<PluginHeld[]>
   /** Deliver one pack to this agent at one scope. */
   install(id: string, scope: PluginInstallScope, tools: PluginTools): Promise<PluginInstallReport>
   /** Take one pack back out of this agent at that scope. */
