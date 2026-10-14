@@ -322,6 +322,7 @@ export const messages: Record<string, string> = {
   "plugins.scope.project": "这个仓库",
   "plugins.scope.local": "这个仓库，只对我",
   "plugins.client.absent": "未安装",
+  "plugins.client.unread": "读取失败",
   "plugins.scope.hint": "一个插件可以同时装在多个位置，每一处都是单独安装的。",
   "plugins.update.action": "更新",
   "plugins.update.done": "{name} 已取到上游当前的内容。",

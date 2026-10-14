@@ -59,7 +59,9 @@ const shell =
  * The scope menu: one group per client, with an indented action per scope, each
  * showing whether the pack is already there and acting as a toggle for that one
  * place. A client that is not on this machine is listed as unavailable rather
- * than hidden, so a person knows the hub looked for it.
+ * than hidden, so a person knows the hub looked for it; one that could not be
+ * read is listed as unread, because its scopes read empty either way and the
+ * difference is the whole reason the row is still worth trusting or not.
  */
 function ScopeMenu({
   plugin,
@@ -113,7 +115,14 @@ function ScopeMenu({
                 <DropdownMenuLabel className="flex items-center gap-1.5 px-1.5 py-1 text-[11.5px] font-semibold text-muted-soft">
                   <Mark className="size-3.5 shrink-0" aria-hidden />
                   {client.label}
-                  {client.available ? null : (
+                  {client.error !== undefined ? (
+                    /* Read failed rather than the agent being absent: the
+                       scopes below show nothing installed, and this is what
+                       says that is an unread answer rather than an answer. */
+                    <span className="ml-auto font-normal" title={client.error}>
+                      {t("plugins.client.unread")}
+                    </span>
+                  ) : client.available ? null : (
                     <span className="ml-auto font-normal">{t("plugins.client.absent")}</span>
                   )}
                 </DropdownMenuLabel>

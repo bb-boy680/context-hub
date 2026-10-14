@@ -30,7 +30,8 @@ import {
   type PluginTools,
 } from "./provider.ts"
 import type { PluginRecord, PluginUpdateSummary } from "./revision.ts"
-import { collectScanned, composeRows, type ScannedAnswer, type ScannedPack } from "./rows.ts"
+import { collectScanned, composeRows, type ScannedPack } from "./rows.ts"
+import { probeInstallers } from "./scan.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
 /** The route the library answers on. */
@@ -136,6 +137,14 @@ export interface PluginClient {
   switchable: boolean
   /** Whether the agent is on this machine; one that is not says so instead of failing. */
   available: boolean
+  /**
+   * Why this client could not be read, in its own words; absent when it answered.
+   *
+   * A client that is here but whose list could not be read holds an unknown set
+   * of packs, which is not the same as holding none — so the one row that failed
+   * names the reason rather than drawing itself as an agent holding nothing.
+   */
+  error?: string
   /** The scopes each pack is already in. */
   delivered: Record<string, PluginInstallScope[]>
 }
@@ -256,34 +265,39 @@ export function usePluginLibrary(): PluginLibrary {
       setScanned([])
       return
     }
-    const found: PluginClient[] = []
-    const answers: ScannedAnswer[] = []
-    for (const installer of service.registry.installers()) {
-      /* An agent whose program is missing, or which cannot answer, is still
-         listed: a person then sees that the hub looked for it rather than
-         wondering why an agent they use is absent. */
-      const available = await installer.available(service.tools).catch(() => false)
-      const packs = available ? await installer.held(service.tools).catch(() => []) : []
-      if (available) {
-        answers.push({
-          client: installer.id,
-          label: installer.label,
-          icon: iconFor(installer.id),
-          packs,
-        })
-      }
-      found.push({
-        id: installer.id,
-        label: installer.label,
-        icon: iconFor(installer.id),
-        scopes: installer.scopes,
-        switchable: installer.setEnabled !== undefined,
-        available,
-        delivered: deliveredOf(packs),
-      })
-    }
-    setClients(found)
-    setScanned(collectScanned(answers))
+    /* Every client is asked at once, and each answer stands on its own: see
+       ./scan.ts for why both of those matter. An agent whose program is missing,
+       or which cannot answer at all, is still listed — a person then sees that
+       the hub looked for it rather than wondering why an agent they use is
+       absent, and one that failed says so in its own words. */
+    const probes = await probeInstallers(service.registry.installers(), service.tools)
+    setClients(
+      probes.map((one) => ({
+        id: one.installer.id,
+        label: one.installer.label,
+        icon: iconFor(one.installer.id),
+        scopes: one.installer.scopes,
+        switchable: one.installer.setEnabled !== undefined,
+        available: one.available,
+        ...(one.error === undefined ? {} : { error: one.error }),
+        delivered: deliveredOf(one.packs),
+      }))
+    )
+    /* Only a client that answered contributes packs to the rows: one that failed
+       knows of none, and drawing its empty answer as "holds nothing" is the one
+       thing the error is carried to prevent. */
+    setScanned(
+      collectScanned(
+        probes
+          .filter((one) => one.error === undefined)
+          .map((one) => ({
+            client: one.installer.id,
+            label: one.installer.label,
+            icon: iconFor(one.installer.id),
+            packs: one.packs,
+          }))
+      )
+    )
   }, [service, revision, iconFor])
 
   /** Run one write, then read everything again: any write can change more than it named. */

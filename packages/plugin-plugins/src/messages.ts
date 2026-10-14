@@ -28,6 +28,7 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.scope.project": "This repository",
   "plugins.scope.local": "This repository, only me",
   "plugins.client.absent": "not installed",
+  "plugins.client.unread": "could not be read",
   "plugins.scope.hint":
     "A pack can be in more than one place at once; each is installed on its own.",
   "plugins.update.action": "Update",
