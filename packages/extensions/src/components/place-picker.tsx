@@ -215,12 +215,20 @@ export function PlaceMenu(
   const renderRow = (option: PlaceOption, pick: () => void) => {
     const Mark = option.icon
     const blocked = option.blocked ?? null
+    /* The tile is 28px and a name is one 18px line: without a note the text
+       column is shorter than the tile, and `items-start` would leave the name
+       reading high. `min-h-7` lines the two up — and is inert on a row that
+       carries a second line, since its own content is then already taller. The
+       check follows the same line: on the first of two, or centred on the one. */
+    const single = option.note === undefined && option.where === undefined
     const line = (
       <>
         <span className={ROW_TILE}>
           <Mark className="size-4" aria-hidden />
         </span>
-        <span className="flex min-w-0 flex-1 flex-col text-left">
+        <span
+          className={`flex min-w-0 flex-1 flex-col text-left ${single ? "min-h-7 justify-center" : ""}`}
+        >
           <span className={MENU_NAME}>{option.label}</span>
           <PlaceNote option={option} className={MENU_NOTE} />
         </span>
@@ -229,7 +237,7 @@ export function PlaceMenu(
         )}
         {trailing === "check"
           ? option.selected === true && (
-              <CheckIcon className="mt-1 size-4 shrink-0" />
+              <CheckIcon className={`size-4 shrink-0 ${single ? "self-center" : "mt-1"}`} />
             )
           : trailing(option)}
       </>

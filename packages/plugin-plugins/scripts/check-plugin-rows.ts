@@ -10,6 +10,7 @@
  */
 import type { ExtensionIcon } from "@workspace/extensions"
 
+import type { PluginHeld } from "../src/provider.ts"
 import type { PluginRecord } from "../src/revision.ts"
 import { collectScanned, composeRows, rowsForTab, type ScannedAnswer } from "../src/rows.ts"
 
@@ -265,31 +266,136 @@ check(
 console.log("which tab a row lands in")
 
 const catalog = composeRows([record("stored"), record("idle")], scanned, "en", (key) => key)
-const delivered = ["stored"]
 check(
   "every row is in all",
-  rowsForTab(catalog, "all", delivered).length === 3,
-  rowsForTab(catalog, "all", delivered).length
+  rowsForTab(catalog, "all").length === 3,
+  rowsForTab(catalog, "all").length
 )
 check(
-  "delivered packs are the installed tab",
-  rowsForTab(catalog, "installed", delivered).map((one) => one.name).join() === "stored",
-  rowsForTab(catalog, "installed", delivered).map((one) => one.name)
+  "the packs the hub holds the files of are the library tab",
+  rowsForTab(catalog, "library").map((one) => one.name).join() === "stored,idle",
+  rowsForTab(catalog, "library").map((one) => one.name)
 )
 check(
-  "library packs nothing delivered are the available tab",
-  rowsForTab(catalog, "available", delivered).map((one) => one.name).join() === "idle",
-  rowsForTab(catalog, "available", delivered).map((one) => one.name)
+  "a pack only an agent holds is not one of them",
+  !rowsForTab(catalog, "library").some((one) => one.name === "hud"),
+  rowsForTab(catalog, "library").map((one) => one.name)
 )
 check(
   "packs only an agent holds are the unstored tab",
-  rowsForTab(catalog, "unstored", delivered).map((one) => one.name).join() === "hud",
-  rowsForTab(catalog, "unstored", delivered).map((one) => one.name)
+  rowsForTab(catalog, "unstored").map((one) => one.name).join() === "hud",
+  rowsForTab(catalog, "unstored").map((one) => one.name)
+)
+check(
+  "the two divide the catalog between them",
+  rowsForTab(catalog, "library").length + rowsForTab(catalog, "unstored").length ===
+    rowsForTab(catalog, "all").length,
+  [rowsForTab(catalog, "library").length, rowsForTab(catalog, "unstored").length]
 )
 check(
   "a pack the library took in leaves the unstored tab",
-  rowsForTab(both, "unstored", []).length === 0,
-  rowsForTab(both, "unstored", []).length
+  rowsForTab(both, "unstored").length === 0,
+  rowsForTab(both, "unstored").length
+)
+
+console.log("which tab a row lands in, once a source has moved")
+
+/* A record is only behind its source when a check recorded a revision to
+   compare against, so only a checked pack can reach the updates tab. */
+const behind = {
+  ...record("behind"),
+  checked: { at: "2026-02-01T00:00:00.000Z", latest: "def456", currentHash: "hash" },
+}
+const checkedCatalog = composeRows([record("stored"), behind], scanned, "en", (key) => key)
+check(
+  "a checked pack the source has moved past is the updates tab",
+  rowsForTab(checkedCatalog, "updates").map((one) => one.name).join() === "behind",
+  rowsForTab(checkedCatalog, "updates").map((one) => one.name)
+)
+check(
+  "and a pack nothing checked is not",
+  rowsForTab(catalog, "updates").length === 0,
+  rowsForTab(catalog, "updates").length
+)
+check(
+  "nor is one only an agent holds",
+  rowsForTab(catalog, "updates").every((one) => one.stored),
+  rowsForTab(catalog, "updates").map((one) => one.name)
+)
+
+console.log("which tab a row lands in, by the place it sits in")
+
+/* A roster of its own, so that a pack held in the repository and one held only
+   machine-wide are both on it: the two scope tabs have to tell them apart rather
+   than agree because every pack happens to be in both. */
+function held(name: string, scope: string): PluginHeld {
+  return {
+    name,
+    id: `${name}@curated`,
+    version: "1.0.0",
+    scope,
+    enabled: true,
+    marketplace: "curated",
+    pack: { name, version: "1.0.0", description: "" },
+  }
+}
+
+const scopePlaces = composeRows(
+  [],
+  collectScanned([
+    {
+      client: "hub.target.claude-code",
+      label: "Claude Code",
+      icon: mark,
+      packs: [held("here", "project"), held("everywhere", "user")],
+    },
+    {
+      client: "hub.target.codex",
+      label: "Codex",
+      icon: mark,
+      packs: [held("away", "user")],
+    },
+  ]),
+  "en",
+  (key) => key
+)
+
+check(
+  "a pack an agent holds inside the repository is the workspace tab",
+  rowsForTab(scopePlaces, "workspace").map((one) => one.name).join() === "here",
+  rowsForTab(scopePlaces, "workspace").map((one) => one.name)
+)
+check(
+  "one held only machine-wide is not, whoever holds it",
+  !rowsForTab(scopePlaces, "workspace").some((one) => one.name === "away"),
+  rowsForTab(scopePlaces, "workspace").map((one) => one.name)
+)
+check(
+  "every pack an agent holds machine-wide is the global tab",
+  rowsForTab(scopePlaces, "global").map((one) => one.name).join() === "everywhere,away",
+  rowsForTab(scopePlaces, "global").map((one) => one.name)
+)
+check(
+  "and one held only inside the repository is not",
+  !rowsForTab(scopePlaces, "global").some((one) => one.name === "here"),
+  rowsForTab(scopePlaces, "global").map((one) => one.name)
+)
+check(
+  "narrowed to the agent that holds it here, the workspace tab keeps it",
+  rowsForTab(scopePlaces, "workspace", "hub.target.claude-code")
+    .map((one) => one.name)
+    .join() === "here"
+)
+check(
+  "narrowed to the one that only holds machine-wide, the workspace tab is empty",
+  rowsForTab(scopePlaces, "workspace", "hub.target.codex").length === 0,
+  rowsForTab(scopePlaces, "workspace", "hub.target.codex").map((one) => one.name)
+)
+check(
+  "while the global tab narrowed to it keeps the one it does hold",
+  rowsForTab(scopePlaces, "global", "hub.target.codex")
+    .map((one) => one.name)
+    .join() === "away"
 )
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${String(failures)} failed`} (${String(checked)} checks)`)

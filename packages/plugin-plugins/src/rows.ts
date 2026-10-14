@@ -13,7 +13,7 @@
  * wrong by the next render.
  */
 import { assetRef } from "@workspace/core"
-import type { ExtensionIcon } from "@workspace/extensions"
+import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 
 import { installedRevision, type PluginOrigin } from "./contract.ts"
 import type { PluginHeld } from "./provider.ts"
@@ -216,33 +216,60 @@ export function composeRows(
 }
 
 /** Which rows a tab shows. */
-export type PluginTab = "all" | "installed" | "available" | "unstored"
+export type PluginTab = "all" | "library" | "unstored" | "updates" | AssetScope
+
+/**
+ * The install scopes each grouped tab stands for, in a client's own words.
+ *
+ * They are the agents' vocabulary rather than this hub's: Claude Code names all
+ * three, Codex only the machine-wide one, and a client that invents a fourth is
+ * simply one no tab of this page covers. The page reads this as well, so the tab
+ * that groups the agents and the rows it then shows cannot drift apart.
+ */
+export const SCOPES_OF: Record<AssetScope, readonly string[]> = {
+  workspace: ["project", "local"],
+  global: ["user"],
+}
+
+/** Whether a client — one agent, or any of them — holds the pack in these scopes. */
+function holdsIn(row: PluginRow, scopes: readonly string[], place: string | null): boolean {
+  return row.held.some(
+    (hold) =>
+      (place === null || hold.client === place) &&
+      hold.scopes.some((scope) => scopes.includes(scope))
+  )
+}
 
 /**
  * Which rows a tab holds, before the tag filter and the query.
  *
- * `delivered` is what this hub itself installed. A pack only an agent holds is
- * neither installed nor available here — the library has nothing to deliver
- * yet, so the one thing to do with it is adopt it.
+ * The library tab and the unstored one divide the catalog between them: a pack
+ * this hub holds the files of, and a pack only a client holds, which is the one
+ * thing left to do with it — adopt it.
  *
  * @param rows — the catalog.
  * @param value — the tab on screen.
- * @param delivered — the names this hub delivered to a client, by its own report.
+ * @param place — the one client a scope tab is narrowed to; `null` leaves it whole.
  * @returns the rows the tab shows.
  */
 export function rowsForTab(
   rows: readonly PluginRow[],
   value: PluginTab,
-  delivered: readonly string[]
+  place: string | null = null
 ): PluginRow[] {
   switch (value) {
     case "all":
       return [...rows]
-    case "installed":
-      return rows.filter((row) => row.stored && delivered.includes(row.id))
-    case "available":
-      return rows.filter((row) => row.stored && !delivered.includes(row.id))
+    case "library":
+      return rows.filter((row) => row.stored)
     case "unstored":
       return rows.filter((row) => !row.stored)
+    /* Only a pack with a recorded revision can have moved on, which is what
+       keeps a pack no client ever fetched out of this set. */
+    case "updates":
+      return rows.filter((row) => row.outdated === true)
+    case "workspace":
+    case "global":
+      return rows.filter((row) => holdsIn(row, SCOPES_OF[value], place))
   }
 }

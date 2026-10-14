@@ -8,19 +8,23 @@
  * so nothing here opens a card.
  */
 import {
+  CircleArrowUpIcon,
+  ContainerIcon,
   DownloadIcon,
   FileArchiveIcon,
   FolderGit2Icon,
   GitBranchIcon,
+  GlobeIcon,
   HardDriveIcon,
   InboxIcon,
   LayoutGridIcon,
+  LibraryIcon,
   ListIcon,
+  PackagePlusIcon,
   PlugIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchXIcon,
-  StoreIcon,
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
@@ -34,19 +38,23 @@ import {
   type PluginClient,
   type PluginCollected,
 } from "./library.ts"
-import { rowsForTab, type PluginTab } from "./rows.ts"
+import { rowsForTab, SCOPES_OF, type PluginTab } from "./rows.ts"
 import { PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import type { PluginInstallScope } from "./contract.ts"
 
-import type { ExtensionIcon } from "@workspace/extensions"
+import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 import {
+  ActionTab,
   AvatarStack,
   FilterBar,
   Ledger,
   PageBody,
+  PlaceScopePicker,
   TablePagination,
   type LedgerColumn,
+  type PlaceOption,
+  type PlaceWords,
 } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
@@ -74,12 +82,24 @@ const SCOPE_LABELS: Record<PluginInstallScope, string> = {
   local: "plugins.scope.local",
 }
 
+/* The tab row carries two dimensions. Four entries are the hub's own view of the
+   catalog — everything, what it holds the files of, what only an agent holds,
+   and what a source has moved past. The last of the four stands for what is
+   missing rather than for where anything is, so it carries the one batch action
+   its set is for and the toolbar stays about the page as a whole. The last two
+   group the agents by the kind of place they hold a pack in: one inside the
+   repository in use, and one machine-wide. */
 const SHELL_TABS: { value: PluginTab; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "plugins.tab.all", icon: LayoutGridIcon },
-  { value: "installed", labelKey: "plugins.tab.installed", icon: HardDriveIcon },
-  { value: "available", labelKey: "plugins.tab.available", icon: StoreIcon },
+  { value: "library", labelKey: "plugins.tab.library", icon: LibraryIcon },
   { value: "unstored", labelKey: "plugins.tab.unstored", icon: InboxIcon },
+  { value: "updates", labelKey: "plugins.tab.updates", icon: CircleArrowUpIcon },
+  { value: "workspace", labelKey: "plugins.tab.workspace", icon: ContainerIcon },
+  { value: "global", labelKey: "plugins.tab.global", icon: GlobeIcon },
 ]
+
+/** The tabs that group the agents by where they hold a pack, which open a menu. */
+const SCOPE_TABS: PluginTab[] = ["workspace", "global"]
 
 /** The mark for where a pack came from. */
 const SOURCE_ICONS: Record<PluginSource, LucideIcon> = {
@@ -109,6 +129,22 @@ function matchesQuery(row: PluginRow, text: string) {
 /** A refusal's own words, whichever side of the bridge it came from. */
 function reasonOf(failure: unknown) {
   return failure instanceof Error ? failure.message : String(failure)
+}
+
+/**
+ * The words every place list on this page draws, resolved in the active locale.
+ * The list itself knows no keys: a module hands it the strings it owns.
+ *
+ * @param t — the active locale's lookup.
+ * @returns the strings a place menu draws.
+ */
+function placeWords(t: (key: string) => string): PlaceWords {
+  return {
+    search: t("plugins.place.search"),
+    searchClear: t("plugins.place.searchClear"),
+    searchEmpty: t("plugins.place.searchEmpty"),
+    count: (total) => t("plugins.location.count").replace("{count}", String(total)),
+  }
 }
 
 const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
@@ -734,6 +770,9 @@ function ViewButton({
 export function PluginsPage() {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<PluginTab>("all")
+  /* One agent inside the scope tab on screen, once a person picked one from its
+     menu; `null` leaves the scope whole. */
+  const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const [view, setView] = React.useState<"grid" | "list">("grid")
   /* Which segment the Add dialog opens on; `null` while it is closed. */
   const [addTab, setAddTab] = React.useState<AddPluginTab | null>(null)
@@ -748,9 +787,11 @@ export function PluginsPage() {
   const [checked, setChecked] = React.useState<readonly string[]>([])
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
+  /* A batch a tab's menu started, which holds the menu's item disabled until the
+     run it stands for has finished. */
+  const [batch, setBatch] = React.useState<"adopt" | "update" | null>(null)
   /* The library the rows come from, and the one place a write reaches it. */
   const library = usePluginLibrary()
-  const installed = library.delivered
   const catalog = library.rows
 
   /* A pack whose folder was deleted is fetched again as the page loads: the
@@ -809,21 +850,63 @@ export function PluginsPage() {
     [offered, tag]
   )
 
-  /* A number belongs to every tab: this screen's tabs are states of one set
-     rather than places, so each one can say its size. */
+  /* A number belongs to the tabs that hold packs; a scope tab shows which agents
+     it spans instead, so its size is not printed twice. Every count is read
+     before any narrowing: a tab says how big its set is, not how big the slice of
+     it a person happens to be looking at is. */
   const counts = React.useMemo(
     () => ({
-      all: rowsForTab(filtered, "all", installed).length,
-      installed: rowsForTab(filtered, "installed", installed).length,
-      available: rowsForTab(filtered, "available", installed).length,
-      unstored: rowsForTab(filtered, "unstored", installed).length,
+      all: rowsForTab(filtered, "all").length,
+      library: rowsForTab(filtered, "library").length,
+      unstored: rowsForTab(filtered, "unstored").length,
+      updates: rowsForTab(filtered, "updates").length,
     }),
-    [filtered, installed]
+    [filtered]
   )
 
+  /* A tab whose set is empty leaves the row rather than sitting there saying
+     nothing, and the screen follows it off: a person who emptied the set by
+     acting on it lands back on the whole catalog rather than on a blank page. */
+  const screenTab: PluginTab =
+    (tab === "unstored" && counts.unstored === 0) || (tab === "updates" && counts.updates === 0)
+      ? "all"
+      : tab
+
+  /* The agents each scope tab spans, as the tab's own stack and menu draw them.
+     Which of them is a place of which tab is the same reading the rows go
+     through, so a client no tab can show is not offered by one either. */
+  const scopePlaces = React.useMemo(() => {
+    const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
+    for (const scope of SCOPE_TABS as AssetScope[]) {
+      const scopes = SCOPES_OF[scope]
+      byScope[scope] = library.clients
+        .filter((client) => client.scopes.some((one) => scopes.includes(one)))
+        .map((client) => ({
+          id: client.id,
+          icon: client.icon,
+          label: client.label,
+          count: catalog.filter((row) =>
+            row.held.some(
+              (hold) => hold.client === client.id && hold.scopes.some((one) => scopes.includes(one))
+            )
+          ).length,
+        }))
+    }
+    return byScope
+  }, [library.clients, catalog])
+
+  /* A choice from a scope tab's menu only means something while it is a place of
+     the scope on screen; anywhere else the scope is whole. */
+  const chosen =
+    narrowed !== null &&
+    SCOPE_TABS.includes(screenTab) &&
+    scopePlaces[screenTab as AssetScope].some((place) => place.id === narrowed)
+      ? narrowed
+      : null
+
   const matching = React.useMemo(
-    () => rowsForTab(filtered, tab, installed),
-    [filtered, tab, installed]
+    () => rowsForTab(filtered, screenTab, chosen),
+    [filtered, screenTab, chosen]
   )
 
   /* A filter can leave the page past the end; the page shown is clamped rather
@@ -942,6 +1025,47 @@ export function PluginsPage() {
   /* A category edited in the lightbox is that row's own from then on. */
   const setTags = (plugin: PluginRow, tags: string[]) => library.setTags(plugin.name, tags)
 
+  /* The two batches act on the whole catalog rather than on what the filters and
+     the current tab happen to leave on screen: one of them is offered by the tab
+     that stands for the set, and that set is what it runs on. */
+  const unstoredRows = React.useMemo(() => catalog.filter((row) => !row.stored), [catalog])
+  const outdatedRows = React.useMemo(() => catalog.filter((row) => row.outdated === true), [catalog])
+
+  /**
+   * Take in every pack a client wrote, one at a time: each is a write of its own,
+   * and the first refusal names the pack it was about, so a run that stops says
+   * which one stopped it.
+   */
+  const adoptAll = async () => {
+    setBatch("adopt")
+    try {
+      for (const plugin of unstoredRows) await library.adopt(plugin.name)
+    } catch (error: unknown) {
+      toast.add({ type: "error", title: reasonOf(error) })
+    } finally {
+      setBatch(null)
+    }
+  }
+
+  /** Take every pack that fell behind to the revision its source holds. */
+  const updateAll = async () => {
+    setBatch("update")
+    try {
+      let replaced = false
+      for (const plugin of outdatedRows) {
+        const outcome = await library.update(plugin.id)
+        replaced = replaced || outcome.overwroteEdits
+      }
+      /* An update replaces the files it lands on, and a batch answers for all of
+         them at once: one line says that some of what was here is now gone. */
+      if (replaced) toast.add({ type: "warning", title: t("plugins.update.overwritten") })
+    } catch (error: unknown) {
+      toast.add({ type: "error", title: reasonOf(error) })
+    } finally {
+      setBatch(null)
+    }
+  }
+
   const pagination = (
     <TablePagination
       pageText={`${shownPage + 1} / ${pageCount}`}
@@ -974,21 +1098,76 @@ export function PluginsPage() {
       </div>
     )
 
+  /* Taking a tab is one thing whichever element carried it — a tab primitive, an
+     action's pill, or a scope's — so the reset that goes with it lives here. */
+  const pickTab = (value: PluginTab) => {
+    setTab(value)
+    setPage(0)
+    setChecked([])
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-8">
       <PageHeading />
       <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
-          setPage(0)
-          setChecked([])
-        }}
+        value={screenTab}
+        onValueChange={(value) =>
+          pickTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
+        }
         className="flex-1 gap-8"
       >
         <div className="flex items-center justify-between gap-6">
           <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
-            {SHELL_TABS.map((item) => {
+            {SHELL_TABS.filter(
+              (item) =>
+                (item.value !== "unstored" || counts.unstored > 0) &&
+                (item.value !== "updates" || counts.updates > 0)
+            ).map((item) => {
+              const active = screenTab === item.value
+              /* A set of what is missing opens through the one action it is for:
+                 the whole pill is the trigger, and the count it carries is the
+                 size of the set that action runs on. */
+              if (item.value === "unstored" || item.value === "updates") {
+                const own = item.value === "unstored" ? "adopt" : "update"
+                return (
+                  <ActionTab
+                    key={item.value}
+                    icon={item.icon}
+                    label={t(item.labelKey)}
+                    count={counts[item.value]}
+                    action={t(
+                      own === "adopt" ? "plugins.action.adoptAll" : "plugins.action.updateAll"
+                    )}
+                    actionIcon={own === "adopt" ? PackagePlusIcon : DownloadIcon}
+                    /* The run is this tab's to show; the other one only holds it up. */
+                    state={batch === null ? "idle" : batch === own ? "running" : "blocked"}
+                    active={active}
+                    onTab={() => pickTab(item.value)}
+                    onAction={() => void (own === "adopt" ? adoptAll() : updateAll())}
+                  />
+                )
+              }
+              /* A scope opens through the agents it spans, so a person never lands
+                 on it without having said which agent they meant. */
+              if (item.value === "workspace" || item.value === "global") {
+                return (
+                  <PlaceScopePicker
+                    key={item.value}
+                    scopeIcon={item.icon}
+                    scopeLabel={t(item.labelKey)}
+                    places={scopePlaces[item.value]}
+                    chosen={active ? chosen : null}
+                    active={active}
+                    allLabel={t("plugins.place.all")}
+                    title={t("plugins.place.which")}
+                    words={placeWords(t)}
+                    onChoose={(id) => {
+                      pickTab(item.value)
+                      setNarrowed(id)
+                    }}
+                  />
+                )
+              }
               const count = counts[item.value]
               return (
                 <TabsTrigger
@@ -1081,7 +1260,7 @@ export function PluginsPage() {
             all: t("plugins.allTags"),
           }}
         />
-        <TabsContent value={tab} className="flex flex-col">
+        <TabsContent value={screenTab} className="flex flex-col">
           <PageBody footer={footer}>
             {plugins.length === 0 ? (
               needle !== "" ? (
@@ -1105,11 +1284,11 @@ export function PluginsPage() {
                 />
               ) : (
                 <EmptyState
-                  icon={SHELL_TABS.find((item) => item.value === tab)?.icon ?? PlugIcon}
+                  icon={SHELL_TABS.find((item) => item.value === screenTab)?.icon ?? PlugIcon}
                   title={t("plugins.empty.tab")}
                   hint={t("plugins.empty.tabHint")}
                   action={
-                    <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
+                    <Button className="h-10 rounded-full px-4" onClick={() => pickTab("all")}>
                       {t("plugins.tab.all")}
                     </Button>
                   }

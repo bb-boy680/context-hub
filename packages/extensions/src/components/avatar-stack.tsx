@@ -46,6 +46,10 @@ export function AvatarStack({
   label?: string
   max?: number
 }) {
+  /* Nothing to stack is nothing to draw: the geometry below would otherwise
+     leave a sliver of empty box where the marks would have been. */
+  if (marks.length === 0) return null
+
   const shown = marks.slice(0, max)
   const more = marks.length - shown.length
   const slots = more === 0 ? shown.length : max + 1
