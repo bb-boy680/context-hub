@@ -1,18 +1,17 @@
 /**
- * The detail lightbox for one pack: the media pane on the left and the panel of
- * facts and actions on the right, with the pack's files sliding in over both.
+ * The media pane on the left and the panel of facts and actions on the right,
+ * with the pack's files sliding in over both.
  *
- * The interface only, like the page it opens from. A picture added here lives in
- * this window (its own object URL) rather than on disk, because nothing in this
- * module reads or writes a pack's directory yet; the files panel lists what
- * `./sample.ts` says the pack holds.
+ * A picture added here lives in this window (its own object URL) rather than on
+ * disk, because nothing in this module writes a pack's directory; the files
+ * panel reads what the pack actually holds from the host, and shows nothing when
+ * it cannot be read rather than standing something in.
  */
 import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardPasteIcon,
-  DownloadIcon,
   FileTextIcon,
   ImageIcon,
   ImagePlusIcon,
@@ -21,15 +20,16 @@ import {
   PlayIcon,
   PlugIcon,
   PlusIcon,
-  Trash2Icon,
   UploadIcon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
-import { sampleFiles } from "./sample.ts"
-import type { PluginRow } from "./types.ts"
+import { PluginActions } from "./install-actions.tsx"
+import { packFile, packFiles, type PluginClient } from "./library.ts"
+import type { PluginInstallScope } from "./contract.ts"
+import type { PluginFileEntry, PluginRow } from "./types.ts"
 
 import {
   CodeCard,
@@ -68,17 +68,13 @@ function mediaKind(src: string): "image" | "video" {
 
 /** The stage with no picture to show: what the pack is, in one block. */
 function BundleStage({ plugin }: { plugin: PluginRow }) {
-  const { t } = useI18n()
-
   return (
     <div className="flex size-full flex-col items-center justify-center gap-3 bg-surface-raised px-8 text-center">
       <span className="flex size-14 items-center justify-center rounded-full bg-secondary">
         <PlugIcon className="size-6 text-muted-foreground" aria-hidden />
       </span>
       <span className="font-mono text-[13px] leading-[19px] text-muted-foreground">
-        {t("plugins.cover.bundle")
-          .replace("{skills}", String(plugin.bundle.skills))
-          .replace("{commands}", String(plugin.bundle.commands))}
+        {plugin.name}
       </span>
       <span className="max-w-[520px] text-[13px] leading-[19px] text-copy">
         {plugin.description}
@@ -516,15 +512,21 @@ function MetaRow({ label, value }: { label: string; value: string }) {
 
 function InfoPanel({
   plugin,
-  installed,
-  onToggleInstall,
+  clients,
+  busy,
+  onUpdate,
+  onInstall,
+  onUninstall,
   onViewFiles,
   onTagsChange,
   tagSuggestions,
 }: {
   plugin: PluginRow
-  installed: boolean
-  onToggleInstall: () => void
+  clients: readonly PluginClient[]
+  busy: boolean
+  onUpdate: () => void
+  onInstall: (client: string, scope: PluginInstallScope) => void
+  onUninstall: (client: string, scope: PluginInstallScope) => void
   onViewFiles: () => void
   onTagsChange: (tags: string[]) => void
   /** Every category in use across the catalog, for the editor's quick picks. */
@@ -577,20 +579,13 @@ function InfoPanel({
           }}
         />
 
-        {/* What installing this would bring, then when it last moved: both answer
-            "what is this pack", so they read as one group. */}
+        {/* When this last moved, and where it came from: both answer "what is
+            this pack", so they read as one group. */}
         <div className="flex flex-col">
           <span className="pb-1 text-[12px] font-semibold text-muted-soft">
-            {t("plugins.detail.bundle")}
+            {t("plugins.detail.about")}
           </span>
-          <MetaRow
-            label={t("plugins.detail.skills")}
-            value={String(plugin.bundle.skills)}
-          />
-          <MetaRow
-            label={t("plugins.detail.commands")}
-            value={String(plugin.bundle.commands)}
-          />
+          <MetaRow label={t("plugins.detail.source")} value={t(`plugins.source.${plugin.source}`)} />
           <MetaRow label={t("plugins.detail.updated")} value={plugin.updated} />
         </div>
       </div>
@@ -605,25 +600,14 @@ function InfoPanel({
         </Button>
         {/* Installing is another class of action, so it sits apart from the main
             one rather than in the same visual slot. */}
-        {installed ? (
-          <Button
-            variant="outline"
-            onClick={onToggleInstall}
-            className="h-10 shrink-0 gap-[7px] rounded-full border-destructive/35 bg-transparent px-4 text-[13.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive dark:border-destructive/35 dark:bg-transparent"
-          >
-            <Trash2Icon className="size-[15px]" />
-            {t("plugins.action.uninstall")}
-          </Button>
-        ) : (
-          <Button
-            variant="outline"
-            onClick={onToggleInstall}
-            className="h-10 shrink-0 gap-[7px] rounded-full border-border bg-transparent px-4 text-[13.5px] font-semibold dark:border-input dark:bg-transparent"
-          >
-            <DownloadIcon className="size-[15px]" />
-            {t("plugins.action.install")}
-          </Button>
-        )}
+        <PluginActions
+          plugin={plugin}
+          clients={clients}
+          busy={busy}
+          onUpdate={onUpdate}
+          onInstall={onInstall}
+          onUninstall={onUninstall}
+        />
       </div>
     </div>
   )
@@ -640,7 +624,25 @@ function FilesPanel({
   onBack: () => void
 }) {
   const { t } = useI18n()
-  const files = React.useMemo(() => sampleFiles(plugin), [plugin])
+  /* A pack's files come from the host, so the panel shows what the pack holds
+     and nothing at all when it cannot be read. */
+  const [files, setFiles] = React.useState<PluginFileEntry[]>([])
+  React.useEffect(() => {
+    let alive = true
+    queueMicrotask(() => {
+      if (!alive) return
+      void packFiles(plugin.id)
+        .then((found) => {
+          if (alive) setFiles(found)
+        })
+        .catch(() => {
+          if (alive) setFiles([])
+        })
+    })
+    return () => {
+      alive = false
+    }
+  }, [plugin.id])
   /* README.md is what a pack is for, so it is what opens first. */
   const fallback =
     files.find((file) => file.path === "README.md" && !file.directory)?.path ??
@@ -649,7 +651,28 @@ function FilesPanel({
   const [picked, setPicked] = React.useState<string | null>(null)
   /* Another pack's files make a remembered path meaningless; the fallback wins. */
   const current = picked !== null && files.some((file) => file.path === picked) ? picked : fallback
-  const loaded = files.find((file) => file.path === current)?.text
+  const [text, setText] = React.useState("")
+  React.useEffect(() => {
+    let alive = true
+    queueMicrotask(() => {
+      if (!alive) return
+      if (current === null) {
+        setText("")
+        return
+      }
+      void packFile(plugin.id, current)
+        .then((body) => {
+          if (alive) setText(body ?? "")
+        })
+        .catch(() => {
+          if (alive) setText("")
+        })
+    })
+    return () => {
+      alive = false
+    }
+  }, [plugin.id, current])
+  const loaded = text
   const name = current === null ? "" : (current.split("/").at(-1) ?? current)
 
   return (
@@ -723,15 +746,21 @@ function FilesPanel({
  */
 function PackLightbox({
   plugin,
-  installed,
+  clients,
+  busy,
   tagSuggestions,
-  onToggleInstall,
+  onUpdate,
+  onInstall,
+  onUninstall,
   onTagsChange,
 }: {
   plugin: PluginRow
-  installed: boolean
+  clients: readonly PluginClient[]
+  busy: boolean
   tagSuggestions: string[]
-  onToggleInstall: (plugin: PluginRow) => void
+  onUpdate: (plugin: PluginRow) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
   onTagsChange: (tags: string[]) => void
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
@@ -742,8 +771,11 @@ function PackLightbox({
       panel={
         <InfoPanel
           plugin={plugin}
-          installed={installed}
-          onToggleInstall={() => onToggleInstall(plugin)}
+          clients={clients}
+          busy={busy}
+          onUpdate={() => onUpdate(plugin)}
+          onInstall={(client, scope) => onInstall(plugin, client, scope)}
+          onUninstall={(client, scope) => onUninstall(plugin, client, scope)}
           onViewFiles={() => setFilesOpen(true)}
           onTagsChange={onTagsChange}
           tagSuggestions={tagSuggestions}
@@ -766,18 +798,25 @@ function PackLightbox({
 /** Detail lightbox for one pack; opens on click from either view. */
 export function PluginDetailDialog({
   plugin,
-  installed,
+  clients,
+  busy,
   tagSuggestions,
-  onToggleInstall,
+  onUpdate,
+  onInstall,
+  onUninstall,
   onTagsChange,
   onOpenChange,
 }: {
   /** The pack on screen, or `null` while the lightbox is closed. */
   plugin: PluginRow | null
-  installed: boolean
+  /** The clients this hub can deliver to, with what each one already holds. */
+  clients: readonly PluginClient[]
+  busy: boolean
   /** Every category in use across the catalog, for the editor's quick picks. */
   tagSuggestions: string[]
-  onToggleInstall: (plugin: PluginRow) => void
+  onUpdate: (plugin: PluginRow) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
   onTagsChange: (tags: string[]) => void
   onOpenChange: (open: boolean) => void
 }) {
@@ -787,9 +826,12 @@ export function PluginDetailDialog({
         <PackLightbox
           key={plugin.id}
           plugin={plugin}
-          installed={installed}
+          clients={clients}
+          busy={busy}
           tagSuggestions={tagSuggestions}
-          onToggleInstall={onToggleInstall}
+          onUpdate={onUpdate}
+          onInstall={onInstall}
+          onUninstall={onUninstall}
           onTagsChange={onTagsChange}
         />
       )}

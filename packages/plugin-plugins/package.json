@@ -12,6 +12,7 @@
     "@deepseek-ai/cordis": "^4.0.4",
     "@headless-tree/core": "^1.7.0",
     "@headless-tree/react": "^1.7.0",
+    "@workspace/core": "workspace:*",
     "@workspace/extensions": "workspace:*",
     "@workspace/ui": "workspace:*",
     "lucide-react": "^1.48.0",
@@ -28,6 +29,10 @@
     "typescript-eslint": "^8"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./provider": "./src/provider.ts",
+    "./library": "./src/library.ts",
+    "./vite": "./vite.ts"
   }
 }

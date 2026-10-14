@@ -12,7 +12,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { assertPluginId, PLUGIN_ROUTE } from "@workspace/core/plugins"
+import { assertPluginId, EXTENSION_DIR, EXTENSION_RECORDS, EXTENSION_ROUTE, LEGACY_EXTENSION_DIR } from "@workspace/core/plugins"
 import { createFsPluginStore } from "@workspace/core/host/plugins"
 import { discoverPlugins } from "../src/plugin.ts"
 
@@ -29,12 +29,12 @@ function check(what: string, ok: boolean, detail?: unknown) {
 
 /** Write one plugin directory carrying a manifest and an entry module. */
 async function writePlugin(
-  home: string,
+  root: string,
   id: string,
   manifest: string,
   entry?: string
 ): Promise<void> {
-  const dir = path.join(home, "plugins", id)
+  const dir = path.join(root, id)
   await fs.mkdir(dir, { recursive: true })
   await fs.writeFile(path.join(dir, "plugin.json"), manifest, "utf8")
   /* A plugin directory is an npm-style package, so Node reads its entry as ESM. */
@@ -45,8 +45,28 @@ async function writePlugin(
 const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-plugins-"))
 console.log(`home: ${home}`)
 
+const extensions = path.join(home, EXTENSION_DIR)
+/* The space used to be `<home>/plugins`, which agent plugin packs now own, so a
+   home from before the move is written here: two extension directories, one
+   pack that must stay put, and a records file. */
+const legacy = path.join(home, LEGACY_EXTENSION_DIR)
 await writePlugin(
-  home,
+  legacy,
+  "acme.legacy",
+  JSON.stringify({ id: "acme.legacy", name: "Legacy", version: "0.9.0", apiVersion: "^0.1" }),
+  "export function activate() {}\n"
+)
+await writePlugin(legacy, "acme.pack", JSON.stringify({ name: "acme.pack", version: "1.0.0" }))
+await fs.writeFile(
+  path.join(legacy, EXTENSION_RECORDS),
+  JSON.stringify({
+    "acme.legacy": { version: "0.9.0", source: "local", installedAt: "2026-01-01T00:00:00.000Z" },
+  }),
+  "utf8"
+)
+
+await writePlugin(
+  extensions,
   "acme.hello",
   JSON.stringify({
     id: "acme.hello",
@@ -63,28 +83,51 @@ await writePlugin(
    }\n`
 )
 await writePlugin(
-  home,
+  extensions,
   "acme.mismatch",
   JSON.stringify({ id: "acme.other", name: "Mismatch", version: "1.0.0", apiVersion: "^0.1" }),
   "export function activate() {}\n"
 )
 await writePlugin(
-  home,
+  extensions,
   "acme.future",
   JSON.stringify({ id: "acme.future", name: "Future", version: "1.0.0", apiVersion: "^9.9" })
 )
 await writePlugin(
-  home,
+  extensions,
   "acme.empty",
   JSON.stringify({ id: "acme.empty", name: "Empty", version: "1.0.0", apiVersion: "^0.1" }),
   "export const nothing = true\n"
 )
 /* A directory with no manifest at all is not a plugin. */
-await fs.mkdir(path.join(home, "plugins", "acme.notes"), { recursive: true })
+await fs.mkdir(path.join(extensions, "acme.notes"), { recursive: true })
 
 const store = createFsPluginStore(home)
 const ids = await store.list()
-check("only directories with a manifest are plugins", ids.join(",") === "acme.empty,acme.future,acme.hello,acme.mismatch", ids)
+check(
+  "only directories with a manifest are plugins",
+  ids.join(",") === "acme.empty,acme.future,acme.hello,acme.legacy,acme.mismatch",
+  ids
+)
+
+/* The first read moved the old space across, and left the agent plugin pack. */
+check(
+  "an extension directory moved to `<home>/extensions`",
+  (await fs.stat(path.join(extensions, "acme.legacy")).catch(() => null)) !== null
+)
+check(
+  "a directory that is not an extension stayed under `<home>/plugins`",
+  (await fs.stat(path.join(legacy, "acme.pack")).catch(() => null)) !== null
+)
+check(
+  "the old directory keeps nothing else",
+  (await fs.readdir(legacy)).join(",") === "acme.pack",
+  await fs.readdir(legacy)
+)
+check(
+  "the old records file moved with the extensions",
+  (await store.records())["acme.legacy"]?.version === "0.9.0"
+)
 
 const found = await discoverPlugins({
   source: store,
@@ -92,14 +135,19 @@ const found = await discoverPlugins({
   importModule: (url) =>
     import(
       pathToFileURL(
-        path.join(home, "plugins", decodeURIComponent(url.slice(PLUGIN_ROUTE.length + 1)))
+        path.join(extensions, decodeURIComponent(url.slice(EXTENSION_ROUTE.length + 1)))
       ).href
     ) as Promise<unknown>,
 })
 const byId = new Map(found.map((plugin) => [plugin.id, plugin]))
 
-check("every plugin is reported", found.length === 4, found.length)
+check("every plugin is reported", found.length === 5, found.length)
 check("a valid plugin loads", byId.get("acme.hello")?.definition !== undefined, byId.get("acme.hello"))
+check(
+  "the migrated extension loads too",
+  byId.get("acme.legacy")?.definition !== undefined,
+  byId.get("acme.legacy")
+)
 check(
   "the manifest reaches the kernel definition",
   byId.get("acme.hello")?.definition?.manifest.name === "Hello" &&
@@ -189,15 +237,31 @@ await store.setRecord("acme.hello", {
   installedAt: "2026-10-08T00:00:00.000Z",
 })
 check("a record round-trips", (await store.records())["acme.hello"]?.version === "1.0.0")
-await fs.writeFile(path.join(home, "plugins", "index.json"), "{not json", "utf8")
+await fs.writeFile(path.join(extensions, EXTENSION_RECORDS), "{not json", "utf8")
 check("an unreadable records file reads as none", Object.keys(await store.records()).length === 0)
 await store.setRecord("acme.hello", { version: "1.0.1", source: "local", installedAt: "2026-10-08T00:00:00.000Z" })
 check("the records file is rewritten whole", (await store.records())["acme.hello"]?.version === "1.0.1")
 
 await store.remove("acme.hello")
-check("remove deletes the directory", (await fs.stat(path.join(home, "plugins", "acme.hello")).catch(() => null)) === null)
+check("remove deletes the directory", (await fs.stat(path.join(extensions, "acme.hello")).catch(() => null)) === null)
 check("remove forgets the record", (await store.records())["acme.hello"] === undefined)
-check("the other plugins stay", (await store.list()).join(",") === "acme.empty,acme.future,acme.mismatch")
+check(
+  "the other plugins stay",
+  (await store.list()).join(",") === "acme.empty,acme.future,acme.legacy,acme.mismatch"
+)
+
+/* A home with the old directory but nothing in it — the shape a machine holds
+   when the space was never used — is handed over empty to the plugin library. */
+const fresh = await fs.mkdtemp(path.join(tmpdir(), "context-hub-extensions-"))
+await fs.mkdir(path.join(fresh, LEGACY_EXTENSION_DIR), { recursive: true })
+const freshStore = createFsPluginStore(fresh)
+check("an unused old directory lists as none", (await freshStore.list()).join(",") === "")
+check(
+  "an unused old directory is replaced by the new one",
+  (await fs.stat(path.join(fresh, EXTENSION_DIR)).catch(() => null)) !== null &&
+    (await fs.stat(path.join(fresh, LEGACY_EXTENSION_DIR)).catch(() => null)) === null
+)
+await fs.rm(fresh, { recursive: true, force: true })
 
 await fs.rm(home, { recursive: true, force: true })
 console.log(failures === 0 ? "\nall checks passed" : `\n${failures} check(s) failed`)

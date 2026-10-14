@@ -19,7 +19,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { createFsPluginStore } from "@workspace/core/host/plugins"
 import { createFsPlaceFiles } from "@workspace/core/host/place-files"
-import { PLUGIN_ROUTE } from "@workspace/core/plugins"
+import { EXTENSION_DIR, EXTENSION_ROUTE } from "@workspace/core/plugins"
 import { createHubKernel, discoverPlugins } from "@workspace/extensions"
 import type { ExtensionIcon, HubKernel } from "@workspace/extensions"
 import { readJsonObject, type McpIo } from "../src/contract.ts"
@@ -76,10 +76,10 @@ async function main(): Promise<void> {
   const files = path.join(workspace, ".acme", "mcp.json")
   for (const dir of [home, workspace, userHome]) await fs.mkdir(dir, { recursive: true })
 
-  /* The plugin space as a download leaves it: a directory of files. The only
+  /* The extension space as a download leaves it: a directory of files. The only
      thing this check adds is the npm shim Node needs to import ESM from a
      folder; the browser reads the entry over the hub's own route. */
-  const installed = path.join(home, "plugins", "acme.mcp")
+  const installed = path.join(home, EXTENSION_DIR, "acme.mcp")
   await fs.cp(EXAMPLE, installed, { recursive: true })
   await fs.writeFile(
     path.join(installed, "package.json"),
@@ -93,7 +93,7 @@ async function main(): Promise<void> {
     importModule: (url) =>
       import(
         pathToFileURL(
-          path.join(home, "plugins", decodeURIComponent(url.slice(PLUGIN_ROUTE.length + 1)))
+          path.join(home, EXTENSION_DIR, decodeURIComponent(url.slice(EXTENSION_ROUTE.length + 1)))
         ).href
       ) as Promise<unknown>,
   })

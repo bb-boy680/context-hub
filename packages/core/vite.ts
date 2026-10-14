@@ -7,7 +7,7 @@
  * Assets are read-only: files are created and deleted through the store that
  * records them, which is what keeps a reference and its file in step. State
  * documents are read and written, because they are what a browser form cannot
- * keep anywhere else. Plugin files are read-only for the same reason assets
+ * keep anywhere else. Extension files are read-only for the same reason assets
  * are: installing is a host-side operation that writes the whole directory.
  */
 import { createReadStream, promises as fs } from "node:fs"
@@ -16,7 +16,7 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 import { ASSET_ROUTE } from "./src/assets.ts"
 import { NET_ROUTE } from "./src/net.ts"
 import { PLACE_FILES_ROUTE, readPlaceCall } from "./src/place-files.ts"
-import { PLUGIN_ROUTE } from "./src/plugins.ts"
+import { EXTENSION_ROUTE } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
@@ -273,11 +273,12 @@ export function placeFiles(options: { home?: string; folder?: string } = {}) {
 }
 
 /**
- * Send one file from the plugin space. Every response is `no-store`: an
- * installed plugin's files change on update, and a cached module would run the
- * old code in the page.
+/**
+ * Send one file from the extension space. Every response is `no-store`: an
+ * installed extension's files change on update, and a cached module would run
+ * the old code in the page.
  */
-async function sendPluginFile(
+async function sendExtensionFile(
   root: string,
   id: string,
   file: string,
@@ -298,15 +299,15 @@ async function sendPluginFile(
 }
 
 /**
- * Vite plugin that serves the plugin space over the dev server: the installed
- * ids, and every file inside a plugin directory, so a browser form can import
- * an installed plugin's entry module.
+ * Vite plugin that serves the extension space over the dev server: the installed
+ * ids, and every file inside an extension directory, so a browser form can import
+ * an installed extension's entry module.
  */
-export function pluginFiles(options: { home?: string } = {}) {
+export function extensionFiles(options: { home?: string } = {}) {
   const store = createFsPluginStore(resolveHubHome(options.home))
 
   return {
-    name: "context-hub-plugin-files",
+    name: "context-hub-extension-files",
     configureServer(server: {
       middlewares: { use: (handler: unknown) => void }
     }) {
@@ -317,7 +318,7 @@ export function pluginFiles(options: { home?: string } = {}) {
           next: () => void
         ) => {
           const url = new URL(request.url ?? "/", "http://localhost")
-          if (!url.pathname.startsWith(PLUGIN_ROUTE)) {
+          if (!url.pathname.startsWith(EXTENSION_ROUTE)) {
             next()
             return
           }
@@ -325,7 +326,7 @@ export function pluginFiles(options: { home?: string } = {}) {
             response.writeHead(405).end()
             return
           }
-          const rest = url.pathname.slice(PLUGIN_ROUTE.length).replace(/^\//, "")
+          const rest = url.pathname.slice(EXTENSION_ROUTE.length).replace(/^\//, "")
           try {
             if (rest === "") {
               sendJson(response, 200, { ids: await store.list() })
@@ -337,7 +338,7 @@ export function pluginFiles(options: { home?: string } = {}) {
               sendJson(response, 200, JSON.parse(await store.read(id, "plugin.json")) as unknown)
               return
             }
-            await sendPluginFile(store.root, id, rest.slice(slash + 1), response)
+            await sendExtensionFile(store.root, id, rest.slice(slash + 1), response)
           } catch {
             response.writeHead(404).end()
           }

@@ -162,7 +162,7 @@ async function readManifest(
  *
  * @param options.source — the plugin space to read.
  * @param options.importModule — loads one entry module by the URL the source implies.
- * @param options.route — route the source serves plugin files on; defaults to `/hub/plugins`.
+ * @param options.route — route the source serves extension files on; defaults to `/hub/extensions`.
  * @returns the loadable extensions, and one entry per plugin that could not be loaded.
  */
 export async function discoverPlugins(options: {
@@ -170,7 +170,7 @@ export async function discoverPlugins(options: {
   importModule(url: string): Promise<unknown>
   route?: string
 }): Promise<DiscoveredPlugin[]> {
-  const route = options.route ?? "/hub/plugins"
+  const route = options.route ?? "/hub/extensions"
   const found: DiscoveredPlugin[] = []
   for (const id of await options.source.list()) {
     try {

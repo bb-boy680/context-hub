@@ -3,14 +3,15 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import {
   assetLibrary,
+  extensionFiles,
   netProxy,
   placeFiles,
-  pluginFiles,
   stateStore,
   workspaceList,
 } from "@workspace/core/vite"
 import { skillLibrary } from "@workspace/plugin-skills/vite"
 import { mcpProbe } from "@workspace/plugin-mcp/vite"
+import { pluginLibrary } from "@workspace/plugin-plugins/vite"
 import { defineConfig } from "vite"
 
 // https://vite.dev/config/
@@ -22,12 +23,13 @@ export default defineConfig({
     tailwindcss(),
     assetLibrary(),
     stateStore(),
-    pluginFiles(),
+    extensionFiles(),
     workspaceList(),
     netProxy(),
     skillLibrary(),
     placeFiles(),
     mcpProbe(),
+    pluginLibrary(),
   ],
   resolve: {
     alias: {

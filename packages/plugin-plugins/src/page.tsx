@@ -9,24 +9,31 @@
  */
 import {
   DownloadIcon,
+  FileArchiveIcon,
+  GitBranchIcon,
   HardDriveIcon,
   LayoutGridIcon,
   ListIcon,
-  PackageIcon,
   PlugIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchXIcon,
   StoreIcon,
-  Trash2Icon,
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { AddPluginDialog, type AddPluginTab } from "./add-plugin-dialog.tsx"
 import { PluginDetailDialog } from "./detail-dialog.tsx"
-import { sampleInstalled, samplePlugins } from "./sample.ts"
+import { PluginActions } from "./install-actions.tsx"
+import {
+  usePluginLibrary,
+  type PackUploadFile,
+  type PluginClient,
+  type PluginCollected,
+} from "./library.ts"
 import type { PluginRow, PluginSource } from "./types.ts"
+import type { PluginInstallScope } from "./contract.ts"
 
 import type { ExtensionIcon } from "@workspace/extensions"
 import {
@@ -44,6 +51,23 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
+import { toast } from "@workspace/ui/components/toast"
+
+/** The words a scope wears in the batch menu. */
+const SCOPE_LABELS: Record<PluginInstallScope, string> = {
+  user: "plugins.scope.user",
+  project: "plugins.scope.project",
+  local: "plugins.scope.local",
+}
 
 /** Which rows a tab shows: everything, what is installed, or what is not. */
 type PluginTab = "all" | "installed" | "available"
@@ -56,9 +80,9 @@ const SHELL_TABS: { value: PluginTab; labelKey: string; icon: ExtensionIcon }[] 
 
 /** The mark for where a pack came from. */
 const SOURCE_ICONS: Record<PluginSource, LucideIcon> = {
-  marketplace: StoreIcon,
+  git: GitBranchIcon,
+  archive: FileArchiveIcon,
   local: HardDriveIcon,
-  builtin: PackageIcon,
 }
 
 /** The categories on offer, read from the rows so the chips cannot drift. */
@@ -95,6 +119,11 @@ function matchesQuery(row: PluginRow, text: string) {
     row.description.toLowerCase().includes(text) ||
     row.tags.some((item) => item.toLowerCase().includes(text))
   )
+}
+
+/** A refusal's own words, whichever side of the bridge it came from. */
+function reasonOf(failure: unknown) {
+  return failure instanceof Error ? failure.message : String(failure)
 }
 
 const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
@@ -141,51 +170,28 @@ function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
   )
 }
 
-/**
- * The one action a row carries. Installing is the row's own action, so it reads
- * as a soft fill; undoing it reads as an outline. Both are the interface's own
- * state until the module writes anything.
- */
-function InstallButton({
-  plugin,
-  installed,
-  onToggle,
-}: {
-  plugin: PluginRow
-  installed: boolean
-  onToggle: () => void
-}) {
-  const { t } = useI18n()
-  const shell =
-    "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+/** What every row's action cluster needs, gathered so it travels as one prop. */
+interface RowActions {
+  /** The clients this hub can deliver to, with what each one already holds. */
+  clients: readonly PluginClient[]
+  /** True while a call is in flight, which disables the actions. */
+  busy: boolean
+  onUpdate: (plugin: PluginRow) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+}
 
-  return installed ? (
-    <Button
-      type="button"
-      variant="outline"
-      aria-label={`${t("plugins.action.uninstall")} ${plugin.name}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onToggle()
-      }}
-      className={`${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
-    >
-      <Trash2Icon className="size-3.5" />
-      {t("plugins.action.uninstall")}
-    </Button>
-  ) : (
-    <Button
-      type="button"
-      aria-label={`${t("plugins.action.install")} ${plugin.name}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onToggle()
-      }}
-      className={`${shell} bg-secondary text-foreground hover:bg-accent`}
-    >
-      <DownloadIcon className="size-3.5" />
-      {t("plugins.action.install")}
-    </Button>
+/** The one action a row carries: the pack's own actions, over the install places. */
+function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowActions }) {
+  return (
+    <PluginActions
+      plugin={plugin}
+      clients={actions.clients}
+      busy={actions.busy}
+      onUpdate={() => actions.onUpdate(plugin)}
+      onInstall={(client, scope) => actions.onInstall(plugin, client, scope)}
+      onUninstall={(client, scope) => actions.onUninstall(plugin, client, scope)}
+    />
   )
 }
 
@@ -233,36 +239,50 @@ function PhotoCover({ src, onRatio }: { src: string; onRatio: (ratio: number) =>
 }
 
 /**
- * The cover of a pack that ships no picture: its mark, and how much it carries.
- * The card body already states the name and the description, so what is left to
- * say is what installing it would bring.
+ * The cover of a pack that ships no picture: its mark, and the version the pack
+ * itself declares. The card body already states the name and the description, so
+ * what is left to say is which revision of it this is.
  */
 function BundleCover({ plugin }: { plugin: PluginRow }) {
-  const { t } = useI18n()
-
   return (
     <div className="flex size-full flex-col items-center justify-center gap-2 bg-surface-raised">
       <span className="flex size-11 items-center justify-center rounded-full bg-secondary">
         <PlugIcon className="size-5 text-muted-foreground" aria-hidden />
       </span>
-      <span className="font-mono text-[12px] leading-[18px] text-muted-foreground">
-        {t("plugins.cover.bundle")
-          .replace("{skills}", String(plugin.bundle.skills))
-          .replace("{commands}", String(plugin.bundle.commands))}
-      </span>
+      {plugin.version === "" ? null : (
+        <span className="font-mono text-[12px] leading-[18px] text-muted-foreground">
+          {plugin.version}
+        </span>
+      )}
     </div>
+  )
+}
+
+/**
+ * The mark a pack carries when its source moved past the copy here. It is the
+ * only place the answer to a check is visible without opening the pack, so it
+ * says the one word and nothing else.
+ */
+function UpdateBadge({ plugin }: { plugin: PluginRow }) {
+  const { t } = useI18n()
+  if (plugin.outdated !== true) return null
+  return (
+    <span
+      className="shrink-0 rounded-full bg-amber-600/12 px-[7px] py-[2px] text-[11px] leading-[14px] font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400"
+      title={plugin.modified === true ? t("plugins.update.modified") : t("plugins.update.available")}
+    >
+      {t("plugins.update.badge")}
+    </span>
   )
 }
 
 function PluginCard({
   plugin,
-  installed,
-  onToggle,
+  actions,
   onOpen,
 }: {
   plugin: PluginRow
-  installed: boolean
-  onToggle: () => void
+  actions: RowActions
   onOpen: () => void
 }) {
   const { t } = useI18n()
@@ -326,6 +346,7 @@ function PluginCard({
             <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
               {t("plugins.version").replace("{version}", plugin.version)}
             </span>
+            <UpdateBadge plugin={plugin} />
           </span>
           <span className="shrink-0 text-[12px] leading-[15px] text-muted-soft">
             {plugin.updated}
@@ -334,7 +355,7 @@ function PluginCard({
         <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">{plugin.description}</p>
         <div className="flex items-center justify-between gap-2">
           <PluginSourceLine plugin={plugin} />
-          <InstallButton plugin={plugin} installed={installed} onToggle={onToggle} />
+          <InstallButton plugin={plugin} actions={actions} />
         </div>
       </div>
     </div>
@@ -372,13 +393,11 @@ function EmptyState({
 
 function PluginGrid({
   plugins,
-  installed,
-  onToggle,
+  actions,
   onOpen,
 }: {
   plugins: PluginRow[]
-  installed: readonly string[]
-  onToggle: (plugin: PluginRow) => void
+  actions: RowActions
   onOpen: (plugin: PluginRow) => void
 }) {
   /*
@@ -394,8 +413,7 @@ function PluginGrid({
           <PluginCard
             key={plugin.id}
             plugin={plugin}
-            installed={installed.includes(plugin.id)}
-            onToggle={() => onToggle(plugin)}
+            actions={actions}
             onOpen={() => onOpen(plugin)}
           />
         ))}
@@ -444,8 +462,7 @@ function PluginTable({
   needle,
   checked,
   onCheck,
-  installed,
-  onToggle,
+  actions,
   onOpen,
 }: {
   plugins: PluginRow[]
@@ -454,8 +471,7 @@ function PluginTable({
   /** Keys of the rows ticked for a batch action. */
   checked: readonly string[]
   onCheck: (keys: string[]) => void
-  installed: readonly string[]
-  onToggle: (plugin: PluginRow) => void
+  actions: RowActions
   onOpen: (plugin: PluginRow) => void
 }) {
   const { t } = useI18n()
@@ -480,6 +496,7 @@ function PluginTable({
               <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
                 {t("plugins.version").replace("{version}", plugin.version)}
               </span>
+              <UpdateBadge plugin={plugin} />
             </span>
             <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
               <Highlighted text={plugin.description} needle={needle} />
@@ -518,13 +535,7 @@ function PluginTable({
       key: "action",
       label: t("plugins.column.action"),
       width: "8.5%",
-      cell: (plugin) => (
-        <InstallButton
-          plugin={plugin}
-          installed={installed.includes(plugin.id)}
-          onToggle={() => onToggle(plugin)}
-        />
-      ),
+      cell: (plugin) => <InstallButton plugin={plugin} actions={actions} />,
     },
   ]
 
@@ -542,20 +553,55 @@ function PluginTable({
         clearLabel: t("plugins.batch.clear"),
         onClear: () => onCheck([]),
         action: (
-          <Button
-            type="button"
-            disabled={checked.length === 0}
-            onClick={() => {
-              for (const plugin of plugins) {
-                if (checked.includes(plugin.id)) onToggle(plugin)
+          /* One target, chosen once, applied to every ticked row: a batch that
+             asked per row would be the row's own menu again. */
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  disabled={checked.length === 0 || actions.busy}
+                  className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
+                />
               }
-              onCheck([])
-            }}
-            className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
-          >
-            <DownloadIcon className="size-3.5" />
-            {t("plugins.action.install")}
-          </Button>
+            >
+              <DownloadIcon className="size-3.5" />
+              {t("plugins.action.installTo")}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={6} className="w-[272px] p-1">
+              {actions.clients.map((client) => (
+                <div key={client.id}>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="flex items-center gap-1.5 px-1.5 py-1 text-[11.5px] font-semibold text-muted-soft">
+                      <client.icon className="size-3.5 shrink-0" aria-hidden />
+                      {client.label}
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  {client.scopes.map((scope) => (
+                    <DropdownMenuItem
+                      key={`${client.id}:${scope}`}
+                      closeOnClick={false}
+                      disabled={actions.busy || !client.available}
+                      onClick={() => {
+                        for (const plugin of plugins) {
+                          if (checked.includes(plugin.id)) {
+                            actions.onInstall(plugin, client.id, scope)
+                          }
+                        }
+                        onCheck([])
+                      }}
+                      className="gap-2.5 px-1.5 py-2 pl-4"
+                    >
+                      <span className="text-[13px] leading-[18px] font-semibold">
+                        {t(SCOPE_LABELS[scope])}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </div>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ),
       }}
       onOpen={onOpen}
@@ -634,12 +680,55 @@ export function PluginsPage() {
   const [checked, setChecked] = React.useState<readonly string[]>([])
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
-  /* Which packs read as installed. Until the module reads a real catalog this
-     is the screen's own state, seeded from the sample. */
-  const [installed, setInstalled] = React.useState<readonly string[]>(sampleInstalled)
-  /* The rows on offer. Reading real packs replaces this list outright; until
-     then an edit in the lightbox is a change to this state. */
-  const [catalog, setCatalog] = React.useState<PluginRow[]>(samplePlugins)
+  /* The library the rows come from, and the one place a write reaches it. */
+  const library = usePluginLibrary()
+  const installed = library.delivered
+  const catalog = library.rows
+
+  /* A pack whose folder was deleted is fetched again as the page loads: the
+     record is what says it was here, and the address it carries is what puts the
+     files back. One notice names every pack that is gone, and they are fetched at
+     once — each address is that pack's own, so nothing here has to wait for
+     another to finish before it starts. */
+  const missing = library.missing
+  const repairing = React.useRef(new Set<string>())
+  React.useEffect(() => {
+    const gone = missing.filter((name) => !repairing.current.has(name))
+    /* A pack that failed once is not tried again on every re-read: a source that
+       has gone away answers the same way each time, and a reload is the retry. */
+    if (gone.length === 0) return
+    for (const name of gone) repairing.current.add(name)
+    const id = "plugins.restore"
+    toast.add({
+      id,
+      type: "loading",
+      title: t("plugins.notice.restoring").replace("{names}", gone.join(t("plugins.notice.separator"))),
+    })
+    void Promise.allSettled(gone.map((name) => library.restore(name)))
+      .then(async (results) => {
+        const failed = results.flatMap((result, at) =>
+          result.status === "rejected"
+            ? [{ name: gone[at] as string, reason: reasonOf(result.reason) }]
+            : []
+        )
+        await library.refresh()
+        if (failed.length === 0) {
+          toast.close(id)
+          return
+        }
+        toast.update(id, {
+          type: "error",
+          title: t("plugins.notice.restoreFailed").replace(
+            "{names}",
+            failed.map((one) => one.name).join(t("plugins.notice.separator"))
+          ),
+          description: failed.map((one) => one.reason).join("\n"),
+        })
+      })
+      .catch((error: unknown) => {
+        toast.update(id, { type: "error", title: reasonOf(error) })
+      })
+  }, [missing, library, t])
 
   const offered = React.useMemo(() => {
     if (needle === "") return catalog
@@ -678,28 +767,87 @@ export function PluginsPage() {
     [matching, shownPage, pageSize]
   )
 
-  /* The one write this screen makes: a pack moves between the two tabs. */
-  const toggle = (plugin: PluginRow) =>
-    setInstalled((held) =>
-      held.includes(plugin.id)
-        ? held.filter((id) => id !== plugin.id)
-        : [...held, plugin.id]
+  /* Every row's own write: a pack is delivered to one client at one scope, or
+     taken back out of that same place. Each place is its own, so the row's menu
+     acts on them one at a time. */
+  const actions: RowActions = {
+    clients: library.clients,
+    busy: library.busy,
+    onUpdate: (plugin) => {
+      void library
+        .update(plugin.id)
+        .then((outcome) => {
+          toast.add({
+            type: "success",
+            title: outcome.changed
+              ? t("plugins.update.done").replace("{name}", plugin.name)
+              : t("plugins.update.unchanged").replace("{name}", plugin.name),
+          })
+          if (outcome.overwroteEdits) {
+            toast.add({ type: "warning", title: t("plugins.update.overwritten") })
+          }
+        })
+        .catch((error: unknown) => {
+          toast.add({
+            type: "error",
+            title: error instanceof Error ? error.message : String(error),
+          })
+        })
+    },
+    onInstall: (plugin, client, scope) => {
+      void library.install(plugin.name, client, scope).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onUninstall: (plugin, client, scope) => {
+      void library.uninstall(plugin.name, client, scope).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+  }
+
+  /**
+   * Collect one pack and say what became of it.
+   *
+   * The dialog closes on a pack that is new, so the notice is what says what
+   * landed; a pack that was already here, or a failure, leaves the dialog open
+   * for the address to be corrected, so the notice is the only thing that reports
+   * it. A failure is a notice rather than a state the dialog draws, because it is
+   * about this one attempt rather than about the address that produced it.
+   */
+  const collect = (run: () => Promise<PluginCollected>) =>
+    run().then(
+      (collected) => {
+        toast.add({
+          type: collected.already ? "info" : "success",
+          title: t(
+            collected.already ? "plugins.notice.already" : "plugins.notice.added"
+          ).replace("{name}", collected.record.name),
+        })
+        return collected
+      },
+      (error: unknown) => {
+        toast.add({
+          type: "error",
+          title: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
     )
 
-  /* A pack the Add dialog named. Until the module reads a real catalog there is
-     nothing to install into, so the name is what the tabs then read. */
-  const take = (name: string) =>
-    setInstalled((held) => (held.includes(name) ? held : [...held, name]))
+  const take = (source: string) => collect(() => library.add(source))
+
+  /* The same for a folder a page read, whose pack the host names from the same
+     manifest — so it too only knows what landed by being told. */
+  const addFromFolder = (name: string, files: readonly PackUploadFile[]) =>
+    collect(() => library.addFolder(name, files))
 
   /* The pack the lightbox is open on, read from the catalog rather than the
      page: a filter can take its row away while the lightbox is up. */
   const detail = catalog.find((plugin) => plugin.id === detailId) ?? null
 
   /* A category edited in the lightbox is that row's own from then on. */
-  const setTags = (plugin: PluginRow, tags: string[]) =>
-    setCatalog((rows) =>
-      rows.map((row) => (row.id === plugin.id ? { ...row, tags } : row))
-    )
+  const setTags = (plugin: PluginRow, tags: string[]) => library.setTags(plugin.name, tags)
 
   const pagination = (
     <TablePagination
@@ -781,12 +929,41 @@ export function PluginsPage() {
             </div>
             <Button
               variant="outline"
+              disabled={library.busy}
               className="h-9 gap-2 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+              onClick={() => {
+                void library
+                  .checkUpdates()
+                  .then((summary) => {
+                    toast.add({
+                      type: summary.modified > 0 ? "warning" : "success",
+                      title: t("plugins.notice.checked")
+                        .replace("{count}", String(summary.checked))
+                        .replace("{outdated}", String(summary.outdated))
+                        .replace("{modified}", String(summary.modified)),
+                    })
+                    if (summary.failed.length > 0) {
+                      toast.add({
+                        type: "error",
+                        title: t("plugins.notice.checkFailed").replace(
+                          "{count}",
+                          String(summary.failed.length)
+                        ),
+                      })
+                    }
+                  })
+                  .catch((error: unknown) => {
+                    toast.add({
+                      type: "error",
+                      title: error instanceof Error ? error.message : String(error),
+                    })
+                  })
+              }}
             >
-              <RefreshCwIcon />
+              <RefreshCwIcon className={library.busy ? "animate-spin" : undefined} />
               {t("plugins.action.checkUpdates")}
             </Button>
-            <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddTab("marketplace")}>
+            <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddTab("address")}>
               <PlusIcon />
               {t("plugins.action.add")}
             </Button>
@@ -848,8 +1025,7 @@ export function PluginsPage() {
             ) : view === "grid" ? (
               <PluginGrid
                 plugins={plugins}
-                installed={installed}
-                onToggle={toggle}
+                actions={actions}
                 onOpen={(plugin) => setDetailId(plugin.id)}
               />
             ) : (
@@ -858,8 +1034,7 @@ export function PluginsPage() {
                 needle={needle}
                 checked={checked}
                 onCheck={setChecked}
-                installed={installed}
-                onToggle={toggle}
+                actions={actions}
                 onOpen={(plugin) => setDetailId(plugin.id)}
               />
             )}
@@ -868,19 +1043,22 @@ export function PluginsPage() {
       </Tabs>
       <AddPluginDialog
         open={addTab !== null}
-        tab={addTab ?? "marketplace"}
-        installed={installed}
+        tab={addTab ?? "address"}
         onTabChange={setAddTab}
         onOpenChange={(next) => {
           if (!next) setAddTab(null)
         }}
-        onInstall={take}
+        onAdd={take}
+        onAddFolder={addFromFolder}
       />
       <PluginDetailDialog
         plugin={detail}
-        installed={detail !== null && installed.includes(detail.id)}
+        clients={library.clients}
+        busy={library.busy}
         tagSuggestions={tagsOf(catalog)}
-        onToggleInstall={toggle}
+        onUpdate={(plugin) => actions.onUpdate(plugin)}
+        onInstall={(plugin, client, scope) => actions.onInstall(plugin, client, scope)}
+        onUninstall={(plugin, client, scope) => actions.onUninstall(plugin, client, scope)}
         onTagsChange={(tags) => {
           if (detail !== null) setTags(detail, tags)
         }}

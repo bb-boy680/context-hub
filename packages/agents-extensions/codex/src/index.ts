@@ -1,18 +1,21 @@
 /**
  * Codex as a Context Hub integration: one instructions file, one TOML config,
- * and the provider that reads and writes the servers in it.
+ * the provider that reads and writes the servers in it, and the installer that
+ * delivers plugin packs to Codex.
  *
- * Nothing here renders. The plugin declares an agent target and registers its
- * MCP provider into the MCP module's registry, and the shell does the rest: the
- * MCP page's places, the catalog entry, and the skills page's install targets
- * all read these. Nothing here imports the MCP module at run time — the service
- * carries the registry and the toolkit — which is what lets this plugin work
- * exactly like one downloaded from GitHub.
+ * Nothing here renders. The plugin declares an agent target and registers its MCP
+ * provider and its plugin installer into the modules' registries, and the shell
+ * does the rest: the MCP page's places, the catalog entry, the skills page's
+ * install targets and the plugins page's menu all read these. Nothing here
+ * imports either module at run time — the services carry the registries and the
+ * toolkit — which is what lets this plugin work exactly like one downloaded from
+ * GitHub.
  */
 import Codex from "@lobehub/icons/es/Codex"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
 
+import { codexInstaller } from "./installer.ts"
 import { codexMessages } from "./messages.ts"
 import { createCodexMcp } from "./provider.ts"
 
@@ -42,6 +45,14 @@ export const codexExtension: ExtensionDefinition = {
       ctx.effect(() => registry.register(createCodexMcp(tools)))
     })
 
+    /* Likewise for the plugins module: it publishes the registry an installer
+       registers into and the tools an installer is handed, so this extension
+       needs no knowledge of where either lives. */
+    scope.inject(["plugins"], (ctx, plugins) => {
+      const { registry } = plugins.plugins
+      ctx.effect(() => registry.register(codexInstaller))
+    })
+
     scope.contribute("target", {
       id: "hub.target.codex",
       displayName: "Codex",
@@ -62,3 +73,4 @@ export const codexExtension: ExtensionDefinition = {
 }
 
 export { createCodexMcp } from "./provider.ts"
+export { codexInstaller } from "./installer.ts"

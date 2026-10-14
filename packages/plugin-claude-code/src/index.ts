@@ -16,6 +16,7 @@ import ClaudeCode from "@lobehub/icons/es/ClaudeCode"
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
 import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
+import { claudeCodeInstaller } from "./installer.ts"
 import {
   CLAUDE_CODE_ID,
   CLAUDE_CODE_SKILL_DIR,
@@ -59,6 +60,7 @@ const CLAUDE_CODE_PLACES: SkillPlace[] = [
 ]
 
 export { createClaudeCodeMcp } from "./provider.ts"
+export { claudeCodeInstaller } from "./installer.ts"
 
 export const claudeCodeExtension: ExtensionDefinition = {
   manifest: {
@@ -84,6 +86,14 @@ export const claudeCodeExtension: ExtensionDefinition = {
     scope.inject(["mcp"], (ctx, plugins) => {
       const { registry, tools } = plugins.mcp
       ctx.effect(() => registry.register(createClaudeCodeMcp(tools)))
+    })
+
+    /* How Claude Code installs a plugin is this extension's knowledge, not the
+       plugins module's: that module owns the page and the library, and this
+       registers the installer it drives, through the same service. */
+    scope.inject(["plugins"], (ctx, plugins) => {
+      const { registry } = plugins.plugins
+      ctx.effect(() => registry.register(claudeCodeInstaller))
     })
 
     /* The places register into the skills module, which is what makes this

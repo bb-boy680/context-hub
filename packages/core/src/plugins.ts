@@ -1,28 +1,37 @@
 /**
- * The hub's plugin space: one directory per installed plugin under
- * `<home>/plugins`. A plugin package is a directory holding `plugin.json` (the
- * kernel manifest: identity, target API, entry module, declared permissions)
- * plus the files it ships. Media lives in the asset library and kernel state in
- * `state/`; this is where third-party code and its own files live.
+ * The hub's extension space: one directory per installed extension under
+ * `<home>/extensions`. An extension package is a directory holding `plugin.json`
+ * (the kernel manifest: identity, target API, entry module, declared
+ * permissions) plus the files it ships. Media lives in the asset library and
+ * kernel state in `state/`; this is where third-party code and its own files
+ * live.
  *
- * The kernel loads a plugin's entry module through whatever channel the form
+ * The kernel loads an extension's entry module through whatever channel the form
  * provides, so this file owns only the layout and the names — never a transport.
+ *
+ * The directory is `extensions`, not `plugins`: agent plugins (the packs this
+ * hub collects and delivers to coding agents) are a different thing and own
+ * `<home>/plugins`. Both spaces read a file called `plugin.json`, so sharing one
+ * directory would have each side reading the other's files.
  */
 
-/** Route a form serves plugin files on, for a loader that imports them over HTTP. */
-export const PLUGIN_ROUTE = "/hub/plugins"
+/** Route a form serves extension files on, for a loader that imports them over HTTP. */
+export const EXTENSION_ROUTE = "/hub/extensions"
 
-/** Directory under the hub home that holds one directory per plugin. */
-export const PLUGIN_DIR = "plugins"
+/** Directory under the hub home that holds one directory per extension. */
+export const EXTENSION_DIR = "extensions"
 
-/** Manifest file inside a plugin directory; its `id` must match the directory name. */
+/** Manifest file inside an extension directory; its `id` must match the directory name. */
 export const PLUGIN_MANIFEST = "plugin.json"
 
-/** Bookkeeping file in the plugins root: where each installed plugin came from. */
-export const PLUGIN_RECORDS = "index.json"
+/** Bookkeeping file in the extensions root: where each installed extension came from. */
+export const EXTENSION_RECORDS = "index.json"
 
 /** Entry module used when a manifest names none. */
 export const DEFAULT_PLUGIN_ENTRY = "index.js"
+
+/** Directory under the hub home the extensions used to live in, migrated once on first read. */
+export const LEGACY_EXTENSION_DIR = "plugins"
 
 /** Characters a plugin id may not carry, because it becomes a directory name. */
 const RESERVED_DIR_NAMES = new Set([

@@ -1,13 +1,13 @@
 /**
- * Browser-side plugin space: reads the plugin space over the host's own route,
- * so a page can list installed plugins and import their entry modules without
- * touching the disk. This is the read side only — installing a plugin writes
- * files, which is the host's job.
+ * Browser-side extension space: reads the extension space over the host's own
+ * route, so a page can list installed extensions and import their entry modules
+ * without touching the disk. This is the read side only — installing an
+ * extension writes files, which is the host's job.
  */
-import { PLUGIN_ROUTE } from "@workspace/core/plugins"
+import { EXTENSION_ROUTE } from "@workspace/core/plugins"
 import type { PluginSource } from "@workspace/core/plugins"
 
-/** Host answer for the plugin list. */
+/** Host answer for the extension list. */
 interface PluginListBody {
   ids?: unknown
 }
@@ -17,10 +17,10 @@ interface PluginListBody {
  *
  * @param base — origin-relative base the host serves the hub on; empty for the
  * same origin.
- * @param route — route the host serves plugin files on.
- * @returns a source a loader can read installed plugins through.
+ * @param route — route the host serves extension files on.
+ * @returns a source a loader can read installed extensions through.
  */
-export function createRemotePluginSource(base = "", route = PLUGIN_ROUTE): PluginSource {
+export function createRemotePluginSource(base = "", route = EXTENSION_ROUTE): PluginSource {
   return {
     root: "host",
 

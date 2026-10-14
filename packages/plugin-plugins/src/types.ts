@@ -1,20 +1,15 @@
 /**
- * One plugin as the catalog lists it: what the two views and the filter bar
- * draw. Nothing here is read from a bundle's own files yet — the screen this
- * ships first is the interface, and these are the fields it is built around.
+ * One plugin as the page draws it: the fields the two views, the filter bar and
+ * the lightbox are built around. A row is a library record read for the screen —
+ * the same pack, with its age and its source already worded.
  */
-export type PluginSource = "marketplace" | "local" | "builtin"
 
-/** What a plugin pack carries, which is what its cover states. */
-export interface PluginBundle {
-  skills: number
-  commands: number
-}
+export type PluginSource = "git" | "archive" | "local"
 
 export interface PluginRow {
   /** Stable identity, which the selection and the row keys travel in. */
   id: string
-  /** The pack's own name, which is also the directory a marketplace gives it. */
+  /** The pack's own name, which is also the directory it lives in. */
   name: string
   version: string
   description: string
@@ -24,10 +19,16 @@ export interface PluginRow {
   source: PluginSource
   /** How long ago it last moved, already worded for the locale it prints in. */
   updated: string
-  /** An image the pack ships, drawn at its own ratio; without one the cover
-      falls back to what the pack bundles. */
+  /** The first asset the hub holds for it, which is the pack's own picture when it shipped one. */
   cover?: string
-  bundle: PluginBundle
+  /** The last check found the source ahead of this copy. */
+  outdated?: boolean
+  /** These files differ from the revision they were collected at. */
+  modified?: boolean
+  /** Whether this pack's source can be asked about at all. */
+  hasSource?: boolean
+  /** When the source was last asked, empty when it never was. */
+  checkedAt?: string
 }
 
 /** One entry of a pack's directory listing, as the files panel reads it. */

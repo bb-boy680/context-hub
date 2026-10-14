@@ -7,62 +7,31 @@
  * when the CLI ran — nothing here recomputes one for a skill it installed.
  * The single question the CLI cannot answer is whether the files here were
  * edited after that install, because it never hashes what is on disk, so
- * `skillFolderHash` below repeats the same algorithm for exactly that.
+ * `skillFolderHash` repeats the same algorithm for exactly that.
+ *
+ * That algorithm lives in `@workspace/core/host/folder-hash` — the plugin
+ * library hashes its packs with it too, and one implementation is one place for
+ * this to be wrong. This module only re-exports it under the name the skills
+ * code has always used.
  */
-import { createHash } from "node:crypto"
 import { promises as fs } from "node:fs"
 import path from "node:path"
+
+import { folderHash } from "@workspace/core/host/folder-hash"
 
 import type { SkillUpstream } from "../store.ts"
 
 /** The file the CLI writes at the root of the folder it installed into. */
 const LOCK_FILE = "skills-lock.json"
-/** Entries the CLI's hash leaves out; a repository's own bookkeeping is not the skill. */
-const SKIPPED = new Set([".git", "node_modules"])
-
-/** One file the hash covers. */
-interface HashedFile {
-  relative: string
-  bytes: Buffer
-}
-
-async function collect(dir: string, at: string, into: HashedFile[]): Promise<void> {
-  const entries = await fs.readdir(at, { withFileTypes: true })
-  for (const entry of entries) {
-    if (SKIPPED.has(entry.name)) continue
-    const full = path.join(at, entry.name)
-    if (entry.isDirectory()) {
-      await collect(dir, full, into)
-      continue
-    }
-    if (!entry.isFile()) continue
-    into.push({
-      relative: path.relative(dir, full).split(path.sep).join("/"),
-      bytes: await fs.readFile(full),
-    })
-  }
-}
 
 /**
  * The hash the skills CLI computes over one skill directory, and records in
- * `skills-lock.json`: every file's relative path and bytes, in path order,
- * fed to one SHA-256. A different order or separator gives a different
- * number, so this has to match the CLI exactly to be worth comparing.
+ * `skills-lock.json`.
  *
  * @param dir — the skill directory, absolute.
  * @returns the hex digest the CLI would record for it.
  */
-export async function skillFolderHash(dir: string): Promise<string> {
-  const files: HashedFile[] = []
-  await collect(dir, dir, files)
-  files.sort((left, right) => left.relative.localeCompare(right.relative))
-  const hash = createHash("sha256")
-  for (const file of files) {
-    hash.update(file.relative)
-    hash.update(file.bytes)
-  }
-  return hash.digest("hex")
-}
+export const skillFolderHash = folderHash
 
 /** One lock entry, as much of it as the hub reads. */
 interface LockEntry {

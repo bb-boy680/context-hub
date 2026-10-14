@@ -117,8 +117,8 @@ async function skillStoreAvailable(): Promise<boolean> {
 }
 
 /**
- * Every plugin installed under `<home>/plugins`. One that cannot be loaded is
- * reported to the console and left out, so a broken download never keeps the
+ * Every extension installed under `<home>/extensions`. One that cannot be loaded
+ * is reported to the console and left out, so a broken download never keeps the
  * hub from starting.
  */
 async function installedPlugins() {

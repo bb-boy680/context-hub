@@ -196,6 +196,9 @@ importers:
       '@workspace/plugin-mcp':
         specifier: workspace:*
         version: link:../../plugin-mcp
+      '@workspace/plugin-plugins':
+        specifier: workspace:*
+        version: link:../../plugin-plugins
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -710,6 +713,9 @@ importers:
       '@workspace/plugin-mcp':
         specifier: workspace:*
         version: link:../plugin-mcp
+      '@workspace/plugin-plugins':
+        specifier: workspace:*
+        version: link:../plugin-plugins
       '@workspace/plugin-skills':
         specifier: workspace:*
         version: link:../plugin-skills
@@ -826,6 +832,9 @@ importers:
       '@headless-tree/react':
         specifier: ^1.7.0
         version: 1.7.0(@headless-tree/core@1.7.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@workspace/core':
+        specifier: workspace:*
+        version: link:../core
       '@workspace/extensions':
         specifier: workspace:*
         version: link:../extensions
