@@ -454,7 +454,12 @@ function EmptyState({
       <span className="max-w-[420px] text-[13px] leading-[18px] text-muted-foreground">
         {hint}
       </span>
-      {action === undefined ? null : <div className="mt-1 flex items-center gap-2">{action}</div>}
+      {/* An empty state may carry no action at all, and a caller that switches
+          one off passes `null` rather than `undefined` — both have to read as
+          nothing, or the row keeps an empty box it never fills. */}
+      {action === undefined || action === null ? null : (
+        <div className="mt-1 flex items-center gap-2">{action}</div>
+      )}
     </div>
   )
 }
