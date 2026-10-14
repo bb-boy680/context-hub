@@ -86,6 +86,21 @@ export function hasUpstream(origin: PluginOrigin): boolean {
 /** The directory under a hub home that holds collected plugin packs. */
 export const PLUGIN_LIBRARY_DIR = "plugins"
 
+/**
+ * The files a pack may name itself in, most specific first.
+ *
+ * A pack carries whichever one its own agent's convention asks for — Claude Code
+ * reads the first, a pack from before that convention reads the second, and a
+ * pack built for Codex reads the third — so a pack is a directory carrying any
+ * of them. Which one that is also answers "is this directory a pack at all",
+ * which is the question a folder full of repositories is scanned with.
+ */
+export const PLUGIN_MANIFESTS = [
+  ".claude-plugin/plugin.json",
+  "plugin.json",
+  ".codex-plugin/plugin.json",
+]
+
 /** The index inside the library root: one row per collected pack. */
 export const PLUGIN_INDEX_FILE = "plugins.json"
 

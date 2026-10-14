@@ -26,7 +26,7 @@ import { writeFileAtomic } from "@workspace/core/host/atomic"
 import { folderHash } from "@workspace/core/host/folder-hash"
 import { resolveHubHome } from "@workspace/core/host/home"
 
-import { PLUGIN_INDEX_FILE, PLUGIN_LIBRARY_DIR } from "../contract.ts"
+import { PLUGIN_INDEX_FILE, PLUGIN_LIBRARY_DIR, PLUGIN_MANIFESTS } from "../contract.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../records.ts"
 import { assertSafeSegment } from "./names.ts"
 import { findLogo, assetPresent, clearPictures, ownsPicture, storePicture } from "./logo.ts"
@@ -104,14 +104,6 @@ export interface PluginLibrary {
 }
 
 /**
- * Layouts a pack may name itself in, most specific first. Claude Code reads the
- * first, a pack from before that convention reads the second, and a pack built
- * for Codex reads the third — a pack that carries several is still one plugin,
- * so the first one that names it wins.
- */
-const MANIFESTS = [".claude-plugin/plugin.json", "plugin.json", ".codex-plugin/plugin.json"]
-
-/**
  * Whether a directory really holds a pack: it is there, and its manifest can be
  * read. A directory is not a pack — one that lost its manifest, or never got
  * one, holds nothing this hub could describe.
@@ -151,9 +143,11 @@ async function readJson(file: string): Promise<Record<string, unknown> | null> {
  * @throws {Error} when the directory carries no manifest at all, because this hub records a pack by the name its manifest gives it and has nothing else to record it under.
  */
 export async function readPackManifest(dir: string, fallbackName: string): Promise<PackManifest> {
-  for (const relative of MANIFESTS) {
+  let carried = false
+  for (const relative of PLUGIN_MANIFESTS) {
     const manifest = await readJson(path.join(dir, relative))
     if (manifest === null) continue
+    carried = true
     const name =
       typeof manifest.name === "string" && manifest.name !== "" ? manifest.name : undefined
     const version = typeof manifest.version === "string" ? manifest.version : ""
@@ -164,7 +158,14 @@ export async function readPackManifest(dir: string, fallbackName: string): Promi
       description: typeof manifest.description === "string" ? manifest.description : "",
     }
   }
-  throw new Error("this directory carries no plugin manifest (.claude-plugin/plugin.json)")
+  /* A file by that name may still be somebody else's: a repository root carries a
+     `plugin.json` for its own tooling often enough that "no manifest" would be
+     the wrong thing to say about one. */
+  throw new Error(
+    carried
+      ? "the plugin manifest in this directory names no plugin (it needs a name or a version)"
+      : "this directory carries no plugin manifest (.claude-plugin/plugin.json)"
+  )
 }
 
 /** Walk one pack's directory, skipping the bookkeeping nothing reads. */
