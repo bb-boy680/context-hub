@@ -87,7 +87,7 @@ async function remoteRevision(url: string, ref: string | undefined): Promise<str
 /** What asking one source produced. */
 async function askSource(origin: PluginOrigin): Promise<Ask | null> {
   switch (origin.kind) {
-    case "git":
+    case "url":
       return { latest: await remoteRevision(origin.url, origin.ref) }
     case "archive": {
       const response = await fetch(origin.url, { method: "HEAD", redirect: "follow" })
@@ -98,7 +98,14 @@ async function askSource(origin: PluginOrigin): Promise<Ask | null> {
       if (etag === null) throw new Error(`${origin.url} publishes no revision`)
       return { latest: etag }
     }
-    case "path":
+    /* The revision a subdirectory pack records is the repository's, so the
+       answer a check would need is the subdirectory's own last commit. This
+       build does not read that yet, and asking the repository instead would
+       report an update every time somebody touched an unrelated directory —
+       `hasUpstream` keeps these out of the queue rather than answering wrongly. */
+    case "git-subdir":
+      return null
+    case "local":
       return null
   }
 }

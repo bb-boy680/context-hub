@@ -42,30 +42,101 @@ function isObject(value: unknown): value is Record<string, unknown> {
 /** One origin read back, or null when the stored value is not one this build can use. */
 function originOf(value: unknown): PluginOrigin | null {
   if (!isObject(value)) return null
-  switch (value.kind) {
-    case "git": {
+  /* The word is written under `source`, the key Claude Code's own marketplace
+     schema uses; `kind` is what this build wrote before, and is still read so a
+     library collected by an older one is not lost. */
+  switch (value.source ?? value.kind) {
+    case "url": {
       if (typeof value.url !== "string" || typeof value.revision !== "string") return null
       return {
-        kind: "git",
+        kind: "url",
         url: value.url,
+        revision: value.revision,
+        ...(typeof value.ref === "string" ? { ref: value.ref } : {}),
+      }
+    }
+    case "git-subdir": {
+      if (
+        typeof value.url !== "string" ||
+        typeof value.path !== "string" ||
+        typeof value.revision !== "string"
+      ) {
+        return null
+      }
+      return {
+        kind: "git-subdir",
+        url: value.url,
+        path: value.path,
         revision: value.revision,
         ...(typeof value.ref === "string" ? { ref: value.ref } : {}),
       }
     }
     case "archive": {
       if (typeof value.url !== "string") return null
+      /* `etag` is what this build wrote before the validator took the name every
+         other source uses for "what the upstream held when this landed". */
+      const revision = value.revision ?? value.etag
       return {
         kind: "archive",
         url: value.url,
-        ...(typeof value.etag === "string" ? { etag: value.etag } : {}),
+        ...(typeof revision === "string" ? { revision } : {}),
+      }
+    }
+    case "local": {
+      if (typeof value.path !== "string") return null
+      return { kind: "local", path: value.path }
+    }
+    /* The three words this build used before they were rewritten: a repository
+       was `git`, and a directory here was `path`. */
+    case "git": {
+      if (typeof value.url !== "string" || typeof value.revision !== "string") return null
+      return {
+        kind: "url",
+        url: value.url,
+        revision: value.revision,
+        ...(typeof value.ref === "string" ? { ref: value.ref } : {}),
       }
     }
     case "path": {
       if (typeof value.path !== "string") return null
-      return { kind: "path", path: value.path }
+      return { kind: "local", path: value.path }
     }
     default:
       return null
+  }
+}
+
+/**
+ * One origin as the file writes it: the same fields under the word Claude Code's
+ * marketplace schema spells its own sources with.
+ *
+ * @param origin — where a collected pack came from.
+ */
+function storedOrigin(origin: PluginOrigin): Record<string, unknown> {
+  switch (origin.kind) {
+    case "url":
+      return {
+        source: "url",
+        url: origin.url,
+        ...(origin.ref === undefined ? {} : { ref: origin.ref }),
+        revision: origin.revision,
+      }
+    case "git-subdir":
+      return {
+        source: "git-subdir",
+        url: origin.url,
+        path: origin.path,
+        ...(origin.ref === undefined ? {} : { ref: origin.ref }),
+        revision: origin.revision,
+      }
+    case "archive":
+      return {
+        source: "archive",
+        url: origin.url,
+        ...(origin.revision === undefined ? {} : { revision: origin.revision }),
+      }
+    case "local":
+      return { source: "local", path: origin.path }
   }
 }
 
@@ -136,5 +207,6 @@ export function readIndex(stored: unknown): PluginRecord[] {
 
 /** The index as the file is written: two-space JSON, one trailing newline. */
 export function serializeIndex(records: readonly PluginRecord[]): string {
-  return `${JSON.stringify(records, null, 2)}\n`
+  const written = records.map((record) => ({ ...record, source: storedOrigin(record.source) }))
+  return `${JSON.stringify(written, null, 2)}\n`
 }

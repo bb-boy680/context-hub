@@ -16,14 +16,30 @@
 /** How a plugin pack was obtained, which is also how it is asked about later. */
 export type PluginOrigin =
   /** A git repository, at one revision. `ref` is the branch or tag the person named. */
-  | { kind: "git"; url: string; ref?: string; revision: string }
-  /** A zip or tarball fetched over HTTP; `etag` is the validator the server gave, when it gave one. */
-  | { kind: "archive"; url: string; etag?: string }
-  /** A directory on this machine. Where it came from is not a question this hub can answer. */
-  | { kind: "path"; path: string }
+  | { kind: "url"; url: string; ref?: string; revision: string }
+  /**
+   * One directory of a git repository, which is how a monorepo ships a pack.
+   * `path` is where the pack sits inside the repository, so two packs from one
+   * repository are told apart by it.
+   */
+  | { kind: "git-subdir"; url: string; path: string; ref?: string; revision: string }
+  /**
+   * A zip or tarball fetched over HTTP. `revision` is the validator the server
+   * published for it — an `ETag`, or a `Last-Modified` — which is the only thing
+   * a later check can compare; a server that publishes none leaves it absent.
+   */
+  | { kind: "archive"; url: string; revision?: string }
+  /**
+   * A directory on this machine: one the hub copied in, or — for a pack the hub
+   * never collected — the directory an agent reads it from. Nothing about a
+   * directory here answers "what does the source hold now", so none of the three
+   * asks a check; `path` is where it sat, and for a pack a person dropped in
+   * from a browser it is a label rather than a location.
+   */
+  | { kind: "local"; path: string }
 
 /** Every kind an origin can take, for checks and for what an installer accepts. */
-export const ORIGIN_KINDS = ["git", "archive", "path"] as const
+export const ORIGIN_KINDS = ["url", "git-subdir", "archive", "local"] as const
 
 /** Where one pack came from, and the state of the copy that landed here. */
 export interface PluginUpstream {
@@ -94,19 +110,21 @@ export interface PluginInstallReport {
  * be asked returns null and is never reported as having moved.
  */
 export function installedRevision(origin: PluginOrigin): string | null {
-  switch (origin.kind) {
-    case "git":
-      return origin.revision
-    case "archive":
-      return origin.etag ?? null
-    case "path":
-      return null
-  }
+  if (origin.kind === "local") return null
+  return origin.revision ?? null
 }
 
-/** Whether a source can be asked about at all. */
+/**
+ * Whether a source can be asked about at all.
+ *
+ * A `git-subdir` pack is left out on purpose rather than by omission: the
+ * revision it records is the repository's, and what a check would have to ask
+ * about is the subdirectory's own last commit. Asking the repository instead
+ * would report an update every time somebody touched an unrelated directory, so
+ * this build says it cannot answer rather than answering wrongly.
+ */
 export function hasUpstream(origin: PluginOrigin): boolean {
-  return origin.kind !== "path"
+  return origin.kind === "url" || origin.kind === "archive"
 }
 
 /** The directory under a hub home that holds collected plugin packs. */

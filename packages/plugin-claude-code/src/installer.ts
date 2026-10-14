@@ -108,7 +108,7 @@ export function readHeld(output: string): PluginHeld[] {
       scope: entry.scope,
       enabled: entry.enabled === true,
       marketplace: entry.id.slice(at + 1),
-      ...(path === undefined ? {} : { source: { kind: "path", path } }),
+      ...(path === undefined ? {} : { source: { kind: "local", path } }),
       pack: { name: "", version: "", description: "" },
     })
   }

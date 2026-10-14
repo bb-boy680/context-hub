@@ -15,7 +15,7 @@
 import { assetRef } from "@workspace/core"
 import type { ExtensionIcon } from "@workspace/extensions"
 
-import { installedRevision } from "./contract.ts"
+import { installedRevision, type PluginOrigin } from "./contract.ts"
 import type { PluginHeld } from "./provider.ts"
 import type { PluginRecord } from "./revision.ts"
 import type { PluginHeldBy, PluginRow, PluginSource } from "./types.ts"
@@ -42,9 +42,12 @@ function ageOf(iso: string, language: string | undefined, t: (key: string) => st
   return t("plugins.age.unknown")
 }
 
-/** Where a pack came from, in the words the row shows. */
-function sourceOf(record: PluginRecord): PluginSource {
-  return record.source.kind === "path" ? "local" : record.source.kind
+/** Where a pack came from, in the word a row shows. */
+const SOURCE_WORDS: Record<PluginOrigin["kind"], PluginSource> = {
+  url: "repo",
+  "git-subdir": "subdir",
+  archive: "archive",
+  local: "local",
 }
 
 /** One record as the row the two views draw. */
@@ -66,7 +69,7 @@ export function toRow(
     version: record.version,
     description: record.description,
     tags: record.tags,
-    source: sourceOf(record),
+    source: SOURCE_WORDS[record.source.kind],
     updated: ageOf(record.updatedAt, language, t),
     ...(record.icon === "" ? {} : { icon: assetRef(record.icon) }),
     ...(cover === undefined ? {} : { cover: assetRef(cover) }),
@@ -104,7 +107,7 @@ export interface ScannedPack {
    * name. One answers for the pack: the clients hold copies of the same pack,
    * and the first one that names a directory is as good as any.
    */
-  source?: { kind: "path"; path: string }
+  source?: { kind: "local"; path: string }
   /** The clients holding it, in the order they were read. */
   held: PluginHeldBy[]
 }
@@ -170,6 +173,9 @@ export function heldRow(pack: ScannedPack): PluginRow {
     /* The categories are the hub's own — what a person files a pack under once
        it is here — so a pack that is not here carries none. */
     tags: [],
+    /* Where this pack is: the directory the agent reads it from, which is on
+       this machine. The hub has taken it from nowhere itself. */
+    source: "local",
     updated: "",
     /* A pack the hub has not taken in has no picture but its own, so that one
        fills both places: the tile, and the card's own box. Both are read from

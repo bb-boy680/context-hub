@@ -19,11 +19,11 @@ import path from "node:path"
 
 import { folderHash } from "@workspace/core/host/folder-hash"
 
-import type { PluginOrigin } from "../contract.ts"
+import { installedRevision, type PluginOrigin } from "../contract.ts"
 import type { PluginRecord } from "../revision.ts"
+import { originToSpec } from "../inspect.ts"
 import { fetchPlugin, stagingDir } from "./fetch.ts"
 import type { PluginLibrary } from "./library.ts"
-import type { PluginSourceSpec } from "../inspect.ts"
 
 /** What one update did, as the person is told it. */
 export interface PluginUpdateOutcome {
@@ -35,22 +35,6 @@ export interface PluginUpdateOutcome {
   to: string | null
   /** The files here had been edited, and the update replaced them. */
   overwroteEdits: boolean
-}
-
-/** The address one recorded source is fetched by again. */
-export function specOf(source: PluginOrigin): PluginSourceSpec {
-  switch (source.kind) {
-    case "git":
-      return {
-        kind: "git",
-        url: source.url,
-        ...(source.ref === undefined ? {} : { ref: source.ref }),
-      }
-    case "archive":
-      return { kind: "archive", url: source.url }
-    case "path":
-      return { kind: "path", path: source.path }
-  }
 }
 
 /** Bringing the library's packs up to date. */
@@ -72,10 +56,10 @@ export function createPluginUpdater(library: PluginLibrary): PluginUpdater {
       const records = await library.list()
       const record = records.find((one) => one.name === name)
       if (record === undefined) throw new Error(`${name} is not in this library`)
-      if (record.source.kind === "path") {
+      if (record.source.kind === "local") {
         throw new Error(`${name} came from a directory on this machine; there is nothing to fetch again`)
       }
-      const spec = specOf(record.source)
+      const spec = originToSpec(record.source)
 
       const work = await stagingDir()
       const stage = path.join(work, "pack")
@@ -126,14 +110,7 @@ export function createPluginUpdater(library: PluginLibrary): PluginUpdater {
 
 /** The revision a person recognizes, as the record stores it. */
 function revisionLabel(source: PluginOrigin): string {
-  switch (source.kind) {
-    case "git":
-      return source.revision
-    case "archive":
-      return source.etag ?? ""
-    case "path":
-      return source.path
-  }
+  return installedRevision(source) ?? ""
 }
 
 /** One pack's record, for a caller that needs the row rather than the update. */

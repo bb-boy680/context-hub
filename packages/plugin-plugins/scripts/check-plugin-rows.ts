@@ -36,7 +36,7 @@ function record(name: string): PluginRecord {
     version: "1.0.0",
     description: `${name} does things`,
     tags: [],
-    source: { kind: "git", url: "https://example.com/pack.git", revision: "abc123" },
+    source: { kind: "url", url: "https://example.com/pack.git", revision: "abc123" },
     hash: "hash",
     icon: "",
     assets: [],
@@ -58,7 +58,7 @@ const answers: ScannedAnswer[] = [
         scope: "user",
         enabled: true,
         marketplace: "hud",
-        source: { kind: "path", path: "/cache/hud/0.8.0" },
+        source: { kind: "local", path: "/cache/hud/0.8.0" },
         pack: {
           name: "claude-hud",
           version: "1.0.0",
@@ -73,7 +73,7 @@ const answers: ScannedAnswer[] = [
         scope: "project",
         enabled: true,
         marketplace: "hud",
-        source: { kind: "path", path: "/cache/hud/0.8.0" },
+        source: { kind: "local", path: "/cache/hud/0.8.0" },
         pack: {
           name: "claude-hud",
           version: "1.0.0",
@@ -95,7 +95,7 @@ const answers: ScannedAnswer[] = [
         scope: "user",
         enabled: true,
         marketplace: "curated",
-        source: { kind: "path", path: "/codex/hud" },
+        source: { kind: "local", path: "/codex/hud" },
         pack: { name: "", version: "", description: "" },
       },
     ],
@@ -148,8 +148,8 @@ check(
   scanned[0]
 )
 check(
-  "the directory it sits in is read as a source",
-  scanned[0]?.source?.path === "/cache/hud/0.8.0",
+  "the directory it sits in is read as a local source",
+  scanned[0]?.source?.kind === "local" && scanned[0].source.path === "/cache/hud/0.8.0",
   scanned[0]?.source
 )
 check(
@@ -177,7 +177,52 @@ check(
   rows[1]?.description === "A statusline HUD" && rows[1]?.icon === "/hub/files/assets/hud-logo-3f9a2b1c.png",
   rows[1]
 )
-check("the agent's row names no source of its own", rows[1]?.source === undefined, rows[1]?.source)
+/* A pack only an agent holds came from a directory on this machine — the very
+   directory the agent reads it from — so its row says so rather than naming the
+   agent in the source's place. Which agents hold it is what the marks are for. */
+check("a pack only an agent holds reads as a local one", rows[1]?.source === "local", rows[1]?.source)
+check(
+  "a pack collected from a repository reads as the repository",
+  rows[0]?.source === "repo",
+  rows[0]?.source
+)
+check(
+  "one collected from a subdirectory reads as one",
+  composeRows(
+    [
+      {
+        ...record("mono"),
+        source: {
+          kind: "git-subdir",
+          url: "https://example.com/mono.git",
+          path: "tools/mono",
+          revision: "abc123",
+        },
+      },
+    ],
+    [],
+    "en",
+    (key) => key
+  )[0]?.source === "subdir"
+)
+check(
+  "one collected from an archive reads as an archive",
+  composeRows(
+    [{ ...record("zipped"), source: { kind: "archive", url: "https://x.test/a.zip" } }],
+    [],
+    "en",
+    (key) => key
+  )[0]?.source === "archive"
+)
+check(
+  "and one copied from a folder here reads as local",
+  composeRows(
+    [{ ...record("copied"), source: { kind: "local", path: "/packs/copied" } }],
+    [],
+    "en",
+    (key) => key
+  )[0]?.source === "local"
+)
 check(
   "a library row draws the mark the hub copied out of the pack",
   composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.icon ===

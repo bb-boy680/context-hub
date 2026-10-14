@@ -33,6 +33,7 @@ import {
 } from "../src/provider.ts"
 import { modified, outdated } from "../src/revision.ts"
 import { createPluginCollector, type PackUpload } from "../src/host/collect.ts"
+import { fetchPlugin, stagingDir } from "../src/host/fetch.ts"
 import { createFsPluginLibrary } from "../src/host/library.ts"
 import { findLogo } from "../src/host/logo.ts"
 import { bestPicture, pictureOf } from "../src/pictures.ts"
@@ -126,19 +127,19 @@ console.log("reading an address")
 
 check("owner/repo becomes the repository it names", (() => {
   const spec = parsePluginSource("DietrichGebert/ponytail")
-  return spec.kind === "git" && spec.url === "https://github.com/DietrichGebert/ponytail"
+  return spec.kind === "url" && spec.url === "https://github.com/DietrichGebert/ponytail"
 })())
 check("a repository URL is that repository", (() => {
   const spec = parsePluginSource("https://github.com/owner/repo")
-  return spec.kind === "git" && spec.url === "https://github.com/owner/repo"
+  return spec.kind === "url" && spec.url === "https://github.com/owner/repo"
 })())
 check("a fragment is the ref", (() => {
   const spec = parsePluginSource("owner/repo#v2")
-  return spec.kind === "git" && spec.ref === "v2"
+  return spec.kind === "url" && spec.ref === "v2"
 })())
 check("an @ on a shorthand is the ref too", (() => {
   const spec = parsePluginSource("owner/repo@v2")
-  return spec.kind === "git" && spec.ref === "v2" && spec.url === "https://github.com/owner/repo"
+  return spec.kind === "url" && spec.ref === "v2" && spec.url === "https://github.com/owner/repo"
 })())
 check("both spellings read alike", (() => {
   const hash = parsePluginSource("owner/repo#main")
@@ -147,29 +148,34 @@ check("both spellings read alike", (() => {
 })())
 check("a host shorthand expands", (() => {
   const spec = parsePluginSource("gitlab:owner/repo")
-  return spec.kind === "git" && spec.url === "https://gitlab.com/owner/repo"
+  return spec.kind === "url" && spec.url === "https://gitlab.com/owner/repo"
 })())
 /* An scp address carries an `@` for its own reasons, so it must not be read as a
    pinned ref. */
 check("an scp address keeps the user's @", (() => {
   const spec = parsePluginSource("git@github.com:owner/repo.git")
-  return spec.kind === "git" && spec.url === "git@github.com:owner/repo.git" && spec.ref === undefined
+  return spec.kind === "url" && spec.url === "git@github.com:owner/repo.git" && spec.ref === undefined
 })())
 check("a distinct git protocol URL is one", (() => {
   const spec = parsePluginSource("git://example.test/repo.git")
-  return spec.kind === "git" && spec.url === "git://example.test/repo.git"
+  return spec.kind === "url" && spec.url === "git://example.test/repo.git"
 })())
-check("an absolute path is a directory", parsePluginSource("/tmp/pack").kind === "path")
-check("a windows path is a directory", parsePluginSource("D:\\packs\\x").kind === "path")
+check("an absolute path is a directory", parsePluginSource("/tmp/pack").kind === "local")
+check("a windows path is a directory", parsePluginSource("D:\\packs\\x").kind === "local")
 check("a file URL is a directory", (() => {
   const spec = parsePluginSource("file:///tmp/pack")
-  return spec.kind === "path" && spec.path === "/tmp/pack"
+  return spec.kind === "local" && spec.path === "/tmp/pack"
 })())
 check("an archive URL is an archive", parsePluginSource("https://x.test/p.zip").kind === "archive")
 check("a tarball URL is an archive", parsePluginSource("https://x.test/p.tgz").kind === "archive")
 check(
   "an address reads back as text",
-  formatPluginSource({ kind: "git", url: "https://x.test/r", ref: "v1" }) === "https://x.test/r#v1"
+  formatPluginSource({ kind: "url", url: "https://x.test/r", ref: "v1" }) === "https://x.test/r#v1"
+)
+check(
+  "a subdirectory address reads back as one",
+  formatPluginSource({ kind: "git-subdir", url: "https://x.test/r", path: "tools/one" }) ===
+    "https://x.test/r/tools/one"
 )
 
 /* A relative path is refused because the host's working directory means nothing
@@ -197,12 +203,23 @@ console.log("records")
 
 /* A record's two answers come from two separate facts: the revision the source
    was at, and the hash of the files that landed. */
-const gitOrigin: PluginOrigin = { kind: "git", url: "/tmp/x", revision: "abc1234" }
-const pathOrigin: PluginOrigin = { kind: "path", path: source }
+const gitOrigin: PluginOrigin = { kind: "url", url: "/tmp/x", revision: "abc1234" }
+const pathOrigin: PluginOrigin = { kind: "local", path: source }
+const subdirOrigin: PluginOrigin = {
+  kind: "git-subdir",
+  url: "/tmp/x",
+  path: "tools/one",
+  revision: "abc1234",
+}
 check("a git source reports its revision", installedRevision(gitOrigin) === "abc1234")
 check("a local directory reports none", installedRevision(pathOrigin) === null)
 check("a repository can be asked about", hasUpstream(gitOrigin))
 check("a local directory cannot", !hasUpstream(pathOrigin))
+/* A subdirectory's revision is the repository's, and what a check would have to
+   ask about is the subdirectory's own last commit: this build says it cannot
+   answer rather than reporting an update whenever any other directory moves. */
+check("a subdirectory is not asked about yet", !hasUpstream(subdirOrigin))
+check("its revision still reads back", installedRevision(subdirOrigin) === "abc1234")
 
 const record = {
   name: "acme-hello",
@@ -233,9 +250,9 @@ check("a different hash is", modified({ ...record, checked: { at: "now", current
 /* The index is durable JSON a person may edit: a record this build cannot use is
    dropped, not fatal to the rest. */
 const stored = [
-  { name: "good", version: "1", source: { kind: "archive", url: "https://x.test/a.tgz" }, hash: "h" },
+  { name: "good", version: "1", source: { source: "archive", url: "https://x.test/a.tgz" }, hash: "h" },
   { name: "broken" },
-  { version: "2", source: { kind: "git", url: "u", revision: "r" }, hash: "h" },
+  { version: "2", source: { source: "url", url: "u", revision: "r" }, hash: "h" },
   record,
 ]
 const read = readIndex(stored)
@@ -246,6 +263,63 @@ check("an unreadable file reads as empty", readIndex({ plugins: {} }).length ===
 check("an empty index is an empty array", emptyIndex().length === 0)
 check("an empty file is one empty array", serializeIndex(emptyIndex()) === "[]\n")
 
+/* The four words were rewritten once: a repository was `git`, a directory here
+   was `path`, and an archive's validator was `etag`. A library collected by that
+   build has to read back as the words this one stores, or a person's packs would
+   be dropped by an upgrade. */
+const older = readIndex([
+  {
+    name: "older-git",
+    version: "1",
+    hash: "h",
+    source: { kind: "git", url: "https://x.test/r", ref: "v1", revision: "aaa" },
+  },
+  { name: "older-path", version: "1", hash: "h", source: { kind: "path", path: "/here" } },
+  {
+    name: "older-archive",
+    version: "1",
+    hash: "h",
+    source: { kind: "archive", url: "https://x.test/a.zip", etag: "W/1" },
+  },
+])
+check("a repository written as git reads as a url", older[0]?.source.kind === "url", older[0]?.source)
+check(
+  "and keeps the ref it was taken at",
+  older[0]?.source.kind === "url" && older[0].source.ref === "v1",
+  older[0]?.source
+)
+check("a directory written as path reads as local", older[1]?.source.kind === "local", older[1]?.source)
+check(
+  "an archive's etag reads as its revision",
+  older[2]?.source.kind === "archive" && older[2].source.revision === "W/1",
+  older[2]?.source
+)
+check(
+  "a subdirectory written by this build reads back whole",
+  (() => {
+    const one = readIndex([
+      {
+        name: "sub",
+        version: "1",
+        hash: "h",
+        source: {
+          source: "git-subdir",
+          url: "https://x.test/r",
+          path: "tools/one",
+          ref: "main",
+          revision: "bbb",
+        },
+      },
+    ])[0]
+    return (
+      one?.source.kind === "git-subdir" &&
+      one.source.path === "tools/one" &&
+      one.source.ref === "main" &&
+      one.source.revision === "bbb"
+    )
+  })()
+)
+
 /* A record written before the two fields were told apart kept the pack's mark
    among the pictures a person adds. Reading one puts the mark back where it
    belongs, and leaves a picture somebody added alone. */
@@ -253,7 +327,7 @@ const mixed = readIndex([
   {
     name: "old-pack",
     version: "1",
-    source: { kind: "path", path: "/somewhere" },
+    source: { source: "local", path: "/somewhere" },
     hash: "h",
     assets: ["assets/old-pack/logo.png", "https://cdn.test/shot.png"],
   },
@@ -272,7 +346,7 @@ const named = readIndex([
   {
     name: "named-pack",
     version: "1",
-    source: { kind: "path", path: "/somewhere" },
+    source: { source: "local", path: "/somewhere" },
     hash: "h",
     icon: "assets/named-pack/icon.png",
     assets: ["assets/named-pack/icon.png", "assets/added-by-hand.png"],
@@ -294,7 +368,7 @@ check("a fresh address is collected", !collected.already, collected.already)
 check("the pack landed under its own manifest name", collected.record.name === "acme-hello", collected.record.name)
 check("its version was read from the manifest", collected.record.version === "1.0.0", collected.record.version)
 check("its description was read", collected.record.description.includes("hello"), collected.record.description)
-check("a local directory is recorded as one", collected.record.source.kind === "path")
+check("a local directory is recorded as one", collected.record.source.kind === "local")
 check("its tags start empty", collected.record.tags.length === 0)
 check("it has no pictures of its own", collected.record.icon === "" && collected.record.assets.length === 0, collected.record)
 
@@ -315,6 +389,14 @@ check(
   JSON.stringify(Object.keys((index as Record<string, unknown>[])[0] as object)) ===
     JSON.stringify(["name", "version", "description", "tags", "source", "hash", "icon", "assets", "installedAt", "updatedAt"]),
   Object.keys((index as Record<string, unknown>[])[0] as object)
+)
+/* The word travels under `source`, the key Claude Code's own marketplace schema
+   spells its sources with, rather than under the `kind` this build used to write. */
+check(
+  "the source is written under its own word",
+  JSON.stringify((index as Record<string, unknown>[])[0]?.source) ===
+    JSON.stringify({ source: "local", path: source }),
+  (index as Record<string, unknown>[])[0]?.source
 )
 check(
   "nothing writes a marketplace index beside it",
@@ -357,7 +439,7 @@ check(
 )
 check(
   "what was recorded is where it sat in the drop",
-  uploaded.record.source.kind === "path" && uploaded.record.source.path === "dropped/plugins/acme-hello",
+  uploaded.record.source.kind === "local" && uploaded.record.source.path === "dropped/plugins/acme-hello",
   uploaded.record.source
 )
 check(
@@ -375,7 +457,7 @@ const other = await uploadCollector.addFolder(
   await uploads(two)
 )
 check("a second pack from one drop is its own record", other.record.name === "acme-other", other.record.name)
-check("the two are told apart by where they sat", other.record.source.kind === "path" && other.record.source.path !== uploaded.record.source.path)
+check("the two are told apart by where they sat", other.record.source.kind === "local" && other.record.source.path !== uploaded.record.source.path)
 check("and both are in the library", (await uploadLibrary.list()).length === 2)
 
 /* The label is a label, not a location, but it still must not read as one: a
@@ -766,7 +848,7 @@ async function takeFromRepo(into: ReturnType<typeof createFsPluginLibrary>, at?:
   return into.add(
     "acme-hello",
     pack,
-    { kind: "git", url: repo, ...(at === undefined ? {} : { ref: at }), revision },
+    { kind: "url", url: repo, ...(at === undefined ? {} : { ref: at }), revision },
     await folderHash(pack)
   )
 }
@@ -774,7 +856,7 @@ async function takeFromRepo(into: ReturnType<typeof createFsPluginLibrary>, at?:
 const cloned = await takeFromRepo(repoLibrary)
 check(
   "a pack taken from a repository records its revision",
-  cloned.source.kind === "git" && /^[0-9a-f]{40}$/.test(cloned.source.revision),
+  cloned.source.kind === "url" && /^[0-9a-f]{40}$/.test(cloned.source.revision),
   cloned.source
 )
 
@@ -802,7 +884,7 @@ check("nothing failed to answer", firstCheck.failed.length === 0, firstCheck.fai
 check(
   "the answer was recorded",
   (await repoLibrary.list())[0]?.checked?.latest ===
-    (cloned.source.kind === "git" ? cloned.source.revision : ""),
+    (cloned.source.kind === "url" ? cloned.source.revision : ""),
   (await repoLibrary.list())[0]?.checked
 )
 
@@ -824,7 +906,7 @@ check("it reports what it came from and went to", applied.from !== applied.to, a
 const after = (await repoLibrary.list())[0]
 check(
   "the record now holds the new revision",
-  after?.source.kind === "git" && after.source.revision === applied.to
+  after?.source.kind === "url" && after.source.revision === applied.to
 )
 check("and the new hash", after?.hash === (await folderHash(path.join(root, "repo-hub", "plugins", "acme-hello"))))
 check("the check that said there was an update is answered", !outdated(after!), after?.checked)
@@ -847,6 +929,90 @@ check("and a commit above the tag is not an update to it", stillPinned.outdated 
    reporting a change every time. */
 const localCheck = await probe.checkAll([collected.record])
 check("a local directory is listed as unanswerable", localCheck.unanswerable.includes("acme-hello"), localCheck)
+
+console.log("one directory of a repository")
+
+/* A monorepo ships packs as directories of one repository. An address naming a
+   subdirectory is taken as that directory and nothing else: the pack is what
+   lands, and no other directory of the repository comes with it. */
+const monorepo = path.join(root, "monorepo")
+await fs.mkdir(path.join(monorepo, "tools"), { recursive: true })
+await writePack(path.join(monorepo, "tools", "acme-hello"), "3.0.0")
+await writePack(path.join(monorepo, "tools", "other-pack"), "1.0.0", "other-pack")
+await fs.writeFile(path.join(monorepo, "README.md"), "The repository's own file.\n", "utf8")
+await git(monorepo, ["init", "-q"])
+await git(monorepo, ["config", "user.email", "check@example.test"])
+await git(monorepo, ["config", "user.name", "Check"])
+await git(monorepo, ["add", "-A"])
+await git(monorepo, ["commit", "-qm", "first"])
+await fs.rm(path.join(root, "subdir-hub"), { recursive: true, force: true })
+
+/** One fetch of a subdirectory of the monorepo, into a staging directory of its own. */
+async function takeSubdir(where: string): Promise<{ taken: PluginOrigin; stage: string }> {
+  const work = await stagingDir()
+  const stage = path.join(work, "pack")
+  await fs.mkdir(stage, { recursive: true })
+  const taken = await fetchPlugin({ kind: "git-subdir", url: monorepo, path: where }, stage, work)
+  return { taken, stage }
+}
+
+const subdir = await takeSubdir("tools/acme-hello")
+check(
+  "a subdirectory is recorded as one",
+  subdir.taken.kind === "git-subdir" &&
+    subdir.taken.path === "tools/acme-hello" &&
+    /^[0-9a-f]{40}$/.test(subdir.taken.revision),
+  subdir.taken
+)
+check(
+  "the pack's own files are what landed",
+  (await fs.stat(path.join(subdir.stage, "skills", "hello", "SKILL.md")).catch(() => null)) !== null
+)
+check(
+  "and nothing of the rest of the repository",
+  (await fs.stat(path.join(subdir.stage, "README.md")).catch(() => null)) === null &&
+    (await fs.stat(path.join(subdir.stage, "tools")).catch(() => null)) === null,
+  await fs.readdir(subdir.stage)
+)
+check(
+  "with no history",
+  (await fs.stat(path.join(subdir.stage, ".git")).catch(() => null)) === null
+)
+
+let noSuchDir = ""
+try {
+  await takeSubdir("tools/nowhere")
+} catch (error) {
+  noSuchDir = error instanceof Error ? error.message : String(error)
+}
+check("a subdirectory the repository does not hold is refused", noSuchDir.includes("holds no"), noSuchDir)
+
+let walkedOut = ""
+try {
+  await takeSubdir("../elsewhere")
+} catch (error) {
+  walkedOut = error instanceof Error ? error.message : String(error)
+}
+check("a subdirectory that walks out is refused", walkedOut.includes("unusable path"), walkedOut)
+
+/* Two packs from one repository are two packs: the path is what tells them
+   apart, so a library can hold both. */
+const subdirLibrary = createFsPluginLibrary(path.join(root, "subdir-hub"))
+const collectedSubdir = await takeSubdir("tools/acme-hello")
+const firstSubdir = await subdirLibrary.add(
+  "acme-hello",
+  collectedSubdir.stage,
+  collectedSubdir.taken,
+  await folderHash(collectedSubdir.stage)
+)
+check("a pack from a subdirectory is recorded", firstSubdir.source.kind === "git-subdir", firstSubdir.source)
+const subdirCheck = await createPluginProbe(subdirLibrary).checkAll(await subdirLibrary.list())
+check(
+  "and is answered as one this build cannot ask about",
+  subdirCheck.unanswerable.includes("acme-hello") && subdirCheck.outdated === 0,
+  subdirCheck
+)
+check("so it is never reported as behind", !outdated(firstSubdir))
 
 console.log("putting a pack back")
 

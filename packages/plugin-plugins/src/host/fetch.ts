@@ -1,6 +1,7 @@
 /**
- * Getting one plugin pack onto this machine: a repository at a revision, an
- * archive over HTTP, or a directory that is already here.
+ * Getting one plugin pack onto this machine: a repository at a revision, one
+ * directory of a repository, an archive over HTTP, or a directory that is
+ * already here.
  *
  * Every form ends in the same place — a staged directory holding the pack's own
  * files and nothing of the transport. A git checkout loses its `.git`, which is
@@ -20,6 +21,7 @@ import path from "node:path"
 
 import type { PluginOrigin } from "../contract.ts"
 import type { PluginSourceSpec } from "../inspect.ts"
+import { assertPackRelative } from "./names.ts"
 
 /** How long any one fetch may take before it is abandoned. */
 const FETCH_TIMEOUT_MS = 120_000
@@ -123,7 +125,7 @@ export async function fetchPlugin(
   work: string
 ): Promise<PluginOrigin> {
   switch (spec.kind) {
-    case "git": {
+    case "url": {
       const revision = await resolveRef(spec.url, spec.ref, work)
       const checkout = path.join(work, "checkout")
       await run(
@@ -144,13 +146,52 @@ export async function fetchPlugin(
       await fs.rm(path.join(checkout, ".git"), { recursive: true, force: true })
       await fs.cp(checkout, stage, { recursive: true })
       return {
-        kind: "git",
+        kind: "url",
         url: spec.url,
         revision,
         ...(spec.ref === undefined ? {} : { ref: spec.ref }),
       }
     }
 
+    case "git-subdir": {
+      const revision = await resolveRef(spec.url, spec.ref, work)
+      /* The pack is one directory of a repository, so only that directory is
+         asked for: a sparse checkout fetches the trees and the blobs the pack
+         needs and leaves the rest of the repository on the server. */
+      const inside = assertPackRelative(spec.path)
+      const checkout = path.join(work, "checkout")
+      await run(
+        "git",
+        [
+          "clone",
+          "--depth",
+          "1",
+          "--no-tags",
+          "--filter=blob:none",
+          "--sparse",
+          ...(spec.ref === undefined ? [] : ["--branch", spec.ref]),
+          "--",
+          spec.url,
+          checkout,
+        ],
+        work
+      )
+      await run("git", ["sparse-checkout", "set", "--", inside], checkout)
+      const from = path.join(checkout, ...inside.split("/"))
+      const stat = await fs.stat(from).catch(() => null)
+      if (stat === null || !stat.isDirectory()) {
+        throw new PluginFetchError(`${spec.url} holds no ${inside} at ${spec.ref ?? "HEAD"}`)
+      }
+      await fs.rm(path.join(checkout, ".git"), { recursive: true, force: true })
+      await fs.cp(from, stage, { recursive: true })
+      return {
+        kind: "git-subdir",
+        url: spec.url,
+        path: inside,
+        revision,
+        ...(spec.ref === undefined ? {} : { ref: spec.ref }),
+      }
+    }
 
     case "archive": {
       const response = await fetch(spec.url, { redirect: "follow" })
@@ -167,11 +208,11 @@ export async function fetchPlugin(
       /* bsdtar — the `tar` both Windows and macOS ship — reads zip as well as
          tar, so one call covers every archive a pack is shipped as. */
       await run("tar", ["-xf", file, "-C", stage], work)
-      const etag = response.headers.get("etag")
-      return { kind: "archive", url: spec.url, ...(etag === null ? {} : { etag }) }
+      const etag = response.headers.get("etag") ?? response.headers.get("last-modified")
+      return { kind: "archive", url: spec.url, ...(etag === null ? {} : { revision: etag }) }
     }
 
-    case "path": {
+    case "local": {
       const stat = await fs.stat(spec.path).catch(() => null)
       if (stat === null) throw new PluginFetchError(`there is nothing at ${spec.path}`)
       if (!stat.isDirectory()) throw new PluginFetchError(`${spec.path} is not a directory`)
@@ -182,7 +223,7 @@ export async function fetchPlugin(
         dereference: true,
         filter: (source) => !/[/\\](?:\.git|node_modules)(?:[/\\]|$)/.test(source),
       })
-      return { kind: "path", path: spec.path }
+      return { kind: "local", path: spec.path }
     }
   }
 }

@@ -548,7 +548,7 @@ function InfoPanel({
             <span aria-hidden className="text-muted-soft">
               ·
             </span>
-            {plugin.source === undefined ? null : t(`plugins.source.${plugin.source}`)}
+            {t(`plugins.source.${plugin.source}`)}
           </DialogDescription>
         </div>
         <DialogClose

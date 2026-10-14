@@ -84,7 +84,7 @@ export function readHeld(output: string): PluginHeld[] {
       scope: "user",
       enabled: entry.enabled !== false,
       marketplace: typeof entry.marketplaceName === "string" ? entry.marketplaceName : null,
-      ...(typeof path === "string" && path !== "" ? { source: { kind: "path", path } } : {}),
+      ...(typeof path === "string" && path !== "" ? { source: { kind: "local", path } } : {}),
       pack: { name: "", version: "", description: "" },
     })
   }

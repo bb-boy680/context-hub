@@ -93,9 +93,10 @@ export interface PluginHeld {
   marketplace: string | null
   /**
    * The directory the client loads the pack from — its own copy, or the folder
-   * it reads in place — read as the source recording it would name.
+   * it reads in place — read as the source recording it would name: a directory
+   * on this machine, which is what it is.
    */
-  source?: { kind: "path"; path: string }
+  source?: { kind: "local"; path: string }
   /** What the pack says about itself there; the fields are empty when it carries no manifest. */
   pack: PackDescription
 }

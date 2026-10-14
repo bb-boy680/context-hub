@@ -1,15 +1,23 @@
 /**
  * Reading an address before anything is fetched: which form a person typed, and
- * whether it is one this hub will take. Three forms cover every way a pack
+ * whether it is one this hub will take. Three forms cover every way an address
  * arrives — a git repository, an archive over HTTP, or a directory already on
- * this machine.
+ * this machine. A fourth, `git-subdir`, is one directory of a repository rather
+ * than the whole of it; nothing a person can type names one yet, so it appears
+ * here only as the form a record may already carry.
+ *
+ * The words are the same four a record stores, spelled the same way, because an
+ * address and the source it produced are the same thing before and after the
+ * fetch. `url` is a git repository — not a download link — which is what Claude
+ * Code's own marketplace schema calls it; an archive is its own word for the
+ * same reason a record needs one.
  *
  * An address is normalized here rather than kept as typed: `owner/repo` becomes
  * the repository address it names, so nothing downstream has to know which
- * shorthand a person pasted. A form that is not one of the three is refused with
- * the reason, because the alternative — treating a word as a name and looking it
- * up somewhere — is a marketplace's job, and a marketplace is somebody else's
- * index rather than an address to fetch.
+ * shorthand a person pasted. A form that is not one of them is refused with the
+ * reason, because the alternative — treating a word as a name and looking it up
+ * somewhere — is a marketplace's job, and a marketplace is somebody else's index
+ * rather than an address to fetch.
  *
  * A local path must be absolute. The host's working directory means nothing to a
  * person typing into a browser, so resolving a relative path against it would
@@ -21,12 +29,14 @@ import type { PluginOrigin } from "./contract.ts"
 
 /** An address read into the form the host fetches it by. */
 export type PluginSourceSpec =
-  /** A repository, optionally at a ref. */
-  | { kind: "git"; url: string; ref?: string }
+  /** A git repository, optionally at a ref. */
+  | { kind: "url"; url: string; ref?: string }
+  /** One directory of a git repository: `path` is where the pack sits inside it. */
+  | { kind: "git-subdir"; url: string; path: string; ref?: string }
   /** A zip or tarball over HTTP. */
   | { kind: "archive"; url: string }
   /** A directory on this machine, absolute. */
-  | { kind: "path"; path: string }
+  | { kind: "local"; path: string }
 
 /** An address the hub will not take; {@link InvalidPluginSourceError.reason} is what the person reads. */
 export class InvalidPluginSourceError extends Error {
@@ -102,7 +112,7 @@ export function parsePluginSource(raw: string): PluginSourceSpec {
   /* A local path, which must name where it is: a relative one would be resolved
      against a working directory the person cannot see. */
   const withoutScheme = source.replace(/^file:\/\//i, "")
-  if (ABSOLUTE.test(withoutScheme)) return { kind: "path", path: withoutScheme }
+  if (ABSOLUTE.test(withoutScheme)) return { kind: "local", path: withoutScheme }
   if (/^\.{1,2}(?:[\\/]|$)/.test(source) || source === "~" || /^~[\\/]/.test(source)) {
     throw invalid(source, "a path here must be absolute, like /packs/one or C:\\packs\\one")
   }
@@ -110,7 +120,7 @@ export function parsePluginSource(raw: string): PluginSourceSpec {
   /* An scp-like git address, whose `@` belongs to the user rather than a ref. */
   if (SCP_ADDRESS.test(source)) {
     const { url, ref } = splitRef(source, false)
-    return { kind: "git", url, ...(ref === undefined ? {} : { ref }) }
+    return { kind: "url", url, ...(ref === undefined ? {} : { ref }) }
   }
 
   /* A repository a git host knows by shorthand, which may carry a ref either way. */
@@ -118,12 +128,12 @@ export function parsePluginSource(raw: string): PluginSourceSpec {
   const host = shorthand === null ? undefined : GIT_SHORTHANDS[shorthand[1]?.toLowerCase() ?? ""]
   if (shorthand !== null && host !== undefined) {
     const { url, ref } = splitRef(shorthand[2] as string, true)
-    return { kind: "git", url: `${host}${url}`, ...(ref === undefined ? {} : { ref }) }
+    return { kind: "url", url: `${host}${url}`, ...(ref === undefined ? {} : { ref }) }
   }
 
   if (GIT_URL.test(source)) {
     const { url, ref } = splitRef(source, false)
-    return { kind: "git", url, ...(ref === undefined ? {} : { ref }) }
+    return { kind: "url", url, ...(ref === undefined ? {} : { ref }) }
   }
 
   if (/^https?:\/\//i.test(source)) {
@@ -134,14 +144,14 @@ export function parsePluginSource(raw: string): PluginSourceSpec {
     if (!HOSTED_REPOSITORY.test(url.replace(/^https?:\/\/[^/]+\//i, ""))) {
       throw invalid(source, "a URL must point at a repository or an archive")
     }
-    return { kind: "git", url, ...(ref === undefined ? {} : { ref }) }
+    return { kind: "url", url, ...(ref === undefined ? {} : { ref }) }
   }
 
   /* `owner/repo`, the form a repository page hands out, with a ref either way. */
   const hosted = splitRef(source, true)
   if (HOSTED_REPOSITORY.test(hosted.url)) {
     return {
-      kind: "git",
+      kind: "url",
       url: `https://github.com/${hosted.url}`,
       ...(hosted.ref === undefined ? {} : { ref: hosted.ref }),
     }
@@ -175,23 +185,62 @@ function samePlace(path: string): string {
  * from it is the pack already here.
  *
  * A ref counts: a pack taken at one branch is not the pack at another, and
- * taking the second one is a real add rather than a repeat.
+ * taking the second one is a real add rather than a repeat. A subdirectory
+ * counts the same way, for the same reason: one repository ships many packs, and
+ * the path is what tells them apart.
  *
  * @param spec — the address as it was read.
  * @param source — where a collected pack came from.
  */
 export function sourceMatches(spec: PluginSourceSpec, source: PluginOrigin): boolean {
   switch (spec.kind) {
-    case "git":
+    case "url":
       return (
-        source.kind === "git" &&
+        source.kind === "url" &&
         spec.url === source.url &&
+        (spec.ref ?? "") === (source.ref ?? "")
+      )
+    case "git-subdir":
+      return (
+        source.kind === "git-subdir" &&
+        spec.url === source.url &&
+        spec.path === source.path &&
         (spec.ref ?? "") === (source.ref ?? "")
       )
     case "archive":
       return source.kind === "archive" && spec.url === source.url
-    case "path":
-      return source.kind === "path" && samePlace(spec.path) === samePlace(source.path)
+    case "local":
+      return source.kind === "local" && samePlace(spec.path) === samePlace(source.path)
+  }
+}
+
+/**
+ * The address a recorded source is fetched by again.
+ *
+ * The two vocabularies are the same four words, so this only drops what a fetch
+ * has no use for: the revision that was recorded when the pack landed.
+ *
+ * @param origin — where a collected pack came from.
+ */
+export function originToSpec(origin: PluginOrigin): PluginSourceSpec {
+  switch (origin.kind) {
+    case "url":
+      return {
+        kind: "url",
+        url: origin.url,
+        ...(origin.ref === undefined ? {} : { ref: origin.ref }),
+      }
+    case "git-subdir":
+      return {
+        kind: "git-subdir",
+        url: origin.url,
+        path: origin.path,
+        ...(origin.ref === undefined ? {} : { ref: origin.ref }),
+      }
+    case "archive":
+      return { kind: "archive", url: origin.url }
+    case "local":
+      return { kind: "local", path: origin.path }
   }
 }
 
@@ -201,11 +250,13 @@ export function sourceMatches(spec: PluginSourceSpec, source: PluginOrigin): boo
  */
 export function formatPluginSource(spec: PluginSourceSpec): string {
   switch (spec.kind) {
-    case "git":
+    case "url":
       return spec.ref === undefined ? spec.url : `${spec.url}#${spec.ref}`
+    case "git-subdir":
+      return `${spec.ref === undefined ? spec.url : `${spec.url}#${spec.ref}`}/${spec.path}`
     case "archive":
       return spec.url
-    case "path":
+    case "local":
       return spec.path
   }
 }

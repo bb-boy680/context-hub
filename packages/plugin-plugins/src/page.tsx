@@ -10,6 +10,7 @@
 import {
   DownloadIcon,
   FileArchiveIcon,
+  FolderGit2Icon,
   GitBranchIcon,
   HardDriveIcon,
   InboxIcon,
@@ -40,6 +41,7 @@ import type { PluginInstallScope } from "./contract.ts"
 
 import type { ExtensionIcon } from "@workspace/extensions"
 import {
+  AvatarStack,
   FilterBar,
   Ledger,
   PageBody,
@@ -81,7 +83,8 @@ const SHELL_TABS: { value: PluginTab; labelKey: string; icon: ExtensionIcon }[] 
 
 /** The mark for where a pack came from. */
 const SOURCE_ICONS: Record<PluginSource, LucideIcon> = {
-  git: GitBranchIcon,
+  repo: GitBranchIcon,
+  subdir: FolderGit2Icon,
   archive: FileArchiveIcon,
   local: HardDriveIcon,
 }
@@ -135,41 +138,45 @@ function TagPill({ tag }: { tag: string }) {
 }
 
 /**
- * What a row's own line says about where the pack is: the hub's own word for
- * the kind of source it collected the pack from, or — for a pack an agent holds
- * and the hub does not — the agents holding it, because that is where it is.
+ * What a row's own line says about where the pack is: the hub's own word for the
+ * kind of source it collected the pack from. A pack the hub does not hold is
+ * worded as what it is — a directory on this machine — because that is where the
+ * agents holding it read it from.
  */
 function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
   const { t } = useI18n()
-  const shell =
-    "inline-flex max-w-full min-w-0 items-center gap-[5px] text-[12px] leading-[15px]"
+  const Icon = SOURCE_ICONS[plugin.source]
 
-  if (plugin.source !== undefined) {
-    const Icon = SOURCE_ICONS[plugin.source]
-    return (
-      /* max-w-full clamps the line to its container: without it a fixed-width
-         cell's nowrap text sets the box's minimum to the full line, so nothing
-         ever shrinks and the text paints over the neighbouring column. */
-      <span className={shell}>
-        <Icon className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
-        <span className="min-w-0 truncate text-muted-foreground">
-          {t(`plugins.source.${plugin.source}`)}
-        </span>
-      </span>
-    )
-  }
-
-  const first = plugin.held[0]
-  if (first === undefined) return null
-  const Mark = first.icon
-  const rest = plugin.held.length - 1
   return (
-    <span className={shell}>
-      <Mark className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
+    /* max-w-full clamps the line to its container: without it a fixed-width
+       cell's nowrap text sets the box's minimum to the full line, so nothing
+       ever shrinks and the text paints over the neighbouring column. */
+    <span className="inline-flex max-w-full min-w-0 items-center gap-[5px] text-[12px] leading-[15px]">
+      <Icon className="size-[13px] shrink-0 text-muted-soft" aria-hidden />
       <span className="min-w-0 truncate text-muted-foreground">
-        {rest === 0 ? first.label : `${first.label} +${String(rest)}`}
+        {t(`plugins.source.${plugin.source}`)}
       </span>
     </span>
+  )
+}
+
+/**
+ * The agents holding a pack, as their own marks.
+ *
+ * It answers "which agents have this" without the row being opened, which is the
+ * question a pack's source word cannot: a pack collected from a repository can
+ * still be sitting in three agents, and one only an agent holds is worded as a
+ * local directory like every other pack on this machine.
+ */
+function HolderStack({ plugin }: { plugin: PluginRow }) {
+  if (plugin.held.length === 0) return null
+
+  return (
+    <AvatarStack
+      marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
+      seam="ring-card"
+      label={plugin.held.map((hold) => hold.label).join(" · ")}
+    />
   )
 }
 
@@ -375,7 +382,7 @@ function PluginCard({
       </div>
       <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
         {/* The title block reads as the MCP cards do: the pack's own mark on a
-            tile, then its name and version, with where it came from beneath. */}
+            tile, then its name, with where it came from and its version beneath. */}
         <div className="flex min-w-0 items-center gap-3">
           <PluginTile plugin={plugin} />
           <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
@@ -383,12 +390,19 @@ function PluginCard({
               <span className="truncate font-mono text-[13.5px] leading-[1.3] font-semibold">
                 {plugin.name}
               </span>
-              <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
-                {t("plugins.version").replace("{version}", plugin.version)}
-              </span>
               <UpdateBadge plugin={plugin} />
             </div>
-            <PluginSourceLine plugin={plugin} />
+            <div className="flex min-w-0 items-center gap-1.5">
+              <PluginSourceLine plugin={plugin} />
+              {plugin.version === "" ? null : (
+                <>
+                  <span className="size-[3px] shrink-0 rounded-full bg-muted-soft" />
+                  <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
+                    {t("plugins.version").replace("{version}", plugin.version)}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
           <span className="shrink-0 self-start text-[12px] leading-[15px] text-muted-soft">
             {plugin.updated}
@@ -399,7 +413,12 @@ function PluginCard({
             {plugin.description}
           </p>
         )}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
+          {/* The marks take the left of the row and the action keeps the right,
+              whether or not any agent holds this pack. */}
+          <span className="mr-auto flex min-w-0 items-center">
+            <HolderStack plugin={plugin} />
+          </span>
           {plugin.stored ? (
             <InstallButton plugin={plugin} actions={actions} />
           ) : (
@@ -555,7 +574,12 @@ function PluginTable({
       key: "source",
       label: t("plugins.column.source"),
       width: "16.1%",
-      cell: (plugin) => <PluginSourceLine plugin={plugin} />,
+      cell: (plugin) => (
+        <div className="flex min-w-0 items-center gap-2">
+          <PluginSourceLine plugin={plugin} />
+          <HolderStack plugin={plugin} />
+        </div>
+      ),
     },
     {
       key: "updated",

@@ -6,7 +6,15 @@
  */
 import type { ExtensionIcon } from "@workspace/extensions"
 
-export type PluginSource = "git" | "archive" | "local"
+/**
+ * Where a pack came from, in the word a row shows.
+ *
+ * The words are the screen's rather than the record's: a stored source says
+ * `url` where a row says the repository it is, so a person reads what a pack is
+ * rather than the name of a field. A pack only an agent holds is a directory on
+ * this machine — the agent's own copy of it — and is worded as one.
+ */
+export type PluginSource = "repo" | "subdir" | "archive" | "local"
 
 /** One agent holding a pack, as a row names it. */
 export interface PluginHeldBy {
@@ -29,8 +37,8 @@ export interface PluginRow {
   description: string
   /** The categories the filter bar narrows by; a row may carry several. */
   tags: string[]
-  /** Where the pack came from. Absent for a pack only an agent holds: the hub took this one from nowhere itself. */
-  source?: PluginSource
+  /** Where the pack came from. A pack only an agent holds came from a directory on this machine, because that directory is where the agent reads it. */
+  source: PluginSource
   /** How long ago it last moved, already worded for the locale it prints in. */
   updated: string
   /** The pack's own mark, as a URL the row draws beside its name. */

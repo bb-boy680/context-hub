@@ -22,6 +22,7 @@ import { folderHash } from "@workspace/core/host/folder-hash"
 import type { PluginOrigin } from "../contract.ts"
 import {
   isAbsolutePath,
+  originToSpec,
   parsePluginSource,
   sourceMatches,
   type PluginSourceSpec,
@@ -45,17 +46,21 @@ const UPLOAD_LIMIT = 16 * 1024 * 1024
 
 /** Where one recorded source names itself, for a refusal to read back. */
 function whereFrom(source: PluginOrigin): string {
-  return source.kind === "path" ? source.path : source.url
+  return source.kind === "local" ? source.path : source.url
 }
 
 /** The fallback name an address suggests when the pack names itself nothing usable. */
 function fallbackName(spec: PluginSourceSpec): string {
   switch (spec.kind) {
-    case "git":
+    case "url":
       return spec.url.replace(/\.git$/, "").split("/").pop() || "plugin"
+    /* One repository ships many packs, and the directory a pack sits in is the
+       only name the address itself suggests. */
+    case "git-subdir":
+      return spec.path.split("/").filter((part) => part !== "").pop() || "plugin"
     case "archive":
       return spec.url.split("/").pop()?.replace(/\.(?:zip|tgz|tar\.gz)$/i, "") || "plugin"
-    case "path":
+    case "local":
       return path.basename(spec.path)
   }
 }
@@ -66,24 +71,6 @@ export interface PluginCollected {
   record: PluginRecord
   /** True when this address was already in the library, so nothing was fetched. */
   already: boolean
-}
-
-/** The address one record came from, as the spec that fetched it. */
-function specOf(source: PluginOrigin): PluginSourceSpec | null {
-  switch (source.kind) {
-    case "git":
-      return {
-        kind: "git",
-        url: source.url,
-        ...(source.ref === undefined ? {} : { ref: source.ref }),
-      }
-    case "archive":
-      return { kind: "archive", url: source.url }
-    case "path":
-      /* A directory on this machine *is* the pack: nothing was copied from it, so
-         there is nothing to fetch again. */
-      return null
-  }
 }
 
 /** Collecting packs into one library. */
@@ -149,7 +136,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
    */
   const samePack = (spec: PluginSourceSpec, source: PluginOrigin): boolean => {
     if (sourceMatches(spec, source)) return true
-    if (spec.kind !== "path" || source.kind !== "path") return false
+    if (spec.kind !== "local" || source.kind !== "local") return false
     return !isAbsolutePath(spec.path) || !isAbsolutePath(source.path)
   }
 
@@ -229,8 +216,8 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
          from one folder are told apart by the same field. */
       return await take(
         stage,
-        { kind: "path", path: from },
-        { kind: "path", path: from },
+        { kind: "local", path: from },
+        { kind: "local", path: from },
         await folderHash(stage)
       )
     } finally {
@@ -249,11 +236,12 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
   const restore = async (name: string): Promise<PluginRecord> => {
     const record = (await library.list()).find((one) => one.name === name)
     if (record === undefined) throw new Error(`${name} is not in this library`)
-    const spec = specOf(record.source)
-    if (spec === null) {
+    /* A directory on this machine *is* the pack: nothing was copied away from it,
+       so there is nothing to fetch it back from. */
+    if (record.source.kind === "local") {
       throw new Error(`${name} came from a folder on this machine, so there is nothing to fetch it from`)
     }
-    return (await collect(spec)).record
+    return (await collect(originToSpec(record.source))).record
   }
 
   return {
