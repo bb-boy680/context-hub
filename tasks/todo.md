@@ -1,7 +1,367 @@
-# 插件模块的实施计划（2026-10-13，用户：「列一个详细的一个实施计划，计划是有阶段执行的，每个阶段需要有一个验收目标」）
+# 插件「添加」这一步（2026-10-14 重做，待审核）
+
+> 本计划**只做「添加插件」**：输入地址 → 把包下载进 `~/.context-hub/plugins/` → 记进 `plugins.json`
+> → 包自带 logo 收进资产库。**市场、交付（装到 Agent）都不在本轮**。
+> 上一轮的计划与实测记录保留在本文件下半部分。
+
+## 落地进度（2026-10-14 收工）
+
+**六个阶段全部做完并验证**：
+
+- **阶段 1 地址解析**：`inspect.ts` 重写 —— 简写在解析时归一、`#ref` 与 `@ref` 都认（`@` 只在简写上切）、
+  相对路径与裸名字给可读拒绝、npm 删掉。`fetch.ts` 删 npm 与 `subdir`/`pinned`。`collect.ts` 只剩
+  `add(address)` 与 `addFolder`。**`git failed` 的根因（地址未归一）已修**。
+- **阶段 2 记录格式**：`records.ts` 改写成顶层数组（`readIndex`/`recordOf`/`serializeIndex`），
+  `revision.ts` 的 `PluginRecord` 换成九个字段，`library.ts` 读写数组、按 `name` 定位、重名报错。
+- **阶段 3 logo**：新增 `host/logo.ts`（深度≤3、条目上限、跳过 node_modules/.git、四级排序），
+  命中即复制进中央资产库，取名 `<name>-<basename>`；删包时只删自己带来的那些。
+- **阶段 4 删市场**：删掉 `host/marketplaces.ts`；`host/marketplace.ts` 只留生成索引那半；
+  probe/update 去掉 marketplace、subdir、npm 三个分支；桥接去掉 `inspect` 与 `asset` 两个动作。
+- **阶段 5 界面**：卡片封面取 `assets[0]`（走 `/hub/files`）；无封面卡片显示图标+版本；
+  对话框两段改成「地址」「本地」；详情页把「Carries/Skills/Commands」换成「来源」；
+  中英文案同步（语料 547 → **544**）。
+- **阶段 6 端到端**（旧库已改名 `plugins.old` 留作回滚）：
+  - `DietrichGebert/ponytail` → 落成 `ponytail` v5.2.0，记录字段与约定逐字一致
+  - 同一条再输入 `https://github.com/DietrichGebert/ponytail` → **记录除时间戳外逐字节相同**
+  - logo 复制进 `<home>/assets/ponytail-logo.png`，与包内那份**哈希一致**；卡片封面就是它
+  - 库根静止时**只有** `plugins.json` + `ponytail/`（没有 `.claude-plugin`、`.agents`）
+  - 三条拒绝各有可读文案：裸名字 / `./relative` / 无清单的仓库；且失败不留残留
+
+**验证**：`check-plugin-library.ts` **92 项全绿**；plugin-plugins / web / plugin-claude-code /
+plugin-mcp / locale-zh-cn 五个包 `typecheck` 零错、`lint` 干净；`check-plugins`(extensions)、
+`check-plugin`(mcp) 30/30、`check-upstream`(skills)、`check-messages` 544/544 全绿。
+
+**已知边界（本轮有意不做）**：仓库按 `subdir`/`path` 取子目录、npm、读别人的市场、交付链路、
+详情页画廊接后端（`assets` 目前只有扫描到的封面）。
+
+---
+
+## 为什么重做
+
+上一轮把「添加」做成了「市场语义」：输入框既收地址、又被当成**市场**读（读它的
+`.claude-plugin/marketplace.json`）、读到就**顺手登记**成 `marketplaces.json`、之后还能用**裸名字**
+反查所有市场。但 Claude Code 里这是**两个动作**：
+
+```
+/plugin marketplace add <地址>     ← 取物：把东西拿到本地
+/plugin install <名>@<市场>         ← 按名字解析：装到 Agent
+```
+
+我们的「安装」= **CC 的 `marketplace add` 那一半（取物）**；`plugin install` 那一半属于**交付**，
+本轮不做。所以输入框只该收**取物地址**，不该有名字反查、不该有登记副作用。
+
+### 顺带修掉的两个真 bug（已实测）
+
+1. **`git failed`**：`owner/repo` 被原样存成字符串，当 git 地址用时 `git ls-remote -- DietrichGebert/ponytail`
+   → `fatal: does not appear to be a git repository`（exit 128）；`https://…` 则正常。
+   根因是**地址没有在解析时归一**（CC 是在解析时归一成 `{source:'github', repo}`，用时才拼 URL）。
+2. **`owner/repo@ref` 打不通**：`@` 被 npm 版本分隔符抢走（`splitRef` 只认 `#`），走到 npm 分支后
+   `owner/repo` 又过不了包名校验。CC 两种都认（显示端用 `@`，用户就跟着打 `@`）。
+
+---
+
+## 一、定稿的规格
+
+### 1.1 输入框收什么（只收取物地址）
+
+| 输入 | 判定 | 怎么取 |
+|---|---|---|
+| `owner/repo`、`owner/repo#ref`、`owner/repo@ref` | GitHub 仓库 | 归一为 `https://github.com/owner/repo` |
+| `https://github.com/owner/repo` | 同上（补 `.git` 或归一） | 同上 |
+| `https://…/x.git`、`git@host:owner/repo.git`、含 `/_git/`（ADO） | git 仓库（任意主机） | 直接 clone |
+| 其它 `http(s)://` | 直接抓这个 URL 当索引读 | `url` 形态 |
+| `.zip` / `.tgz` / `.tar.gz` 的 URL | 压缩包 | 下载后 `tar -xf` |
+| `C:\…`、`/…`、`\\…`、`file://…` | 本机目录 | 复制进库 |
+| **`./` `../` `~`** | **拒绝**（只收绝对路径） | — |
+| **裸名字**（如 `airwallex-dev`） | **拒绝**，报「请给一个地址」 | — |
+
+**删掉 npm**：CC 的市场源里直接 `throw new Error('NPM marketplace sources not yet implemented')`；
+官方市场 315 条的实际分布是 164 `url` / 98 `git-subdir` / 53 相对路径、**npm 条目 0 个**。
+
+### 1.2 采集流程
+
+```
+解析（归一地址）→ git ls-remote -- <url> [ref] 拿 revision
+→ git clone --depth 1 --no-tags → 删 .git
+→ 读清单：.claude-plugin/plugin.json → 根 plugin.json → .codex-plugin/plugin.json
+          ↓ 都没有 → 拒绝入库（报「这个目录里找不到插件清单」）
+          ↓ name 不能当目录名 → 拒绝（不当场改名）
+→ 扫 logo → 命中就读字节 → assets 库 put() → 得到 "assets/logo.png"
+→ folderHash → 移进 ~/.context-hub/plugins/<name>/ → plugins.json 数组追加
+```
+
+**清单回退顺序的数据依据**（官方市场抽样 50 个包实测）：
+
+```
+ 25  .claude-plugin/plugin.json
+  8  .claude-plugin/plugin.json + .codex-plugin/plugin.json
+  4  .claude-plugin/plugin.json + package.json
+  3  .claude-plugin/plugin.json + .codex-plugin/plugin.json + plugin.json
+  2  .claude-plugin/plugin.json + plugin.json
+  2  .claude-plugin/plugin.json + .codex-plugin/plugin.json + package.json
+  1  全部四种都有
+  ── 以上 45/50（90%）都有 .claude-plugin/plugin.json
+  5  (none)  ← csharp-lsp / receipts / atomic-agents / learn-with-coursera / netsuite-suitecloud
+```
+
+那 5 个里：`csharp-lsp`、`receipts` 的目录**只有 LICENSE/README**（内容写在市场索引里，没有可下载的实体）；
+`atomic-agents`、`learn-with-coursera`、`netsuite-suitecloud` 的插件在子目录里、靠索引的 `path` 定位。
+**这 5 个在「给地址取物」这一步本来就不在覆盖范围内**，所以「拒绝收尾」不会丢掉任何可用的包。
+
+### 1.3 logo 扫描
+
+- 匹配：basename **含** `logo` 或 `icon`（不区分大小写）；扩展名 `png/jpg/jpeg/webp/gif/svg`
+- **深度 ≤ 3**；跳过 `node_modules`、`.git`；有扫描条目上限（防大仓库拖慢）
+- 多个命中时排序：**深度升序** → **独立词优先**（stem 恰为 `logo`/`icon`）→ **无变体后缀优先**
+  （`dark`/`light`/`sm`/`lg`/`@2x`…）→ **路径字典序**（保证稳定，不随文件系统顺序变）
+- 命中的那张 → 读字节 → `createFsAssetLibrary(home).put(basename, bytes, contentType)` → ref 记进 `assets`
+
+**实测依据**：ponytail 里名字含 logo/icon 的图有 7 个（`assets/logo.png`、`logo-dark.png`、`logo-dark.svg`、
+`logo-greenpt.svg`、`logo-greenpt-dark.svg`、`retriever-logo-dark.svg`、`retriever-logo-light.svg`），
+按上面的排序会选中 `assets/logo.png`（与旧的精确表结果一致，但覆盖面更大：`logo.svg`、
+`assets/brand/icon.png` 这类也能找到）。`alloydb-omni` 一个都没有 → `assets: []`
+（扫描救不了空封面，只是把命中面变宽）。
+
+### 1.4 `plugins.json`（顶层数组，`name` 是唯一键）
+
+```json
+[
+  {
+    "name": "ponytail",
+    "version": "5.2.0",
+    "description": "Lazy senior dev mode. Forces the simplest, shortest solution that actually works…",
+    "tags": [],
+    "source": {
+      "kind": "git",
+      "url": "https://github.com/DietrichGebert/ponytail",
+      "ref": "main",
+      "revision": "2961b52fc1fe6a5a87c7a959a79512e5c2f3ffe5"
+    },
+    "hash": "<sha256 hex>",
+    "assets": ["assets/logo.png"],
+    "installedAt": "2026-10-14T…Z",
+    "updatedAt": "2026-10-14T…Z",
+    "checked": { "at": "…", "latest": "…", "currentHash": "…" }
+  }
+]
+```
+
+- 形状对齐 `<home>/mcp/mcp.json`（顶层数组、一条一个对象）；`name` 唯一键**已实测安全**：
+  官方市场 **315/315** 个条目名都能直接当目录名。
+- `archive` 形态用 `source.etag` 替 `revision`；`path` 只有 `path`。
+- `hash` **纯 hex**（继续与 skills 共用 `folderHash`；那个算法被 `check-upstream.ts` 的黄金值钉死）。
+- 数组顺序 = **采集顺序**（界面自己按 `updatedAt` 排）。
+- 重名（`name` 已存在）→ **报错不覆盖**。
+
+### 1.5 更新检测要哪些字段（已确认：光靠 `hash` 不够）
+
+要回答的是**两个互不相干**的问题，各需一个独立事实：
+
+| 问题 | 字段 | 拿什么比 |
+|---|---|---|
+| 上游动了没（`outdated`） | `source.revision` + `source.ref` | 现问 `git ls-remote -- url ref` |
+| 本地被改过没（`modified`） | `hash` | 现算本地目录 hash |
+| 记住上次答案 | `checked` | 避免每次渲染都问远端 + 重算 hash |
+
+`hash` 答不了第一个：hash 是**下载下来的文件**的指纹，对远端一无所知——上游推一个只改 README、
+或 revert 回原样的提交时，远端确实动了，但文件 hash 一模一样。反之 `revision` 答不了本地改动。
+
+### 1.6 封面与资产
+
+- 封面 = `assets[0]` → `assetUrl()` → `/hub/files/...`（**复用 skills 那条中央资产库路由**）
+- 删掉：`cover` 字段、`COVERS` 精确表、`/hub/plugins?action=asset` 路由、`coverUrl()`
+- 删包时一并删资产（`!isLink(ref)` 的；`put` 重名加 `-1` 后缀，两个包不会互相误删）
+
+---
+
+## 二、删除清单
+
+| 删什么 | 在哪 |
+|---|---|
+| 市场登记表（整文件） | `src/host/marketplaces.ts` |
+| 市场**读取**半：`readMarketplaceText/Document/Offers`、`entrySourceOf`、`marketplaceEntrySource`、`isLocalPath` | `src/host/marketplace.ts` |
+| 信封（`{version, revision, plugins:{}}`）→ 顶层数组 | `src/records.ts` |
+| `PluginMarketplaceRef`、`PLUGIN_MARKETPLACES_FILE`、`origin.kind` 的 `npm`/`command` | `src/contract.ts` |
+| `git.subdir` / `git.pinned`（只可能来自市场条目）→ 连带 `takeSubdir`、checkout 的 pinned 分支 | `src/inspect.ts`、`src/host/fetch.ts` |
+| `countBundle`、`PluginBundle`、`bundle`、`displayName`、`id`、`upstream`（拆平成 `source`+`hash`） | `src/host/library.ts`、`src/revision.ts` |
+| `inspect` 动作、`SourceInspection`、`MarketplaceOffer`、`collect.inspect`、`findEntry`/`entryIn`/`offersOf`、前端 `listOffers` | `src/host/collect.ts`、`vite.ts`、`src/library.ts` |
+| 对话框的 market 段、`page.tsx` 的 `AddPluginTab` | `src/add-plugin-dialog.tsx`、`src/page.tsx` |
+
+**不动（交付，下一步）**：`install-actions.tsx`、`plugin-claude-code/src/installer.ts`、
+`agents-extensions/codex/src/installer.ts`、以及 `marketplace.ts` 的**生成索引**那半。
+**唯一改动**：`writeMarketplaceIndex` 从 `save()` 里挪到 `syncMarketplace` 里 —— 库目录平时干净
+（只有 `plugins.json` + 包目录），只在点「安装到 Agent」时生成索引。
+
+---
+
+## 三、分阶段执行
+
+### 阶段 1 — 地址解析与采集（host，不碰界面）
+
+**改**：`src/inspect.ts`、`src/host/fetch.ts`、`src/host/collect.ts`
+
+- [ ] `inspect.ts`：简写**在解析时归一**成 `https://github.com/owner/repo`；`#ref` 与 `@ref` 都认
+      （`@` 只在**简写**上切，避免误伤 `git@host:` 与 `https://user@host`）；删 npm 分支；
+      相对路径与裸名字给明确拒绝文案
+- [ ] `fetch.ts`：删 npm；删 `pinned`/`subdir`；保留 git / archive / path 三条
+- [ ] `collect.ts`：只留 `add(source)` 与 `addFolder`；清单三级回退 + 拒绝；删 `inspect` 与登记表
+
+**验收**
+- `node packages/plugin-plugins/scripts/check-plugin-library.ts` 的 parse/collect 段全绿
+- `DietrichGebert/ponytail` → `https://github.com/DietrichGebert/ponytail`；`…@ref` 与 `…#ref` 等价
+- `git@github.com:a/b.git` **不被切坏**
+- 裸名字、`./relative`、`../up` 各给可读拒绝（不是 stack trace）
+- 本地造的 git 仓库能被 `add` 采进来，`.git` 不在产物里
+
+### 阶段 2 — 记录格式（顶层数组）
+
+**改**：`src/records.ts`（重写）、`src/revision.ts`、`src/contract.ts`、`src/host/library.ts`
+
+- [ ] `records.ts`：`readRecords` / `serializeRecords` / `recordOf` / `upsertRecord` / `dropRecord` /
+      `upsertRecords`；`name` 唯一键；顺序=采集顺序；坏条目**丢弃而不是整份拒绝**（沿用现在的宽厚读法）
+- [ ] `revision.ts`：`PluginRecord` 换成新字段；删 `PluginBundle`
+- [ ] `contract.ts`：`hasUpstream` 简化成 git|archive；删 `PluginMarketplaceRef`
+- [ ] `library.ts`：读写成数组；`save()` **不再**写市场索引；按 `name` 定位；`add` 重名报错；
+      `remove` 顺序 = 先写索引 → 删目录 → 删资产
+
+**验收**
+- `plugins.json` 是**顶层数组**，字段与 1.4 逐字对上（用真包采进来核对）
+- 重名再采一次 → 报错且**库里仍只有一条**
+- 删除后：行没了、目录没了、资产文件也没了
+- `installedAt`/`updatedAt`/`checked` 正确落盘；坏条目被跳过而非整份丢弃
+
+### 阶段 3 — logo → 资产库
+
+**新增**：`src/host/logo.ts`；**改**：`src/host/library.ts`
+
+- [ ] 扫描 + 排序 + 深度/条目上限；`library` 在 `recordOf` 里调它并 `put()`；`remove` 删自有资产
+
+**验收**
+- 构造 `assets/logo.png` + `assets/logo-dark.png` + `assets/v5/icon.png` 的包
+  → `assets[0] === "assets/logo.png"`，且 `<home>/assets/logo.png` **真的存在**
+- 无命中 → `assets: []`，且不报错
+- 两个包各带同名 `logo.png` → 资产库里是两份（`logo.png` 与 `logo-1.png`），互不覆盖
+
+### 阶段 4 — 删市场与死分支
+
+**删**：`src/host/marketplaces.ts`；**改**：`src/host/marketplace.ts`、`src/host/probe.ts`、
+`src/host/update.ts`、`vite.ts`
+
+- [ ] 桥接去掉 `inspect` 与 `asset` 两个动作；probe/update 去掉 marketplace、subdir、npm 三个分支
+
+**验收**
+- 全仓 grep 不到 `PluginMarketplaceRef`、`marketplaces.json`、`entrySourceOf`、`listOffers`
+- `pnpm --filter @workspace/plugin-plugins lint` 干净、`typecheck` 零错
+- `check-plugin-library.ts` 全绿（probe/update 段已按新字段改）
+
+### 阶段 5 — 界面
+
+**改**：`src/library.ts`（前端）、`src/types.ts`、`src/add-plugin-dialog.tsx`、`src/page.tsx`、
+`src/detail-dialog.tsx`、`src/messages.ts`、`packages/locale-zh-cn/src/messages.ts`
+
+- [ ] 卡片封面取 `assets[0]`；`BundleCover` 改成**图标 + 版本**（`bundle` 已删）
+- [ ] 对话框：两段改成「地址」「本地」；输入框直接 `onAdd(source)`（不再有"列一下"这一步）
+- [ ] 详情页：删「Carries / Skills / Commands」三行，保留 Updated
+- [ ] 文案：删 `plugins.cover.bundle`、`plugins.detail.bundle/skills/commands`；
+      `plugins.source.marketplace` 改成按来源类型（git / archive / 本地）；中英同步
+
+**验收**
+- `pnpm --filter @workspace/plugin-plugins --filter web typecheck` 零错；`lint` 干净
+- `node packages/locale-zh-cn/scripts/check-messages.ts` 语料对齐（键数会降约 4 个，**预期内**）
+- 浏览器里：卡片、添加对话框、详情页渲染正常，封面显示的是资产库那张图
+
+### 阶段 6 — 端到端验收
+
+- [ ] 旧库目录**改名备份**（`plugins` → `plugins.old`，可回滚）→ 起 dev server（5174）
+- [ ] 输入 `DietrichGebert/ponytail` → 核对记录 / 资产 / 卡片封面
+- [ ] 删除 → 再输入 `https://github.com/DietrichGebert/ponytail` → **两条记录应当一致**（除 revision/时间）
+- [ ] 拒绝用例：裸名字、`./relative`、只有 README 的目录
+- [ ] 静止状态：库根**只有** `plugins.json` + 包目录（**没有** `.claude-plugin`、`.agents`）
+
+**验收**：上面五条全部通过。旧目录留着不删，等你确认后再处理。
+
+---
+
+## 四、本轮不做（边界）
+
+- **读别人的市场**（`marketplace.json` 解析、登记、按条目名安装）→ 留给将来的「插件市场插件」
+- **交付链路**（`install-actions.tsx`、两个 Agent 安装器）→ 保持现状可用，等这一步验收完再单独做
+- **读 skills / commands**（不再数「N 个技能 · M 个命令」）
+- **详情页的媒体画廊接后端** → 独立一步；本轮的 `assets` 只有扫描到的封面
+- **`subdir`**（市场条目的 `path`）→ 不做
+
+## 五、已知代价 / 取舍
+
+1. logo 是**复制**进资产库，磁盘上存两份（包必须保持原样，不能只放个链接）
+2. 删包时一并删资产
+3. 那 90% 之外的包（5/50）采不进来，且**故意**不做兜底命名
+4. `assets` 目前只有扫描到的封面；用户自加的图要等画廊那一步（届时 `assets[0]` 仍是封面）
+5. 你不在场时按推荐定的两条：**（a）库根索引只在交付时生成**、**（a）无封面卡片显示图标+版本**
+
+## 六、验证配方
+
+```sh
+# 行为检查（本包最重要的一道）
+node packages/plugin-plugins/scripts/check-plugin-library.ts
+# 类型 + lint（改宿主侧后必须重启 dev server）
+pnpm --filter @workspace/plugin-plugins lint
+pnpm --filter @workspace/plugin-plugins --filter web typecheck
+# 语料
+node packages/locale-zh-cn/scripts/check-messages.ts
+# 端到端：5174 上两种输入各跑一次
+```
+
+---
+
+## 附录：上一轮（2026-10-13）的原计划与实测记录
+
+- 新增 `src/contract.ts`（`PluginOrigin`/`PluginUpstream`/`PluginCheck`/`PluginInstaller`）、`src/revision.ts`
+  （`outdated`/`modified`/`checkable` 派生值，不存字段）、`src/records.ts`（`plugins.json` 文档形状）、
+  `src/inspect.ts`（来源解析：git/npm/archive/path，**强制绝对路径**）、`src/library.ts`（浏览器侧 hook）、
+  `src/host/{names,library,marketplace,collect,fetch,probe,update,install}.ts`、`vite.ts`（桥 `/hub/plugins`）。
+- `packages/core` 新增 `src/host/folder-hash.ts`（`folderHash`），`plugin-skills` 改为复用它
+  （黄金值夹具 `check-upstream.ts` 仍绿，证明行为未变）。
+- **UI**：页面接真数据（`usePluginLibrary`），「检查更新」按钮走 `check-updates` 并出 toast，
+  行内 `UpdateBadge`（琥珀「有更新」，`modified` 时换说法），添加弹窗两个分段接 `inspect`/`add`，
+  文件面板从宿主读真实文件；`sample.ts` 已删。
+- **验证**：`node packages/plugin-plugins/scripts/check-plugin-library.ts` **66/66**；
+  `pnpm typecheck` 22/22、`pnpm lint` 干净、`check-messages` 531/531、`check-plugins`(extensions)、
+  `check-plugin`(mcp) 全 0。
+- **真机端到端**：桥 `POST /hub/plugins {action:"add"}` 收录一个本地 pack → `plugins.json` 记全 origin/hash、
+  库根生成 `marketplace.json`（`claude plugin validate` **通过**，只有 fixture 缺 author 的警告）→
+  `install` 到 Claude Code（user）：客户端记 `acme-demo@context-hub`、`readFromFolder` 指向库目录、
+  `?action=delivered` 报 `["acme-demo"]` → `uninstall` 后 `installed_plugins.json` 与操作前**逐字节相同**，
+  客户端 cache 的残留已删、市场注册已移除；库与临时夹具已清理。
+
+### 第二轮（同日晚）：作用域菜单、冲突确认、Codex
+
+- **「安装到 ⌄」菜单按客户端分组**（`src/install-actions.tsx`）：`?action=clients` 报每个客户端及其作用域与
+  `delivered`；菜单里 Claude Code 三档、Codex 一档，已装的那档带勾、点击即在该档装/卸；客户端不在本机时
+  标注「未安装」并禁用。批量菜单同构。
+- **更新动作**：`outdated` 时行内出现琥珀「更新」按钮；`modified` 时先弹 `AlertDialog` 确认（"会被覆盖"），
+  确认后才更新；更新后 toast 说明结果，覆盖了本地改动时另发一条 warning。
+- **实测（本地 git 仓库当上游）**：改上游 → 检测更新 → 徽标 + 按钮出现 → 点更新 → 记录 revision/hash 更新、
+  文件真的换成新内容、徽标消失；再检测一次报「0 个有更新」；再改本地副本 + 推上游 → 检测报
+  「1 个有更新，1 个在本地被改过」→ 点更新**先弹确认** → 确认后覆盖并出 warning toast。
+- **Codex 实测结论（写进 `host/marketplace.ts` 的注释）**：**同一个库根同时是两个客户端的市场** ——
+  Claude Code 读 `.claude-plugin/marketplace.json`（`source:"./<id>"`），Codex 读
+  `.agents/plugins/marketplace.json`（`source:{source:"local",path:"./<id>"}` + `policy.installation`）。
+  两者都实测：`claude plugin validate` 通过、`codex plugin marketplace add <库根>` + `codex plugin list`
+  列出 `acme-both@context-hub`。**Codex 没有作用域**（`plugin add <name>@<marketplace> --json`），
+  也没有启停开关，`createCodexInstaller` 对这两点如实拒绝而不是假装支持。
+- **验证**：`check-plugin-library.ts` **73/73**（新增：同根写两份索引、Codex entry 的 source 形状、
+  一个 pack 装两个作用域各留各的）；messages 546/546；workspace typecheck 22/22、lint 干净；
+  两个客户端的装-卸都成对做并核对状态文件、cache 与市场注册全部复原（Codex 的 `config.toml` 事后无
+  `[marketplaces]` 段、Claude 的 `settings.json` 无 `context-hub`）。
+
+**尚未做（下一轮）**：
+
+- 阶段 2 的 UI 细节：详情弹窗里那行「上次检查」（现在只有徽标与 tooltip）。
+- 阶段 4 的「一键更新」页签（批量更新选中行）与「更新后自动重发到已持有位置」（现在是手动各自再点）。
+- 阶段 5 剩下的**库同步**：`<home>/plugins` 作为 git 仓库 push/pull，以及"从别人的库直接装"的只读投影。
 
 界面（`packages/plugin-plugins` 的 page / 两个弹窗）前四轮已完成，本计划只做**数据与行为**：
-把 pack 收进 hub、检测上游、分发给各 Agent。全部判定都建立在这几轮实测出来的事实上（见
+把插件收进 hub、检测上游、分发给各 Agent。全部判定都建立在这几轮实测出来的事实上（见
 `/memories/repo/agent-plugin-install.md`）：客户端不回答"有没有更新"；远端是每个插件一条记录，
 不是每个市场一条；本机 Claude Code / Codex 的市场都能吃**本地路径**；安装是"注册引用 + 拷贝一份"。
 
@@ -9,37 +369,77 @@
 2 让"有更新"可判 → 3 让东西出得去 → 4 把"更新后重发"这个闭环补上 → 5 第二个宿主与库同步。
 每一阶段都能单独跑、单独验收，不依赖后面的阶段。
 
+## 库的落盘形状（2026-10-13 用户定稿）
+
+```
+<home>/plugins/                     ← Agent 插件库（与 skills 同构）
+  plugins.json                      ← 索引：库里有哪些插件（查询用）
+  <plugin-name>/                    ← 一个插件一个目录，放它的整份内容
+    .claude-plugin/plugin.json      （Claude Code 的入口）
+    .codex-plugin/plugin.json       （Codex 的入口）
+    skills/ commands/ hooks/ …
+  .claude-plugin/marketplace.json   ← 库根索引（生成的），让这个库本身可被客户端添加为市场
+```
+
+**⚠ 与 Extensions 撞目录 → 已解决（2026-10-13）**：内核的 Extensions 空间原本也是 `<home>/plugins`
+（`PLUGIN_DIR = "plugins"` + `PLUGIN_RECORDS = "index.json"`，桥 `/hub/plugins`），而下载来的插件常常带一个
+**根级 `plugin.json`**（本机 ponytail 的缓存根就有 `{"name": "ponytail"}`），Extensions 的发现器会把它当
+格式错误的扩展报进目录页。现已整体挪到 **`<home>/extensions/`**：
+
+- `packages/core/src/plugins.ts`：`PLUGIN_DIR`/`PLUGIN_ROUTE`/`PLUGIN_RECORDS`
+  → `EXTENSION_DIR = "extensions"` / `EXTENSION_ROUTE = "/hub/extensions"` / `EXTENSION_RECORDS`；
+  另加 `LEGACY_EXTENSION_DIR = "plugins"`。
+- `packages/core/src/host/plugins-fs.ts`：`pluginsRoot` → `extensionsRoot`；
+  新增 `migrateExtensionSpace(home)`，由 `createFsPluginStore` 的**每个入口方法 await 同一个迁移 promise**。
+  迁移只搬**真扩展**（有根 `plugin.json` 且 `id` 等于目录名、`name`/`version`/`apiVersion` 都是字符串）——
+  这条判据就是用来把 agent 插件包（根 `plugin.json` 里没有 `id`）留在原地。旧 `index.json` 也搬走，
+  旧目录空了就删掉，把它交给插件库。
+- `packages/core/vite.ts`：`pluginFiles()` → `extensionFiles()`（vite 插件名同步改），路由走 `EXTENSION_ROUTE`。
+- `packages/extensions/src/{remote.ts,plugin.ts}`、`extensions/scripts/check-plugins.ts`、
+  `plugin-mcp/scripts/check-plugin.ts`、`apps/web/vite.config.ts` 同步改。
+- 验证：`check-plugins` 增 6 条断言（旧目录里的扩展搬走、agent 插件包留在原地、旧目录只剩它、
+  旧记录文件跟着搬、搬过去的扩展能加载、**空旧目录被新目录取代**）全绿；`check-plugin`(mcp) 绿；
+  `pnpm typecheck` 22/22、三个包的 lint 干净；真机 `<home>/plugins`（本来是空的）已被换成
+  `<home>/extensions`，浏览器 `/extensions` 页零失败请求、`/hub/extensions` 回 `{"ids":[]}`。
+
 ## 阶段 0 — 契约与记录（无网络、无宿主、纯类型与纯函数）
 
-- [ ] `src/contract.ts`（唯一导出面）：`PackOrigin`（`git`/`npm`/`archive`/`command`/`path`）、
-      `PackUpstream`（origin + marketplace 指针 + 采集时的 `hash`）、`PackCheck{at,latest?,currentHash}`。
+- [ ] `src/contract.ts`（唯一导出面）：`PluginOrigin`（`git`/`npm`/`archive`/`command`/`path`）、
+      `PluginUpstream`（origin + marketplace 指针 + 采集时的 `hash`）、`PluginCheck{at,latest?,currentHash}`。
+      **本包内一律用 `Plugin*` 命名**（包就是 `plugin-plugins`，且内核里的 `Plugin*` 是 Extensions 的词汇，
+      两者不在同一包，不会混）。
 - [ ] `src/revision.ts`：`originRevision(origin): string | null`（git→子目录 commit sha / npm→version /
       archive→etag / command·path→null）+ `hasUpstream(origin)`。**浏览器与宿主共用同一份**（两个平面同一套判定）。
-- [ ] `src/records.ts`（共用）：`<home>/packs/index.json` 的文档形状 + `readRecords`/`upsert`/`remove`。
+- [ ] `src/records.ts`（共用）：`<home>/plugins/plugins.json` 的文档形状（`{version, revision, plugins:{…}}`，
+      照 skills 的 `index.json`）+ `readRecords`/`upsert`/`remove`。
 - [ ] `src/host/hash.ts`：把 `skillFolderHash` 从 `plugin-skills` 提出来复用（不复制第二份实现）。
-- [ ] `scripts/check-pack-records.ts`：假数据下 `originRevision` 各形态、`outdated`/`modified` 派生、
+- [ ] `scripts/check-plugin-records.ts`：假数据下 `originRevision` 各形态、`outdated`/`modified` 派生、
       记录读写往返、坏 JSON 拒绝。
 
-**验收**：`node packages/plugin-plugins/scripts/check-pack-records.ts` 全绿；`pnpm typecheck` 干净；
+**验收**：`node packages/plugin-plugins/scripts/check-plugin-records.ts` 全绿；`pnpm typecheck` 干净；
 **没有任何网络调用与文件写入**（本阶段不落盘、不碰宿主）。
 
-## 阶段 1 — 收录：把 pack 收进 hub
+## 阶段 1 — 收录：把插件收进 hub
 
-- [ ] `src/inspect.ts`：spec → `PackOrigin`（照 DSH 的 `parseInstallSpec`：**强制绝对路径**、
+- [x] **先把 Extensions 的空间挪到 `<home>/extensions/`**（已完成，见上）。
+- [ ] `src/inspect.ts`：spec → `PluginOrigin`（照 DSH 的 `parseInstallSpec`：**强制绝对路径**、
       git 简写/URL/本地路径/tarball 四形态收敛、拒绝相对路径与非法包名）。
 - [ ] `src/host/fetch.ts`：`git clone --depth 1`（可带 `subdir`）/ npm 下载 / 本地路径复制 → 临时目录，
       **不带 `.git`**（与客户端缓存一致）。
-- [ ] `src/host/packs-fs.ts`：原子写 + 尾队列（照 `workspaces-fs` 的教训），落 `<home>/packs/<id>/`；
-      写 `index.json`；**幂等**：同 id 已存在时拒绝并说清"已收录"。
-- [ ] `src/host/marketplace.ts`：在**库根**生成 `.claude-plugin/marketplace.json`
-      （`{name, owner, plugins:[{name, source:"./<id>", description}]}`）—— 库自带可安装性。
-- [ ] 桥 `vite.ts`：`POST /hub/packs?action=inspect|add|records|list`；宿主侧改完**必须重启 dev server**。
+- [ ] `src/host/plugins-fs.ts`：原子写 + 尾队列（照 `workspaces-fs` 的教训），落 `<home>/plugins/<name>/`；
+      写 `plugins.json`（`revision` 递增，照 skills 的 catalog）；**幂等**：同 id 已存在时拒绝并说清"已收录"。
+- [ ] `src/host/marketplace.ts`：生成**库根**的 `.claude-plugin/marketplace.json`
+      （`{name, owner, plugins:[{name, source:"./<name>", description}]}`）—— 库自带可安装性；
+      收录/删除/更新后重生成（它只是索引，可从各目录的 `plugin.json` 推出来）。
+- [ ] 桥 `vite.ts`：`POST /hub/plugins?action=inspect|add|records|list` —— 路由名现在**空出来了**
+      （Extensions 已改用 `/hub/extensions`），本模块就用 `/hub/plugins`；宿主侧改完**必须重启 dev server**。
 - [ ] UI：添加弹窗的 Marketplace / Local 两个分段接真数据（现在是 `sample.ts`），
       成功后列表刷新、失败走 toast（skills 已定的规矩）。
 
-**验收**：三种来源各收一个真 pack（本地夹具仓库 / 一个真 GitHub repo / 一个本地目录）→
-磁盘上 `<home>/packs/<id>/` 内容与来源逐字节一致（无 `.git`）、`index.json` 记全 `upstream`、库根索引合法
-（`claude plugin validate <home>/packs` 通过）；重复收录被拒；`sample.ts` 可删。
+**验收**：三种来源各收一个真插件（本地夹具仓库 / 一个真 GitHub repo / 一个本地目录）→
+磁盘上 `<home>/plugins/<name>/` 内容与来源逐字节一致（无 `.git`）、`plugins.json` 记全 `upstream`、库根索引合法
+（`claude plugin validate <home>/plugins` 通过）；重复收录被拒；Extensions 目录页在搬迁后仍正常
+（启停状态沿用、旧目录条目已迁走）；`sample.ts` 可删。
 
 ## 阶段 2 — 检测更新（便宜探针 + 内容哈希终审）
 
@@ -51,7 +451,7 @@
 - [ ] `command` / `path` 两种来源**显式回答"无法检查"**，不转圈。
 - [ ] `checked` 落盘（重启保留）；`outdated`/`modified` 仍是派生值，不存字段。
 - [ ] UI：「检查更新」按钮 + 卡片/列表的「有更新」徽标 + 详情里那行"上次检查"（键名沿用 skills 的读法）。
-- [ ] `scripts/check-pack-updates.ts`：**本机 `file://` git 仓库当离线上游**（skills 的 `check-updates.ts` 已证明可行）。
+- [ ] `scripts/check-plugin-updates.ts`：**本机 `file://` git 仓库当离线上游**（skills 的 `check-updates.ts` 已证明可行）。
 
 **验收**：脚本覆盖「推进一版 → outdated → 再检查 → 归零」以及「钉 sha 的市场：pin 没变不算更新 /
 子目录动了才算」（假 marketplace 夹具覆盖两条分支）；浏览器实测：首次自动查一次、之后只有点按钮才发请求
@@ -59,18 +459,18 @@
 
 ## 阶段 3 — 分发安装（Claude Code 打通，其它宿主同构）
 
-- [ ] 内核契约 `PackInstaller`：`{id, label, icon, accepts: PackOrigin["kind"][], scopes, inspect(), install(plan), remove(), setEnabled(id, scope, on)}`
+- [ ] 内核契约 `PluginInstaller`：`{id, label, icon, accepts: PluginOrigin["kind"][], scopes, inspect(), install(plan), remove(), setEnabled(id, scope, on)}`
       —— 写进 `packages/extensions` 的贡献点，**内核不含任何插件格式知识**（与 MCP 归位同一条规则）。
 - [ ] `installer-claude-code`（放 `packages/plugin-claude-code`）：
-      ① 确保库根索引 → ② `claude plugin marketplace add <home>/packs --json`（幂等）→
-      ③ `claude plugin install <id>@<hub> -s user|project|local --json`；卸载 `uninstall`；启停 `enable|disable`。
+      ① 确保库根索引 → ② `claude plugin marketplace add <home>/plugins --json`（幂等）→
+      ③ `claude plugin install <name>@<hub> -s user|project|local --json`；卸载 `uninstall`；启停 `enable|disable`。
       **不写它的 `installed_plugins.json` / cache**（实测它会拷一份，那是它的私有格式）。
 - [ ] `installer-link`（技能 / 规则目录）：已有的 link 能力复用，包成同一契约（skill / rules 两种投影）。
 - [ ] UI：卡片与列表的「安装到 ⌄」菜单（按 `工作区` / `全局 Agent` 分组，勾选=写进哪个位置），
       与 MCP 那个菜单同构；作用域语义 = Claude Code 的 user / project / local。
-- [ ] `scripts/check-pack-install.ts`（假安装器）+ 真机成对验证（装 → 卸 → 核对状态逐字节复原）。
+- [ ] `scripts/check-plugin-install.ts`（假安装器）+ 真机成对验证（装 → 卸 → 核对状态逐字节复原）。
 
-**验收**：浏览器上从库里把一个 pack 装到 Claude Code（三个作用域各试一次）→ `claude plugin list --json`
+**验收**：浏览器上从库里把一个插件装到 Claude Code（三个作用域各试一次）→ `claude plugin list --json`
 看得到、`~/.claude/plugins/cache/<hub>/<id>/` 出现；卸载后 `installed_plugins.json` 与 `settings.json`
 与操作前**逐字节相同**（本轮实测的收尾配方）；启动 `claude` 能列出该插件的命令。
 
@@ -83,26 +483,25 @@
 - [ ] 批量入口与 skills 一致：页签上的 `一键更新`（悬浮菜单）+ 失败走 toast。
 
 **验收**：离线夹具下「改一字节 → modified=true 且更新前有提示 → 更新 → 归零」；
-真机：库里的 pack 推进一版 → 检查出「有更新」→ 更新 → 客户端那本同步变化、库哈希与记录一致；
+真机：库里的插件推进一版 → 检查出「有更新」→ 更新 → 客户端那本同步变化、库哈希与记录一致；
 一次故意失败的更新（拔网/坏修订）后库与客户端都回到操作前状态。
 
 ## 阶段 5 — 第二个宿主与库同步（用户明确要的"存到 GitHub 或别处"）
 
 - [ ] `installer-codex`：先实测它认的索引文件名（`.codex-plugin/marketplace.json` 还是
       `.agents/plugins/marketplace.json`）与 `codex plugin add` 的 JSON 输出，再照阶段 3 的骨架实现。
-- [ ] 库同步：`<home>/packs` 作为 git 仓库（`git init` / remote / commit / push），
+- [ ] 库同步：`<home>/plugins` 作为 git 仓库（`git init` / remote / commit / push），
       或复用仓库模块已有的同步能力（先看 `apps/web/src/pages/repository.tsx` 是不是还只是壳）。
 - [ ] 只读投影：从别人的库 `add marketplace <owner>/<repo>` 直接装，不需要先收进本地库。
 
 **验收**：Codex 上一次装/卸往返且状态文件复原；库 push 到远端后再 clone 到另一台机器，
-`claude plugin marketplace add <owner>/<repo>` + 装一个 pack 成功（证明"库自带可安装性"成立）。
+`claude plugin marketplace add <owner>/<repo>` + 装一个插件成功（证明"库自带可安装性"成立）。
 
 ## 仍未定（开始前需要拍板，或到那一步再定）
 
-- 库根的 `.claude-plugin/marketplace.json` 是 hub 每次改 pack 就重生成，还是只在人点"同步/发布"时生成？
-  （倾向：收录/更新时自动重生成，因为它只是索引。）
+- 库根的 `.claude-plugin/marketplace.json` 是每次收录/更新就重生成，还是只在人点"同步/发布"时生成？
+  （倾向：自动重生成，它只是索引。）
 - 更新后是否**自动**重发到已持有的位置，还是列出来让人勾（破坏性动作倾向后者）。
-- `<home>/plugins` 被 Extensions 占用，本模块用 `<home>/packs`（已按此写计划）。
 
 ## 验证配方（每次收尾都跑）
 
