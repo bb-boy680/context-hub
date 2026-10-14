@@ -30,9 +30,10 @@ import {
   type PluginTools,
 } from "../src/provider.ts"
 import { modified, outdated } from "../src/revision.ts"
-import { createPluginCollector } from "../src/host/collect.ts"
+import { createPluginCollector, type PackUpload } from "../src/host/collect.ts"
 import { createFsPluginLibrary } from "../src/host/library.ts"
 import { findLogo } from "../src/host/logo.ts"
+import { bestPicture, pictureOf } from "../src/pictures.ts"
 import { createPluginProbe } from "../src/host/probe.ts"
 import { createPluginUpdater } from "../src/host/update.ts"
 
@@ -90,6 +91,27 @@ async function writePicture(dir: string, relative: string, text: string): Promis
   const target = path.join(dir, relative)
   await fs.mkdir(path.dirname(target), { recursive: true })
   await fs.writeFile(target, text, "utf8")
+}
+
+/**
+ * One pack's files the way a page sends them: the path each keeps inside the
+ * pack, and its bytes as base64, because the request body is JSON.
+ */
+async function uploads(dir: string): Promise<PackUpload[]> {
+  const found: PackUpload[] = []
+  const walk = async (at: string, prefix: string): Promise<void> => {
+    for (const entry of await fs.readdir(at, { withFileTypes: true })) {
+      const inside = prefix === "" ? entry.name : `${prefix}/${entry.name}`
+      const full = path.join(at, entry.name)
+      if (entry.isDirectory()) {
+        await walk(full, inside)
+        continue
+      }
+      found.push({ path: inside, base64: (await fs.readFile(full)).toString("base64") })
+    }
+  }
+  await walk(dir, "")
+  return found
 }
 
 const root = await fs.mkdtemp(path.join(tmpdir(), "hub-plugin-check-"))
@@ -265,6 +287,122 @@ check("the same address answers that it is already here", repeated.already, repe
 check("and names the pack that is here", repeated.record.name === "acme-hello", repeated.record.name)
 check("nothing was added a second time", (await library.list()).length === 1)
 
+console.log("a folder a page read")
+
+/* A page hands over files rather than a path, because a browser is told nothing
+   about where a folder sits. The pack's own manifest still names it, and what the
+   page called it is kept as where it came from — a pack found inside a folder is
+   the pack, not the folder, so the two are not the same word. */
+const uploadHub = path.join(root, "upload-hub")
+const uploadLibrary = createFsPluginLibrary(uploadHub)
+const uploadCollector = createPluginCollector(uploadLibrary)
+const dropped = path.join(root, "dropped")
+const one = path.join(dropped, "plugins", "acme-hello")
+await writePack(one, "2.0.0")
+await writePicture(one, "assets/logo.png", "the logo")
+await writePicture(one, "skills/hello/reference.md", "More.\n")
+
+const uploaded = await uploadCollector.addFolder(
+  "dropped/plugins/acme-hello",
+  await uploads(one)
+)
+check("a folder a page read is collected", uploaded.record.name === "acme-hello", uploaded.record.name)
+check("it is not reported as already here", !uploaded.already)
+check("its files landed under the manifest's name", await uploadLibrary.has("acme-hello"))
+check(
+  "every file came across, not only the manifest",
+  (await fs.stat(path.join(uploadHub, "plugins", "acme-hello", "skills", "hello", "reference.md")).catch(() => null)) !== null
+)
+check(
+  "what was recorded is where it sat in the drop",
+  uploaded.record.source.kind === "path" && uploaded.record.source.path === "dropped/plugins/acme-hello",
+  uploaded.record.source
+)
+check(
+  "and its picture came with it",
+  (await fs.readdir(path.join(uploadHub, "assets", "acme-hello"))).join() === "logo.png"
+)
+
+/* A folder of packs is not one pack: the page collects each separately, so what
+   it calls each one has to tell them apart — two packs from one drop share a
+   folder but not a path. */
+const two = path.join(dropped, "plugins", "acme-other")
+await writePack(two, "1.0.0", "acme-other")
+const other = await uploadCollector.addFolder(
+  "dropped/plugins/acme-other",
+  await uploads(two)
+)
+check("a second pack from one drop is its own record", other.record.name === "acme-other", other.record.name)
+check("the two are told apart by where they sat", other.record.source.kind === "path" && other.record.source.path !== uploaded.record.source.path)
+check("and both are in the library", (await uploadLibrary.list()).length === 2)
+
+/* The label is a label, not a location, but it still must not read as one: a
+   path that would walk out of what was chosen is refused before anything lands. */
+let escaped = ""
+try {
+  await uploadCollector.addFolder("../elsewhere", await uploads(two))
+} catch (error) {
+  escaped = error instanceof Error ? error.message : String(error)
+}
+check("a label that walks out is refused", escaped.includes("unusable path"), escaped)
+
+console.log("one folder, two ways in")
+
+/* A dropped folder is recorded by the label it was chosen by, because a browser
+   cannot say where it sits. The same folder typed as a path can never equal that
+   label, so the name is what has to say the two are one pack — otherwise a person
+   typing the path of the folder they just dropped is told a different pack is
+   wearing the name. */
+const twiceHub = path.join(root, "twice-hub")
+const twice = createFsPluginLibrary(twiceHub)
+const twiceCollector = createPluginCollector(twice)
+const typed = path.join(root, "typed")
+await writePack(typed, "4.0.0", "twice-pack")
+await writePicture(typed, "assets/logo.png", "the logo")
+
+const byLabel = await twiceCollector.addFolder("somewhere/twice-pack", await uploads(typed))
+check("a dropped folder is recorded by its label", byLabel.record.source.path === "somewhere/twice-pack", byLabel.record.source)
+const byPath = await twiceCollector.add(typed)
+check("the same folder typed as a path is that pack", byPath.already, byPath)
+check("nothing was written a second time", (await twice.list()).length === 1)
+check("and the label it was first recorded by stands", (await twice.list())[0]?.source.path === "somewhere/twice-pack")
+
+/* Edited since it was dropped: what the person handed over is what belongs here,
+   and it is the same folder either way. */
+await fs.writeFile(
+  path.join(typed, "skills", "hello", "SKILL.md"),
+  "---\nname: hello\n---\n\nChanged since.\n",
+  "utf8"
+)
+const movedOn = await twiceCollector.add(typed)
+check("a folder whose files moved on is taken again", !movedOn.already, movedOn)
+check(
+  "and what is here is what it holds now",
+  (await fs.readFile(path.join(twiceHub, "plugins", "twice-pack", "skills", "hello", "SKILL.md"), "utf8")).includes("Changed since")
+)
+
+/* The label travels the other way too, and a path typed with the other separator
+   names the same folder. */
+const bySlash = await twiceCollector.add(typed.replace(/\\/g, "/"))
+check("the path in either separator is that folder", bySlash.already, bySlash)
+
+/* A dropped folder under a name the library already holds is that pack, because
+   the label it arrives with cannot be compared to anything. */
+const droppedAgain = await twiceCollector.addFolder("elsewhere/twice-pack", await uploads(typed))
+check("a dropped folder of that name is the same pack", droppedAgain.already, droppedAgain)
+
+/* Two folders a person named by path are comparable, and differing ones are two
+   packs: which belongs here is the person's call rather than this hub's. */
+const otherFolder = path.join(root, "other-twice")
+await writePack(otherFolder, "6.0.0", "twice-pack")
+let twoPaths = ""
+try {
+  await twiceCollector.add(otherFolder)
+} catch (error) {
+  twoPaths = error instanceof Error ? error.message : String(error)
+}
+check("a second path of that name is refused", twoPaths.includes("already in this library"), twoPaths)
+
 console.log("an index that lost a record")
 
 /* The index is durable JSON a person may edit, and a directory is a fact whether
@@ -360,6 +498,24 @@ try {
 check("a directory with no manifest is refused", noManifest.includes("no plugin manifest"), noManifest)
 check("and nothing was recorded", (await library.list()).length === 1)
 
+/* A file with that name may still be somebody else's — a repository root carries
+   a `plugin.json` for its own tooling often enough that the refusal has to say
+   which of the two it found. */
+const foreign = path.join(root, "foreign-manifest")
+await fs.mkdir(foreign, { recursive: true })
+await fs.writeFile(
+  path.join(foreign, "plugin.json"),
+  `${JSON.stringify({ build: { out: "dist" } }, null, 2)}\n`,
+  "utf8"
+)
+let notAPack = ""
+try {
+  await collector.add(foreign)
+} catch (error) {
+  notAPack = error instanceof Error ? error.message : String(error)
+}
+check("a manifest that names no plugin says so", notAPack.includes("names no plugin"), notAPack)
+
 /* A root manifest is the fallback for a pack from before the convention. */
 const legacy = path.join(root, "legacy")
 await fs.mkdir(legacy, { recursive: true })
@@ -413,6 +569,30 @@ check("a plain logo, near the root, wins", chosen === "assets/logo.png", chosen)
 const noLogo = path.join(root, "no-logo")
 await writePack(noLogo, "1.0.0")
 check("a pack with no picture finds none", (await findLogo(noLogo)) === undefined)
+
+/* The rule that says which file is the picture is shared with the page that scans
+   a folder, which applies it to the tree it has already read rather than walking
+   a disk. Both go through this, so a row cannot offer a picture the library would
+   then say the pack does not have. */
+const ranked = ["assets/logo-dark.png", "logo.png", "assets/retriever-logo-dark.svg"].map(
+  (one, at) => pictureOf(one, at === 1 ? 1 : 2)!
+)
+check("the rule picks the same file the walk does", bestPicture(ranked)?.relative === "logo.png")
+check("a name that is not a picture is not one", pictureOf("assets/screenshot.png", 2) === null)
+check("a file that is not a picture is not one", pictureOf("logo.txt", 1) === null)
+check("a name merely containing one is not", pictureOf("catalogue.png", 1) === null)
+check("but one that carries it is", pictureOf("my-logo.png", 1) !== null)
+check("and one that says it another way is too", pictureOf("icon.svg", 1) !== null)
+check("nothing found is no picture", bestPicture([]) === undefined)
+check(
+  "the depth bound is the rule's, not the walk's",
+  pictureOf("a/b/logo.png", 3) !== null && pictureOf("a/b/c/logo.png", 4) === null
+)
+check(
+  "and a dependency's pictures are nobody's",
+  pictureOf("node_modules/left-pad/logo.png", 3) === null &&
+    pictureOf(".git/logo.png", 2) === null
+)
 
 /* A logo is *copied* into the hub's own asset library, because a record holds one
    kind of reference and a reference that only resolves while the pack is
@@ -503,6 +683,19 @@ check(
   cloned.source.kind === "git" && /^[0-9a-f]{40}$/.test(cloned.source.revision),
   cloned.source
 )
+
+/* A name the library holds from an address is not a folder's to take over: that
+   address can be asked again, so which pack belongs here is the person's call
+   rather than this hub's. Only a folder is a label nobody can compare. */
+const folderWithATakenName = path.join(root, "impostor-folder")
+await writePack(folderWithATakenName, "1.0.0")
+let takenOver = ""
+try {
+  await createPluginCollector(repoLibrary).add(folderWithATakenName)
+} catch (error) {
+  takenOver = error instanceof Error ? error.message : String(error)
+}
+check("a folder does not take a name held from an address", takenOver.includes("already in this library"), takenOver)
 check(
   "and none of the repository's history came with it",
   (await fs.stat(path.join(root, "repo-hub", "plugins", "acme-hello", ".git")).catch(() => null)) === null

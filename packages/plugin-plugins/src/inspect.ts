@@ -151,6 +151,26 @@ export function parsePluginSource(raw: string): PluginSourceSpec {
 }
 
 /**
+ * Whether a path names where it is, rather than where whatever is reading it
+ * happens to stand. A label a page gives a chosen folder is not one: a browser is
+ * told nothing about where a folder sits, so what it can say is a name.
+ *
+ * @param value — the path as it was read.
+ */
+export function isAbsolutePath(value: string): boolean {
+  return ABSOLUTE.test(value)
+}
+
+/**
+ * A local path as the place it names rather than as it was typed: the two
+ * separators name the same directory on the platform whose paths carry a
+ * backslash, and a trailing one names nothing extra.
+ */
+function samePlace(path: string): string {
+  return path.replace(/[\\/]+/g, "/").replace(/\/$/, "")
+}
+
+/**
  * Whether a stored source is the one an address names, so the pack that landed
  * from it is the pack already here.
  *
@@ -171,7 +191,7 @@ export function sourceMatches(spec: PluginSourceSpec, source: PluginOrigin): boo
     case "archive":
       return source.kind === "archive" && spec.url === source.url
     case "path":
-      return source.kind === "path" && spec.path === source.path
+      return source.kind === "path" && samePlace(spec.path) === samePlace(source.path)
   }
 }
 

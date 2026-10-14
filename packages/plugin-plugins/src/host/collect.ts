@@ -20,7 +20,12 @@ import path from "node:path"
 import { folderHash } from "@workspace/core/host/folder-hash"
 
 import type { PluginOrigin } from "../contract.ts"
-import { parsePluginSource, sourceMatches, type PluginSourceSpec } from "../inspect.ts"
+import {
+  isAbsolutePath,
+  parsePluginSource,
+  sourceMatches,
+  type PluginSourceSpec,
+} from "../inspect.ts"
 import type { PluginRecord } from "../revision.ts"
 import { fetchPlugin, stagingDir } from "./fetch.ts"
 import type { PluginLibrary } from "./library.ts"
@@ -107,12 +112,12 @@ export interface PluginCollector {
    * pack's own manifest has been read there, and a failure leaves the library
    * untouched.
    *
-   * @param name — the folder's own name, which is all that names where this came from.
-   * @param files — every file in it, with the paths it keeps inside.
+   * @param from — where the pack sits in the folder a person chose: that folder's own name when it is the pack, or its path inside that folder when the page found it among others. It is a label rather than a location, because nothing here can reach the folder again.
+   * @param files — every file of that pack, with the paths it keeps inside it.
    * @returns the record that is there now, and whether it was already there.
    * @throws {Error} for an empty folder, a file path that would escape it, or a folder larger than this hub takes.
    */
-  addFolder(name: string, files: readonly PackUpload[]): Promise<PluginCollected>
+  addFolder(from: string, files: readonly PackUpload[]): Promise<PluginCollected>
   /**
    * Fetch one pack again from the address its record carries.
    *
@@ -130,6 +135,24 @@ export interface PluginCollector {
 
 /** Create the collector over one library. */
 export function createPluginCollector(library: PluginLibrary): PluginCollector {
+  /**
+   * Whether an address names the pack a record already holds.
+   *
+   * The name is the identity, so the same name from somewhere else is a different
+   * pack wearing it — but "somewhere else" is a question only an address can
+   * answer, and a folder a page dropped carries a label rather than an address: a
+   * browser is told nothing about where a folder sits, so what it can say is the
+   * name the folder was chosen by, which no typed path can ever equal. A label
+   * therefore cannot rule the pack out, and the hash goes on to decide whether
+   * anything about it changed. Two paths a person typed *are* comparable, and
+   * differing ones are still two packs.
+   */
+  const samePack = (spec: PluginSourceSpec, source: PluginOrigin): boolean => {
+    if (sourceMatches(spec, source)) return true
+    if (spec.kind !== "path" || source.kind !== "path") return false
+    return !isAbsolutePath(spec.path) || !isAbsolutePath(source.path)
+  }
+
   /** Read a staged pack's manifest and record it under the name that manifest gives. */
   const take = async (
     stage: string,
@@ -140,14 +163,23 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
     const manifest = await readPackManifest(stage, fallbackName(spec))
     const name = assertSafeSegment(manifest.name, "plugin name")
     const held = (await library.list()).find((one) => one.name === name)
-    /* The name is the identity, so the same name from somewhere else is a
-       different pack wearing it, and which one belongs here is the person's call
-       rather than this hub's. The same name from the same address is this pack —
-       either already recorded, or recorded again from the files that are here. */
-    if (held !== undefined && !sourceMatches(spec, held.source)) {
+    if (held !== undefined && !samePack(spec, held.source)) {
       throw new Error(`${name} is already in this library, from ${whereFrom(held.source)}`)
     }
-    return { record: await library.add(name, stage, source, hash), already: false }
+    if (held === undefined) {
+      return { record: await library.add(name, stage, source, hash), already: false }
+    }
+    /* The same pack, handed over again. Nothing changed when the files hash the
+       same, and saying so is the answer rather than a rewrite: a record that
+       moved its `updatedAt` for a folder nobody edited would read as a change
+       that did not happen. */
+    if ((await library.has(name)) && held.hash === hash) return { record: held, already: true }
+    return {
+      record: (await library.has(name))
+        ? await library.replace(name, stage, source, hash)
+        : await library.add(name, stage, source, hash),
+      already: false,
+    }
   }
 
   /** Fetch one address into a staging directory and record what landed. */
@@ -171,9 +203,9 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
     }
   }
 
-  /** Write an uploaded folder into a staging directory and collect it there. */
+  /** Write an uploaded pack into a staging directory and collect it there. */
   const collectUpload = async (
-    name: string,
+    from: string,
     files: readonly PackUpload[]
   ): Promise<PluginCollected> => {
     if (files.length === 0) throw new Error("that folder holds no file")
@@ -190,13 +222,15 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
         await fs.mkdir(path.dirname(target), { recursive: true })
         await fs.writeFile(target, bytes)
       }
-      /* The folder's name is the only thing that says where this came from, and
-         nothing here can reach that folder again — which the record says by
-         carrying a path source, the kind no check ever asks about. */
+      /* A folder on this machine is the one source that leaves no address behind,
+         because nothing here can reach it again — which the record says by
+         carrying a path source, the kind no check ever asks about. What is
+         recorded is where the pack sat in what was chosen, so two packs taken
+         from one folder are told apart by the same field. */
       return await take(
         stage,
-        { kind: "path", path: name },
-        { kind: "path", path: name },
+        { kind: "path", path: from },
+        { kind: "path", path: from },
         await folderHash(stage)
       )
     } finally {
@@ -224,7 +258,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
 
   return {
     add: (source) => collect(parsePluginSource(source)),
-    addFolder: (name, files) => collectUpload(assertSafeSegment(name.trim(), "folder name"), files),
+    addFolder: (from, files) => collectUpload(assertPackRelative(from.trim()), files),
     restore,
   }
 }
