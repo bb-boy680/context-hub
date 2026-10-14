@@ -1,5 +1,23 @@
 # 插件扫描 + 未收录（2026-10-14，本轮）
 
+## 资产存哪、怎么命名、怎么扩展（2026-10-14 第五轮，用户要求）
+
+**用户**：assets 下不要建目录；下载资源时给文件名一个唯一名；保存逻辑放 core、其他插件只调用它；
+这个方法要能通过插件形式扩展（例如把资源上传到云端）。
+
+- **core 是唯一的存取口**：`File` 就是流动的东西（`put(file)` / `AssetSink.keep(file)`；`drop` 收回引用）/
+  `AssetStore{put,remove}` / `createAssetStore(library, sinks)`；`assetRef(ref)` 统一
+  「链接原样、库内路径走 `/hub/files`」。命名规则在宿主侧：**`<hint 的词语>-<sha256 前 8 位><ext>`**，
+  同一份字节永远同一个文件（重复扫描不再长文件），不同字节永不互相覆盖。
+- **插件只调用**：`plugin-plugins` 的 `storePicture` 把包里的图读成 `File` 再 `store.put`（不再自己 mkdir/write）；
+  `plugin-skills` 的 `SkillStoreOptions.assets?: AssetStore`，上传的 `File` 名字带 skill id 前缀（两个技能不共用文件）。
+- **扩展缝**：宿主组装处注入 sink（`pluginLibrary({sinks})` / `skillLibrary({sinks})`）；
+  云端后端＝一个 `keep(file)` 上传后返回 URL 的 sink。检查脚本用假 sink 端到端验过（引用变 bucket URL、本地不落盘、删除回调）。
+- **本机数据已迁移**：`assets/<pack>/*.png` → 扁平名，空目录删除；现在 `~/.context-hub/assets` 只有 5 个扁平文件。
+- 验证：`check-plugin-library` 168 / `check-store` / `check-plugin-rows` 25 / `check-installer` 19 全绿；
+  typecheck、三个包 lint、web build 通过；浏览器实测图都来自 `/hub/files/assets/*.png`、无失效图。
+
+
 > 扫描各 Agent 里已装的插件，在插件列表里给出「未收录」页签，卡片上点「收录」把它收进 hub 库。
 > **扫描逻辑住在 Agent 插件里**（它认识自己的 CLI 与清单），插件模块只是调用方。
 

@@ -11,18 +11,18 @@
  * this answers with empty fields, which a row shows as nothing rather than as an
  * invented sentence.
  *
- * The picture is copied into the hub's asset library, under the pack's own
- * directory there, exactly as collecting the pack would: a row must not point
- * into an agent's install directory, because that path stops resolving the
- * moment the agent removes the pack. Nothing about the pack is recorded — only
- * its picture is kept, and the row reads it back from the library.
+ * The picture is kept the way collecting the pack would keep it — through the
+ * hub's asset store, under the hub's own directory — so a row never points into
+ * an agent's install directory: that path stops resolving the moment the agent
+ * removes the pack. Nothing about the pack is recorded, only its picture, and a
+ * pack read twice keeps one copy of it.
  *
  * This module runs in the process that owns the disk.
  */
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import type { AssetLibrary } from "@workspace/core"
+import type { AssetStore } from "@workspace/core"
 
 import { PLUGIN_MANIFESTS, type PackDescription } from "../contract.ts"
 import { findLogo, storePicture } from "./logo.ts"
@@ -89,19 +89,17 @@ async function readManifestFile(file: string): Promise<Record<string, unknown> |
  * What the pack in one directory says about itself.
  *
  * @param dir — the pack's directory, as the agent named it.
- * @param name — the pack's name, which is the directory its picture is kept under in the asset library.
- * @param assets — the hub's asset library, where the picture is copied.
+ * @param name — the pack's name, which prefixes the file its picture is kept as.
+ * @param assets — the hub's asset store, where the picture is kept.
  * @returns its name, version, description, and the reference to its picture when it ships one the hub will keep.
  */
 export async function describePack(
   dir: string,
   name: string,
-  assets: AssetLibrary
+  assets: AssetStore
 ): Promise<PackDescription> {
   const fields = await readManifestFields(dir)
   const logo = await findLogo(dir)
-  /* A picture that is too large for the library costs the picture and not the
-     description: a row is still worth drawing without one. */
   const icon = logo === undefined ? undefined : await storePicture(assets, dir, name, logo)
   return {
     name: fields.name ?? "",

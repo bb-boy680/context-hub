@@ -21,6 +21,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 
 import { isLink } from "@workspace/core"
+import { createAssetStore } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
 import { writeFileAtomic } from "@workspace/core/host/atomic"
 import { folderHash } from "@workspace/core/host/folder-hash"
@@ -30,9 +31,10 @@ import { PLUGIN_INDEX_FILE, PLUGIN_LIBRARY_DIR } from "../contract.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../records.ts"
 import { readManifestFields } from "./describe.ts"
 import { assertSafeSegment } from "./names.ts"
-import { findLogo, assetPresent, clearPictures, ownsPicture, storePicture } from "./logo.ts"
+import { findLogo, assetPresent, storePicture } from "./logo.ts"
 import type { PluginCheck, PluginOrigin } from "../contract.ts"
 import type { PluginRecord } from "../revision.ts"
+import type { AssetStore } from "@workspace/core"
 
 /** One file inside a pack, as the files panel reads it. */
 export interface PackFileEntry {
@@ -178,11 +180,18 @@ async function moveInto(from: string, to: string): Promise<void> {
   })
 }
 
-/** Create the library that reads and writes under one hub home. */
-export function createFsPluginLibrary(home?: string): PluginLibrary {
+/**
+ * Create the library that reads and writes under one hub home.
+ *
+ * @param home — the hub home, or the one this process resolves.
+ * @param assets — where the packs' pictures are kept; the hub's own store over `<home>/assets` unless a form composes one with sinks of its own.
+ */
+export function createFsPluginLibrary(home?: string, assets?: AssetStore): PluginLibrary {
   const resolved = resolveHubHome(home)
   const root = path.join(resolved, PLUGIN_LIBRARY_DIR)
   const indexPath = path.join(root, PLUGIN_INDEX_FILE)
+  const own = createFsAssetLibrary(resolved)
+  const store = assets ?? createAssetStore(own)
 
   /** Serialises every write: each one is a read-modify-write of the same index. */
   let queue: Promise<unknown> = Promise.resolve()
@@ -209,35 +218,39 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
 
   const packDir = (name: string) => path.join(root, assertSafeSegment(name, "plugin name"))
 
-  /** The hub's own files, which a pack's logo is copied into. */
-  const assets = createFsAssetLibrary(resolved)
+  /**
+   * Drop an asset the hub recorded for one pack, and sweep up after a pack
+   * whose picture once lived in a directory of its own.
+   */
+  const dropAsset = async (name: string, ref: string): Promise<void> => {
+    if (ref === "") return
+    await store.remove(ref)
+    /* Nothing else is ever kept in a directory named after a pack: this is a
+       leftover of how pictures were stored once, and it goes when it is empty. */
+    await fs.rmdir(path.join(own.root, name)).catch(() => undefined)
+  }
 
   /**
    * Drop the files a record used to point at and no longer does.
    *
-   * A pack's own picture is left alone: it lives in the pack's own directory
-   * under the asset root, which is emptied and written afresh whenever the pack
-   * is read in, so anything recorded there is already accounted for by the
-   * record being written now.
+   * A pack's own picture is not among them: it is the record's `icon`, and the
+   * one place that says whether to drop it is the read that replaced it.
    */
-  const pruneAssets = async (
-    name: string,
-    previous: readonly string[],
-    next: readonly string[]
-  ): Promise<void> => {
+  const pruneAssets = async (previous: readonly string[], next: readonly string[]): Promise<void> => {
     for (const ref of previous) {
-      if (next.includes(ref) || isLink(ref) || ownsPicture(name, ref)) continue
-      await assets.remove(ref).catch(() => undefined)
+      if (next.includes(ref) || isLink(ref)) continue
+      await store.remove(ref).catch(() => undefined)
     }
   }
 
   /**
    * Read what a directory holds into a record, given where it came from.
    *
-   * A pack's own picture is stored afresh: the copy that was here is dropped
-   * first, so a pack collected again — because its files were lost, or replaced
-   * by what its address holds now — never leaves a second copy or a reference to
-   * one. What a person added is kept, as long as it is still readable.
+   * The pack's own picture is stored afresh: the copy the old record named is
+   * dropped once the new one is known, so a pack collected again — because its
+   * files were lost, or replaced by what its address holds now — never leaves a
+   * second copy or a reference to one. What a person added is kept, as long as
+   * it is still readable.
    */
   const recordOf = async (
     name: string,
@@ -247,12 +260,15 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
   ): Promise<PluginRecord> => {
     const dir = packDir(name)
     const manifest = await readPackManifest(dir, name)
-    await clearPictures(assets, name)
     const logo = await findLogo(dir)
-    const picture = logo === undefined ? undefined : await storePicture(assets, dir, name, logo)
+    const picture = logo === undefined ? undefined : await storePicture(store, dir, name, logo)
+    const icon = picture ?? ""
+    /* The same picture read again is the same file, and dropping it here would
+       delete what was just written. */
+    await dropAsset(name, previous?.icon === icon ? "" : (previous?.icon ?? ""))
     const kept: string[] = []
     for (const ref of previous?.assets ?? []) {
-      if (ownsPicture(name, ref) || !(await assetPresent(resolved, ref))) continue
+      if (!(await assetPresent(resolved, ref))) continue
       kept.push(ref)
     }
     const now = new Date().toISOString()
@@ -263,20 +279,16 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
       tags: previous?.tags ?? [],
       source,
       hash,
-      icon: picture ?? "",
+      icon,
       assets: kept,
       installedAt: previous?.installedAt ?? now,
       updatedAt: now,
     }
   }
 
-  /** Drop every file the hub holds for one pack.
-   *
-   * The pack's own picture lives in a directory of its own, so this is one
-   * removal rather than a search. A recovery path reaches it with no record to
-   * read names from. */
-  const forgetAssets = async (name: string): Promise<void> => {
-    await clearPictures(assets, name)
+  /** Drop every file the hub holds for one pack, picture included. */
+  const forgetAssets = async (name: string, icon: string): Promise<void> => {
+    await dropAsset(name, icon)
   }
 
   return {
@@ -383,7 +395,7 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
           throw error
         }
         await fs.rm(aside, { recursive: true, force: true })
-        await pruneAssets(name, previous.assets, record.assets)
+        await pruneAssets(previous.assets, record.assets)
         return record
       })
     },
@@ -396,11 +408,10 @@ export function createFsPluginLibrary(home?: string): PluginLibrary {
            directory nothing points at. */
         await save(records.filter((one) => one.name !== name))
         await fs.rm(packDir(name), { recursive: true, force: true })
-        /* What the pack brought: its own picture, and anything a person added
-           while it was here. The first is removed wholesale, because a record is
-           not the only thing that may have put a file in that directory. */
-        await pruneAssets(name, record?.assets ?? [], [])
-        await forgetAssets(name)
+        /* What the hub kept for the pack: anything a person added while it was
+           here, and the picture the pack itself brought. */
+        await pruneAssets(record?.assets ?? [], [])
+        await forgetAssets(name, record?.icon ?? "")
       })
     },
 

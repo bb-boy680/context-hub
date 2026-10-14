@@ -109,7 +109,7 @@ const tools = {
       name: "claude-hud",
       version: "0.8.0",
       description: "Real-time statusline HUD for Claude Code",
-      icon: `assets/${name}/logo.png`,
+      icon: `assets/${name}-logo-3f9a2b1c.png`,
     }
   },
 }
@@ -124,7 +124,7 @@ check(
 check(
   "and what it says is carried on the entry",
   enriched[0]?.pack.description === "Real-time statusline HUD for Claude Code" &&
-    enriched[0]?.pack.icon === "assets/claude-hud/logo.png",
+    enriched[0]?.pack.icon === "assets/claude-hud-logo-3f9a2b1c.png",
   enriched[0]?.pack
 )
 check(

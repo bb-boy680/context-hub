@@ -12,7 +12,7 @@
  * here rather than stored, because a row that carried "2 days ago" would be
  * wrong by the next render.
  */
-import { assetUrl } from "@workspace/core"
+import { assetRef } from "@workspace/core"
 import type { ExtensionIcon } from "@workspace/extensions"
 
 import { installedRevision } from "./contract.ts"
@@ -68,8 +68,8 @@ export function toRow(
     tags: record.tags,
     source: sourceOf(record),
     updated: ageOf(record.updatedAt, language, t),
-    ...(record.icon === "" ? {} : { icon: assetUrl(record.icon) }),
-    ...(cover === undefined ? {} : { cover: assetUrl(cover) }),
+    ...(record.icon === "" ? {} : { icon: assetRef(record.icon) }),
+    ...(cover === undefined ? {} : { cover: assetRef(cover) }),
     outdated: installed !== null && latest !== undefined && latest !== installed,
     modified: current !== undefined && current !== record.hash,
     hasSource: installed !== null,
@@ -176,7 +176,7 @@ export function heldRow(pack: ScannedPack): PluginRow {
        the asset library, which is where the reading of the pack put it. */
     ...(pack.icon === undefined
       ? {}
-      : { icon: assetUrl(pack.icon), cover: assetUrl(pack.icon) }),
+      : { icon: assetRef(pack.icon), cover: assetRef(pack.icon) }),
     stored: false,
     held: pack.held,
   }

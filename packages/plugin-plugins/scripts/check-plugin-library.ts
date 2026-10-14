@@ -15,6 +15,8 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { folderHash } from "@workspace/core/host/folder-hash"
+import { createAssetStore, type AssetSink } from "@workspace/core"
+import { createFsAssetLibrary } from "@workspace/core/host"
 
 import {
   hasUpstream,
@@ -360,7 +362,7 @@ check(
 )
 check(
   "and its picture came with it",
-  (await fs.readdir(path.join(uploadHub, "assets", "acme-hello"))).join() === "logo.png"
+  (await fs.readdir(path.join(uploadHub, "assets"))).join() === "acme-hello-logo-7e0b9e9c.png"
 )
 
 /* A folder of packs is not one pack: the page collects each separately, so what
@@ -474,8 +476,8 @@ check(
    so recovering a pack does not leave a second copy of its picture behind. */
 check(
   "its picture is stored once, not twice",
-  (await fs.readdir(path.join(orphanHub, "assets", "acme-hello"))).join() === "logo.png",
-  await fs.readdir(path.join(orphanHub, "assets", "acme-hello"))
+  (await fs.readdir(path.join(orphanHub, "assets"))).join() === "acme-hello-logo-8da96759.png",
+  await fs.readdir(path.join(orphanHub, "assets"))
 )
 check("a third attempt then finds it here", (await orphanCollector.add(orphanSource)).already)
 
@@ -492,8 +494,8 @@ check("adding that address fetches the pack again", !refetched.already)
 check("the files are back", await orphanLibrary.has("acme-hello"))
 check(
   "and its picture is there once",
-  (await fs.readdir(path.join(orphanHub, "assets", "acme-hello"))).join() === "logo.png",
-  await fs.readdir(path.join(orphanHub, "assets", "acme-hello"))
+  (await fs.readdir(path.join(orphanHub, "assets"))).join() === "acme-hello-logo-8da96759.png",
+  await fs.readdir(path.join(orphanHub, "assets"))
 )
 
 /* A folder that is there but holds no manifest is not a pack either. */
@@ -504,8 +506,8 @@ check("and that fetches it again too", !refetchedAgain.already)
 check("the manifest is back", await orphanLibrary.has("acme-hello"))
 check(
   "with its picture stored once",
-  (await fs.readdir(path.join(orphanHub, "assets", "acme-hello"))).join() === "logo.png",
-  await fs.readdir(path.join(orphanHub, "assets", "acme-hello"))
+  (await fs.readdir(path.join(orphanHub, "assets"))).join() === "acme-hello-logo-8da96759.png",
+  await fs.readdir(path.join(orphanHub, "assets"))
 )
 
 /* A directory holding a *different* pack under a name the index lost is replaced
@@ -634,22 +636,22 @@ check(
     pictureOf(".git/logo.png", 2) === null
 )
 
-/* A logo is *copied* into the hub's own asset library, because a record holds one
-   kind of reference and a reference that only resolves while the pack is
-   installed is not one. A pack's copies live in a directory of their own, so the
-   copies can be removed exactly when the pack is collected again or dropped. */
+/* A logo is *copied* into the hub's own asset directory, because a record holds
+   one kind of reference and a reference that only resolves while the pack is
+   installed is not one. The file is flat and named after the pack, so two packs
+   that ship a `logo.png` never share one. */
 const logoHub = path.join(root, "logo-hub")
 const logoLibrary = createFsPluginLibrary(logoHub)
 const first = (await createPluginCollector(logoLibrary).add(logoPack)).record
 check(
-  "the record points at the copy, under the pack's own directory",
-  first.icon === "assets/acme-hello/logo.png",
+  "the record points at the copy, named after the pack and its bytes",
+  first.icon === "assets/acme-hello-logo-7e0b9e9c.png",
   first.icon
 )
 check("and it is not filed among what a person added", first.assets.length === 0, first.assets)
 check(
-  "and the copy really is in the hub's asset directory",
-  (await fs.readFile(path.join(logoHub, "assets", "acme-hello", "logo.png"), "utf8")) === "the logo"
+  "and the copy really is in the hub's asset directory, in no directory of its own",
+  (await fs.readFile(path.join(logoHub, "assets", "acme-hello-logo-7e0b9e9c.png"), "utf8")) === "the logo"
 )
 
 /* Two packs that each ship a `logo.png` keep one file each, and removing one
@@ -661,13 +663,64 @@ const second = (await createPluginCollector(logoLibrary).add(otherPack)).record
 check("a second pack's logo does not collide with the first", second.icon !== first.icon, second.icon)
 check(
   "each copy is kept under the name of the pack that brought it",
-  second.icon === "assets/other-pack/logo.png",
+  second.icon === "assets/other-pack-logo-e157ef72.png",
   second.icon
 )
 check(
   "and the first file is untouched",
-  (await fs.readFile(path.join(logoHub, "assets", "acme-hello", "logo.png"), "utf8")) === "the logo"
+  (await fs.readFile(path.join(logoHub, "assets", "acme-hello-logo-7e0b9e9c.png"), "utf8")) === "the logo"
 )
+
+/* The same pack read again stores the same file rather than a second copy: a
+   scan runs on every page load, so this is what keeps the directory from
+   growing. */
+const again = (await createPluginCollector(logoLibrary).add(logoPack)).record
+check("reading a pack again keeps one copy of its picture", again.icon === first.icon, again.icon)
+check(
+  "and the asset directory still holds one file per pack",
+  (await fs.readdir(path.join(logoHub, "assets"))).join(",") ===
+    "acme-hello-logo-7e0b9e9c.png,other-pack-logo-e157ef72.png",
+  await fs.readdir(path.join(logoHub, "assets"))
+)
+
+console.log("an asset store with a sink of its own")
+
+/* A sink is the seam a plugin adds a backend through — somewhere else an asset
+   can be kept. The store offers every file to it first; one that answers takes
+   the file over, and dropping that reference is the sink's again. */
+const kept: { name: string; type: string; bytes: number }[] = []
+const sinkDropped: string[] = []
+const bucket: AssetSink = {
+  id: "check-bucket",
+  async keep(file: File) {
+    kept.push({ name: file.name, type: file.type, bytes: file.size })
+    return `https://bucket.test/${encodeURIComponent(file.name)}`
+  },
+  async drop(ref: string) {
+    sinkDropped.push(ref)
+  },
+}
+const sinkHub = path.join(root, "sink-hub")
+const sinkStore = createAssetStore(createFsAssetLibrary(sinkHub), [bucket])
+const sinkLibrary = createFsPluginLibrary(sinkHub, sinkStore)
+const hosted = (await createPluginCollector(sinkLibrary).add(logoPack)).record
+check(
+  "the sink is offered the pack's picture as a file of its own",
+  kept.length === 1 && kept[0]?.name === "acme-hello-logo.png" && kept[0]?.type === "image/png",
+  kept
+)
+check(
+  "and the reference it answers with is what the record holds",
+  hosted.icon === "https://bucket.test/acme-hello-logo.png",
+  hosted.icon
+)
+check(
+  "so nothing is kept in the hub's own directory",
+  (await fs.readdir(path.join(sinkHub, "assets")).catch(() => [])).length === 0,
+  await fs.readdir(path.join(sinkHub, "assets")).catch(() => [])
+)
+await sinkLibrary.remove(hosted.name)
+check("dropping the pack asks the sink to drop its copy", sinkDropped.join() === hosted.icon, sinkDropped)
 
 console.log("removing")
 
@@ -676,11 +729,11 @@ check("the pack's directory is gone", (await fs.stat(path.join(logoHub, "plugins
 check("its record is gone", !(await logoLibrary.list()).some((one) => one.name === first.name))
 check(
   "the picture it brought is gone too",
-  (await fs.stat(path.join(logoHub, "assets", "acme-hello")).catch(() => null)) === null
+  (await fs.stat(path.join(logoHub, "assets", "acme-hello-logo-7e0b9e9c.png")).catch(() => null)) === null
 )
 check(
   "while the other pack's picture stays",
-  (await fs.stat(path.join(logoHub, second.icon)).catch(() => null)) !== null
+  (await fs.stat(path.join(logoHub, "assets", "other-pack-logo-e157ef72.png")).catch(() => null)) !== null
 )
 
 console.log("a source that moved")

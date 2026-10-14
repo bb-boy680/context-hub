@@ -22,12 +22,13 @@ import { promises as fs, watch } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { assetKind, assetUrl, isLink, readSource } from "@workspace/core"
+import { assetKind, assetRef, readSource } from "@workspace/core"
+import { createAssetStore } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
 import { TEMP_PREFIX, writeFileAtomic } from "@workspace/core/host/atomic"
 import { displayPath, resolveHubHome, userHome } from "@workspace/core/host/home"
 import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
-import type { AssetLibrary } from "@workspace/core"
+import type { AssetStore } from "@workspace/core"
 import type { AssetScope } from "@workspace/extensions"
 
 import {
@@ -174,6 +175,18 @@ async function readdirOrEmpty(dir: string) {
   }
 }
 
+/**
+ * One uploaded file, named so its owner keeps it apart from every other
+ * owner's: the skill's id prefixes the name, so two skills that upload a
+ * picture of the same name never end up sharing one file — which is what lets
+ * either of them drop its own without taking the other's with it.
+ *
+ * The bytes are not copied: a file is itself valid file data.
+ */
+function owned(id: string, file: File): File {
+  return new File([file], `${id}-${file.name}`, { type: file.type })
+}
+
 /** What a disk-backed store needs to know about where it writes. */
 export interface SkillStoreOptions {
   /** Hub home; skills live in `<home>/skills` and their files in `<home>/assets`. */
@@ -189,8 +202,12 @@ export interface SkillStoreOptions {
    * rather than inheriting whichever account the process runs as.
    */
   userHome?: string
-  /** An already-built library, for a form that shares one across features. */
-  library?: AssetLibrary
+  /**
+   * An already-built asset store, for a form that keeps assets its own way —
+   * with a sink that uploads them somewhere, say. The hub's own store over
+   * `<home>/assets` when absent.
+   */
+  assets?: AssetStore
 }
 
 /** Create the disk-backed store for one hub home. */
@@ -200,7 +217,7 @@ export async function createFsSkillStore(
   const home = resolveHubHome(options.home)
   const root = skillsRoot(home)
   const homeDir = options.userHome ?? userHome()
-  const library = options.library ?? createFsAssetLibrary(home)
+  const assets = options.assets ?? createAssetStore(createFsAssetLibrary(home))
   await fs.mkdir(root, { recursive: true })
   const catalogPath = path.join(root, CATALOG_FILE)
   const listeners = new Set<() => void>()
@@ -421,10 +438,10 @@ export async function createFsSkillStore(
     return { ref, kind }
   }
 
-  /** Drop references the hub does not own from a row that is going away. */
+  /** Drop the assets a row held, from wherever each one is kept. */
   const dropStored = async (refs: string[]): Promise<void> => {
     for (const ref of refs) {
-      if (!isLink(ref)) await library.remove(ref)
+      await assets.remove(ref)
     }
   }
 
@@ -675,12 +692,7 @@ export async function createFsSkillStore(
       const current = await loadCatalog()
       if (current.skills[id] === undefined)
         throw new Error(`unknown skill: ${id}`)
-      const ref = await library.put(
-        file.name,
-        new Uint8Array(await file.arrayBuffer()),
-        file.type
-      )
-      return recordAsset(id, ref)
+      return recordAsset(id, await assets.put(owned(id, file)))
     },
 
     async addAssetSource(id: string, source: string): Promise<SkillAsset> {
@@ -695,19 +707,14 @@ export async function createFsSkillStore(
         }
         return recordAsset(id, parsed.ref)
       }
-      const ref = await library.put(
-        parsed.name,
-        parsed.bytes,
-        parsed.contentType
-      )
-      return recordAsset(id, ref)
+      return recordAsset(id, await assets.put(owned(id, parsed.file)))
     },
 
     async deleteAsset(id: string, ref: string): Promise<void> {
       const current = await loadCatalog()
       const row = current.skills[id]
       if (row === undefined) throw new Error(`unknown skill: ${id}`)
-      if (!isLink(ref)) await library.remove(ref)
+      await assets.remove(ref)
       await mutate((skills) => {
         const next = skills[id]
         if (next === undefined) return
@@ -719,9 +726,7 @@ export async function createFsSkillStore(
       })
     },
 
-    assetUrl(ref: string): string {
-      return isLink(ref) ? ref : assetUrl(ref)
-    },
+    assetUrl: (ref) => assetRef(ref),
 
     async placeSkills(ref: SkillPlaceRef): Promise<PlaceSkills | null> {
       const base = await placeBase(ref.scope)

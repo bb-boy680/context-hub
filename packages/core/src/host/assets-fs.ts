@@ -1,30 +1,62 @@
 /**
- * Disk-backed asset library. Files live under `<home>/assets`, so a recorded
- * path like `assets/cover.png` resolves the same way in every form: `<home>`
- * plus the path.
+ * Disk-backed asset library. Files live under `<home>/assets` — one directory,
+ * flat — so a recorded path like `assets/cover-3f9a2b1c.png` resolves the same
+ * way in every form: `<home>` plus the path.
+ *
+ * A file is named after the hint its caller gave and a digest of its bytes. A
+ * pack read on every page load therefore writes nothing after the first time,
+ * and two callers that happen to use one hint still never overwrite each other.
+ * The hint is sanitized rather than refused: its words come from other people's
+ * files, and a picture whose name carries a character Windows forbids is still
+ * a picture worth keeping.
  *
  * Writes replace files atomically (see `atomic.ts`), so a reader never sees a
  * partial file. This module runs in the process that owns the disk.
  */
+import { createHash } from "node:crypto"
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import { ASSET_DIR, assetKind, assetLimit, limitMessage } from "../assets.ts"
+import { ASSET_DIR, assetKind, assetLimit, extensionFor, limitMessage } from "../assets.ts"
 import type { AssetLibrary } from "../assets.ts"
 import { writeFileAtomic } from "./atomic.ts"
 
-/** Characters no file name may carry: path separators plus the Windows reserved set. */
-const RESERVED_IN_NAME = /[\\/:*?"<>|]/
+/** How much of the digest names a file, in hex characters. */
+const DIGEST_LENGTH = 8
 
-/** Reject a name that would escape, hide, or fail to write. */
-function assertSafeName(value: string): string {
-  if (value === "" || value === "." || value === ".." || value.startsWith(".")) {
-    throw new Error(`asset name is not allowed: ${value}`)
-  }
-  if (RESERVED_IN_NAME.test(value)) {
-    throw new Error(`asset name is not allowed: ${value}`)
-  }
-  return value
+/** How long the words taken from a hint may be. */
+const STEM_LIMIT = 48
+
+/** Characters no file name may carry; each becomes a separator instead. */
+const RESERVED_IN_NAME = /[\\/:*?"<>|]+/g
+
+/**
+ * A caller's hint as the words of a file name.
+ *
+ * A path in the hint contributes its words rather than being cut at the last
+ * separator: what a caller put in front of one — the pack or skill the asset
+ * belongs to — is exactly what keeps two owners' files apart, and a name that
+ * cannot carry a separator cannot escape the directory either.
+ */
+function stemOf(hint: string): string {
+  const stem = hint
+    .replace(RESERVED_IN_NAME, "-")
+    .replace(/\.[^.]*$/, "")
+    .replace(/\s+/g, "-")
+    .replace(/[^\p{L}\p{N}_.-]+/gu, "-")
+    .replace(/\.{2,}/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^[-_.]+|[-_.]+$/g, "")
+    .slice(0, STEM_LIMIT)
+  return stem === "" ? "asset" : stem
+}
+
+/** The extension a file keeps, from the hint first and its media type second. */
+function extensionOf(hint: string, contentType: string | undefined): string {
+  const named = /\.[A-Za-z0-9]{1,5}$/.exec(hint)
+  if (named !== null) return named[0].toLowerCase()
+  const byType = extensionFor(contentType ?? "")
+  return byType === undefined ? "" : `.${byType}`
 }
 
 /**
@@ -58,20 +90,22 @@ export function createFsAssetLibrary(home: string): AssetLibrary {
   return {
     root: dir,
 
-    async put(name, bytes, contentType) {
+    async put(file) {
       await fs.mkdir(dir, { recursive: true })
-      const original = assertSafeName(path.basename(name))
-      const kind = assetKind(original, contentType)
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const kind = assetKind(file.name, file.type)
       const limit = assetLimit(kind)
       if (bytes.byteLength > limit) throw new Error(limitMessage(kind))
-      let file = original
-      let suffix = 1
-      while ((await statOrNull(path.join(dir, file))) !== null) {
-        file = `${path.basename(original, path.extname(original))}-${suffix++}${path.extname(original)}`
-      }
-      /* Write beside the target and rename, so a failed write leaves no half file. */
-      await writeFileAtomic(path.join(dir, file), bytes)
-      return `${ASSET_DIR}/${file}`
+      const digest = createHash("sha256")
+        .update(bytes)
+        .digest("hex")
+        .slice(0, DIGEST_LENGTH)
+      const name = `${stemOf(file.name)}-${digest}${extensionOf(file.name, file.type)}`
+      const target = path.join(dir, name)
+      /* The name carries the digest, so a file already there holds these very
+         bytes and rewriting it would only move its timestamp. */
+      if ((await statOrNull(target)) === null) await writeFileAtomic(target, bytes)
+      return `${ASSET_DIR}/${name}`
     },
 
     async remove(relative) {

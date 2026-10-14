@@ -14,6 +14,7 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http"
 
+import { createAssetStore, type AssetSink, type AssetStore } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
 import { resolveHubHome } from "@workspace/core/host/home"
 
@@ -69,15 +70,19 @@ function requiredString(value: unknown, field: string): string {
  * agent plugins; nothing in this file names an agent.
  *
  * @param options.home — the hub home; the library is `<home>/plugins`.
+ * @param options.sinks — places this form keeps assets besides the hub's own directory, such as a bucket a plugin uploads to.
+ * @param options.assets — a store to use instead of one over `<home>/assets`, for a form that keeps assets its own way.
  */
-export function pluginLibrary(options: { home?: string } = {}) {
-  const library = createFsPluginLibrary(options.home)
+export function pluginLibrary(
+  options: { home?: string; sinks?: readonly AssetSink[]; assets?: AssetStore } = {}
+) {
+  const assets =
+    options.assets ??
+    createAssetStore(createFsAssetLibrary(resolveHubHome(options.home)), options.sinks ?? [])
+  const library = createFsPluginLibrary(options.home, assets)
   const collector = createPluginCollector(library)
   const probe = createPluginProbe(library)
   const updater = createPluginUpdater(library)
-  /* The pictures a pack ships are kept where the hub keeps every file of its
-     own, which is also where a scanned pack's picture lands. */
-  const assets = createFsAssetLibrary(resolveHubHome(options.home))
 
   return {
     name: "context-hub-plugin-library",

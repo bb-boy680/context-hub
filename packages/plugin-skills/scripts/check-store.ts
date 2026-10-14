@@ -178,14 +178,41 @@ check("the write changes the file", patched !== before)
 const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10])
 const first = await store.putAsset("pdf-extract", new File([png], "cover.png", { type: "image/png" }))
 const second = await store.putAsset("pdf-extract", new File([png], "cover.png", { type: "image/png" }))
-check("first upload keeps its name", first.ref === "assets/cover.png", first.ref)
-check("a taken name gains a suffix", second.ref === "assets/cover-1.png", second.ref)
+check(
+  "an upload is stored under its own name and a digest of its bytes",
+  first.ref === "assets/pdf-extract-cover-4c4b6a3b.png",
+  first.ref
+)
+check("uploading the same bytes again reuses that file", second.ref === first.ref, second.ref)
 check("upload reports the kind", first.kind === "image")
 const withAssets = await store.get("pdf-extract")
-check("assets keep upload order", withAssets.assets.join(",") === "assets/cover.png,assets/cover-1.png", withAssets.assets)
-check("the bytes are stored with the hub", (await fs.stat(path.join(files, "cover.png"))).size === png.byteLength)
+check(
+  "the same asset is recorded once",
+  withAssets.assets.join(",") === "assets/pdf-extract-cover-4c4b6a3b.png",
+  withAssets.assets
+)
+check(
+  "the bytes are stored with the hub",
+  (await fs.stat(path.join(files, "pdf-extract-cover-4c4b6a3b.png"))).size === png.byteLength
+)
 check("the skill directory keeps no copy", (await fs.readdir(path.join(root, "pdf-extract", "assets"))).length === 0)
-check("a stored path is served from the hub route", store.assetUrl("assets/cover.png") === "/hub/files/assets/cover.png", store.assetUrl("assets/cover.png"))
+check(
+  "a stored path is served from the hub route",
+  store.assetUrl("assets/pdf-extract-cover-4c4b6a3b.png") ===
+    "/hub/files/assets/pdf-extract-cover-4c4b6a3b.png",
+  store.assetUrl("assets/pdf-extract-cover-4c4b6a3b.png")
+)
+
+/* Two different pictures under one name stay two files. */
+const other = await store.putAsset(
+  "pdf-extract",
+  new File([new Uint8Array([137, 80, 78, 71, 13, 10, 26, 11])], "cover.png", { type: "image/png" })
+)
+check("different bytes under one name are a second file", other.ref !== first.ref, other.ref)
+check(
+  "and the first file is untouched",
+  (await fs.stat(path.join(files, "pdf-extract-cover-4c4b6a3b.png")).catch(() => null)) !== null
+)
 
 /* Oversize uploads are refused before anything is written. */
 let refused = ""
@@ -209,16 +236,28 @@ const again = await store.addAssetSource("pdf-extract", link.ref)
 check("re-adding a link keeps one entry", again.ref === link.ref, again.ref)
 const linked = await store.get("pdf-extract")
 check("re-adding a link does not duplicate it", linked.assets.filter((ref) => ref === link.ref).length === 1)
-check("no file is written for a link", (await fs.readdir(files)).sort().join(",") === "cover-1.png,cover.png", await fs.readdir(files))
+check(
+  "no file is written for a link",
+  (await fs.readdir(files)).sort().join(",") ===
+    "pdf-extract-cover-4c4b6a3b.png,pdf-extract-cover-87f2af60.png",
+  await fs.readdir(files)
+)
 
 /* A data: source carries its own bytes, so the hub takes it over. */
 const inline = await store.addAssetSource(
   "pdf-extract",
   `data:image/png;base64,${Buffer.from(png).toString("base64")}`
 )
-check("a data: source is stored as a file", inline.ref === "assets/asset.png", inline.ref)
+check(
+  "a data: source is stored as a file",
+  inline.ref === "assets/pdf-extract-asset-4c4b6a3b.png",
+  inline.ref
+)
 check("a data: source reports the kind its type names", inline.kind === "image", inline.kind)
-check("a data: source writes the decoded bytes", (await fs.stat(path.join(files, "asset.png"))).size === png.byteLength)
+check(
+  "a data: source writes the decoded bytes",
+  (await fs.stat(path.join(files, "pdf-extract-asset-4c4b6a3b.png"))).size === png.byteLength
+)
 
 /* Anything the hub cannot keep is refused with a reason. */
 let scheme = ""
@@ -231,13 +270,17 @@ check("a non-http source is refused", scheme.includes("http"), scheme)
 
 /* Deleting a reference deletes the file the hub stores for it. */
 await store.deleteAsset("pdf-extract", inline.ref)
-check("the file is gone from the disk", (await fs.stat(path.join(files, "asset.png")).catch(() => null)) === null)
+check(
+  "the file is gone from the disk",
+  (await fs.stat(path.join(files, "pdf-extract-asset-4c4b6a3b.png")).catch(() => null)) === null
+)
 check("the reference is gone from the record", !(await store.get("pdf-extract")).assets.includes(inline.ref))
 
 await store.deleteAsset("pdf-extract", link.ref)
 check(
   "the record keeps the other references",
-  (await store.get("pdf-extract")).assets.join(",") === "assets/cover.png,assets/cover-1.png",
+  (await store.get("pdf-extract")).assets.join(",") ===
+    "assets/pdf-extract-cover-4c4b6a3b.png,assets/pdf-extract-cover-87f2af60.png",
   (await store.get("pdf-extract")).assets
 )
 
@@ -247,13 +290,13 @@ const traversing = await store.putAsset(
   new File([png], "../cover.png", { type: "image/png" })
 )
 check(
-  "upload name keeps only its base name",
-  /^assets\/cover(-\d+)?\.png$/.test(traversing.ref),
+  "a path inside the name cannot escape, and keeps the skill's own words",
+  traversing.ref === "assets/pdf-extract-cover-4c4b6a3b.png",
   traversing.ref
 )
 check(
   "upload lands inside the asset directory",
-  (await fs.stat(path.join(files, "cover.png")).catch(() => null)) !== null
+  (await fs.stat(path.join(files, "pdf-extract-cover-4c4b6a3b.png")).catch(() => null)) !== null
 )
 
 /* Path escapes are refused. */
@@ -271,7 +314,7 @@ try {
 } catch (error) {
   unsafe = error instanceof Error ? error.message : String(error)
 }
-check("a reference outside the hub is refused", unsafe.includes("escapes"), unsafe)
+check("a reference outside the hub is refused", unsafe.includes("asset directory"), unsafe)
 
 /* Removing a skill takes the files it references with it. */
 await store.remove("pdf-extract")

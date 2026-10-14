@@ -63,7 +63,7 @@ const answers: ScannedAnswer[] = [
           name: "claude-hud",
           version: "1.0.0",
           description: "A statusline HUD",
-          icon: "assets/hud/logo.png",
+          icon: "assets/hud-logo-3f9a2b1c.png",
         },
       },
       {
@@ -78,7 +78,7 @@ const answers: ScannedAnswer[] = [
           name: "claude-hud",
           version: "1.0.0",
           description: "A statusline HUD",
-          icon: "assets/hud/logo.png",
+          icon: "assets/hud-logo-3f9a2b1c.png",
         },
       },
     ],
@@ -144,7 +144,7 @@ check(
 )
 check(
   "what the pack says about itself travels with it",
-  scanned[0]?.description === "A statusline HUD" && scanned[0]?.icon === "assets/hud/logo.png",
+  scanned[0]?.description === "A statusline HUD" && scanned[0]?.icon === "assets/hud-logo-3f9a2b1c.png",
   scanned[0]
 )
 check(
@@ -174,29 +174,29 @@ check(
 )
 check(
   "and it says what the pack says about itself",
-  rows[1]?.description === "A statusline HUD" && rows[1]?.icon === "/hub/files/assets/hud/logo.png",
+  rows[1]?.description === "A statusline HUD" && rows[1]?.icon === "/hub/files/assets/hud-logo-3f9a2b1c.png",
   rows[1]
 )
 check("the agent's row names no source of its own", rows[1]?.source === undefined, rows[1]?.source)
 check(
   "a library row draws the mark the hub copied out of the pack",
-  composeRows([{ ...record("stored"), icon: "assets/stored/logo.png" }], [], "en", (key) => key)[0]?.icon ===
-    "/hub/files/assets/stored/logo.png",
-  composeRows([{ ...record("stored"), icon: "assets/stored/logo.png" }], [], "en", (key) => key)[0]?.icon
+  composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.icon ===
+    "/hub/files/assets/stored-logo-3f9a2b1c.png",
+  composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.icon
 )
 check(
   "and the mark also fills the card until a picture is added",
-  composeRows([{ ...record("stored"), icon: "assets/stored/logo.png" }], [], "en", (key) => key)[0]?.cover ===
-    "/hub/files/assets/stored/logo.png"
+  composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.cover ===
+    "/hub/files/assets/stored-logo-3f9a2b1c.png"
 )
 check(
   "a picture a person added is what the card draws instead",
   composeRows(
-    [{ ...record("stored"), icon: "assets/stored/logo.png", assets: ["assets/stored/shot.png"] }],
+    [{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png", assets: ["assets/stored-shot-8d1c40aa.png"] }],
     [],
     "en",
     (key) => key
-  )[0]?.cover === "/hub/files/assets/stored/shot.png"
+  )[0]?.cover === "/hub/files/assets/stored-shot-8d1c40aa.png"
 )
 check(
   "a pack with no picture of its own draws none",
