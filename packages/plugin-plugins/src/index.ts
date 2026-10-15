@@ -11,6 +11,7 @@
  */
 import { PlugIcon } from "lucide-react"
 
+import type { WorkspaceService } from "@workspace/core/workspace"
 import type { ExtensionDefinition } from "@workspace/extensions"
 
 import { pluginsMessages } from "./messages.ts"
@@ -21,6 +22,16 @@ import {
   type PluginService,
 } from "./provider.ts"
 import { createRemotePluginTools } from "./tools.ts"
+
+declare module "@deepseek-ai/cordis" {
+  interface Context {
+    /**
+     * The form-owned workspace list; a client resolves its own project files
+     * against the folder this names, so the page rereads when it changes.
+     */
+    "hub.workspaces"?: WorkspaceService
+  }
+}
 
 export { PluginsPage }
 export * from "./contract.ts"

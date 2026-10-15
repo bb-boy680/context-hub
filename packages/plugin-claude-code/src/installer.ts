@@ -28,6 +28,7 @@ import {
   CLAUDE_CODE_ENABLED_KEY,
   CLAUDE_CODE_ID,
   CLAUDE_CODE_SETTINGS_FILE,
+  normalizeProjectPath,
 } from "./locations.ts"
 
 /** The marketplace name the hub's library is registered under. */
@@ -156,10 +157,18 @@ function firstString(...values: unknown[]): string | undefined {
  * What the pack itself carries is not in this answer, so `pack` reads empty
  * here; {@link PluginInstaller.held} fills it in by reading each directory.
  *
+ * A record that names the project it belongs to is kept only when that is the
+ * folder in use: the client keeps one record per folder and names the folder in
+ * it, so another repository's record says nothing about this one — read as this
+ * one's, it would draw a pack this repository does not hold and offer an
+ * uninstall that cannot find it. A record naming no folder is kept, because
+ * nothing says it is a project's: the machine-wide places are not folders.
+ *
  * @param output — what `claude plugin list --json` printed.
+ * @param folder — the folder in use, or `null` when this form cannot name one.
  * @returns one entry per installed pack, in the order the client listed them.
  */
-export function readHeld(output: string): PluginHeld[] {
+export function readHeld(output: string, folder: string | null = null): PluginHeld[] {
   let parsed: unknown
   try {
     parsed = JSON.parse(output)
@@ -174,6 +183,14 @@ export function readHeld(output: string): PluginHeld[] {
     if (typeof entry.id !== "string" || typeof entry.scope !== "string") continue
     const at = entry.id.lastIndexOf("@")
     if (at <= 0 || at === entry.id.length - 1) continue
+    const project = firstString(entry.projectPath)
+    if (
+      folder !== null &&
+      project !== undefined &&
+      normalizeProjectPath(project) !== normalizeProjectPath(folder)
+    ) {
+      continue
+    }
     const path = firstString(entry.readFromFolder, entry.installPath)
     found.push({
       name: entry.id.slice(0, at),
@@ -187,6 +204,19 @@ export function readHeld(output: string): PluginHeld[] {
     })
   }
   return found
+}
+
+/**
+ * The folder in use, as the client's own project records name it, or `null` when
+ * this form cannot say which folder that is.
+ *
+ * A form with no host behind it holds no files, and a hub with no workspace open
+ * has no folder: neither is a folder to compare a record against, so both answer
+ * `null` and a caller keeps every record rather than dropping the ones it cannot
+ * place.
+ */
+async function folderInUse(tools: PluginTools): Promise<string | null> {
+  return (await tools.files?.workspace().catch(() => null)) ?? null
 }
 
 /**
@@ -216,7 +246,10 @@ export const claudeCodeInstaller: PluginInstaller = {
   available: (tools) => tools.has(PROGRAM),
 
   async held(tools) {
-    return withPacks(tools, readHeld(await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG])))
+    return withPacks(
+      tools,
+      readHeld(await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG]), await folderInUse(tools))
+    )
   },
 
   async switches(tools) {

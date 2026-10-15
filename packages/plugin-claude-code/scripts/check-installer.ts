@@ -324,6 +324,49 @@ check("an answer that is not a list yields nothing", readHeld('{"installed":[]}'
 check("prose yields nothing", readHeld("No plugins installed.").length === 0)
 check("an empty list yields nothing", readHeld("[]").length === 0)
 
+console.log("reading one repository's records")
+
+/* The shape the client prints for a pack installed at project scope, in the
+   folder it was installed for and in the one beside it. */
+const PROJECTS = JSON.stringify([
+  {
+    id: "ponytail@ponytail",
+    version: "5.2.0",
+    scope: "project",
+    enabled: true,
+    projectPath: "D:\\work\\hub",
+    projectEnabled: true,
+    installPath: "C:\\Users\\me\\.claude\\plugins\\cache\\ponytail\\ponytail\\5.2.0",
+  },
+  {
+    id: "ponytail@ponytail",
+    version: "5.2.0",
+    scope: "user",
+    enabled: true,
+    projectEnabled: false,
+    installPath: "C:\\Users\\me\\.claude\\plugins\\cache\\ponytail\\ponytail\\5.2.0",
+  },
+])
+
+const here = readHeld(PROJECTS, "D:/work/hub/")
+check(
+  "a record that names this folder is this repository's, however it is spelt",
+  here.length === 2 && here.some((one) => one.scope === "project"),
+  here
+)
+
+const beside = readHeld(PROJECTS, "D:\\work\\other")
+check(
+  "a record naming another folder is left out, and the machine-wide one kept",
+  beside.length === 1 && beside[0]?.scope === "user",
+  beside
+)
+
+check(
+  "with no folder to compare against, every record is kept",
+  readHeld(PROJECTS).length === 2 && readHeld(PROJECTS, null).length === 2
+)
+
 console.log("turning a pack on and off")
 
 /* The command line is the whole of this action's behaviour, and nothing above

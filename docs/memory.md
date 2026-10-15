@@ -420,3 +420,45 @@ EDGE="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
   的第二个 dev server，别往真实的 `~/.context-hub/plugins` 里写；
   收尾记得连进程一起清掉（这轮清理时误杀了一个不是我起的 5173，用户自己的服务）。
 
+
+## 用 CDP 点开关菜单会写进用户的真实配置（2026-10-15）
+
+**问题模式**：为了看「状态」菜单里各位置的状态，我拿 headless Edge 点了 `状态 ponytail`、
+`安装到 ponytail` 这些菜单，读 innerText。收尾时发现两处**用户的真实状态被我改了**：
+
+- `D:\work-space\new-api\.claude\settings.json` —— **这个文件本来不存在**，我点出来一个
+  `{"enabledPlugins":{"warp@claude-code-warp":true}}`（菜单里的 Switch 被我的坐标碰到了）；
+- `D:\work-space\dsh-context-hub\.claude\settings.json` 多了一条 `aikido@context-hub: true`。
+
+菜单的打开是安全的，**菜单内部的点击不安全**：`PlaceMenu` 的行尾是 `Switch`，
+一次偏移几十像素的合成点击就等于「帮用户拨了开关」，而它写的是仓库里的 `.claude/settings.json`
+或 `~/.claude/settings.json`。这跟本文件「不要为了让现象消失去改用户的机器状态」是同一条。
+
+**规则**：
+- 探针里**只读的东西只用 `Escape` 关**，绝不用「点别处」来关菜单；一次 `Page.navigate`
+  之后只做一次菜单交互，别让上一张菜单还在关闭动画里就发下一次点击。
+- 探针跑完必须回头核对**被点过的那些路径**是否还是原样：本轮核对方式是 `cat` 那两份
+  settings、`installed_plugins.json`（`scope`/`projectPath` 列表）、以及 `GET /hub/workspaces`
+  的 `current`；发现多出来的东西就按原内容写回去（本轮已还原：new-api 那个文件删掉，
+  dsh 那份恢复成只有 `ponytail@ponytail: true`）。
+- 需要「带真实数据看菜单」时，宁可起 `CONTEXT_HUB_HOME=<temp>` 的那台，或者只读
+  桥接口的数据自己算（本轮最后就是改读 `GET /hub/workspaces` + 菜单文本，不再点菜单内部）。
+
+## `claude plugin list` 的 `enabled` 是整条文件链的答案，`projectEnabled` 只是本仓库这一层（2026-10-15）
+
+**问题模式**：用户报「切换到 new-api 后 plugins 页还是说 ponytail 在本仓库已启用」。
+我按归档计划 `plugins-status-menu.md` 的记忆，打算把工作区那一处的兜底从 `enabled`
+换成 `projectEnabled`（那份计划里叫 `workspaceEnabled`）——**方向错了**。
+
+真实值是：`~/.claude/settings.json` 的 `enabledPlugins` 里就有 `ponytail@ponytail: true`，
+这个包是**机器级启用**的，本机每个仓库都生效。`projectEnabled` 只是「本仓库这一层的文件说了什么」
+（没有这个文件就是 `false`），拿它当答案会把一个真实生效的包报成「未启用」。
+
+**规则**：`claude plugin list --json` 的两个布尔要分开读——`enabled` = 整条链解析后的答案
+（machine + project + local），`projectEnabled` = 项目那一层自己的值。判断「配置里某个值
+代表什么」之前，先把**产生它的那几个文件都打开看一眼**（这里是 `~/.claude/settings.json`
+与仓库里的 `.claude/settings.json`），别只信归档计划里当时测出来的那张表——那张表是对的，
+但它只覆盖了「local 文件参与」的场景，不能外推到「机器级启用」。
+
+**判据**：归档计划里的结论是**当时的实验**，不是规范；它没有覆盖的输入（这里是「user 文件参与」）
+要重新测一次再照做。

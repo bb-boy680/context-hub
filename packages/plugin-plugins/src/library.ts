@@ -338,6 +338,34 @@ export interface PluginUpdateOutcome {
   overwroteEdits: boolean
 }
 
+/** Nothing to follow when this form provides no workspace list. */
+const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
+
+/**
+ * The workspace in use, as the form keeps it.
+ *
+ * A client resolves its own project files against the folder it is started in —
+ * Claude Code writes `.claude/settings.json` where it was run — so switching
+ * workspaces changes what every client holds and which of its files switches a
+ * pack on. The id is therefore a reload key rather than context a read may
+ * ignore.
+ *
+ * @returns the current workspace's id, or `null` when this form has none.
+ */
+function useCurrentWorkspace(): string | null {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(
+    () => workspaces?.current()?.current ?? null,
+    [workspaces]
+  )
+  return React.useSyncExternalStore(subscribe, read)
+}
+
 /* Which agents this hub can deliver to is a plugin question, not a library one:
    the installers live in the agent plugins, and this page reads the registry
    they registered into. The snapshot's revision is what says the catalog
@@ -363,6 +391,7 @@ export function usePluginLibrary(): PluginLibrary {
     (): PluginTools | null => (service === null ? null : { ...service.tools, files: ctx.host.files }),
     [service, ctx]
   )
+  const workspace = useCurrentWorkspace()
   /* An installer carries no mark of its own: it shows the icon its own extension
      declares, which is the same one the catalog row draws. */
   const iconFor = React.useCallback(
@@ -380,6 +409,9 @@ export function usePluginLibrary(): PluginLibrary {
 
   const read = React.useCallback(async () => {
     void revision
+    /* The workspace in use is a reload key: it decides which folder each client
+       is asked in, and which of its files the switches are read from. */
+    void workspace
     const answer = await call<ListAnswer>(`${ENDPOINT}?action=list`)
     setRecords(answer.plugins)
     setRoot(answer.root)
@@ -423,7 +455,7 @@ export function usePluginLibrary(): PluginLibrary {
           }))
       )
     )
-  }, [service, revision, iconFor, tools])
+  }, [service, revision, iconFor, tools, workspace])
 
   /** Run one write, then read everything again: any write can change more than it named. */
   const write = React.useCallback(

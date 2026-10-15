@@ -28,6 +28,7 @@ import {
   CLAUDE_CODE_ID,
   CLAUDE_CODE_MCP_FILE,
   CLAUDE_CODE_MCP_KEY,
+  normalizeProjectPath,
 } from "./locations.ts"
 
 /** The two places Claude Code reads servers from. */
@@ -116,8 +117,8 @@ export function createClaudeCodeMcp(tools: McpTools): McpProvider {
     if (workspace === null) return null
     const projects = valueAt(document, [PROJECTS])
     if (typeof projects !== "object" || projects === null) return null
-    const wanted = normalize(workspace)
-    return Object.keys(projects).find((key) => normalize(key) === wanted) ?? null
+    const wanted = normalizeProjectPath(workspace)
+    return Object.keys(projects).find((key) => normalizeProjectPath(key) === wanted) ?? null
   }
 
   return {
@@ -218,11 +219,6 @@ export function createClaudeCodeMcp(tools: McpTools): McpProvider {
         : jsonValueLines(text, [CLAUDE_CODE_MCP_KEY, name])
     },
   }
-}
-
-/** A path compared the way Claude Code spells it: forward slashes, no trailing one. */
-function normalize(value: string): string {
-  return value.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
 }
 
 /** The message one thrown value carries. */

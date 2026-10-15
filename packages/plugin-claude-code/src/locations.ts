@@ -78,3 +78,15 @@ export const PROJECT_LOCATIONS: ClaudeCodeLocation[] = [
 
 /** The asset kinds Claude Code accepts, in the order a panel lists them. */
 export const SUPPORTS = ["skill", "mcp", "memory", "hook"] as const
+
+/**
+ * A folder compared the way Claude Code spells it: forward slashes, no trailing
+ * one, and no case — the same folder is written its own way in its own records,
+ * and both a project's key and its record name it that way.
+ *
+ * @param value — a folder path, as either side wrote it.
+ * @returns the form two spellings of one folder agree on.
+ */
+export function normalizeProjectPath(value: string): string {
+  return value.replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase()
+}
