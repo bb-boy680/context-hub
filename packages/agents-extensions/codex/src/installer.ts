@@ -83,6 +83,9 @@ export function readHeld(output: string): PluginHeld[] {
       version: typeof entry.version === "string" ? entry.version : "",
       scope: "user",
       enabled: entry.enabled !== false,
+      /* Codex keeps one list and no per-repository one, so there is no such
+         answer to give — and it holds no switch for this hub to offer. */
+      workspaceEnabled: false,
       marketplace: typeof entry.marketplaceName === "string" ? entry.marketplaceName : null,
       ...(typeof path === "string" && path !== "" ? { source: { kind: "local", path } } : {}),
       pack: { name: "", version: "", description: "" },

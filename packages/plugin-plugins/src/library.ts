@@ -215,6 +215,18 @@ export interface PluginLibrary {
   install(name: string, client: string, scope: PluginInstallScope): Promise<void>
   /** Take it back out of that client and scope, whatever marketplace it came from. */
   uninstall(name: string, client: string, scope: PluginInstallScope): Promise<void>
+  /**
+   * Switch a client's use of a pack on or off in one scope.
+   *
+   * The scope is the one its own file records: the hub writes the repository's
+   * file, which is the one it can name, and never the person's own.
+   */
+  setEnabled(
+    name: string,
+    client: string,
+    scope: PluginInstallScope,
+    on: boolean
+  ): Promise<void>
 }
 
 /** What one update did, as the bridge reports it. */
@@ -396,6 +408,19 @@ export function usePluginLibrary(): PluginLibrary {
     [scanned, write, t]
   )
 
+  /**
+   * The agent's own id for one pack it holds.
+   *
+   * It names the marketplace the pack really came from, and an agent holds packs
+   * this hub never delivered. The agent answered with that id when it was asked
+   * what it holds, so this side never has to guess at it.
+   */
+  const heldId = React.useCallback(
+    (name: string, client: string): string | undefined =>
+      scanned.find((one) => one.name === name)?.held.find((one) => one.client === client)?.id,
+    [scanned]
+  )
+
   return {
     rows,
     clients,
@@ -428,6 +453,20 @@ export function usePluginLibrary(): PluginLibrary {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }
       return deliver(client, (installer, tools) => installer.remove(own, scope, tools))
+    },
+    setEnabled: (name, client, scope, on) => {
+      const own = heldId(name, client)
+      if (own === undefined) {
+        return Promise.reject(new Error(t("plugins.uninstall.unknown")))
+      }
+      return deliver(client, (installer, tools) => {
+        /* An agent that keeps no such switch is refused here rather than left
+           looking as though the press did nothing. */
+        if (installer.setEnabled === undefined) {
+          return Promise.reject(new Error(t("plugins.enable.selfManaged")))
+        }
+        return installer.setEnabled(own, scope, on, tools)
+      })
     },
   }
 }

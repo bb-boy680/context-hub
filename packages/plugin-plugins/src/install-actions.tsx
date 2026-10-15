@@ -11,13 +11,15 @@
  * so its clicks stop there: without that, opening the menu would also open the
  * pack's own lightbox.
  */
-import { CheckIcon, DownloadIcon } from "lucide-react"
+import { ChevronDownIcon, DownloadIcon, PowerIcon } from "lucide-react"
 
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginClient } from "./library.ts"
-import { SCOPE_LABELS } from "./rows.ts"
+import { SCOPE_LABELS, SCOPES_OF } from "./rows.ts"
 import type { PluginRow } from "./types.ts"
 
+import type { AssetScope } from "@workspace/extensions"
+import { PlaceMenu } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import {
   AlertDialog,
@@ -31,19 +33,21 @@ import {
   AlertDialogTrigger,
 } from "@workspace/ui/components/alert-dialog"
 import { Button } from "@workspace/ui/components/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuGroup,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
+import { Switch } from "@workspace/ui/components/switch"
+import { DropdownMenu, DropdownMenuTrigger } from "@workspace/ui/components/dropdown-menu"
 
 /** The button shape every action in this cluster wears. */
 const shell =
-  "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+  "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+
+/**
+ * What a menu trigger puts on top of that shape: the soft fill the MCP page
+ * gives its own two, so the controls of the two pages read as one family.
+ */
+const trigger = `${shell} bg-secondary hover:bg-accent`
+
+/** The two groups a pack's places fall into, in the order the panel lists them. */
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
 /**
  * The scope menu: one group per client, with an indented action per scope, each
@@ -69,103 +73,195 @@ function ScopeMenu({
 }) {
   const { t } = useI18n()
 
+  /* One row per client and place it installs into, run under the group that
+     place belongs to. A client that is not on this machine is listed rather than
+     hidden, so a person knows the hub looked for it; one whose own list could
+     not be read says that instead, because its places read empty either way. */
+  const options = clients.flatMap((client) =>
+    client.scopes
+      .filter((scope): scope is PluginInstallScope => scope === "user" || scope === "project")
+      .map((scope) => ({
+        id: `${client.id}:${scope}`,
+        client: client.id,
+        scope,
+        icon: client.icon,
+        label: client.label,
+        /* The place, which is what tells this row from the client's other one. */
+        note: t(SCOPE_LABELS[scope] ?? scope),
+        selected: (plugin.held.find((one) => one.client === client.id)?.scopes ?? []).includes(
+          scope
+        ),
+        blocked:
+          client.error !== undefined
+            ? t("plugins.client.unread")
+            : client.available
+              ? null
+              : t("plugins.client.absent"),
+      }))
+  )
+  const byId = new Map(options.map((one) => [one.id, one]))
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
         render={
           <Button
             type="button"
-            variant="outline"
             disabled={busy}
             aria-label={`${t("plugins.action.installTo")} ${plugin.name}`}
             onClick={(event) => event.stopPropagation()}
-            className={`${shell} border-border bg-transparent dark:border-input dark:bg-transparent`}
+            className={trigger}
           />
         }
       >
         <DownloadIcon className="size-3.5" />
         {t("plugins.action.installTo")}
-        <ChevronDownGlyph />
+        <ChevronDownIcon className="size-3" />
       </DropdownMenuTrigger>
-      <DropdownMenuContent
+      <PlaceMenu
+        title={t("plugins.action.installTo")}
         align="end"
-        sideOffset={6}
-        /* A portal renders elsewhere but stays this row's React child. */
-        onClick={(event) => event.stopPropagation()}
-        className="w-[272px] p-1"
-      >
-        {clients.map((client, index) => {
-          /* What this agent holds, in its own words — not what this hub delivered
-             to it. A pack the agent got from some other marketplace is just as
-             installed, and its row has to offer the way out. */
-          const here = plugin.held.find((one) => one.client === client.id)?.scopes ?? []
-          const Mark = client.icon
-          return (
-            <div key={client.id}>
-              {/* A group label is only meaningful inside a group, and Base UI
-                  refuses one that stands alone. */}
-              <DropdownMenuGroup>
-                <DropdownMenuLabel className="flex items-center gap-1.5 px-1.5 py-1 text-[11.5px] font-semibold text-muted-soft">
-                  <Mark className="size-3.5 shrink-0" aria-hidden />
-                  {client.label}
-                  {client.error !== undefined ? (
-                    /* Read failed rather than the agent being absent: the
-                       scopes below show nothing installed, and this is what
-                       says that is an unread answer rather than an answer. */
-                    <span className="ml-auto font-normal" title={client.error}>
-                      {t("plugins.client.unread")}
-                    </span>
-                  ) : client.available ? null : (
-                    <span className="ml-auto font-normal">{t("plugins.client.absent")}</span>
-                  )}
-                </DropdownMenuLabel>
-              </DropdownMenuGroup>
-              {client.scopes.map((scope) => {
-                const at = here.includes(scope)
-                return (
-                  <DropdownMenuItem
-                    key={`${client.id}:${scope}`}
-                    /* Acting here must not close the menu: a person installs into
-                       more than one place in a row, and a menu that shuts each
-                       time makes that several gestures instead of one. */
-                    closeOnClick={false}
-                    disabled={busy || !client.available}
-                    onClick={() => (at ? onUninstall(client.id, scope) : onInstall(client.id, scope))}
-                    className="gap-2.5 px-1.5 py-2 pl-4"
-                  >
-                    <span className="text-[13px] leading-[18px] font-semibold">
-                      {t(SCOPE_LABELS[scope])}
-                    </span>
-                    {at ? <CheckIcon className="ml-auto size-4 shrink-0 text-primary" /> : null}
-                  </DropdownMenuItem>
-                )
-              })}
-              {index < clients.length - 1 ? <DropdownMenuSeparator /> : null}
-            </div>
-          )
-        })}
-        <DropdownMenuSeparator />
-        <p className="px-1.5 py-1 text-[11.5px] leading-[16px] text-muted-soft">
-          {t("plugins.scope.hint")}
-        </p>
-      </DropdownMenuContent>
+        /* Installing can go to several places, and the row just taken shows its
+           mark in place, so the menu stays up. */
+        closeOnClick={false}
+        words={{
+          search: t("plugins.place.search"),
+          searchClear: t("plugins.place.searchClear"),
+          searchEmpty: t("plugins.place.searchEmpty"),
+          empty: t("plugins.place.none"),
+          count: (total) => t("plugins.location.count").replace("{count}", String(total)),
+        }}
+        onPick={(id) => {
+          const at = byId.get(id)
+          if (at === undefined) return
+          if (at.selected) onUninstall(at.client, at.scope)
+          else onInstall(at.client, at.scope)
+        }}
+        groups={SCOPES.map((group) => ({
+          label: t(`plugins.detail.group.${group}`),
+          options: options.filter((one) => SCOPES_OF[group].includes(one.scope)),
+        })).filter((group) => group.options.length > 0)}
+      />
     </DropdownMenu>
   )
 }
 
-/** A small chevron drawn inline, so the menu trigger needs no extra import. */
-function ChevronDownGlyph() {
+/**
+ * The status menu: which agents hold this pack, where each keeps it, and whether
+ * the repository in use loads it.
+ *
+ * The switch belongs to the repository's own place, because that is the one this
+ * hub can name and write. The machine-wide place is the person's own — an agent
+ * keeps a single switch for a pack, so the hub reports it there without offering
+ * to move it.
+ */
+function EnabledMenu({
+  plugin,
+  clients,
+  busy,
+  onSetEnabled,
+}: {
+  plugin: PluginRow
+  clients: readonly PluginClient[]
+  busy: boolean
+  onSetEnabled: (client: string, scope: PluginInstallScope, on: boolean) => void
+}) {
+  const { t } = useI18n()
+
+  /* One row per place an agent answered with. Only the scopes this build has a
+     word for, since a client that invents a third is one no row here covers. A
+     pack no agent holds has nothing to report, so no button is drawn rather
+     than a menu with nothing in it. */
+  const known = (scope: string): scope is PluginInstallScope =>
+    scope === "user" || scope === "project"
+  const places = plugin.held.flatMap((hold) =>
+    hold.scopes.filter(known).map((scope) => ({
+      id: `${hold.client}:${scope}`,
+      client: hold.client,
+      scope,
+      hold,
+    }))
+  )
+  const byId = new Map(places.map((place) => [place.id, place]))
+  /* Which agents keep a switch at all: one that does not says so in its own
+     installer, and is nobody's to toggle. */
+  const switchable = new Set(clients.filter((one) => one.switchable).map((one) => one.id))
+
   return (
-    <svg viewBox="0 0 24 24" className="size-3.5 shrink-0" aria-hidden="true">
-      <path
-        d="m6 9 6 6 6-6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            type="button"
+            disabled={busy}
+            aria-label={`${t("plugins.action.enabled")} ${plugin.name}`}
+            onClick={(event) => event.stopPropagation()}
+            className={trigger}
+          />
+        }
+      >
+        <PowerIcon className="size-3.5" />
+        {t("plugins.action.enabled")}
+        <ChevronDownIcon className="size-3" />
+      </DropdownMenuTrigger>
+      <PlaceMenu
+        title={t("plugins.menu.enabled.title")}
+        /* How many places load it, rather than how many rows the list holds. */
+        count={() => places.filter((one) => one.hold.enabled).length}
+        align="end"
+        activation="control"
+        words={{
+          search: t("plugins.place.search"),
+          searchClear: t("plugins.place.searchClear"),
+          searchEmpty: t("plugins.place.searchEmpty"),
+          empty: t("plugins.menu.enabled.empty"),
+          count: (total) => t("plugins.menu.enabled.tally").replace("{count}", String(total)),
+        }}
+        trailing={(option) => {
+          const place = byId.get(option.id)
+          if (place === undefined) return null
+          /* The machine-wide place is the person's own, and an agent without a
+             switch has none at any place: each says whose business it is rather
+             than showing a control that would not mean anything. */
+          if (place.scope !== "project" || !switchable.has(place.client)) {
+            return (
+              <span className="flex h-5 shrink-0 items-center rounded-full bg-secondary px-2 text-[11.5px] leading-[1.3] text-muted-foreground">
+                {t("plugins.place.self")}
+              </span>
+            )
+          }
+          return (
+            <Switch
+              checked={place.hold.enabled}
+              onCheckedChange={(next) => onSetEnabled(place.client, place.scope, next)}
+              aria-label={option.label}
+              className="data-unchecked:bg-secondary"
+            />
+          )
+        }}
+        groups={SCOPES.map((group) => ({
+          label: t(`plugins.detail.group.${group}`),
+          options: places
+            .filter((one) => SCOPES_OF[group].includes(one.scope))
+            .map((one) => {
+              const here =
+                one.scope === "project" && switchable.has(one.client)
+              return {
+                id: one.id,
+                icon: one.hold.icon,
+                label: one.hold.label,
+                /* The place, then what this agent makes of it there — the two
+                   things the menu exists to tell apart. */
+                note: here
+                  ? t("plugins.menu.enabled.note")
+                      .replace("{scope}", t(SCOPE_LABELS[one.scope] ?? one.scope))
+                      .replace("{state}", t(one.hold.enabled ? "plugins.place.on" : "plugins.place.off"))
+                  : t("plugins.place.selfManaged"),
+              }
+            }),
+        })).filter((group) => group.options.length > 0)}
       />
-    </svg>
+    </DropdownMenu>
   )
 }
 
@@ -247,8 +343,9 @@ export function UpdateAction({
 
 /**
  * The actions a row or the lightbox footer shows: update when the source has
- * moved, and the scope menu. A pack whose source cannot be asked has no update
- * action at all, rather than one that never does anything.
+ * moved, what the agents holding it make of it, and the menu that installs it
+ * somewhere new. A pack whose source cannot be asked has no update action at
+ * all, rather than one that never does anything.
  */
 export function PluginActions({
   plugin,
@@ -257,6 +354,7 @@ export function PluginActions({
   onUpdate,
   onInstall,
   onUninstall,
+  onSetEnabled,
 }: {
   plugin: PluginRow
   clients: readonly PluginClient[]
@@ -264,12 +362,14 @@ export function PluginActions({
   onUpdate: () => void
   onInstall: (client: string, scope: PluginInstallScope) => void
   onUninstall: (client: string, scope: PluginInstallScope) => void
+  onSetEnabled: (client: string, scope: PluginInstallScope, on: boolean) => void
 }) {
   return (
-    <div className="flex items-center gap-2" onClick={(event) => event.stopPropagation()}>
+    <div className="flex items-center gap-3" onClick={(event) => event.stopPropagation()}>
       {plugin.outdated === true ? (
         <UpdateAction plugin={plugin} busy={busy} onUpdate={onUpdate} />
       ) : null}
+      <EnabledMenu plugin={plugin} clients={clients} busy={busy} onSetEnabled={onSetEnabled} />
       <ScopeMenu
         plugin={plugin}
         clients={clients}

@@ -65,6 +65,7 @@ const answers: ScannedAnswer[] = [
         version: "0.8.0",
         scope: "user",
         enabled: true,
+        workspaceEnabled: true,
         marketplace: "hud",
         source: { kind: "local", path: "/cache/hud/0.8.0" },
         pack: {
@@ -80,6 +81,7 @@ const answers: ScannedAnswer[] = [
         version: "0.8.0",
         scope: "project",
         enabled: true,
+        workspaceEnabled: true,
         marketplace: "hud",
         source: { kind: "local", path: "/cache/hud/0.8.0" },
         pack: {
@@ -101,7 +103,10 @@ const answers: ScannedAnswer[] = [
         id: "hud@curated",
         version: "0.7.0",
         scope: "user",
-        enabled: true,
+        /* The same pack, off in this agent and on in the other one: the
+           repository's switch is its own, which is what the folding keeps apart. */
+        enabled: false,
+        workspaceEnabled: false,
         marketplace: "curated",
         source: { kind: "local", path: "/codex/hud" },
         pack: { name: "", version: "", description: "" },
@@ -123,6 +128,11 @@ check(
   "the scopes one agent holds it in are gathered",
   scanned[0]?.held[0]?.scopes.join() === "user,project",
   scanned[0]?.held[0]?.scopes
+)
+check(
+  "and the agent's own switch travels with the hold",
+  scanned[0]?.held[0]?.enabled === true && scanned[0]?.held[1]?.enabled === false,
+  scanned[0]?.held.map((one) => one.enabled)
 )
 check(
   "the pack's own version answers where it declares one",
@@ -353,23 +363,15 @@ check(
 
 console.log("the words one agent's scopes wear")
 
-/* A scope is often named by a phrase that already contains a wider one, so a
-   line joining them would say the wider one twice. Claude Code is the case: its
-   `project` is "this repository" and its `local` is "this repository, only me". */
+/* The two scopes this build names, and the words they wear. */
 {
   /* The real English words, so the check reads the way the row does. */
   const words: Record<string, string> = {
     "plugins.scope.user": "This machine",
     "plugins.scope.project": "This repository",
-    "plugins.scope.local": "This repository, only me",
   }
   const t = (key: string) => words[key] ?? key
 
-  check(
-    "a wider scope a narrower one already says is not printed twice",
-    scopeWords(["project", "local"], t) === "This repository, only me",
-    scopeWords(["project", "local"], t)
-  )
   check(
     "a scope whose word stands on its own is always shown",
     scopeWords(["project"], t) === "This repository" &&
@@ -389,29 +391,24 @@ console.log("the words one agent's scopes wear")
 
 console.log("which place a group's action reaches")
 
-/* The workspace group spans two places. Acting on both would write the
-   repository's shared scope from a row that also stands for the private one. */
+/* One scope per group: no agent can hold a pack in two places at once, and a
+   click that wrote both would be a click that wrote a place nobody chose. */
 check(
-  "the workspace group reaches the repository's shared scope, not the private one",
-  scopeReached(["user", "project", "local"], "workspace") === "project",
-  scopeReached(["user", "project", "local"], "workspace")
+  "the workspace group reaches the repository's scope",
+  scopeReached(["user", "project"], "workspace") === "project",
+  scopeReached(["user", "project"], "workspace")
 )
 check(
-  "a group of one reaches that one",
-  scopeReached(["user", "project", "local"], "global") === "user",
-  scopeReached(["user", "project", "local"], "global")
-)
-check(
-  "an agent keeping only the private scope there still lands somewhere",
-  scopeReached(["user", "local"], "workspace") === "local",
-  scopeReached(["user", "local"], "workspace")
+  "the global group reaches the machine-wide one",
+  scopeReached(["user", "project"], "global") === "user",
+  scopeReached(["user", "project"], "global")
 )
 check(
   "an agent keeping nothing in the group reaches nothing",
   scopeReached(["user"], "workspace") === undefined &&
-    scopeReached(["project", "local"], "global") === undefined
+    scopeReached(["project"], "global") === undefined,
+  [scopeReached(["user"], "workspace"), scopeReached(["project"], "global")]
 )
-
 console.log("which tab a row lands in")
 
 const catalog = composeRows([record("stored"), record("idle")], scanned, "en", (key) => key)

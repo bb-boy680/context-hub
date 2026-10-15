@@ -29,7 +29,10 @@ const PROGRAM = "claude"
 const JSON_FLAG = "--json"
 
 /** The scopes this client installs into, in the order its own menu lists them. */
-const SCOPES: readonly PluginInstallScope[] = ["user", "project", "local"]
+/* The two places this hub can report on afterwards. Claude Code also has a
+   `local` scope, which writes a file the person keeps to themselves and this
+   side never reads, so nothing here offers it. */
+const SCOPES: readonly PluginInstallScope[] = ["user", "project"]
 
 /**
  * Register the library root as a marketplace, and report the root.
@@ -107,6 +110,9 @@ export function readHeld(output: string): PluginHeld[] {
       version: typeof entry.version === "string" ? entry.version : "",
       scope: entry.scope,
       enabled: entry.enabled === true,
+      /* The repository's own entry, which the client answers for the directory
+         it was asked in — the one this hub can name and write. */
+      workspaceEnabled: entry.projectEnabled === true,
       marketplace: entry.id.slice(at + 1),
       ...(path === undefined ? {} : { source: { kind: "local", path } }),
       pack: { name: "", version: "", description: "" },
@@ -180,10 +186,12 @@ export const claudeCodeInstaller: PluginInstaller = {
   },
 
   async setEnabled(id, scope, on, tools) {
+    /* The id is the client's own, for the reason `remove` gives: only the id the
+       agent itself listed names the copy it will find. */
     await tools.run(PROGRAM, [
       "plugin",
       on ? "enable" : "disable",
-      `${id}@${MARKETPLACE}`,
+      id,
       "--scope",
       scope,
       JSON_FLAG,

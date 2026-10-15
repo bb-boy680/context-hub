@@ -27,6 +27,15 @@ export interface PluginHeldBy {
   /** The scopes it is in there, in the agent's own words. */
   scopes: readonly string[]
   /**
+   * Whether the agent currently loads it.
+   *
+   * One value for the whole agent, not one per scope: an agent keeps a single
+   * switch per pack, and which of its own files records that is its business.
+   * So this says "this agent has it on", and never "it is on in this place" —
+   * which is why the row shows it beside the agent rather than beside a place.
+   */
+  enabled: boolean
+  /**
    * The agent's own id for the pack, `<name>@<marketplace>`, which is what that
    * agent's own commands take back. It names the marketplace the pack actually
    * came from, so it is the only thing that can remove a pack this hub never

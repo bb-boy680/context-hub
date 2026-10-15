@@ -127,6 +127,8 @@ interface HeldBuilder {
   /** The client's own id for the pack, which is what its commands take back. */
   id: string
   scopes: string[]
+  /** Whether the client loads it; one answer for the client, not one per scope. */
+  enabled: boolean
 }
 
 /**
@@ -166,8 +168,12 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
            holds it in. It is what that client's own commands take back. */
         id: pack.id,
         scopes: [],
+        enabled: false,
       }
       if (!found.scopes.includes(pack.scope)) found.scopes.push(pack.scope)
+      /* The repository's own switch, which the agent keeps once for the pack
+         however many of its places hold one. */
+      if (pack.workspaceEnabled) found.enabled = true
       entry.at.set(answer.client, found)
       byName.set(pack.name, entry)
     }
@@ -245,7 +251,7 @@ export type PluginTab = "all" | "library" | "unstored" | "updates" | AssetScope
  * that groups the agents and the rows it then shows cannot drift apart.
  */
 export const SCOPES_OF: Record<AssetScope, readonly string[]> = {
-  workspace: ["project", "local"],
+  workspace: ["project"],
   global: ["user"],
 }
 
@@ -277,7 +283,6 @@ export function scopeReached(
 export const SCOPE_LABELS: Record<string, string> = {
   user: "plugins.scope.user",
   project: "plugins.scope.project",
-  local: "plugins.scope.local",
 }
 
 /**

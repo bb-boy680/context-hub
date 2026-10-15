@@ -46,7 +46,7 @@ const LIST = JSON.stringify([
     folderVersion: "5.2.0",
     installedAt: "2026-10-14T09:39:54.822Z",
     lastUpdated: "2026-10-14T09:39:54.822Z",
-    projectEnabled: false,
+    projectEnabled: true,
   },
   {
     id: "warp@claude-code-warp",
@@ -86,6 +86,11 @@ check(
   "a pack read in place names that folder rather than the copy",
   pony?.source?.path === "C:\\Users\\me\\.context-hub\\plugins\\ponytail",
   pony?.source
+)
+check(
+  "the repository's own switch is read beside the client's",
+  pony?.workspaceEnabled === true && hud?.workspaceEnabled === false,
+  [pony?.workspaceEnabled, hud?.workspaceEnabled]
 )
 
 const warp = packs.find((one) => one.name === "warp")
@@ -174,6 +179,37 @@ check("and carries no directory rather than an empty one", mixed[0]?.source === 
 check("an answer that is not a list yields nothing", readHeld('{"installed":[]}').length === 0)
 check("prose yields nothing", readHeld("No plugins installed.").length === 0)
 check("an empty list yields nothing", readHeld("[]").length === 0)
+
+console.log("turning a pack on and off")
+
+/* The command line is the whole of this action's behaviour, and nothing above
+   reaches it. It carries the client's own id rather than one this side builds:
+   a hub that appended its own marketplace would address a copy that is not
+   there, for every pack that came from somewhere else. */
+const ran: { program: string; args: string[] }[] = []
+const seen = {
+  ...tools,
+  run: (program: string, args: string[]) => {
+    ran.push({ program, args })
+    return Promise.resolve("{}")
+  },
+}
+
+await claudeCodeInstaller.setEnabled?.("ponytail@ponytail", "project", false, seen)
+check(
+  "switching off names the client's own id, unchanged, at the scope asked for",
+  ran[0]?.program === "claude" &&
+    ran[0]?.args.join(" ") === "plugin disable ponytail@ponytail --scope project --json",
+  ran[0]
+)
+
+ran.length = 0
+await claudeCodeInstaller.setEnabled?.("ponytail@ponytail", "user", true, seen)
+check(
+  "and switching on is the same line with the other verb",
+  ran[0]?.args.join(" ") === "plugin enable ponytail@ponytail --scope user --json",
+  ran[0]?.args
+)
 
 console.log(`\n${failures === 0 ? "all checks passed" : `${String(failures)} failed`} (${String(checked)} checks)`)
 process.exit(failures === 0 ? 0 : 1)

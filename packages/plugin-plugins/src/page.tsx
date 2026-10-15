@@ -38,7 +38,7 @@ import {
   type PluginClient,
   type PluginCollected,
 } from "./library.ts"
-import { rowsForTab, SCOPES_OF, type PluginTab } from "./rows.ts"
+import { rowsForTab, SCOPE_LABELS, SCOPES_OF, type PluginTab } from "./rows.ts"
 import { PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import type { PluginInstallScope } from "./contract.ts"
@@ -74,13 +74,6 @@ import {
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
 import { toast } from "@workspace/ui/components/toast"
-
-/** The words a scope wears in the batch menu. */
-const SCOPE_LABELS: Record<PluginInstallScope, string> = {
-  user: "plugins.scope.user",
-  project: "plugins.scope.project",
-  local: "plugins.scope.local",
-}
 
 /* The tab row carries two dimensions. Four entries are the hub's own view of the
    catalog — everything, what it holds the files of, what only an agent holds,
@@ -225,6 +218,8 @@ interface RowActions {
   onUpdate: (plugin: PluginRow) => void
   onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
   onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  /** Switch an agent's own use of a pack on or off, where it already sits. */
+  onSetEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, on: boolean) => void
   /** Take a pack an agent holds into the library. */
   onAdopt: (plugin: PluginRow) => void
 }
@@ -239,6 +234,7 @@ function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowAct
       onUpdate={() => actions.onUpdate(plugin)}
       onInstall={(client, scope) => actions.onInstall(plugin, client, scope)}
       onUninstall={(client, scope) => actions.onUninstall(plugin, client, scope)}
+      onSetEnabled={(client, scope, on) => actions.onSetEnabled(plugin, client, scope, on)}
     />
   )
 }
@@ -574,7 +570,7 @@ function PluginTable({
     {
       key: "plugin",
       label: t("plugins.column.plugin"),
-      width: "43.1%",
+      width: "35.7%",
       cell: (plugin) => (
         <div className="flex min-w-0 items-center gap-4">
           <PluginTile plugin={plugin} size={36} />
@@ -598,7 +594,7 @@ function PluginTable({
     {
       key: "tags",
       label: t("plugins.column.tags"),
-      width: "19.3%",
+      width: "16.0%",
       cell: (plugin) => (
         <div className="flex flex-wrap items-center gap-1.5">
           {plugin.tags.map((tag) => (
@@ -610,7 +606,7 @@ function PluginTable({
     {
       key: "source",
       label: t("plugins.column.source"),
-      width: "16.1%",
+      width: "13.3%",
       cell: (plugin) => (
         <div className="flex min-w-0 items-center gap-2">
           <PluginSourceLine plugin={plugin} />
@@ -621,7 +617,7 @@ function PluginTable({
     {
       key: "updated",
       label: t("plugins.column.updated"),
-      width: "10.1%",
+      width: "8.4%",
       cell: (plugin) => (
         <span className="text-[13px] text-muted-foreground">{plugin.updated}</span>
       ),
@@ -629,7 +625,7 @@ function PluginTable({
     {
       key: "action",
       label: t("plugins.column.action"),
-      width: "8.5%",
+      width: "23.7%",
       cell: (plugin) =>
         plugin.stored ? (
           <InstallButton plugin={plugin} actions={actions} />
@@ -949,6 +945,11 @@ export function PluginsPage() {
     },
     onUninstall: (plugin, client, scope) => {
       void library.uninstall(plugin.name, client, scope).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onSetEnabled: (plugin, client, scope, on) => {
+      void library.setEnabled(plugin.name, client, scope, on).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },

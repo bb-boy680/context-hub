@@ -67,7 +67,15 @@ export interface PluginCheck {
 }
 
 /** The scopes a plugin can be installed into, named the way the agents name them. */
-export type PluginInstallScope = "user" | "project" | "local"
+/**
+ * Where an agent can be told to keep a pack.
+ *
+ * Two, not three. Claude Code also names its `local` scope, which is the same
+ * repository as `project` but written to a file the person does not share — and
+ * this hub has no way to read or write that file, so an install aimed at it
+ * would be one nothing here could report on afterwards.
+ */
+export type PluginInstallScope = "user" | "project"
 
 /**
  * What a pack says about itself in its own directory.

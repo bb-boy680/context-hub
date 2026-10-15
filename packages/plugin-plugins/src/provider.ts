@@ -89,6 +89,15 @@ export interface PluginHeld {
   scope: string
   /** Whether the client currently switches it on. */
   enabled: boolean
+  /**
+   * Whether the workspace in use switches it on.
+   *
+   * A second answer beside {@link enabled} because the two can disagree: an
+   * agent keeps one switch per pack, and the repository standing in for a pack
+   * its machine has switched on may have switched it off, which is the one this
+   * hub may speak for and the one its row offers.
+   */
+  workspaceEnabled: boolean
   /** The marketplace it came from; `null` when the client names none. */
   marketplace: string | null
   /**
@@ -140,6 +149,11 @@ export interface PluginInstaller {
   /**
    * Turn this agent's use of an installed pack on or off, without moving any
    * files.
+   *
+   * The id is the agent's own — `<name>@<marketplace>`, as the agent itself
+   * listed it — for the same reason `remove` takes one: the pack may have come
+   * from a marketplace this hub knows nothing about, and this hub's own name
+   * would point at a copy that is not there.
    *
    * Absent for an agent that has no such switch, which is a fact about the agent
    * rather than a gap: the page offers the switch only where it exists.
