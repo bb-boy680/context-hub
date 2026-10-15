@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-15T11:18:01Z",
+  "updated_at": "2026-10-15T11:40:22Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -47,9 +47,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "a2f36fe8cba857c5effed3939f453fda6dc0330da7760a50c515cb4d243c40f3",
-      "size": 99194,
-      "normalized_sha256": "a2f36fe8cba857c5effed3939f453fda6dc0330da7760a50c515cb4d243c40f3"
+      "sha256": "bd8e3167e709cbdc275f977e0d5a393c7186826f5b9c7cd9670d935f79c07a94",
+      "size": 99607,
+      "normalized_sha256": "bd8e3167e709cbdc275f977e0d5a393c7186826f5b9c7cd9670d935f79c07a94"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1025,9 +1025,9 @@
     },
     "packages/plugin-claude-code/scripts/check-installer.ts": {
       "role": "index",
-      "sha256": "a0ba9abd0afb03b3a0fcaa326a322b2f43f9e87f1e05ca62cb97205af1165652",
-      "size": 12686,
-      "normalized_sha256": "20b663a2a06b9389d6c73762643ce34528222e36d8cdbf9b4b287ab5735c2659"
+      "sha256": "80457f330ddbe2850617dad87f2da52cbc806ee53c507f261e2e32de29e12e4d",
+      "size": 13974,
+      "normalized_sha256": "5541cac93155124ce657cd773ac9426b8ce690a6b43bc51c8bdc0b45b0992e31"
     },
     "packages/plugin-claude-code/scripts/check-provider.ts": {
       "role": "index",
@@ -1043,15 +1043,15 @@
     },
     "packages/plugin-claude-code/src/installer.ts": {
       "role": "index",
-      "sha256": "cd4035d4c67c994093fc1221e6e4d2c7fa5a0cbdd8c4c0377a7f047aefe65ca1",
-      "size": 10153,
-      "normalized_sha256": "7836d202e6935efba11a4b648805438c71e7a51aaa6018314fc48287c431847b"
+      "sha256": "c454b04dc5017ee4536bf77e4a5759f5b916bb6d2b0b47ce546c6e52cf25da20",
+      "size": 11592,
+      "normalized_sha256": "b2e585605a83880e663bdbc2cffaa1d29dc40866efa849d8177c8f65958fecc3"
     },
     "packages/plugin-claude-code/src/locations.ts": {
       "role": "index",
-      "sha256": "afe2c15c4fd8068f2fe435ab624130dbd41772e7a04c6b485b7b7574bc07b54c",
-      "size": 3344,
-      "normalized_sha256": "cf7a70c3f2acb3534fecba4c74a2477d3066a9a24ffad714beb0800e95d62762"
+      "sha256": "3627d316688bbb87bf10e1d9f47da6f55008da2a88b7068b4737a88d10f0c0e5",
+      "size": 3845,
+      "normalized_sha256": "43f5d950cc4a8761d30289fe2521b6c61606093711cce8b44701b9af3aa612de"
     },
     "packages/plugin-claude-code/src/messages.ts": {
       "role": "index",
@@ -1061,9 +1061,9 @@
     },
     "packages/plugin-claude-code/src/provider.ts": {
       "role": "index",
-      "sha256": "d924f42ee4b81ee7e306c07352a790febc74e4536e309f22690bef723da37c9e",
-      "size": 8779,
-      "normalized_sha256": "d924f42ee4b81ee7e306c07352a790febc74e4536e309f22690bef723da37c9e"
+      "sha256": "4924a118a9dd799d7a9a7b30b97ce7d81b6241561360226bc1198799aa6d2f94",
+      "size": 8621,
+      "normalized_sha256": "4924a118a9dd799d7a9a7b30b97ce7d81b6241561360226bc1198799aa6d2f94"
     },
     "packages/plugin-claude-code/tsconfig.json": {
       "role": "index",
@@ -1457,9 +1457,9 @@
     },
     "packages/plugin-plugins/src/index.ts": {
       "role": "index",
-      "sha256": "4caaf80928eaf9b23f4a83c62397b233c6e9b241502676b176290691bd6f233a",
-      "size": 2620,
-      "normalized_sha256": "9985bbc54112b32046a7dd6a1d267e0f63e482ace24ef07fff2491d119c33a31"
+      "sha256": "325f79f4222ad58d08fbf99892cfe7560472581ece26116b69c0c62e78301d7b",
+      "size": 2974,
+      "normalized_sha256": "2a1349109b030f5e74110afca7307c6fdfa0136e1c13bda514e7e18a20d65b12"
     },
     "packages/plugin-plugins/src/inspect.ts": {
       "role": "index",
@@ -1475,9 +1475,9 @@
     },
     "packages/plugin-plugins/src/library.ts": {
       "role": "index",
-      "sha256": "b95fee6e140cbe045b1f1a7a50f1174c5546660b9ee5419f60b8e523fd09d3c0",
-      "size": 23234,
-      "normalized_sha256": "925e4a703004cc7c533d38153685321c8afc80e698b9364a7019bcfeb7577fa4"
+      "sha256": "181197238e23da782a944995cd54506ea862e6a8ba0c60e6feea70ea7d6a90d1",
+      "size": 24573,
+      "normalized_sha256": "2b719f9a7727b58fc6649f6af86313639feb9a55f3be0eadf50e27f6b47f8997"
     },
     "packages/plugin-plugins/src/messages.ts": {
       "role": "index",
