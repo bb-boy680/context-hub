@@ -12,7 +12,13 @@ import type { ExtensionIcon } from "@workspace/extensions"
 
 import type { PluginHeld } from "../src/provider.ts"
 import type { PluginRecord } from "../src/revision.ts"
-import { collectScanned, composeRows, rowsForTab, type ScannedAnswer } from "../src/rows.ts"
+import {
+  collectScanned,
+  composeRows,
+  rowsForTab,
+  scopeWords,
+  type ScannedAnswer,
+} from "../src/rows.ts"
 
 let failures = 0
 let checked = 0
@@ -343,6 +349,42 @@ check(
   both[0]?.held.length === 2,
   both[0]?.held.length
 )
+
+console.log("the words one agent's scopes wear")
+
+/* A scope is often named by a phrase that already contains a wider one, so a
+   line joining them would say the wider one twice. Claude Code is the case: its
+   `project` is "this repository" and its `local` is "this repository, only me". */
+{
+  /* The real English words, so the check reads the way the row does. */
+  const words: Record<string, string> = {
+    "plugins.scope.user": "This machine",
+    "plugins.scope.project": "This repository",
+    "plugins.scope.local": "This repository, only me",
+  }
+  const t = (key: string) => words[key] ?? key
+
+  check(
+    "a wider scope a narrower one already says is not printed twice",
+    scopeWords(["project", "local"], t) === "This repository, only me",
+    scopeWords(["project", "local"], t)
+  )
+  check(
+    "a scope whose word stands on its own is always shown",
+    scopeWords(["project"], t) === "This repository" &&
+      scopeWords(["user"], t) === "This machine"
+  )
+  check(
+    "and two words that say different things both stay",
+    scopeWords(["user", "project"], t) === "This machine · This repository",
+    scopeWords(["user", "project"], t)
+  )
+  check(
+    "a word this build has no key for is shown as the agent spelled it",
+    scopeWords(["workspace"], t) === "workspace"
+  )
+  check("an agent holding a pack nowhere says nothing", scopeWords([], t) === "")
+}
 
 console.log("which tab a row lands in")
 

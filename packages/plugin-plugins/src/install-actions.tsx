@@ -15,6 +15,7 @@ import { CheckIcon, DownloadIcon } from "lucide-react"
 
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginClient } from "./library.ts"
+import { SCOPE_LABELS } from "./rows.ts"
 import type { PluginRow } from "./types.ts"
 
 import { useI18n } from "@workspace/extensions/react"
@@ -39,17 +40,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
-
-/**
- * The words for each scope. Which agent installs into which scope is the
- * agent's own declaration, carried by the installer; only the words live here,
- * because they are this page's.
- */
-const SCOPE_LABELS: Record<PluginInstallScope, string> = {
-  user: "plugins.scope.user",
-  project: "plugins.scope.project",
-  local: "plugins.scope.local",
-}
 
 /** The button shape every action in this cluster wears. */
 const shell =

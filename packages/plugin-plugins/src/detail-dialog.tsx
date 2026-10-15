@@ -38,7 +38,7 @@ import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
 import { PluginTile } from "./parts.tsx"
 import { packFile, packFileIn, packFiles, packFilesIn, type PluginClient } from "./library.ts"
-import { SCOPES_OF } from "./rows.ts"
+import { SCOPES_OF, scopeWords } from "./rows.ts"
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
@@ -68,13 +68,6 @@ import type { AssetScope } from "@workspace/extensions"
 
 /** The two scope groups a panel lists places under, in the order it reads them. */
 const SCOPES: readonly AssetScope[] = ["workspace", "global"]
-
-/** The words each scope wears, matching the menu the list page's rows open. */
-const SCOPE_LABELS: Record<string, string> = {
-  user: "plugins.scope.user",
-  project: "plugins.scope.project",
-  local: "plugins.scope.local",
-}
 
 /** One picture or video on the stage. */
 interface MediaItem {
@@ -722,11 +715,9 @@ function PlacesSection({
         id: `${scope}:${client.id}`,
         icon: client.icon,
         label: client.label,
-        /* The agents' own words for their scopes: this hub has no path for a
-           place to show, because an installer never names one. */
-        note: scopesIn(client, scope)
-          .map((one) => t(SCOPE_LABELS[one] ?? one))
-          .join(" · "),
+        /* The agents' own words for their scopes, read as one line: this hub has
+           no path for a place to show, because an installer never names one. */
+        note: scopeWords(scopesIn(client, scope), t),
       })),
   }))
   const byRow = new Map(

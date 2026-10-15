@@ -249,6 +249,38 @@ export const SCOPES_OF: Record<AssetScope, readonly string[]> = {
   global: ["user"],
 }
 
+/**
+ * The words each scope wears, in this hub's own vocabulary.
+ *
+ * Only the words live here: which scopes an agent installs into is that agent's
+ * own declaration, carried by its installer.
+ */
+export const SCOPE_LABELS: Record<string, string> = {
+  user: "plugins.scope.user",
+  project: "plugins.scope.project",
+  local: "plugins.scope.local",
+}
+
+/**
+ * One agent's scopes as a single line, in the order that agent declared them.
+ *
+ * A scope is often named by a phrase that already contains a wider one — Claude
+ * Code's `local` is "this repository, only me" and its `project` is "this
+ * repository" — so a word another word in the same line already says is dropped
+ * rather than printed twice. Only that: a scope whose word stands on its own is
+ * always shown, because which places an agent keeps a pack in is the whole point
+ * of the line.
+ *
+ * @param scopes — the scopes, in the agent's own order.
+ * @param t — the active locale's lookup.
+ */
+export function scopeWords(scopes: readonly string[], t: (key: string) => string): string {
+  const words = scopes.map((one) => t(SCOPE_LABELS[one] ?? one))
+  return words
+    .filter((word) => !words.some((other) => other !== word && other.includes(word)))
+    .join(" · ")
+}
+
 /** Whether a client — one agent, or any of them — holds the pack in these scopes. */
 function holdsIn(row: PluginRow, scopes: readonly string[], place: string | null): boolean {
   return row.held.some(
