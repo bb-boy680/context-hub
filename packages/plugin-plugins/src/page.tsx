@@ -34,6 +34,7 @@ import { PluginDetailDialog } from "./detail-dialog.tsx"
 import { PluginActions } from "./install-actions.tsx"
 import {
   packImageBase,
+  reasonOf,
   usePackReadme,
   usePluginLibrary,
   type PackUploadFile,
@@ -48,12 +49,16 @@ import type { PluginInstallScope } from "./contract.ts"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 import {
   ActionTab,
+  AutoplayVideo,
   AvatarStack,
   FilterBar,
   Ledger,
   PageBody,
   PlaceScopePicker,
   TablePagination,
+  knownAspect,
+  mediaKind,
+  rememberAspect,
   type LedgerColumn,
   type PlaceOption,
   type PlaceWords,
@@ -120,11 +125,6 @@ function matchesQuery(row: PluginRow, text: string) {
     row.description.toLowerCase().includes(text) ||
     row.tags.some((item) => item.toLowerCase().includes(text))
   )
-}
-
-/** A refusal's own words, whichever side of the bridge it came from. */
-function reasonOf(failure: unknown) {
-  return failure instanceof Error ? failure.message : String(failure)
 }
 
 /**
@@ -245,20 +245,6 @@ function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowAct
 /** Ratio a card falls back to before its own cover reports one. */
 const FALLBACK_RATIO = 16 / 9
 
-/** Natural ratios already measured, so a re-mounted card lays out without a jump. */
-const aspects = new Map<string, number>()
-
-/** The ratio measured for a source earlier in this session, if any. */
-function knownAspect(src: string): number | undefined {
-  return aspects.get(src)
-}
-
-/** Remember an asset's measured ratio for later mounts. */
-function rememberAspect(src: string, ratio: number): void {
-  if (!Number.isFinite(ratio) || ratio <= 0) return
-  aspects.set(src, ratio)
-}
-
 /** Cover image that reports its own aspect ratio, for a card sized to the asset. */
 function PhotoCover({ src, onRatio }: { src: string; onRatio: (ratio: number) => void }) {
   const ref = React.useRef<HTMLImageElement | null>(null)
@@ -327,14 +313,26 @@ function ReadmeCover({ plugin }: { plugin: PluginRow }) {
 }
 
 /**
- * What fills a card's cover box. A pack with a picture reads no document at all,
- * which is why the README is read inside the branch that needs it.
+ * What fills a card's cover box: the first picture a person added, drawn or
+ * played by whatever kind it is, and the pack's own document when there is none.
+ * A pack with a picture reads no document at all, which is why the README is read
+ * inside the branch that needs it.
  */
-function CoverFace({ plugin, onRatio }: { plugin: PluginRow; onRatio: (ratio: number) => void }) {
-  return plugin.cover === undefined ? (
-    <ReadmeCover plugin={plugin} />
+function CoverFace({
+  plugin,
+  source,
+  onRatio,
+}: {
+  plugin: PluginRow
+  /** The picture being drawn, as a URL. */
+  source: string | undefined
+  onRatio: (ratio: number) => void
+}) {
+  if (source === undefined) return <ReadmeCover plugin={plugin} />
+  return mediaKind(source) === "video" ? (
+    <AutoplayVideo src={source} onAspect={onRatio} className="size-full object-cover" />
   ) : (
-    <PhotoCover src={plugin.cover} onRatio={onRatio} />
+    <PhotoCover src={source} onRatio={onRatio} />
   )
 }
 
@@ -369,18 +367,20 @@ function PluginCard({
   const shownTags = plugin.tags.slice(0, 2)
   const extraTags = plugin.tags.length - shownTags.length
   /* The media box takes the cover's own ratio, so covers are never cropped and
-     the columns keep differing heights, which is what the grid reads as. */
+     the columns keep differing heights, which is what the grid reads as. Which
+     picture is the cover is the row's answer, already resolved to a URL. */
+  const cover = plugin.cover
   const [ratio, setRatio] = React.useState<number | undefined>(() =>
-    plugin.cover === undefined ? undefined : knownAspect(plugin.cover)
+    cover === undefined ? undefined : knownAspect(cover)
   )
 
   const measure = React.useCallback(
     (next: number) => {
-      if (plugin.cover === undefined) return
-      rememberAspect(plugin.cover, next)
+      if (cover === undefined) return
+      rememberAspect(cover, next)
       setRatio(next)
     },
-    [plugin.cover]
+    [cover]
   )
 
   return (
@@ -406,7 +406,9 @@ function PluginCard({
         className="relative w-full overflow-hidden bg-surface-raised"
         style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
       >
-        <CoverFace plugin={plugin} onRatio={measure} />
+        {/* Keyed by the picture, so a card whose cover changed measures the new
+            one rather than keeping the ratio the old one reported. */}
+        <CoverFace key={cover} plugin={plugin} source={cover} onRatio={measure} />
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           {shownTags.map((tag) => (
             <TagPill key={tag} tag={tag} />
@@ -1333,6 +1335,8 @@ export function PluginsPage() {
         onTagsChange={(tags) => {
           if (detail !== null) setTags(detail, tags)
         }}
+        onAddAssets={(plugin, sources) => library.addAssets(plugin.name, sources)}
+        onRemoveAsset={(plugin, ref) => library.removeAsset(plugin.name, ref)}
         onOpenChange={(next) => {
           if (!next) setDetailId(null)
         }}

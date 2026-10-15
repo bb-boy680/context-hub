@@ -149,10 +149,17 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.media.image": "Show picture",
   "plugins.media.video": "Show video",
   "plugins.media.remove": "Remove this picture",
+  "plugins.media.play": "Play",
+  "plugins.media.pause": "Pause",
+  "plugins.media.seek": "Seek",
+  "plugins.media.mute": "Mute",
+  "plugins.media.unmute": "Unmute",
   "plugins.media.previous": "Previous",
   "plugins.media.next": "Next",
   "plugins.media.hint":
     "Drop a picture, a GIF or a video here, or press + to choose one.",
+  "plugins.media.needStored":
+    "This pack is not in the hub's library yet: add it first, and its pictures can be kept.",
   "plugins.media.drop.title": "Drop to upload",
   "plugins.media.drop.formats": "PNG · JPG · GIF · WebP · MP4 · WebM",
   "plugins.media.paste.done": "Pasted {count} files",

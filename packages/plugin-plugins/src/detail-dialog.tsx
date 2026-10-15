@@ -9,10 +9,11 @@
  * it is read as the lightbox opens and a tab is offered only when that read
  * found something.
  *
- * A picture added here lives in this window (its own object URL) rather than on
- * disk, because nothing in this module writes a pack's directory; the files
- * panel reads what the pack actually holds from the host, and shows nothing when
- * it cannot be read rather than standing something in.
+ * A picture added here is written to the hub: it is kept in the asset library and
+ * recorded on the pack, so the row behind the lightbox draws it and the next open
+ * reads it back. The files panel reads what the pack's own directory holds from
+ * the host, and shows nothing when it cannot be read rather than standing
+ * something in.
  *
  * A pack has no single place it is installed in, so the panel lists them all —
  * the hub's own library first, then one row per agent, under the scope that
@@ -20,18 +21,14 @@
  */
 import {
   ArrowLeftIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ClipboardPasteIcon,
   ExternalLinkIcon,
   FileTextIcon,
-  ImageIcon,
   ImagePlusIcon,
   LibraryIcon,
   LinkIcon,
   MinusIcon,
   MoreHorizontalIcon,
-  PlayIcon,
   PlusIcon,
   RefreshCwIcon,
   SparklesIcon,
@@ -47,6 +44,7 @@ import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
 import { PluginTile } from "./parts.tsx"
 import {
+  dataUrlOf,
   packContents,
   packContentsIn,
   packFile,
@@ -54,6 +52,7 @@ import {
   packFiles,
   packFilesIn,
   packImageBase,
+  reasonOf,
   usePackReadme,
   type PluginClient,
 } from "./library.ts"
@@ -66,8 +65,12 @@ import type { PluginFileEntry, PluginRow } from "./types.ts"
 import {
   CodeCard,
   DialogSplit,
+  MediaGallery,
   PlaceList,
   TagEditor,
+  mediaKind,
+  setPreviewsSuspended,
+  type MediaItem,
   type PlaceOption,
 } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
@@ -95,23 +98,10 @@ import { Markdown } from "@workspace/ui/components/markdown"
 import { Spinner } from "@workspace/ui/components/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { toast } from "@workspace/ui/components/toast"
+import { assetRef } from "@workspace/core"
 import type { AssetScope } from "@workspace/extensions"
 
 /** The two scope groups a panel lists places under, in the order it reads them. */
-/** One picture or video on the stage. */
-interface MediaItem {
-  id: string
-  kind: "image" | "video"
-  src: string
-}
-
-/** data: URLs carry their own mime type; anything else is guessed from the extension. */
-function mediaKind(src: string): "image" | "video" {
-  const mime = /^data:([^;,]+)/i.exec(src)?.[1] ?? ""
-  const sample = mime === "" ? (src.split(/[?#]/)[0]?.split(".").pop() ?? "") : mime
-  return /^(video\/(mp4|webm|ogg)|mp4|webm|mov|m4v)$/i.test(sample) ? "video" : "image"
-}
-
 /** The stage with no picture to show: what the pack is, in one block. */
 function BundleStage({ plugin }: { plugin: PluginRow }) {
   return (
@@ -150,68 +140,44 @@ function ReadmeStage({ text, imageBase }: { text: string; imageBase: string | un
   )
 }
 
-/** One item on the stage: the picture itself, or a video with its own controls. */
-function Slide({ item }: { item: MediaItem }) {
-  if (item.kind === "video") {
-    return (
-      <video
-        key={item.id}
-        src={item.src}
-        controls
-        loop
-        playsInline
-        className="max-h-full max-w-full rounded-lg object-contain"
-      />
-    )
-  }
-
-  return (
-    <img
-      key={item.id}
-      src={item.src}
-      alt=""
-      className="max-h-full max-w-full rounded-lg object-contain"
-    />
-  )
-}
-
-/**
- * Thumbnail for a video: a frame near its start, so the strip neither goes
- * black nor decodes every video in the gallery.
- */
-function VideoThumb({ src }: { src: string }) {
-  return (
-    <video
-      src={src}
-      muted
-      playsInline
-      preload="metadata"
-      onLoadedMetadata={(event) => {
-        const video = event.currentTarget
-        if (!Number.isFinite(video.duration)) return
-        video.currentTime = Math.min(0.5, video.duration / 2)
-      }}
-      className="size-full object-cover"
-    />
-  )
-}
-
 /**
  * The media column: one stage, a strip of thumbnails, and the one way to add a
  * picture — a file picker, a drop, a pasted screenshot, or a direct URL.
+ *
+ * What the strip draws is the pack's record rather than anything this pane
+ * keeps: a picture added here is written to the hub, and the row that comes back
+ * is what shows it. So the pane is told what the pack has and names the change it
+ * wants, and there is only ever one answer to which pictures a pack has.
+ *
+ * @param busy — a write is already in flight, so a second one is not taken.
+ * @param onScreen — this is the tab being read. The paste listener is on the
+ * document and this tab stays mounted while another one is read, so a screenshot
+ * pasted elsewhere would otherwise land here and change a pack nobody is looking
+ * at.
+ * @param onAddAssets — take the pictures a person chose; the row comes back
+ * carrying them.
+ * @param onRemoveAsset — drop one picture, by the reference the record holds it
+ * under.
  */
-function MediaPane({ plugin }: { plugin: PluginRow }) {
+function MediaPane({
+  plugin,
+  busy,
+  onScreen,
+  onAddAssets,
+  onRemoveAsset,
+}: {
+  plugin: PluginRow
+  busy: boolean
+  onScreen: boolean
+  onAddAssets: (sources: string[]) => Promise<void>
+  onRemoveAsset: (ref: string) => Promise<void>
+}) {
   const { t } = useI18n()
-  /* The strip and which item is on the stage move together, so they are one
-     state: an upload that appends shows the new item without a second render. */
-  const [state, setState] = React.useState<{ items: MediaItem[]; active: number }>(() => ({
-    items:
-      plugin.cover === undefined
-        ? []
-        : [{ id: "cover", kind: mediaKind(plugin.cover), src: plugin.cover }],
-    active: 0,
+  const items: MediaItem[] = plugin.pictures.map((ref) => ({
+    id: ref,
+    kind: mediaKind(ref),
+    src: assetRef(ref),
   }))
-  const { items, active } = state
   /* A pack with no picture a person added still has something to show: what it
      says about itself. Read once as the pane mounts, like the tabs beside it. */
   const readme = usePackReadme(plugin)
@@ -223,44 +189,32 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
   const [notice, setNotice] = React.useState<string | null>(null)
   const [link, setLink] = React.useState("")
   const fileRef = React.useRef<HTMLInputElement | null>(null)
-  /* Every object URL this pane minted, released when the lightbox closes. */
-  const objectUrls = React.useRef<string[]>([])
-  const nextId = React.useRef(1)
-  const count = items.length
+  /* A pack the hub does not hold has no record for a picture to live on. */
+  const takes = plugin.stored && !busy
 
-  React.useEffect(
-    () => () => {
-      for (const url of objectUrls.current) URL.revokeObjectURL(url)
-      objectUrls.current = []
+  /** Write the pictures a person chose, saying so when the hub will not take them. */
+  const keep = React.useCallback(
+    (sources: Promise<string[]> | string[]) => {
+      setAddOpen(false)
+      void Promise.resolve(sources)
+        .then((chosen) => (chosen.length === 0 ? undefined : onAddAssets(chosen)))
+        .catch((error: unknown) => {
+          /* Whatever the paste said on its way here is not true any more. */
+          setNotice(null)
+          toast.add({ type: "error", title: reasonOf(error) })
+        })
     },
-    []
+    [onAddAssets, setAddOpen, setNotice]
   )
-
-  const append = React.useCallback((added: MediaItem[]) => {
-    if (added.length === 0) return
-    setState(({ items: held }) => {
-      const next = [...held, ...added]
-      return { items: next, active: next.length - 1 }
-    })
-  }, [])
 
   const addFiles = React.useCallback(
     (files: ArrayLike<File>) => {
-      const added: MediaItem[] = []
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) continue
-        const url = URL.createObjectURL(file)
-        objectUrls.current.push(url)
-        added.push({
-          id: `local-${nextId.current++}`,
-          kind: file.type.startsWith("video/") ? "video" : "image",
-          src: url,
-        })
-      }
-      append(added)
-      if (added.length > 0) setAddOpen(false)
+      const picked = Array.from(files).filter(
+        (file) => file.type.startsWith("image/") || file.type.startsWith("video/")
+      )
+      keep(Promise.all(picked.map((file) => dataUrlOf(file))))
     },
-    [append]
+    [keep]
   )
 
   const addLink = () => {
@@ -269,25 +223,21 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
       toast.add({ type: "error", title: t("plugins.media.add.failed") })
       return
     }
-    append([{ id: `link-${nextId.current++}`, kind: mediaKind(value), src: value }])
     setLink("")
-    setAddOpen(false)
+    keep([value])
   }
 
-  const remove = (id: string) =>
-    setState(({ items: held, active: shown }) => {
-      const next = held.filter((item) => item.id !== id)
-      return { items: next, active: Math.max(0, Math.min(shown, next.length - 1)) }
+  const remove = (ref: string) => {
+    void onRemoveAsset(ref).catch((error: unknown) => {
+      toast.add({ type: "error", title: reasonOf(error) })
     })
-
-  /** Show one item of the strip. */
-  const show = (index: number) =>
-    setState((held) => ({ ...held, active: Math.max(0, Math.min(index, held.items.length - 1)) }))
+  }
 
   /* A screenshot should not have to be saved as a file first, so the paste
-     listener is document-wide while this pane is mounted. A paste into a field
+     listener is document-wide while this pane is on screen. A paste into a field
      is that field's business: the link box takes a URL. */
   React.useEffect(() => {
+    if (!onScreen || !takes) return
     const onPaste = (event: ClipboardEvent) => {
       const target = event.target
       if (
@@ -318,7 +268,7 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
 
     document.addEventListener("paste", onPaste)
     return () => document.removeEventListener("paste", onPaste)
-  }, [addFiles, t])
+  }, [onScreen, takes, addFiles, t])
 
   /* Whatever the upload just said stops saying it on its own. */
   React.useEffect(() => {
@@ -327,13 +277,11 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
     return () => window.clearTimeout(timer)
   }, [notice])
 
-  const current = items[active]
-
   return (
     <div
       onDragEnter={(event) => {
         event.preventDefault()
-        setDragOver(true)
+        if (takes) setDragOver(true)
       }}
       onDragOver={(event) => event.preventDefault()}
       onDragLeave={(event) => {
@@ -347,7 +295,7 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
       onDrop={(event) => {
         event.preventDefault()
         setDragOver(false)
-        addFiles(event.dataTransfer.files)
+        if (takes) addFiles(event.dataTransfer.files)
       }}
       className={`relative flex min-h-0 min-w-0 flex-1 flex-col items-center gap-3.5 px-7 py-6 ${
         dragOver ? "ring-2 ring-primary ring-inset" : ""
@@ -355,7 +303,7 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
     >
       {/* Dropping is a gesture on the whole media area: it does not go through
           the menu, and it does not need the + to be pressed first. */}
-      {dragOver ? (
+      {dragOver && takes ? (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-2.5 bg-primary/8">
           <ImagePlusIcon className="size-7 text-primary" aria-hidden />
           <span className="text-[15px] font-semibold">{t("plugins.media.drop.title")}</span>
@@ -370,208 +318,161 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
         </span>
       )}
 
-      {/* The stage takes every pixel the strip and the hint leave behind, so a
-          tall picture uses the full height instead of a fixed 16:9 band. */}
-      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center">
-        {current !== undefined ? (
-          <Slide item={current} />
-        ) : readme === undefined ? (
-          /* Still reading: the stage holds its own surface rather than drawing
-             the block below, which would only flash and be replaced. */
-          <div className="size-full bg-surface-raised" />
-        ) : readme === null ? (
-          <BundleStage plugin={plugin} />
-        ) : (
-          <ReadmeStage text={readme} imageBase={packImageBase(plugin)} />
-        )}
-
-        {count > 1 ? (
+      <MediaGallery
+        items={items}
+        empty={
+          readme === undefined ? (
+            /* Still reading: the stage holds its own surface rather than drawing
+               the block below, which would only flash and be replaced. */
+            <div className="size-full bg-surface-raised" />
+          ) : readme === null ? (
+            <BundleStage plugin={plugin} />
+          ) : (
+            <ReadmeStage text={readme} imageBase={packImageBase(plugin)} />
+          )
+        }
+        onRemove={takes ? remove : undefined}
+        words={{
+          play: t("plugins.media.play"),
+          pause: t("plugins.media.pause"),
+          seek: t("plugins.media.seek"),
+          mute: t("plugins.media.mute"),
+          unmute: t("plugins.media.unmute"),
+          previous: t("plugins.media.previous"),
+          next: t("plugins.media.next"),
+          image: t("plugins.media.image"),
+          video: t("plugins.media.video"),
+          remove: t("plugins.media.remove"),
+        }}
+        action={
           <>
-            <span className="absolute top-4 left-4 z-10 flex h-[26px] items-center gap-1.5 rounded-full bg-[#0f172acc] px-2.5 text-[11px] font-semibold text-white">
-              <ImageIcon className="size-3.5" />
-              {`${active + 1} / ${count}`}
-            </span>
-            <button
-              type="button"
-              aria-label={t("plugins.media.previous")}
-              disabled={active === 0}
-              onClick={() => show(active - 1)}
-              className="absolute top-1/2 left-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-foreground shadow-[0_2px_8px_#0F172A33] transition-opacity disabled:opacity-40"
-            >
-              <ChevronLeftIcon className="size-4" />
-            </button>
-            <button
-              type="button"
-              aria-label={t("plugins.media.next")}
-              disabled={active === count - 1}
-              onClick={() => show(active + 1)}
-              className="absolute top-1/2 right-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-foreground shadow-[0_2px_8px_#0F172A33] transition-opacity disabled:opacity-40"
-            >
-              <ChevronRightIcon className="size-4" />
-            </button>
-          </>
-        ) : null}
-      </div>
 
-      <div className="flex max-w-full flex-wrap items-center justify-center gap-2.5">
-        {items.map((item, index) => (
-          <div key={item.id} className="group/thumb relative h-11 w-[72px]">
-            <button
-              type="button"
-              aria-label={`${
-                item.kind === "video" ? t("plugins.media.video") : t("plugins.media.image")
-              } ${index + 1}`}
-              aria-current={index === active}
-              onClick={() => show(index)}
-              className={`block size-full overflow-hidden rounded-md ring-inset ${
-                index === active ? "ring-2 ring-primary" : "ring-1 ring-glass-border"
-              }`}
-            >
-              {item.kind === "video" ? (
-                <span className="relative block size-full bg-[#0f172a]">
-                  <VideoThumb src={item.src} />
-                  <span className="absolute right-1 bottom-1 flex size-4 items-center justify-center rounded-full bg-[#0f172ab3]">
-                    <PlayIcon className="size-2.5 fill-white text-white" />
-                  </span>
-                </span>
-              ) : (
-                <img src={item.src} alt="" className="size-full object-cover" />
-              )}
-            </button>
-            <button
-              type="button"
-              aria-label={t("plugins.media.remove")}
-              onClick={() => remove(item.id)}
-              className="absolute top-1 right-1 z-10 flex size-4 items-center justify-center rounded-full bg-[#0f172acc] text-white opacity-0 transition-opacity group-focus-within/thumb:opacity-100 group-hover/thumb:opacity-100 hover:bg-[#0f172a]"
-            >
-              <XIcon className="size-2.5" />
-            </button>
-          </div>
-        ))}
-
-        <Popover
-          open={addOpen}
-          onOpenChange={(next) => {
-            setAddOpen(next)
-            if (!next) setAddFace("menu")
-          }}
-        >
-          <PopoverTrigger
-            render={
-              <button
-                type="button"
-                aria-label={t("plugins.media.upload")}
-                className="flex h-11 w-[72px] shrink-0 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground"
-              />
-            }
+          <Popover
+            open={addOpen}
+            onOpenChange={(next) => {
+              setAddOpen(next)
+              if (!next) setAddFace("menu")
+            }}
           >
-            <PlusIcon className="size-[18px]" />
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            side="top"
-            className={
-              addFace === "menu"
-                ? "w-[240px] gap-0 overflow-hidden rounded-md bg-card p-0 shadow-soft ring-1 ring-border"
-                : "w-[240px] gap-2.5 rounded-md bg-card p-3 shadow-soft ring-1 ring-border"
-            }
-          >
-            {addFace === "menu" ? (
-              /* Each entry is its own row, divided by the same hairline the rest
-                 of the app uses; the menu carries no padding, so the dividers
-                 run the full width. */
-              <>
+            <PopoverTrigger
+              render={
                 <button
                   type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
-                >
-                  <UploadIcon className="size-4 shrink-0 text-copy" aria-hidden />
-                  <span className="flex min-w-0 flex-1 flex-col gap-px">
-                    <span className="truncate text-[13px] leading-[17px] font-medium">
-                      {t("plugins.media.add.file")}
-                    </span>
-                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
-                      {t("plugins.media.add.fileHint")}
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddFace("link")}
-                  className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
-                >
-                  <LinkIcon className="size-4 shrink-0 text-copy" aria-hidden />
-                  <span className="flex min-w-0 flex-1 flex-col gap-px">
-                    <span className="truncate text-[13px] leading-[17px] font-medium">
-                      {t("plugins.media.add.link")}
-                    </span>
-                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
-                      {t("plugins.media.add.linkHint")}
-                    </span>
-                  </span>
-                </button>
-                {/* Paste is a gesture, not an entry: it says what to press and
-                    takes no click, so it is a row rather than a button. */}
-                <span className="flex h-12 w-full items-center gap-2.5 px-3">
-                  <ClipboardPasteIcon className="size-4 shrink-0 text-copy" aria-hidden />
-                  <span className="flex min-w-0 flex-1 flex-col gap-px">
-                    <span className="truncate text-[13px] leading-[17px] font-medium">
-                      {t("plugins.media.add.paste")}
-                    </span>
-                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
-                      {t("plugins.media.add.pasteHint")}
-                    </span>
-                  </span>
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-[12px] font-semibold">
-                  {t("plugins.media.add.linkLabel")}
-                </span>
-                <div className="flex h-[34px] items-center gap-2 rounded-md border-2 border-primary px-2.5">
-                  <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <input
-                    autoFocus
-                    value={link}
-                    onChange={(event) => setLink(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") addLink()
-                    }}
-                    placeholder={t("plugins.media.add.placeholder")}
-                    aria-label={t("plugins.media.add.linkLabel")}
-                    className="min-w-0 flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-muted-soft"
-                  />
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    className="h-7 rounded-full border-border bg-transparent px-3 text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
-                    onClick={() => setAddFace("menu")}
+                  aria-label={t("plugins.media.upload")}
+                  disabled={!takes}
+                  className="flex h-11 w-[72px] shrink-0 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+                />
+              }
+            >
+              <PlusIcon className="size-[18px]" />
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              side="top"
+              className={
+                addFace === "menu"
+                  ? "w-[240px] gap-0 overflow-hidden rounded-md bg-card p-0 shadow-soft ring-1 ring-border"
+                  : "w-[240px] gap-2.5 rounded-md bg-card p-3 shadow-soft ring-1 ring-border"
+              }
+            >
+              {addFace === "menu" ? (
+                /* Each entry is its own row, divided by the same hairline the rest
+                   of the app uses; the menu carries no padding, so the dividers
+                   run the full width. */
+                <>
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
                   >
-                    {t("plugins.action.cancel")}
-                  </Button>
-                  <Button className="h-7 rounded-full px-3 text-[12.5px] font-semibold" onClick={addLink}>
-                    {t("plugins.media.add.action")}
-                  </Button>
-                </div>
-              </>
-            )}
-          </PopoverContent>
-        </Popover>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          hidden
-          onChange={(event) => {
-            if (event.target.files) addFiles(event.target.files)
-            event.target.value = ""
-          }}
-        />
-      </div>
+                    <UploadIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="truncate text-[13px] leading-[17px] font-medium">
+                        {t("plugins.media.add.file")}
+                      </span>
+                      <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                        {t("plugins.media.add.fileHint")}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddFace("link")}
+                    className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
+                  >
+                    <LinkIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="truncate text-[13px] leading-[17px] font-medium">
+                        {t("plugins.media.add.link")}
+                      </span>
+                      <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                        {t("plugins.media.add.linkHint")}
+                      </span>
+                    </span>
+                  </button>
+                  {/* Paste is a gesture, not an entry: it says what to press and
+                      takes no click, so it is a row rather than a button. */}
+                  <span className="flex h-12 w-full items-center gap-2.5 px-3">
+                    <ClipboardPasteIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="truncate text-[13px] leading-[17px] font-medium">
+                        {t("plugins.media.add.paste")}
+                      </span>
+                      <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                        {t("plugins.media.add.pasteHint")}
+                      </span>
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[12px] font-semibold">
+                    {t("plugins.media.add.linkLabel")}
+                  </span>
+                  <div className="flex h-[34px] items-center gap-2 rounded-md border-2 border-primary px-2.5">
+                    <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <input
+                      autoFocus
+                      value={link}
+                      onChange={(event) => setLink(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") addLink()
+                      }}
+                      placeholder={t("plugins.media.add.placeholder")}
+                      aria-label={t("plugins.media.add.linkLabel")}
+                      className="min-w-0 flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-muted-soft"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      className="h-7 rounded-full border-border bg-transparent px-3 text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
+                      onClick={() => setAddFace("menu")}
+                    >
+                      {t("plugins.action.cancel")}
+                    </Button>
+                    <Button className="h-7 rounded-full px-3 text-[12.5px] font-semibold" onClick={addLink}>
+                      {t("plugins.media.add.action")}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </PopoverContent>
+          </Popover>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              if (event.target.files) addFiles(event.target.files)
+              event.target.value = ""
+            }}
+          />
+          </>
+        }
+      />
 
       <p className="text-center text-xs leading-[15px] text-muted-foreground">
         {t("plugins.media.hint")}
@@ -649,7 +550,17 @@ function ContentList({
  * that answer holds something: a view whose whole content is "none" is not a
  * view, and the panel beside it already says what the pack is either way.
  */
-function PackPane({ plugin }: { plugin: PluginRow }) {
+function PackPane({
+  plugin,
+  busy,
+  onAddAssets,
+  onRemoveAsset,
+}: {
+  plugin: PluginRow
+  busy: boolean
+  onAddAssets: (sources: string[]) => Promise<void>
+  onRemoveAsset: (ref: string) => Promise<void>
+}) {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<PackTab>("media")
   const [contents, setContents] = React.useState<PackContents>(NO_CONTENTS)
@@ -725,11 +636,18 @@ function PackPane({ plugin }: { plugin: PluginRow }) {
           ))}
         </TabsList>
       </div>
-      {/* The pictures keep their own state — a picture added here lives in this
-          window and nowhere else — so that pane stays mounted while another tab
-          is on screen, rather than being emptied by a look at the skills. */}
+      {/* The pictures come from the pack's own record, so that pane stays mounted
+          while another tab is on screen rather than being emptied by a look at
+          the skills — and it is told which tab is being read all the same, since
+          its paste listener is on the whole document. */}
       <TabsContent value="media" keepMounted className="flex min-h-0 flex-1 flex-col">
-        <MediaPane plugin={plugin} />
+        <MediaPane
+          plugin={plugin}
+          busy={busy}
+          onScreen={shown === "media"}
+          onAddAssets={onAddAssets}
+          onRemoveAsset={onRemoveAsset}
+        />
       </TabsContent>
       {contents.skills.length === 0 ? null : (
         <TabsContent
@@ -1533,6 +1451,8 @@ function PackLightbox({
   onCheckUpdate,
   onDelete,
   onTagsChange,
+  onAddAssets,
+  onRemoveAsset,
 }: {
   plugin: PluginRow
   clients: readonly PluginClient[]
@@ -1546,12 +1466,29 @@ function PackLightbox({
   onCheckUpdate: (plugin: PluginRow) => Promise<void>
   onDelete: (plugin: PluginRow) => Promise<void>
   onTagsChange: (tags: string[]) => void
+  /** Take the pictures a person chose for this pack, and drop one it holds. */
+  onAddAssets: (sources: string[]) => Promise<void>
+  onRemoveAsset: (ref: string) => Promise<void>
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
 
+  /* The catalog stays mounted behind the lightbox; stop its covers decoding
+     while a full-screen surface is over them. */
+  React.useEffect(() => {
+    setPreviewsSuspended(true)
+    return () => setPreviewsSuspended(false)
+  }, [])
+
   return (
     <DialogSplit
-      pane={<PackPane plugin={plugin} />}
+      pane={
+        <PackPane
+          plugin={plugin}
+          busy={busy}
+          onAddAssets={onAddAssets}
+          onRemoveAsset={onRemoveAsset}
+        />
+      }
       panel={
         <InfoPanel
           plugin={plugin}
@@ -1602,6 +1539,8 @@ export function PluginDetailDialog({
   onCheckUpdate,
   onDelete,
   onTagsChange,
+  onAddAssets,
+  onRemoveAsset,
   onOpenChange,
 }: {
   /** The pack on screen, or `null` while the lightbox is closed. */
@@ -1622,6 +1561,9 @@ export function PluginDetailDialog({
   /** Drop the pack from the library; copies an agent holds are left alone. */
   onDelete: (plugin: PluginRow) => Promise<void>
   onTagsChange: (tags: string[]) => void
+  /** Take the pictures a person chose for this pack, and drop one it holds. */
+  onAddAssets: (plugin: PluginRow, sources: string[]) => Promise<void>
+  onRemoveAsset: (plugin: PluginRow, ref: string) => Promise<void>
   onOpenChange: (open: boolean) => void
 }) {
   return (
@@ -1641,6 +1583,8 @@ export function PluginDetailDialog({
           onCheckUpdate={onCheckUpdate}
           onDelete={onDelete}
           onTagsChange={onTagsChange}
+          onAddAssets={(sources) => onAddAssets(plugin, sources)}
+          onRemoveAsset={(ref) => onRemoveAsset(plugin, ref)}
         />
       )}
     </Dialog>

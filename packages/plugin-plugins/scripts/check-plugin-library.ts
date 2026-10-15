@@ -766,6 +766,168 @@ check(
   await fs.readdir(path.join(logoHub, "assets"))
 )
 
+console.log("the pictures a person adds")
+
+/* What a person adds is recorded on the pack's own row and kept in the hub's
+   asset directory, in the order it was added: that order is what says which
+   picture a card is drawn by, so what was added last is what a card shows. */
+{
+  const shot = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 1])
+  const dataUrl = `data:image/png;base64,${Buffer.from(shot).toString("base64")}`
+  const clip = `data:video/mp4;base64,${Buffer.from(new Uint8Array([0, 0, 0, 24, 102])).toString("base64")}`
+
+  await logoLibrary.addAssets("acme-hello", [dataUrl])
+  const added = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  const stored = added?.assets[0] ?? ""
+  check(
+    "a picture a person added is recorded on the pack, and its file is the hub's",
+    stored.startsWith("assets/") &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(stored))).catch(() => null)) !== null,
+    stored
+  )
+  check(
+    "and it is not confused with the picture the pack brought",
+    added?.icon === first.icon && added?.icon !== stored,
+    added?.icon
+  )
+  check(
+    "and the row was not otherwise rewritten",
+    added !== undefined &&
+      added.hash === first.hash &&
+      added.updatedAt === first.updatedAt &&
+      added.tags.join() === first.tags.join(),
+    added
+  )
+
+  await logoLibrary.addAssets("acme-hello", [clip])
+  const both = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check(
+    "a picture added later comes first, because that is the one a card draws",
+    both?.assets.length === 2 && both.assets[0] !== stored && both.assets[1] === stored,
+    both?.assets
+  )
+
+  await logoLibrary.addAssets("acme-hello", [dataUrl])
+  const same = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check(
+    "the same picture added again is one entry, moved to the front",
+    same?.assets.length === 2 && same.assets[0] === stored && same.assets[1] === both?.assets[0],
+    same?.assets
+  )
+
+  await logoLibrary.addAssets("acme-hello", ["https://elsewhere.test/shot.png"])
+  const linked = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check(
+    "an address is recorded as it stands, and nothing is kept for it",
+    linked?.assets[0] === "https://elsewhere.test/shot.png" && linked.assets.length === 3,
+    linked?.assets
+  )
+
+  /* The name a file is kept under carries the pack's own name: two packs that
+     hold the same bytes are two files, so dropping one never takes the other's. */
+  await logoLibrary.addAssets("other-pack", [dataUrl])
+  const otherRow = (await logoLibrary.list()).find((one) => one.name === "other-pack")
+  const otherFile = otherRow?.assets[0] ?? ""
+  check(
+    "the same picture added to another pack is that pack's own file",
+    otherFile.startsWith("assets/") &&
+      otherFile !== stored &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(otherFile))).catch(() => null)) !== null,
+    [otherFile, stored]
+  )
+
+  const refused = await logoLibrary.addAssets("no-such-pack", [dataUrl]).then(
+    () => null,
+    (error: unknown) => (error instanceof Error ? error.message : String(error))
+  )
+  check(
+    "a picture for a pack the hub does not hold is refused, and nothing is written",
+    refused !== null && refused.includes("not in this library"),
+    refused
+  )
+
+  /* The one thing that could quietly take an added picture away: an update reads
+     the record again, and keeps what a person added only while its file is there.
+     The mark it brought is replaced by that same read, and the two must not be
+     taken for each other. */
+  const stage = path.join(root, "logo-pack-again")
+  await writePack(stage, "9.9.9")
+  await writePicture(stage, "assets/logo.png", "the new logo")
+  const replaced = await logoLibrary.replace(
+    "acme-hello",
+    stage,
+    first.source,
+    await folderHash(stage)
+  )
+  check(
+    "an update keeps the pictures a person added, in their order",
+    replaced.assets.join() === (linked?.assets ?? []).join() &&
+      replaced.assets.length === 3 &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(stored))).catch(() => null)) !== null,
+    [replaced.assets, linked?.assets]
+  )
+  check(
+    "and the mark it now brings is a new file, kept apart from them",
+    replaced.icon !== first.icon &&
+      replaced.icon !== "" &&
+      !replaced.assets.includes(replaced.icon) &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(replaced.icon))).catch(() => null)) !==
+        null,
+    replaced.icon
+  )
+
+  await logoLibrary.removeAsset("acme-hello", "https://elsewhere.test/shot.png")
+  const dropped = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check(
+    "dropping an address takes it off the pack",
+    !dropped?.assets.includes("https://elsewhere.test/shot.png") && dropped.assets.length === 2,
+    dropped?.assets
+  )
+
+  await logoLibrary.removeAsset("acme-hello", stored)
+  const after = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check(
+    "dropping a picture takes its file too, and the next one takes its place",
+    after?.assets.length === 1 &&
+      after.assets[0] === both?.assets[0] &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(stored))).catch(() => null)) === null,
+    after?.assets
+  )
+  check(
+    "and the other pack's copy of the same bytes is still there",
+    (await fs.stat(path.join(logoHub, "assets", path.basename(otherFile))).catch(() => null)) !== null
+  )
+
+  await logoLibrary.removeAsset("acme-hello", after?.assets[0] ?? "")
+  const bare = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check("dropping the last picture leaves the pack with none", bare?.assets.length === 0, bare?.assets)
+  check(
+    "while the picture the pack itself brought stays",
+    bare?.icon !== "" &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(bare.icon))).catch(() => null)) !== null,
+    bare?.icon
+  )
+
+  /* A reference this pack's record does not hold is not this call's to remove:
+     its own mark lives in the same store, and a mistake is not a reason to
+     delete a file. */
+  await logoLibrary.removeAsset("acme-hello", bare?.icon ?? "")
+  await logoLibrary.removeAsset("acme-hello", "assets/never-recorded-00000000.png")
+  const untouched = (await logoLibrary.list()).find((one) => one.name === "acme-hello")
+  check(
+    "the pack's own mark is not a picture a person added, and is left alone",
+    untouched?.icon === bare?.icon &&
+      untouched?.icon !== "" &&
+      (await fs.stat(path.join(logoHub, "assets", path.basename(untouched.icon))).catch(() => null)) !==
+        null,
+    untouched?.icon
+  )
+  check(
+    "and another pack's row is not touched by any of it",
+    (await logoLibrary.list()).find((one) => one.name === "other-pack")?.assets.length === 1
+  )
+}
+
 console.log("reading a directory an agent keeps a pack in")
 
 /* A pack no library record holds is read straight out of the directory an agent

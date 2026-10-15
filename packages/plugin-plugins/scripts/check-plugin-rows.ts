@@ -366,6 +366,28 @@ check(
   )[0]?.cover === "/hub/files/assets/stored-shot-8d1c40aa.png"
 )
 check(
+  "a video is a cover too: the card plays the first picture, whatever kind it is",
+  composeRows(
+    [{ ...record("stored"), assets: ["assets/stored-clip-2f7a1b0c.mp4", "assets/stored-shot-8d1c40aa.png"] }],
+    [],
+    "en",
+    (key) => key
+  )[0]?.cover === "/hub/files/assets/stored-clip-2f7a1b0c.mp4"
+)
+check(
+  "and the row carries every picture it has, in the order the record keeps them",
+  composeRows(
+    [{ ...record("stored"), assets: ["assets/a-1f7b.png", "https://elsewhere.test/b.gif", "assets/c-2c8d.mp4"] }],
+    [],
+    "en",
+    (key) => key
+  )[0]?.pictures.join() === "assets/a-1f7b.png,https://elsewhere.test/b.gif,assets/c-2c8d.mp4"
+)
+check(
+  "a pack the hub does not hold carries none",
+  composeRows([], scanned, "en", (key) => key)[0]?.pictures.length === 0
+)
+check(
   "a pack with no picture of its own draws none",
   composeRows([record("stored")], [], "en", (key) => key)[0]?.icon === undefined &&
     composeRows([record("stored")], [], "en", (key) => key)[0]?.cover === undefined

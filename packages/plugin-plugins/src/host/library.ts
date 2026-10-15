@@ -20,7 +20,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import { isLink } from "@workspace/core"
+import { isLink, readSource } from "@workspace/core"
 import { createAssetStore } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
 import { writeFileAtomic } from "@workspace/core/host/atomic"
@@ -111,6 +111,27 @@ export interface PluginLibrary {
   setChecks(checks: ReadonlyMap<string, PluginCheck>): Promise<void>
   /** Keep one pack's categories. */
   setTags(name: string, tags: readonly string[]): Promise<void>
+  /**
+   * Take over pictures a person chose, and put them at the front of the order the
+   * pack's record keeps.
+   *
+   * A source is either an address the hub only records or inline bytes it keeps
+   * for itself, the same line `@workspace/core`'s `readSource` draws everywhere
+   * else. What is added first is what the pack is drawn by, so a picture someone
+   * just added is the one they see.
+   *
+   * @throws {Error} when the name is not a pack this hub holds, which is the one
+   * thing that stops a picture being recorded with nothing to belong to.
+   */
+  addAssets(name: string, sources: readonly string[]): Promise<void>
+  /**
+   * Drop one picture a person added, and the file the hub kept for it.
+   *
+   * A reference this pack's record does not hold is not this call's to remove:
+   * the pack's own mark lives in the same store, and a wrong reference is not a
+   * reason to delete a file.
+   */
+  removeAsset(name: string, ref: string): Promise<void>
 }
 
 /**
@@ -275,6 +296,17 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
   }
 
   const packDir = (name: string) => path.join(root, assertSafeSegment(name, "plugin name"))
+
+  /**
+   * One file a person handed over, named after the pack it belongs to.
+   *
+   * The library names a stored file after the hint it was given and a digest of
+   * its bytes, so the pack's own name in front is what keeps two packs' copies of
+   * the same picture apart: without it, dropping one would take the other's file
+   * with it.
+   */
+  const owned = (name: string, file: File): File =>
+    new File([file], `${name}-${file.name}`, { type: file.type })
 
   /**
    * Drop an asset the hub recorded for one pack, and sweep up after a pack
@@ -495,6 +527,53 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
           throw new Error(`${name} is not in this library`)
         }
         await save(records.map((one) => (one.name === name ? { ...one, tags: [...tags] } : one)))
+      })
+    },
+
+    addAssets(name, sources) {
+      return run(async () => {
+        const records = await readDocument()
+        const record = records.find((one) => one.name === name)
+        if (record === undefined) throw new Error(`${name} is not in this library`)
+        const added: string[] = []
+        for (const source of sources) {
+          const chosen = readSource(source)
+          /* An address is recorded as it stands — the hub owns none of it — while
+             what a person carried in is bytes it keeps. */
+          added.push(chosen.kind === "link" ? chosen.ref : await store.put(owned(name, chosen.file)))
+        }
+        if (added.length === 0) return
+        /* Newest first: this array is the order a pack is drawn by, so what was
+           just added is what a card shows. */
+        await save(
+          records.map((one) =>
+            one.name === name
+              ? { ...one, assets: [...added, ...one.assets.filter((ref) => !added.includes(ref))] }
+              : one
+          )
+        )
+      })
+    },
+
+    removeAsset(name, ref) {
+      return run(async () => {
+        const records = await readDocument()
+        const record = records.find((one) => one.name === name)
+        if (record === undefined) throw new Error(`${name} is not in this library`)
+        /* Only what this record itself holds is this call's to drop. */
+        if (!record.assets.includes(ref)) return
+        /* The index is written first, so a failure to delete cannot leave a
+           record pointing at a file that is already gone. */
+        await save(
+          records.map((one) =>
+            one.name === name
+              ? { ...one, assets: one.assets.filter((item) => item !== ref) }
+              : one
+          )
+        )
+        /* An address somebody else serves has no file of the hub's to delete,
+           which is the line the sweep after a replace draws as well. */
+        if (!isLink(ref)) await store.remove(ref).catch(() => undefined)
       })
     },
   }

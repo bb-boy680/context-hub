@@ -62,9 +62,10 @@ export function toRow(
   const installed = installedRevision(record.source)
   const latest = record.checked?.latest
   const current = record.checked?.currentHash
-  /* What the card draws large: a picture a person added, and nothing else. The
-     pack's own mark is not one — it is the tile beside the name — so a pack
-     without one falls through to the README the card renders instead. */
+  /* What the card draws large: the first picture a person added, and nothing
+     else. The pack's own mark is not one — it is the tile beside the name — so a
+     pack without one falls through to the README the card renders instead. A
+     video is one of these: the card plays it rather than drawing it still. */
   const cover = record.assets[0]
   return {
     id: record.name,
@@ -79,6 +80,10 @@ export function toRow(
     updated: ageOf(record.updatedAt, language, t),
     ...(record.icon === "" ? {} : { icon: assetRef(record.icon) }),
     ...(cover === undefined ? {} : { cover: assetRef(cover) }),
+    /* The pictures as the record holds them, as references rather than as URLs: a
+       pane that drops one has to name the reference itself, and it resolves one
+       to a URL with the same `assetRef` this row draws its cover by. */
+    pictures: [...record.assets],
     outdated: installed !== null && latest !== undefined && latest !== installed,
     modified: current !== undefined && current !== record.hash,
     hasSource: installed !== null,
@@ -227,6 +232,7 @@ export function heldRow(pack: ScannedPack): PluginRow {
        large is a picture a person added, and a pack the hub has not taken in has
        no record for one to live in — so its card falls through to its README. */
     ...(pack.icon === undefined ? {} : { icon: assetRef(pack.icon) }),
+    pictures: [],
     stored: false,
     held: pack.held,
   }

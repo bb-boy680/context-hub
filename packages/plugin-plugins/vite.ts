@@ -262,6 +262,24 @@ export function pluginLibrary(
                 )
                 sendJson(response, 200, { root: library.root, plugins: await library.list() })
                 return
+              /* The pictures a person chose for one pack. What arrives is a
+                 `data:` URL for a file from this machine and the address itself
+                 for a link, which is the same pair `readSource` draws apart — so
+                 one action carries all four ways a picture is added. */
+              case "asset-add":
+                await library.addAssets(
+                  requiredString(body.name, "name"),
+                  sourceStrings(body.sources)
+                )
+                sendJson(response, 200, { root: library.root, plugins: await library.list() })
+                return
+              case "asset-remove":
+                await library.removeAsset(
+                  requiredString(body.name, "name"),
+                  requiredString(body.ref, "ref")
+                )
+                sendJson(response, 200, { root: library.root, plugins: await library.list() })
+                return
               case "check-updates":
                 sendJson(response, 200, await probe.checkAll(await library.list()))
                 return
@@ -348,4 +366,24 @@ function uploadsOf(value: unknown): PackUpload[] {
     files.push({ path: held.path, base64: held.base64 })
   }
   return files
+}
+
+/** How many pictures one request may carry. */
+const SOURCES_LIMIT = 12
+
+/**
+ * The picture sources a request arrived with: every address or inline file, up
+ * to the point where one body is more than a person's choice of pictures.
+ *
+ * Each entry is a file's bytes once they are decoded, so this is the one place
+ * the size of a body is bounded — a body of no pictures is what an empty or
+ * malformed list means, not an error.
+ */
+function sourceStrings(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  const sources = value.filter((entry): entry is string => typeof entry === "string" && entry !== "")
+  if (sources.length > SOURCES_LIMIT) {
+    throw new Error(`no more than ${String(SOURCES_LIMIT)} pictures at once`)
+  }
+  return sources
 }

@@ -38,6 +38,7 @@ import {
 import { Spinner } from "@workspace/ui/components/spinner"
 
 import { PLUGIN_MANIFESTS } from "./contract.ts"
+import { dataUrlOf } from "./library.ts"
 import type { PackUploadFile, PluginCollected } from "./library.ts"
 import { bestPicture, pictureOf } from "./pictures.ts"
 import type { PackPicture } from "./pictures.ts"
@@ -225,16 +226,6 @@ function ListState({ text, icon: Icon }: { text: string; icon?: ExtensionIcon })
       <span className="text-muted-foreground">{text}</span>
     </div>
   )
-}
-
-/** One file as a data URL, which a preview and an upload are both built from. */
-function dataUrlOf(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error ?? new Error("a file could not be read"))
-    reader.onload = () => resolve(String(reader.result))
-    reader.readAsDataURL(file)
-  })
 }
 
 /** One file's bytes, as the base64 the request body carries. */

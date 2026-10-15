@@ -130,6 +130,22 @@ export async function packContentsIn(dir: string): Promise<PackContents> {
 export const README_FILE = "README.md"
 
 /**
+ * One file as a `data:` URL, which is how a picture reaches the bridge.
+ *
+ * The bridge takes one JSON body per write, so a file travels inside it while it
+ * is still recognizable as the file it is — name, type and bytes — which is
+ * exactly what `@workspace/core`'s `readSource` reads back out at the far end.
+ */
+export function dataUrlOf(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(reader.error ?? new Error("a file could not be read"))
+    reader.onload = () => resolve(String(reader.result))
+    reader.readAsDataURL(file)
+  })
+}
+
+/**
  * Where a pack's own pictures are readable, as the prefix a document's relative
  * references resolve under.
  *
@@ -212,6 +228,11 @@ async function call<T>(path: string, body?: unknown): Promise<T> {
     throw new Error(detail.error ?? `${String(response.status)} ${response.statusText}`)
   }
   return (await response.json()) as T
+}
+
+/** A refusal's own words, whichever side of the bridge it came from. */
+export function reasonOf(failure: unknown) {
+  return failure instanceof Error ? failure.message : String(failure)
 }
 
 /** One client this hub can deliver to, and what it already holds. */
@@ -309,6 +330,18 @@ export interface PluginLibrary {
   remove(name: string): Promise<void>
   /** Keep a pack's categories. */
   setTags(name: string, tags: string[]): Promise<void>
+  /**
+   * Add pictures a person chose for one pack, newest first.
+   *
+   * A source is a `data:` URL for a file from this machine, or the address of one
+   * somebody else serves; the pack's record is what says which pictures it has,
+   * so the pane that draws them reads the row back after this.
+   *
+   * @param sources — the pictures to take over, in the order they were chosen.
+   */
+  addAssets(name: string, sources: string[]): Promise<void>
+  /** Drop one picture a person added, and the file the hub kept for it. */
+  removeAsset(name: string, ref: string): Promise<void>
   /** Deliver a pack to one client, at one scope. */
   install(name: string, client: string, scope: PluginInstallScope): Promise<void>
   /** Take it back out of that client and scope, whatever marketplace it came from. */
@@ -584,6 +617,8 @@ export function usePluginLibrary(): PluginLibrary {
     restore,
     remove: (name) => write<void>({ action: "remove", name }),
     setTags: (name, tags) => write<void>({ action: "tags", name, tags }),
+    addAssets: (name, sources) => write<void>({ action: "asset-add", name, sources }),
+    removeAsset: (name, ref) => write<void>({ action: "asset-remove", name, ref }),
     install: (name, client, scope) =>
       deliver(client, (installer, tools) => installer.install(name, scope, tools)),
     uninstall: (name, client, scope) => {

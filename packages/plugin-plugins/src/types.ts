@@ -81,13 +81,22 @@ export interface PluginRow {
   /** The pack's own mark, as a URL the row draws beside its name. */
   icon?: string
   /**
-   * A picture to show the pack by, as a URL: the first one a person added.
+   * The picture a card draws the pack by, as a URL: the first one a person added.
    *
    * The pack's own mark is not one — that is {@link icon}, and it is a tile
    * rather than a cover. A row with no such picture has its README rendered in
    * the cover's place, and falls back to a placeholder only when it has neither.
+   * A video is one of these: the card plays it rather than drawing it still.
    */
   cover?: string
+  /**
+   * Every picture a person added, as the references the record holds them by.
+   *
+   * The order is the record's own: the first is what the card draws, and the rest
+   * are the gallery a pack's lightbox shows. References rather than URLs, because
+   * the pane that drops one has to name it as the record does.
+   */
+  pictures: readonly string[]
   /** The last check found the source ahead of this copy. */
   outdated?: boolean
   /** These files differ from the revision they were collected at. */
