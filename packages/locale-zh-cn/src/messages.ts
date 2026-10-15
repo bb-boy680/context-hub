@@ -327,6 +327,7 @@ export const messages: Record<string, string> = {
   "plugins.scope.project": "这个仓库",
   "plugins.place.which": "位置",
   "plugins.place.none": "还没有可以安装到的 Agent。",
+  "plugins.install.notHeld": "先收录这个插件，才能安装到新位置。",
   "plugins.place.all": "全部位置",
   "plugins.place.search": "搜索位置",
   "plugins.place.searchClear": "清除搜索",

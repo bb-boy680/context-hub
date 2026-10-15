@@ -33,6 +33,7 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.scope.project": "This repository",
   "plugins.place.which": "Places",
   "plugins.place.none": "No agent to install into yet.",
+  "plugins.install.notHeld": "Adopt this pack first to install it somewhere new.",
   "plugins.place.all": "All places",
   "plugins.place.search": "Search places",
   "plugins.place.searchClear": "Clear the search",

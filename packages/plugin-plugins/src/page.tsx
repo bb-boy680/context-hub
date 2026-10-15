@@ -239,30 +239,6 @@ function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowAct
   )
 }
 
-/** The one action a pack the hub does not hold carries: take it in. */
-function AdoptButton({ plugin, actions }: { plugin: PluginRow; actions: RowActions }) {
-  const { t } = useI18n()
-
-  return (
-    <Button
-      type="button"
-      variant="outline"
-      disabled={actions.busy}
-      aria-label={`${t("plugins.action.adopt")} ${plugin.name}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        actions.onAdopt(plugin)
-      }}
-      /* A soft fill, like the skills page's adopt: installing is the row's own
-         action, and undoing it is what the menus offer. */
-      className="h-8 gap-1.5 rounded-full bg-secondary px-3 text-[13px] font-semibold text-foreground outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <PlusIcon className="size-3.5" />
-      {t("plugins.action.adopt")}
-    </Button>
-  )
-}
-
 /** Ratio a card falls back to before its own cover reports one. */
 const FALLBACK_RATIO = 16 / 9
 
@@ -447,11 +423,11 @@ function PluginCard({
           <span className="mr-auto flex min-w-0 items-center">
             <HolderStack plugin={plugin} />
           </span>
-          {plugin.stored ? (
-            <InstallButton plugin={plugin} actions={actions} />
-          ) : (
-            <AdoptButton plugin={plugin} actions={actions} />
-          )}
+          {/* The two menus stand here whether or not the hub holds the files:
+              what an agent makes of a pack, and where else to put it, are the
+              row's own questions. Taking a pack in is the panel's, which is
+              where a person has just read what it carries. */}
+          <InstallButton plugin={plugin} actions={actions} />
         </div>
       </div>
     </div>
@@ -626,12 +602,7 @@ function PluginTable({
       key: "action",
       label: t("plugins.column.action"),
       width: "23.7%",
-      cell: (plugin) =>
-        plugin.stored ? (
-          <InstallButton plugin={plugin} actions={actions} />
-        ) : (
-          <AdoptButton plugin={plugin} actions={actions} />
-        ),
+      cell: (plugin) => <InstallButton plugin={plugin} actions={actions} />,
     },
   ]
 

@@ -80,24 +80,35 @@ function ScopeMenu({
   const options = clients.flatMap((client) =>
     client.scopes
       .filter((scope): scope is PluginInstallScope => scope === "user" || scope === "project")
-      .map((scope) => ({
-        id: `${client.id}:${scope}`,
-        client: client.id,
-        scope,
-        icon: client.icon,
-        label: client.label,
-        /* The place, which is what tells this row from the client's other one. */
-        note: t(SCOPE_LABELS[scope] ?? scope),
-        selected: (plugin.held.find((one) => one.client === client.id)?.scopes ?? []).includes(
+      .map((scope) => {
+        /* What this agent holds, in its own words — not what this hub delivered
+           to it. A pack the agent got from some other marketplace is just as
+           installed, and its row has to offer the way out. */
+        const at = (plugin.held.find((one) => one.client === client.id)?.scopes ?? []).includes(
           scope
-        ),
-        blocked:
-          client.error !== undefined
-            ? t("plugins.client.unread")
-            : client.available
-              ? null
-              : t("plugins.client.absent"),
-      }))
+        )
+        return {
+          id: `${client.id}:${scope}`,
+          client: client.id,
+          scope,
+          icon: client.icon,
+          label: client.label,
+          /* The place, which is what tells this row from the client's other one. */
+          note: t(SCOPE_LABELS[scope] ?? scope),
+          selected: at,
+          blocked:
+            client.error !== undefined
+              ? t("plugins.client.unread")
+              : !client.available
+                ? t("plugins.client.absent")
+                : /* A place it is already in can always be left. A new one cannot:
+                     delivering into it asks the hub's own marketplace, which
+                     lists the packs this hub holds the files of. */
+                  plugin.stored || at
+                  ? null
+                  : t("plugins.install.notHeld"),
+        }
+      })
   )
   const byId = new Map(options.map((one) => [one.id, one]))
 
