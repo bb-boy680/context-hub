@@ -181,3 +181,24 @@ tab 是错的，应该只有一个资产库"。
 - 浏览器 + `eval` 读 DOM 的真实几何/属性，而不是看 JSX 猜布局
 typecheck/lint/单测全绿**不代表**运行时是对的：它们证明不了字段名对得上、
 也证明不了某个值非空。这一轮四次都是全绿之后被用户看出来的。
+
+## 起子进程的地方要问 cwd（2026-10-15）
+
+**问题模式**：把包装到「工作区」scope，文件落到了 `apps/web/.claude/`，
+而不是用户选的那个工作区。原因：`runProgram` 用 `execFile` 时**没给 `cwd`**，
+子进程于是继承 dev server 的工作目录（`pnpm dev` 从仓库根起、turbo 把 vite 起在
+`apps/web`），而客户端是**按工作目录**解析自己的项目文件的——`claude plugin install
+--scope project` 就写在启动它的那个目录里。
+
+更糟的是同仓的 `plugin-mcp/vite.ts` 早就有 `startFolder()`（「工作区在用哪个，
+没有则取宿主自己的目录」）并写了注释说明为什么，我在同一轮里翻过那段代码也没接上。
+
+**规则**：写任何 `execFile`/`spawn` 之前先问一句"这个程序的**相对路径**（项目文件、
+配置、缓存）会落在哪"——如果它按 cwd 解析，就必须显式传 `cwd`，
+不能靠继承。默认继承的那个目录是**构建工具**的目录，不是用户的目录。
+仓库里已经有 `startFolder()`（workspace store → `page.current` → 兜底
+`hostFolder()`）在做这件事，别写第二份。
+
+**验证方式**：这类 bug 的检查很便宜——让子进程自己报 `process.cwd()`，
+在真桥上调一次 `{action:"program", program:"node", args:["-e","process.stdout.write(process.cwd())"]}`
+就能看出来。已加进 `check-plugin-library.ts`。
