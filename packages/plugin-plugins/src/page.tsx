@@ -33,6 +33,8 @@ import { AddPluginDialog, type AddPluginTab } from "./add-plugin-dialog.tsx"
 import { PluginDetailDialog } from "./detail-dialog.tsx"
 import { PluginActions } from "./install-actions.tsx"
 import {
+  packImageBase,
+  usePackReadme,
   usePluginLibrary,
   type PackUploadFile,
   type PluginClient,
@@ -58,6 +60,7 @@ import {
 } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
+import { Markdown } from "@workspace/ui/components/markdown"
 import {
   Tabs,
   TabsContent,
@@ -303,6 +306,39 @@ function BundleCover({ plugin }: { plugin: PluginRow }) {
 }
 
 /**
+ * The cover of a pack with no picture: what the pack says about itself, rendered
+ * as the document it is. A cover is a thumbnail, so the document is clipped
+ * rather than scrolled — a card reads as one, not as a reading surface.
+ */
+function ReadmeCover({ plugin }: { plugin: PluginRow }) {
+  const readme = usePackReadme(plugin)
+  if (readme === undefined || readme === null) return <BundleCover plugin={plugin} />
+
+  return (
+    <div
+      className={`size-full overflow-hidden bg-surface-raised px-[18px] text-[12px] leading-[18px] text-secondary-foreground ${
+        /* Room for the tag pills, which sit over this corner; nothing to clear without them. */
+        plugin.tags.length > 0 ? "pt-10" : "py-3.5"
+      }`}
+    >
+      <Markdown imageBase={packImageBase(plugin)}>{readme}</Markdown>
+    </div>
+  )
+}
+
+/**
+ * What fills a card's cover box. A pack with a picture reads no document at all,
+ * which is why the README is read inside the branch that needs it.
+ */
+function CoverFace({ plugin, onRatio }: { plugin: PluginRow; onRatio: (ratio: number) => void }) {
+  return plugin.cover === undefined ? (
+    <ReadmeCover plugin={plugin} />
+  ) : (
+    <PhotoCover src={plugin.cover} onRatio={onRatio} />
+  )
+}
+
+/**
  * The mark a pack carries when its source moved past the copy here. It is the
  * only place the answer to a check is visible without opening the pack, so it
  * says the one word and nothing else.
@@ -370,11 +406,7 @@ function PluginCard({
         className="relative w-full overflow-hidden bg-surface-raised"
         style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
       >
-        {plugin.cover === undefined ? (
-          <BundleCover plugin={plugin} />
-        ) : (
-          <PhotoCover src={plugin.cover} onRatio={measure} />
-        )}
+        <CoverFace plugin={plugin} onRatio={measure} />
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           {shownTags.map((tag) => (
             <TagPill key={tag} tag={tag} />

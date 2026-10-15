@@ -349,9 +349,12 @@ check(
   composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.icon
 )
 check(
-  "and the mark also fills the card until a picture is added",
-  composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.cover ===
-    "/hub/files/assets/stored-logo-3f9a2b1c.png"
+  "a mark is the tile beside the name, and never the card's cover",
+  composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]
+    ?.cover === undefined &&
+    rows[1]?.icon === "/hub/files/assets/hud-logo-3f9a2b1c.png" &&
+    rows[1]?.cover === undefined,
+  rows[1]
 )
 check(
   "a picture a person added is what the card draws instead",

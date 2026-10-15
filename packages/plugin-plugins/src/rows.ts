@@ -62,9 +62,10 @@ export function toRow(
   const installed = installedRevision(record.source)
   const latest = record.checked?.latest
   const current = record.checked?.currentHash
-  /* What the card draws large: a picture a person added, or — until there is one
-     — the pack's own mark, which fills the space better than a placeholder. */
-  const cover = record.assets[0] ?? (record.icon === "" ? undefined : record.icon)
+  /* What the card draws large: a picture a person added, and nothing else. The
+     pack's own mark is not one — it is the tile beside the name — so a pack
+     without one falls through to the README the card renders instead. */
+  const cover = record.assets[0]
   return {
     id: record.name,
     name: record.name,
@@ -222,12 +223,10 @@ export function heldRow(pack: ScannedPack): PluginRow {
     updated: "",
     /* Nothing has asked this pack about any source. */
     checkedAge: "",
-    /* A pack the hub has not taken in has no picture but its own, so that one
-       fills both places: the tile, and the card's own box. Both are read from
-       the asset library, which is where the reading of the pack put it. */
-    ...(pack.icon === undefined
-      ? {}
-      : { icon: assetRef(pack.icon), cover: assetRef(pack.icon) }),
+    /* The pack's own mark, which is the tile beside its name. What a card draws
+       large is a picture a person added, and a pack the hub has not taken in has
+       no record for one to live in — so its card falls through to its README. */
+    ...(pack.icon === undefined ? {} : { icon: assetRef(pack.icon) }),
     stored: false,
     held: pack.held,
   }

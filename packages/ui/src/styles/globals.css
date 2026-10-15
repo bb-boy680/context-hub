@@ -206,3 +206,17 @@
         color: var(--shiki-dark);
     }
 }
+
+/* A fenced block inside a document. The colours are the same per-theme variables
+   `file-code` reads, but this carries no `.shiki` element — the block is shiki's
+   `inline` structure, so the document's own <pre> stays the frame — and no line
+   numbers, which a document's blocks do not wear. */
+@utility doc-code {
+    & span {
+        color: var(--shiki-light);
+    }
+
+    .dark & span {
+        color: var(--shiki-dark);
+    }
+}

@@ -80,7 +80,13 @@ export interface PluginRow {
   updated: string
   /** The pack's own mark, as a URL the row draws beside its name. */
   icon?: string
-  /** A picture to show the pack by, as a URL: the first picture the hub holds for it. */
+  /**
+   * A picture to show the pack by, as a URL: the first one a person added.
+   *
+   * The pack's own mark is not one — that is {@link icon}, and it is a tile
+   * rather than a cover. A row with no such picture has its README rendered in
+   * the cover's place, and falls back to a placeholder only when it has neither.
+   */
   cover?: string
   /** The last check found the source ahead of this copy. */
   outdated?: boolean

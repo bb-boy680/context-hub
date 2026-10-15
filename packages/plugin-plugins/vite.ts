@@ -19,11 +19,17 @@ import { createFsAssetLibrary } from "@workspace/core/host"
 import { hostFolder } from "@workspace/core/host/fs-browse"
 import { resolveHubHome } from "@workspace/core/host/home"
 import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
+import { contentTypeOf } from "@workspace/core/vite"
 
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
 import { readPackContents } from "./src/host/contents.ts"
 import { describePack } from "./src/host/describe.ts"
-import { createFsPluginLibrary, listDirectory, readInDirectory } from "./src/host/library.ts"
+import {
+  createFsPluginLibrary,
+  listDirectory,
+  readBytesInDirectory,
+  readInDirectory,
+} from "./src/host/library.ts"
 import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
 import { hasProgram, runProgram } from "./src/host/program.ts"
 import { createPluginProbe } from "./src/host/probe.ts"
@@ -46,6 +52,16 @@ function sendJson(response: ServerResponse, status: number, value: unknown): voi
     "Cache-Control": "no-store",
   })
   response.end(body)
+}
+
+/** One file's bytes, with the type its extension names and no cache. */
+function sendBytes(response: ServerResponse, bytes: Buffer, file: string): void {
+  response.writeHead(200, {
+    "Content-Type": contentTypeOf(file),
+    "Content-Length": bytes.byteLength,
+    "Cache-Control": "no-store",
+  })
+  response.end(bytes)
 }
 
 /** One request body read as an object, or an empty one. */
@@ -165,6 +181,26 @@ export function pluginLibrary(
                     ? await library.read(requiredString(url.searchParams.get("name"), "name"), file)
                     : await readInDirectory(dir, file),
               })
+              return
+            }
+
+            /* One file of a pack as it is written, for a document that points at
+               the pictures beside it: the same pair of places `file` reads text
+               from, answered as the file itself, because an `<img>` needs the
+               bytes and the type its extension names. */
+            if (method === "GET" && action === "raw") {
+              const dir = url.searchParams.get("dir")
+              const file = requiredString(url.searchParams.get("path"), "path")
+              sendBytes(
+                response,
+                dir === null
+                  ? await library.readBytes(
+                      requiredString(url.searchParams.get("name"), "name"),
+                      file
+                    )
+                  : await readBytesInDirectory(dir, file),
+                file
+              )
               return
             }
 

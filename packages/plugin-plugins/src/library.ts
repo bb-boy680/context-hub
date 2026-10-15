@@ -126,6 +126,80 @@ export async function packContentsIn(dir: string): Promise<PackContents> {
   return call<PackContents>(`${ENDPOINT}?action=contents&dir=${encodeURIComponent(dir)}`)
 }
 
+/** The file a pack says what it is for in, which is what a cover falls back to. */
+export const README_FILE = "README.md"
+
+/**
+ * Where a pack's own pictures are readable, as the prefix a document's relative
+ * references resolve under.
+ *
+ * A README points at the pictures beside it — `assets/logo.png` — and those are
+ * the pack's files, so they are served by the same route its text is read from,
+ * out of whichever of the two copies answers for this pack. A pack the hub
+ * neither holds nor can name a directory for has nowhere to read one from, which
+ * is what leaves such a document's pictures unresolved.
+ */
+export function packImageBase(plugin: PluginRow): string | undefined {
+  const where = plugin.stored
+    ? `name=${encodeURIComponent(plugin.id)}`
+    : plugin.directory === undefined
+      ? undefined
+      : `dir=${encodeURIComponent(plugin.directory)}`
+  return where === undefined ? undefined : `${ENDPOINT}?action=raw&${where}&path=`
+}
+
+/**
+ * One pack's own README, for a cover that has no picture to show.
+ *
+ * A pack is read where it lives, by the same rule its files panel uses: out of
+ * the hub's own copy when it holds one, and otherwise out of the directory an
+ * agent reads it in. A pack the hub neither holds nor can name a directory for
+ * has no README to show, which is not a read that can fail.
+ *
+ * Nothing is cached: a row carries no revision to key a cache on, so a pack
+ * updated while this session is open would keep drawing the text it replaced.
+ *
+ * @param plugin — the row whose README is shown.
+ * @returns the text; `undefined` while it is still being read, `null` when the
+ * pack has none to show.
+ */
+export function usePackReadme(plugin: PluginRow): string | null | undefined {
+  /* Where this pack is read from — its own directory, or the hub's copy by name
+     — which is the same pair of places its files panel reads. */
+  const dir = plugin.stored ? null : (plugin.directory ?? null)
+  const read = React.useCallback(
+    () => (dir === null ? packFile(plugin.id, README_FILE) : packFileIn(dir, README_FILE)),
+    [dir, plugin.id]
+  )
+  const [text, setText] = React.useState<string | null | undefined>(undefined)
+
+  /* Every surface showing a pack is keyed by the pack, so this only runs again
+     when the same pack starts being read from somewhere else — which is what
+     adopting one does. */
+  React.useEffect(() => {
+    let live = true
+    /* The read is queued rather than started in the effect's own body, because a
+       state update there is what the hooks lint refuses. */
+    queueMicrotask(() => {
+      if (!live) return
+      void read()
+        .then((body) => {
+          if (live) setText(body)
+        })
+        /* A README that cannot be read is one this cover has none of; what
+           stopped the read is the files panel's to say. */
+        .catch(() => {
+          if (live) setText(null)
+        })
+    })
+    return () => {
+      live = false
+    }
+  }, [read])
+
+  return text
+}
+
 async function call<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",

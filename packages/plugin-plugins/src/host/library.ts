@@ -59,6 +59,13 @@ export interface PluginLibrary {
   list(): Promise<PluginRecord[]>
   /** Read one text file inside a pack. */
   read(name: string, file: string): Promise<string>
+  /**
+   * One file inside a pack as the bytes it is.
+   *
+   * A pack's own pictures are read this way: a document that points at them
+   * needs the file itself, not a decoding of it.
+   */
+  readBytes(name: string, file: string): Promise<Buffer>
   /** One pack's files, in path order. */
   files(name: string): Promise<PackFileEntry[]>
   /** The hash of one pack's files as they are now. */
@@ -182,20 +189,43 @@ export function listDirectory(dir: string): Promise<PackFileEntry[]> {
 }
 
 /**
- * Read one text file inside a directory.
+ * One file's path inside a directory, refused when it climbs out of it.
  *
  * The path is checked against the directory before anything is opened: a pack is
- * somebody else's directory, and the panel asks for a path by name.
+ * somebody else's directory, and a reader asks for a path by name.
  *
  * @throws {Error} when the path climbs out of the directory or is absolute.
  */
-export async function readInDirectory(dir: string, file: string): Promise<string> {
+function resolveInDirectory(dir: string, file: string): string {
   const target = path.join(dir, file)
   const relative = path.relative(dir, target)
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error(`"${file}" escapes the directory`)
   }
-  return fs.readFile(target, "utf8")
+  return target
+}
+
+/**
+ * Read one text file inside a directory.
+ *
+ * @throws {Error} when the path climbs out of the directory or is absolute.
+ */
+export async function readInDirectory(dir: string, file: string): Promise<string> {
+  return fs.readFile(resolveInDirectory(dir, file), "utf8")
+}
+
+/**
+ * Read one file inside a directory as the bytes it is.
+ *
+ * Text and bytes are two reads rather than one, because a caller that shows a
+ * file and a caller that serves it disagree about what to do with a file this
+ * build cannot decode: the first shows what it got, the second must not invent a
+ * replacement for bytes that are not text.
+ *
+ * @throws {Error} when the path climbs out of the directory or is absolute.
+ */
+export async function readBytesInDirectory(dir: string, file: string): Promise<Buffer> {
+  return fs.readFile(resolveInDirectory(dir, file))
 }
 
 /** Move a directory into place, falling back to a copy across a device boundary. */
@@ -345,6 +375,8 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
       }),
 
     read: (name, file) => readInDirectory(packDir(name), file),
+
+    readBytes: (name, file) => readBytesInDirectory(packDir(name), file),
 
     files: (name) => run(() => listDirectory(packDir(name))),
 

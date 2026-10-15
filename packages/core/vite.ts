@@ -49,7 +49,13 @@ const MIME_TYPES: Record<string, string> = {
   map: "application/json",
 }
 
-function contentTypeOf(file: string): string {
+/**
+ * One `Content-Type` for a stored file, from its extension.
+ *
+ * Exported because a second bridge serves files of its own — a pack's pictures —
+ * and two tables would drift into answering differently for the same extension.
+ */
+export function contentTypeOf(file: string): string {
   const extension = file.slice(file.lastIndexOf(".") + 1).toLowerCase()
   return MIME_TYPES[extension] ?? "application/octet-stream"
 }

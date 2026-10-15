@@ -13,8 +13,7 @@
     "@workspace/core": "workspace:*",
     "@workspace/ui": "workspace:*",
     "lucide-react": "^1.48.0",
-    "react": "^19.2.8",
-    "shiki": "^4.5.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10",

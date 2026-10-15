@@ -32,7 +32,6 @@ import {
   MinusIcon,
   MoreHorizontalIcon,
   PlayIcon,
-  PlugIcon,
   PlusIcon,
   RefreshCwIcon,
   SparklesIcon,
@@ -54,6 +53,8 @@ import {
   packFileIn,
   packFiles,
   packFilesIn,
+  packImageBase,
+  usePackReadme,
   type PluginClient,
 } from "./library.ts"
 import { placeReached, SCOPES, scopeWords } from "./rows.ts"
@@ -90,6 +91,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
+import { Markdown } from "@workspace/ui/components/markdown"
 import { Spinner } from "@workspace/ui/components/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { toast } from "@workspace/ui/components/toast"
@@ -114,15 +116,36 @@ function mediaKind(src: string): "image" | "video" {
 function BundleStage({ plugin }: { plugin: PluginRow }) {
   return (
     <div className="flex size-full flex-col items-center justify-center gap-3 bg-surface-raised px-8 text-center">
-      <span className="flex size-14 items-center justify-center rounded-full bg-secondary">
-        <PlugIcon className="size-6 text-muted-foreground" aria-hidden />
-      </span>
       <span className="font-mono text-[13px] leading-[19px] text-muted-foreground">
         {plugin.name}
       </span>
       <span className="max-w-[520px] text-[13px] leading-[19px] text-copy">
         {plugin.description}
       </span>
+    </div>
+  )
+}
+
+/**
+ * The stage a pack with no picture fills with what it says about itself.
+ *
+ * It scrolls on the vertical axis only: `overflow-y-auto` alone computes
+ * `overflow-x` to `auto` as well, and a wrapped line that is one glyph too wide
+ * then paints a second scrollbar across the stage. The padding sits on the
+ * scroller so the text clears the thumb rather than running under it.
+ *
+ * @param imageBase — where this pack's own files are readable, so a document's
+ * pictures resolve to the pack rather than to the page it is drawn on.
+ */
+function ReadmeStage({ text, imageBase }: { text: string; imageBase: string | undefined }) {
+  return (
+    <div className="size-full scrollbar-gutter-stable overflow-x-hidden overflow-y-auto bg-surface-raised px-8 py-6">
+      <Markdown
+        imageBase={imageBase}
+        className="mx-auto max-w-[640px] text-[13px] leading-[21px] text-secondary-foreground"
+      >
+        {text}
+      </Markdown>
     </div>
   )
 }
@@ -189,6 +212,9 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
     active: 0,
   }))
   const { items, active } = state
+  /* A pack with no picture a person added still has something to show: what it
+     says about itself. Read once as the pane mounts, like the tabs beside it. */
+  const readme = usePackReadme(plugin)
   const [dragOver, setDragOver] = React.useState(false)
   const [addOpen, setAddOpen] = React.useState(false)
   /* The second entry of the upload menu opens its link field in place, rather
@@ -347,7 +373,17 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
       {/* The stage takes every pixel the strip and the hint leave behind, so a
           tall picture uses the full height instead of a fixed 16:9 band. */}
       <div className="relative flex min-h-0 w-full flex-1 items-center justify-center">
-        {current === undefined ? <BundleStage plugin={plugin} /> : <Slide item={current} />}
+        {current !== undefined ? (
+          <Slide item={current} />
+        ) : readme === undefined ? (
+          /* Still reading: the stage holds its own surface rather than drawing
+             the block below, which would only flash and be replaced. */
+          <div className="size-full bg-surface-raised" />
+        ) : readme === null ? (
+          <BundleStage plugin={plugin} />
+        ) : (
+          <ReadmeStage text={readme} imageBase={packImageBase(plugin)} />
+        )}
 
         {count > 1 ? (
           <>
