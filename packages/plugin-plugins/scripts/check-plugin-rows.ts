@@ -158,6 +158,15 @@ check(
   scanned[0]?.held[0]?.label === "Claude Code" && scanned[0]?.held[0]?.icon === mark,
   scanned[0]?.held[0]
 )
+/* An agent can hold a pack this hub never delivered, and such a pack came from
+   whatever marketplace supplied it. The agent's own id names that marketplace,
+   and it is the only thing its own commands take back — so it has to reach the
+   row, or the way out of that place cannot be built. */
+check(
+  "each agent's own id for the pack travels with its hold",
+  scanned[0]?.held.map((one) => one.id).join() === "hud@hud,hud@curated",
+  scanned[0]?.held.map((one) => one.id)
+)
 
 console.log("merging the library and the agents")
 
@@ -224,6 +233,78 @@ check(
     (key) => key
   )[0]?.source === "local"
 )
+/* The word above says which kind of source it is; the address is the one thing
+   a person can read back and open, so the two have to be read from the same
+   origin and cannot be spelled apart. */
+console.log("the address a row shows for its source")
+{
+  const address = (source: PluginRecord["source"]) =>
+    composeRows([{ ...record("one"), source }], [], "en", (key) => key)[0]?.sourceAddress
+  check(
+    "a repository reads back as the address it was collected from",
+    address({ kind: "url", url: "https://example.com/pack.git", revision: "abc123" }) ===
+      "https://example.com/pack.git",
+    address({ kind: "url", url: "https://example.com/pack.git", revision: "abc123" })
+  )
+  check(
+    "the ref it was taken at travels with it",
+    address({ kind: "url", url: "https://example.com/pack.git", ref: "v2", revision: "abc123" }) ===
+      "https://example.com/pack.git#v2"
+  )
+  check(
+    "a subdirectory pack names the directory inside the repository",
+    address({
+      kind: "git-subdir",
+      url: "https://example.com/mono.git",
+      path: "tools/mono",
+      revision: "abc123",
+    }) === "https://example.com/mono.git/tools/mono"
+  )
+  check(
+    "an archive reads back as its URL",
+    address({ kind: "archive", url: "https://x.test/a.zip" }) === "https://x.test/a.zip"
+  )
+  check(
+    "a folder here reads back as its path",
+    address({ kind: "local", path: "/packs/copied" }) === "/packs/copied"
+  )
+  check(
+    "a pack only an agent holds names the directory that agent reads it from",
+    composeRows([], scanned, "en", (key) => key)[0]?.sourceAddress === "/cache/hud/0.8.0",
+    composeRows([], scanned, "en", (key) => key)[0]?.sourceAddress
+  )
+  /* The files panel reads that directory, so the row has to carry it and not
+     only the word a person reads. A pack the hub holds needs no path: the host
+     resolves its own copy from the name. */
+  check(
+    "and the row carries that directory for the files panel to read",
+    composeRows([], scanned, "en", (key) => key)[0]?.directory === "/cache/hud/0.8.0",
+    composeRows([], scanned, "en", (key) => key)[0]?.directory
+  )
+  check(
+    "while a pack the hub holds carries none",
+    composeRows([record("stored")], [], "en", (key) => key)[0]?.directory === undefined
+  )
+}
+/* A check is a moment, not a state: a row nobody has asked about has no age to
+   print, and printing one would claim an answer that was never taken. */
+console.log("how long ago the source was last asked")
+{
+  const age = (checked?: PluginRecord["checked"]) =>
+    composeRows([{ ...record("one"), checked }], [], "en", (key) => key)[0]?.checkedAge
+  check("a pack nobody asked about carries no age", age() === "")
+  {
+    /* Away from zero, because a check a moment ago is worded "now"; the point
+       here is that the recorded moment is read, not which word it takes. */
+    const threeMinutesAgo = new Date(Date.now() - 3 * 60_000).toISOString()
+    const shown = age({ at: threeMinutesAgo, latest: "abc123", currentHash: "hash" })
+    check("one that was asked carries how long ago", shown?.includes("minute") === true, shown)
+  }
+  check(
+    "a pack only an agent holds has been asked about nothing",
+    composeRows([], scanned, "en", (key) => key)[0]?.checkedAge === ""
+  )
+}
 check(
   "a library row draws the mark the hub copied out of the pack",
   composeRows([{ ...record("stored"), icon: "assets/stored-logo-3f9a2b1c.png" }], [], "en", (key) => key)[0]?.icon ===

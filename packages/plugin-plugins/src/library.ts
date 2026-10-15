@@ -18,18 +18,16 @@ import type { ExtensionIcon } from "@workspace/extensions"
 import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
 
 import {
-  PLUGIN_MARKETPLACE_NAME,
   type PluginInstallReport,
   type PluginInstallScope,
 } from "./contract.ts"
 import {
   PLUGIN_SERVICE,
-  type PluginHeld,
   type PluginInstaller,
   type PluginService,
   type PluginTools,
 } from "./provider.ts"
-import type { PluginRecord, PluginUpdateSummary } from "./revision.ts"
+import type { PluginRecord, PluginUpdateCheck, PluginUpdateSummary } from "./revision.ts"
 import { collectScanned, composeRows, type ScannedPack } from "./rows.ts"
 import { probeInstallers } from "./scan.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
@@ -73,39 +71,38 @@ export interface PackUploadFile {
   base64: string
 }
 
-/** Whether a client's word for a scope is one this hub can deliver into. */
-function isScope(value: string): value is PluginInstallScope {
-  return value === "user" || value === "project" || value === "local"
+/** One pack's files, as the files panel lists them, out of the hub's own copy. */
+export async function packFiles(name: string): Promise<PluginFileEntry[]> {
+  return call<PluginFileEntry[]>(`${ENDPOINT}?action=files&name=${encodeURIComponent(name)}`)
 }
 
 /**
- * The packs this hub delivered, as the clients themselves report them: the
- * marketplace a pack was installed from is the hub's own when this side put it
- * there.
+ * One pack's files as the directory they sit in holds them.
+ *
+ * A pack no library record holds is not in the hub's own copy at all — it is a
+ * directory an agent reads in place — so its panel reads that directory.
  */
-function deliveredOf(packs: readonly PluginHeld[]): Record<string, PluginInstallScope[]> {
-  const held: Record<string, PluginInstallScope[]> = {}
-  for (const pack of packs) {
-    if (pack.marketplace !== PLUGIN_MARKETPLACE_NAME || !isScope(pack.scope)) continue
-    held[pack.name] = [...(held[pack.name] ?? []), pack.scope]
-  }
-  return held
-}
-
-/** One pack's files, as the files panel lists them. */
-export async function packFiles(id: string): Promise<PluginFileEntry[]> {
-  return call<PluginFileEntry[]>(`${ENDPOINT}?action=files&id=${encodeURIComponent(id)}`)
+export async function packFilesIn(dir: string): Promise<PluginFileEntry[]> {
+  return call<PluginFileEntry[]>(`${ENDPOINT}?action=files&dir=${encodeURIComponent(dir)}`)
 }
 
 /**
- * One file's text.
+ * One file's text, out of the hub's own copy.
  *
  * @returns the text, or null when the pack does not hold that file — an empty
  * panel is honest, where a stand-in would be invented content.
  */
-export async function packFile(id: string, path: string): Promise<string | null> {
+export async function packFile(name: string, path: string): Promise<string | null> {
   const answer = await call<{ text: string }>(
-    `${ENDPOINT}?action=file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(path)}`
+    `${ENDPOINT}?action=file&name=${encodeURIComponent(name)}&path=${encodeURIComponent(path)}`
+  ).catch(() => null)
+  return answer?.text ?? null
+}
+
+/** One file's text, out of the directory an agent reads the pack in. */
+export async function packFileIn(dir: string, path: string): Promise<string | null> {
+  const answer = await call<{ text: string }>(
+    `${ENDPOINT}?action=file&dir=${encodeURIComponent(dir)}&path=${encodeURIComponent(path)}`
   ).catch(() => null)
   return answer?.text ?? null
 }
@@ -145,16 +142,12 @@ export interface PluginClient {
    * names the reason rather than drawing itself as an agent holding nothing.
    */
   error?: string
-  /** The scopes each pack is already in. */
-  delivered: Record<string, PluginInstallScope[]>
 }
 
 /** The library as the page works with it. */
 export interface PluginLibrary {
   /** Every collected pack, newest change first. */
   rows: PluginRow[]
-  /** The packs already delivered to any client. */
-  delivered: readonly string[]
   /** The clients this hub can deliver to, with what each one holds. */
   clients: readonly PluginClient[]
   /** Where the packs live, for the page to show. */
@@ -169,6 +162,15 @@ export interface PluginLibrary {
   refresh(): Promise<void>
   /** Ask every source whether it moved. */
   checkUpdates(): Promise<PluginUpdateSummary>
+  /**
+   * Ask one pack's source whether it moved, and keep the answer.
+   *
+   * A person looking at one pack should not have to check the whole library; the
+   * answer lands on the record, so the row that shows it is read from there.
+   *
+   * @throws {Error} when the pack's source cannot be asked at all.
+   */
+  checkUpdate(name: string): Promise<PluginUpdateCheck>
   /** Take one pack to what its source holds. */
   update(name: string): Promise<PluginUpdateOutcome>
   /**
@@ -211,7 +213,7 @@ export interface PluginLibrary {
   setTags(name: string, tags: string[]): Promise<void>
   /** Deliver a pack to one client, at one scope. */
   install(name: string, client: string, scope: PluginInstallScope): Promise<void>
-  /** Take it back out of that client and scope. */
+  /** Take it back out of that client and scope, whatever marketplace it came from. */
   uninstall(name: string, client: string, scope: PluginInstallScope): Promise<void>
 }
 
@@ -280,7 +282,6 @@ export function usePluginLibrary(): PluginLibrary {
         switchable: one.installer.setEnabled !== undefined,
         available: one.available,
         ...(one.error === undefined ? {} : { error: one.error }),
-        delivered: deliveredOf(one.packs),
       }))
     )
     /* Only a client that answered contributes packs to the rows: one that failed
@@ -397,8 +398,6 @@ export function usePluginLibrary(): PluginLibrary {
 
   return {
     rows,
-    /* A pack counts as delivered when any client holds it anywhere. */
-    delivered: [...new Set(clients.flatMap((client) => Object.keys(client.delivered)))],
     clients,
     root,
     busy,
@@ -406,6 +405,7 @@ export function usePluginLibrary(): PluginLibrary {
     missing,
     refresh: read,
     checkUpdates: () => write<PluginUpdateSummary>({ action: "check-updates" }),
+    checkUpdate: (name) => write<PluginUpdateCheck>({ action: "check-update", name }),
     update: (name) => write<PluginUpdateOutcome>({ action: "update", name }),
 
     add: (source) => write<PluginCollected>({ action: "add", source }),
@@ -416,7 +416,18 @@ export function usePluginLibrary(): PluginLibrary {
     setTags: (name, tags) => write<void>({ action: "tags", name, tags }),
     install: (name, client, scope) =>
       deliver(client, (installer, tools) => installer.install(name, scope, tools)),
-    uninstall: (name, client, scope) =>
-      deliver(client, (installer, tools) => installer.remove(name, scope, tools)),
+    uninstall: (name, client, scope) => {
+      /* The agent's own id for the pack, not the pack's name: it names the
+         marketplace the pack really came from, and an agent holds packs this hub
+         never delivered. It answered with that id when it was asked what it
+         holds, so this side never has to guess at it. */
+      const own = scanned
+        .find((one) => one.name === name)
+        ?.held.find((one) => one.client === client)?.id
+      if (own === undefined) {
+        return Promise.reject(new Error(t("plugins.uninstall.unknown")))
+      }
+      return deliver(client, (installer, tools) => installer.remove(own, scope, tools))
+    },
   }
 }

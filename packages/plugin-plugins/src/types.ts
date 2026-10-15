@@ -26,6 +26,13 @@ export interface PluginHeldBy {
   icon: ExtensionIcon
   /** The scopes it is in there, in the agent's own words. */
   scopes: readonly string[]
+  /**
+   * The agent's own id for the pack, `<name>@<marketplace>`, which is what that
+   * agent's own commands take back. It names the marketplace the pack actually
+   * came from, so it is the only thing that can remove a pack this hub never
+   * delivered — the hub's own name would point at a copy that is not there.
+   */
+  id: string
 }
 
 export interface PluginRow {
@@ -39,6 +46,12 @@ export interface PluginRow {
   tags: string[]
   /** Where the pack came from. A pack only an agent holds came from a directory on this machine, because that directory is where the agent reads it. */
   source: PluginSource
+  /**
+   * The address the pack came from, as a person would read it back and open it:
+   * a repository, a URL, or a directory on this machine. Empty when the source
+   * names nothing to show.
+   */
+  sourceAddress: string
   /** How long ago it last moved, already worded for the locale it prints in. */
   updated: string
   /** The pack's own mark, as a URL the row draws beside its name. */
@@ -53,8 +66,16 @@ export interface PluginRow {
   hasSource?: boolean
   /** When the source was last asked, empty when it never was. */
   checkedAt?: string
+  /** How long ago the source was last asked, already worded; empty when it never was. */
+  checkedAge: string
   /** Whether the library holds the pack's files. A row an agent holds alone carries false, and adopting it is what that row offers. */
   stored: boolean
+  /**
+   * The directory an agent reads the pack in, as that agent named it. Present
+   * only for a pack no library record holds: the hub's own copy needs no path,
+   * and this is where that pack's files are read from.
+   */
+  directory?: string
   /** The agents holding the pack, in the order they were read; empty while none does. */
   held: readonly PluginHeldBy[]
 }

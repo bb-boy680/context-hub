@@ -20,7 +20,7 @@ import { resolveHubHome } from "@workspace/core/host/home"
 
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
 import { describePack } from "./src/host/describe.ts"
-import { createFsPluginLibrary } from "./src/host/library.ts"
+import { createFsPluginLibrary, listDirectory, readInDirectory } from "./src/host/library.ts"
 import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
 import { hasProgram, runProgram } from "./src/host/program.ts"
 import { createPluginProbe } from "./src/host/probe.ts"
@@ -118,18 +118,31 @@ export function pluginLibrary(
               return
             }
 
-            /* GET /hub/plugins?action=files&name= — one pack's files. */
+            /* One pack's files. `name` reads a pack this hub holds, `dir` reads
+               one an agent keeps in place — a pack the hub never collected is
+               still a directory with files in it, and its panel reads that. */
             if (method === "GET" && action === "files") {
-              const name = requiredString(url.searchParams.get("name"), "name")
-              sendJson(response, 200, await library.files(name))
+              const dir = url.searchParams.get("dir")
+              sendJson(
+                response,
+                200,
+                dir === null
+                  ? await library.files(requiredString(url.searchParams.get("name"), "name"))
+                  : await listDirectory(dir)
+              )
               return
             }
 
-            /* GET /hub/plugins?action=file&name=&path= — one file's text. */
+            /* One file's text, from whichever of the two the caller named. */
             if (method === "GET" && action === "file") {
-              const name = requiredString(url.searchParams.get("name"), "name")
+              const dir = url.searchParams.get("dir")
               const file = requiredString(url.searchParams.get("path"), "path")
-              sendJson(response, 200, { text: await library.read(name, file) })
+              sendJson(response, 200, {
+                text:
+                  dir === null
+                    ? await library.read(requiredString(url.searchParams.get("name"), "name"), file)
+                    : await readInDirectory(dir, file),
+              })
               return
             }
 
@@ -175,6 +188,14 @@ export function pluginLibrary(
                 return
               case "check-updates":
                 sendJson(response, 200, await probe.checkAll(await library.list()))
+                return
+              /* One pack, for the panel that is looking at that one. */
+              case "check-update":
+                sendJson(
+                  response,
+                  200,
+                  await probe.checkOne(await library.list(), requiredString(body.name, "name"))
+                )
                 return
               case "update":
                 sendJson(response, 200, await updater.update(requiredString(body.name, "name")))

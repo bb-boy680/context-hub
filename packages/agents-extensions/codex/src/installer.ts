@@ -127,7 +127,10 @@ export const codexInstaller: PluginInstaller = {
   },
 
   async remove(id, _scope, tools) {
-    await tools.run(PROGRAM, ["plugin", "remove", `${id}@${MARKETPLACE}`, JSON_FLAG])
+    /* The id is the client's own, and it names the marketplace the pack really
+       came from: a pack this hub never delivered was installed from somewhere
+       else, and this hub's own name would point at a copy that is not there. */
+    await tools.run(PROGRAM, ["plugin", "remove", id, JSON_FLAG])
     return { message: `${id} removed from Codex` }
   },
 }

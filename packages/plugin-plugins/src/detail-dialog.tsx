@@ -6,36 +6,48 @@
  * disk, because nothing in this module writes a pack's directory; the files
  * panel reads what the pack actually holds from the host, and shows nothing when
  * it cannot be read rather than standing something in.
+ *
+ * A pack has no single place it is installed in, so the panel lists them all —
+ * the hub's own library first, then one row per agent, under the scope that
+ * names it — and each row carries its own way in or out.
  */
 import {
   ArrowLeftIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardPasteIcon,
+  ExternalLinkIcon,
   FileTextIcon,
   ImageIcon,
   ImagePlusIcon,
+  LibraryIcon,
   LinkIcon,
+  MinusIcon,
   MoreHorizontalIcon,
   PlayIcon,
   PlugIcon,
   PlusIcon,
+  RefreshCwIcon,
+  Trash2Icon,
   UploadIcon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
-import { PluginActions } from "./install-actions.tsx"
+import { UpdateAction } from "./install-actions.tsx"
 import { PluginTile } from "./parts.tsx"
-import { packFile, packFiles, type PluginClient } from "./library.ts"
+import { packFile, packFileIn, packFiles, packFilesIn, type PluginClient } from "./library.ts"
+import { SCOPES_OF } from "./rows.ts"
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
 import {
   CodeCard,
   DialogSplit,
+  PlaceList,
   TagEditor,
+  type PlaceOption,
 } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
@@ -52,6 +64,17 @@ import {
 } from "@workspace/ui/components/popover"
 import { Spinner } from "@workspace/ui/components/spinner"
 import { toast } from "@workspace/ui/components/toast"
+import type { AssetScope } from "@workspace/extensions"
+
+/** The two scope groups a panel lists places under, in the order it reads them. */
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
+
+/** The words each scope wears, matching the menu the list page's rows open. */
+const SCOPE_LABELS: Record<string, string> = {
+  user: "plugins.scope.user",
+  project: "plugins.scope.project",
+  local: "plugins.scope.local",
+}
 
 /** One picture or video on the stage. */
 interface MediaItem {
@@ -511,6 +534,328 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** The pill a place row's own action wears, in the panel's 30px measure. */
+const placePill =
+  "h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
+
+/**
+ * Where a browser can read the recorded address, when it names something
+ * public: a URL as it stands, or the `owner/repo` shorthand the add dialog
+ * takes. A directory on this machine stays plain text — there is nothing to
+ * open, and it is not a location any browser knows.
+ */
+function sourceHref(address: string): string | null {
+  if (/^https?:\/\//i.test(address)) return address
+  if (/^[\w.-]+\/[\w.-]+$/.test(address)) return `https://github.com/${address}`
+  return null
+}
+
+/**
+ * The source line for a pack the hub holds: the address it was collected from,
+ * and the one action that follows from it.
+ *
+ * Asking a source means reading it, so nothing runs on its own — a person asks,
+ * and the last recorded answer seeds what this row shows until the next one.
+ * That answer is on the record rather than in this component, because the list
+ * pages read the same one.
+ */
+function SourceSection({
+  plugin,
+  busy,
+  onCheck,
+  onUpdate,
+}: {
+  plugin: PluginRow
+  busy: boolean
+  onCheck: () => Promise<void>
+  onUpdate: () => void
+}) {
+  const { t } = useI18n()
+  const [checking, setChecking] = React.useState(false)
+  const href = sourceHref(plugin.sourceAddress)
+
+  const check = () => {
+    setChecking(true)
+    onCheck().catch((failure: unknown) => {
+      /* The row falls back to what it already knew; why the source could not be
+         asked is said the way every other refusal is. */
+      toast.add({
+        type: "error",
+        title: failure instanceof Error ? failure.message : String(failure),
+      })
+    }).finally(() => setChecking(false))
+  }
+
+  /* Nothing recorded where these files came from — a pack written here, or
+     dropped in by hand — so there is no line to show; the heading beside the
+     pack's name already says it came from this machine. */
+  if (plugin.sourceAddress === "") return null
+
+  const outdated = plugin.outdated === true
+  const modified = plugin.modified === true
+  const status =
+    plugin.hasSource !== true
+      ? t("plugins.update.unanswerable")
+      : checking
+        ? t("plugins.update.checking")
+        : plugin.checkedAt === undefined || plugin.checkedAt === ""
+          ? null
+          : outdated
+            ? t("plugins.update.available")
+            : modified
+              ? t("plugins.update.edited")
+              : t("plugins.update.current")
+
+  return (
+    <div className="flex flex-col gap-1.5 border-b border-border py-2.5">
+      <div className="flex h-[30px] items-center justify-between gap-2">
+        <span className="text-[12.5px] text-muted-foreground">
+          {t("plugins.detail.source")}
+        </span>
+        {/* A source that cannot be asked gets no button, rather than one that
+            never does anything. */}
+        {plugin.hasSource !== true ? null : outdated ? (
+          <UpdateAction plugin={plugin} busy={busy} onUpdate={onUpdate} />
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy || checking}
+            aria-label={`${t("plugins.update.check")} ${plugin.name}`}
+            onClick={check}
+            className={`${placePill} border-border bg-transparent text-foreground hover:bg-muted dark:border-input dark:bg-transparent`}
+          >
+            <RefreshCwIcon className={`size-[13px] ${checking ? "animate-spin" : ""}`} />
+            {t("plugins.update.check")}
+          </Button>
+        )}
+      </div>
+      {href === null ? (
+        <span className="truncate font-mono text-[12.5px] text-muted-foreground">
+          {plugin.sourceAddress}
+        </span>
+      ) : (
+        <a
+          href={href}
+          target="_blank"
+          rel="noreferrer"
+          className="flex h-[17px] min-w-0 items-center gap-1.5 font-mono text-[12.5px] text-primary hover:underline"
+        >
+          <span className="truncate">{plugin.sourceAddress}</span>
+          <ExternalLinkIcon className="size-[13px] shrink-0" />
+        </a>
+      )}
+      {status === null ? null : (
+        <span className="truncate text-[12px] text-muted-soft">{status}</span>
+      )}
+      {plugin.checkedAge === "" ? null : (
+        <span className="truncate text-[12px] text-muted-soft">
+          {t("plugins.update.lastChecked").replace("{age}", plugin.checkedAge)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Where this pack can be, and the way into and out of each place: the hub's own
+ * library first, then one row per agent under the scope that names it.
+ *
+ * A place is one agent, not one of that agent's scopes. An agent that keeps
+ * packs in two places inside a repository reads as one row saying both, and the
+ * row's action is about the row: installing puts the pack in each of them, and
+ * removing takes it back out of the ones that hold it. The finer choice — one
+ * scope at a time — is what the list page's own row menu is for.
+ */
+function PlacesSection({
+  plugin,
+  clients,
+  root,
+  busy,
+  onAdopt,
+  onInstall,
+  onUninstall,
+}: {
+  plugin: PluginRow
+  clients: readonly PluginClient[]
+  /** Where the hub's own library sits, as the panel spells it. */
+  root: string
+  busy: boolean
+  onAdopt: () => void
+  onInstall: (client: string, scope: PluginInstallScope) => void
+  onUninstall: (client: string, scope: PluginInstallScope) => void
+}) {
+  const { t } = useI18n()
+  /* The library is one of the places a pack can be, so it is one of the count.
+     It counts where the pack really is, whether or not this hub put it there. */
+  const installed = plugin.held.length + (plugin.stored ? 1 : 0)
+
+  /* The scopes of this agent that this group stands for, in the agent's own
+     order. */
+  const scopesIn = (client: PluginClient, scope: AssetScope): PluginInstallScope[] =>
+    client.scopes.filter((one) => SCOPES_OF[scope].includes(one))
+  /* What this agent holds in this group, in its own words — not what this hub
+     delivered to it. A pack the agent got from some other marketplace is just as
+     installed, and its row has to say so and offer the way out. */
+  const heldIn = (client: PluginClient, scope: AssetScope): string[] =>
+    (plugin.held.find((one) => one.client === client.id)?.scopes ?? []).filter((one) =>
+      SCOPES_OF[scope].includes(one)
+    )
+  /* Why this row cannot be taken at all: an agent that is not on this machine,
+     or one whose own list could not be read — the second holds an unknown set of
+     packs, which is not the same as holding none. */
+  const blockedFor = (client: PluginClient): string | null =>
+    client.error !== undefined
+      ? t("plugins.client.unread")
+      : client.available
+        ? null
+        : t("plugins.client.absent")
+
+  /* The rows, and what each one's action must reach. An agent that keeps packs
+     in two places inside a repository reads as one row saying both, so its id is
+     not the agent's alone. */
+  const rows = SCOPES.map((scope) => ({
+    label: t(`plugins.detail.group.${scope}`),
+    options: clients
+      .filter((client) => scopesIn(client, scope).length > 0)
+      .map((client): PlaceOption => ({
+        id: `${scope}:${client.id}`,
+        icon: client.icon,
+        label: client.label,
+        /* The agents' own words for their scopes: this hub has no path for a
+           place to show, because an installer never names one. */
+        note: scopesIn(client, scope)
+          .map((one) => t(SCOPE_LABELS[one] ?? one))
+          .join(" · "),
+      })),
+  }))
+  const byRow = new Map(
+    rows.flatMap((group) =>
+      group.options.map((option) => {
+        const [scope, ...rest] = option.id.split(":")
+        return [option.id, { client: rest.join(":"), scope: scope as AssetScope }] as const
+      })
+    )
+  )
+
+  const rowAction = (option: PlaceOption) => {
+    const at = byRow.get(option.id)
+    if (at === undefined) return null
+    const client = clients.find((one) => one.id === at.client)
+    if (client === undefined) return null
+
+    const blocked = blockedFor(client)
+    if (blocked !== null) {
+      /* Nothing can be said about this agent's packs, so the row offers the way
+         in rather than claiming the pack is not there. */
+      return (
+        <Button
+          type="button"
+          variant="ghost"
+          disabled
+          title={blocked}
+          className={`${placePill} bg-secondary text-foreground`}
+        >
+          {t("plugins.action.install")}
+        </Button>
+      )
+    }
+
+    const held = heldIn(client, at.scope)
+    if (held.length > 0) {
+      return (
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          aria-label={`${t("plugins.action.uninstall")} ${client.label}`}
+          onClick={() => {
+            for (const one of held) onUninstall(client.id, one as PluginInstallScope)
+          }}
+          className={`${placePill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
+        >
+          <MinusIcon className="size-[13px]" />
+          {t("plugins.action.uninstall")}
+        </Button>
+      )
+    }
+    return (
+      <Button
+        type="button"
+        variant="ghost"
+        disabled={busy}
+        aria-label={`${t("plugins.action.install")} ${client.label}`}
+        onClick={() => {
+          for (const one of scopesIn(client, at.scope)) onInstall(client.id, one)
+        }}
+        className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
+      >
+        <PlusIcon className="size-[13px]" />
+        {t("plugins.action.install")}
+      </Button>
+    )
+  }
+
+  return (
+    <section className="flex flex-col gap-2.5">
+      <div className="flex items-center gap-1.5">
+        <span className="text-[13px] leading-[16px] font-semibold">
+          {t("plugins.detail.places")}
+        </span>
+        <span className="text-[12.5px] text-muted-foreground">
+          {t("plugins.detail.places.held").replace("{count}", String(installed))}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-2.5">
+        <li className="flex h-14 items-center gap-2.5">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-[8px] bg-surface-raised ring-1 ring-border ring-inset">
+            <LibraryIcon className="size-[15px] text-copy" aria-hidden />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="truncate text-[12.5px] leading-[15px] font-semibold">
+              {t("plugins.tab.library")}
+            </span>
+            {root === "" ? null : (
+              <span className="truncate font-mono text-[10.5px] leading-[14px] text-muted-foreground">
+                {/* A path reads with forward slashes whatever the platform the
+                    host runs on, as every other path this panel shows does. */}
+                {root.replaceAll("\\", "/")}
+              </span>
+            )}
+          </span>
+          {/* Held, the row says which copy this is; not held, it offers the way
+              in — the same action the unstored tab holds. */}
+          {plugin.stored ? (
+            <span className="flex h-[22px] shrink-0 items-center rounded-full px-[9px] text-[11px] font-medium text-copy ring-1 ring-border">
+              {t("plugins.place.body")}
+            </span>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={busy}
+              aria-label={`${t("plugins.action.adopt")} ${plugin.name}`}
+              onClick={onAdopt}
+              className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
+            >
+              <PlusIcon className="size-[13px]" />
+              {t("plugins.action.adopt")}
+            </Button>
+          )}
+        </li>
+        <PlaceList
+          groups={rows}
+          words={{
+            expand: (rest) => t("plugins.place.expand").replace("{count}", String(rest)),
+            collapse: t("plugins.place.collapse"),
+          }}
+          action={rowAction}
+        />
+      </ul>
+    </section>
+  )
+}
+
 function InfoPanel({
   plugin,
   clients,
@@ -518,16 +863,29 @@ function InfoPanel({
   onUpdate,
   onInstall,
   onUninstall,
+  onAdopt,
+  onCheckUpdate,
+  onDelete,
   onViewFiles,
   onTagsChange,
   tagSuggestions,
+  root,
 }: {
   plugin: PluginRow
   clients: readonly PluginClient[]
+  /** Where the hub's own library sits, for the places list to name. */
+  root: string
   busy: boolean
+  /** Take this pack to the revision its source holds. */
   onUpdate: () => void
   onInstall: (client: string, scope: PluginInstallScope) => void
   onUninstall: (client: string, scope: PluginInstallScope) => void
+  /** Take a pack only an agent holds into the library. */
+  onAdopt: () => void
+  /** Ask this pack's source whether it moved. */
+  onCheckUpdate: () => Promise<void>
+  /** Drop the pack from the library; copies an agent holds are left alone. */
+  onDelete: () => Promise<void>
   onViewFiles: () => void
   onTagsChange: (tags: string[]) => void
   /** Every category in use across the catalog, for the editor's quick picks. */
@@ -544,10 +902,16 @@ function InfoPanel({
             {plugin.name}
           </DialogTitle>
           <DialogDescription className="flex min-w-0 items-center gap-2 font-mono text-[12px] text-muted-foreground">
-            {t("plugins.version").replace("{version}", plugin.version)}
-            <span aria-hidden className="text-muted-soft">
-              ·
-            </span>
+            {/* A pack need not declare a revision, and a lone "v" reads as a
+                broken line rather than as a pack that named none. */}
+            {plugin.version === "" ? null : (
+              <>
+                {t("plugins.version").replace("{version}", plugin.version)}
+                <span aria-hidden className="text-muted-soft">
+                  ·
+                </span>
+              </>
+            )}
             {t(`plugins.source.${plugin.source}`)}
           </DialogDescription>
         </div>
@@ -570,48 +934,202 @@ function InfoPanel({
       <div className="flex min-h-0 min-w-0 flex-1 scrollbar-gutter-stable flex-col gap-[18px] overflow-y-auto px-5 pt-5 pb-5">
         <p className="text-[13px] leading-[1.5] text-copy">{plugin.description}</p>
 
-        <TagEditor
-          tags={plugin.tags}
-          suggestions={tagSuggestions}
-          onChange={onTagsChange}
-          words={{
-            add: t("plugins.detail.category.add"),
-            placeholder: t("plugins.detail.category.placeholder"),
-            remove: t("plugins.detail.category.remove"),
-          }}
+        {/* Categories are the hub's own filing of a pack, kept in the record the
+            library holds; a pack only an agent holds has no record to file. */}
+        {plugin.stored ? (
+          <TagEditor
+            tags={plugin.tags}
+            suggestions={tagSuggestions}
+            onChange={onTagsChange}
+            words={{
+              add: t("plugins.detail.category.add"),
+              placeholder: t("plugins.detail.category.placeholder"),
+              remove: t("plugins.detail.category.remove"),
+            }}
+          />
+        ) : null}
+
+        <PlacesSection
+          plugin={plugin}
+          clients={clients}
+          root={root}
+          busy={busy}
+          onAdopt={onAdopt}
+          onInstall={onInstall}
+          onUninstall={onUninstall}
         />
 
-        {/* When this last moved, and where it came from: both answer "what is
-            this pack", so they read as one group. */}
-        <div className="flex flex-col">
-          <span className="pb-1 text-[12px] font-semibold text-muted-soft">
-            {t("plugins.detail.about")}
-          </span>
-          <MetaRow label={t("plugins.detail.source")} value={t(`plugins.source.${plugin.source}`)} />
-          <MetaRow label={t("plugins.detail.updated")} value={plugin.updated} />
-        </div>
+        <SourceSection
+          plugin={plugin}
+          busy={busy}
+          onCheck={onCheckUpdate}
+          onUpdate={onUpdate}
+        />
+
+        {/* When this last moved, which answers the same "what is this pack"
+            question the source block above asks, so it sits with it. A pack the
+            hub never collected has moved nowhere here and carries no such time. */}
+        {plugin.updated === "" ? null : (
+          <div className="flex flex-col">
+            <MetaRow label={t("plugins.detail.updated")} value={plugin.updated} />
+          </div>
+        )}
       </div>
 
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-t border-border px-5">
+        {/* A pack's files are readable either way: the hub's own copy when it
+            holds one, and otherwise the directory an agent reads it in. */}
         <Button
           className="h-10 flex-1 gap-[7px] rounded-full text-[13.5px] font-semibold"
           onClick={onViewFiles}
+          disabled={!plugin.stored && plugin.directory === undefined}
+          title={
+            plugin.stored || plugin.directory !== undefined
+              ? undefined
+              : t("plugins.detail.files.unstored")
+          }
         >
           <FileTextIcon className="size-[15px]" />
           {t("plugins.detail.files.action")}
         </Button>
-        {/* Installing is another class of action, so it sits apart from the main
-            one rather than in the same visual slot. */}
-        <PluginActions
-          plugin={plugin}
-          clients={clients}
-          busy={busy}
-          onUpdate={onUpdate}
-          onInstall={onInstall}
-          onUninstall={onUninstall}
-        />
+        {/* Deleting is another class of action, so it sits apart from the main
+            one rather than in the same visual slot. Each side deletes what it
+            owns: the library its copy, and an agent's own install its copy. */}
+        <DeleteBubble
+          name={plugin.name}
+          text={
+            plugin.stored
+              ? t("plugins.delete.text")
+              : t("plugins.delete.agentText").replace(
+                  "{names}",
+                  plugin.held.map((one) => one.label).join(t("plugins.notice.separator"))
+                )
+          }
+          detail={
+            plugin.stored
+              ? root === "" || root === undefined
+                ? null
+                : root.replaceAll("\\", "/")
+              : /* A path reads with forward slashes whatever the platform the
+                   host runs on, as every other path this panel shows does. */
+                (plugin.directory?.replaceAll("\\", "/") ?? null)
+          }
+          onDelete={() => {
+            if (plugin.stored) return onDelete()
+            /* Nothing here is the hub's to drop: the pack lives in the agents
+               that hold it, so removing it is each of them taking it back out.
+               A pack can be in more than one of them, so this is one call per
+               place it is in, and the first refusal names what stopped it. */
+            return (async () => {
+              for (const hold of plugin.held) {
+                for (const scope of hold.scopes) {
+                  await onUninstall(hold.client, scope as PluginInstallScope)
+                }
+              }
+            })()
+          }}
+        >
+          <Button
+            variant="outline"
+            className="h-10 shrink-0 gap-[7px] rounded-full border-destructive/35 bg-transparent px-4 text-[13.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
+          >
+            <Trash2Icon className="size-[15px]" />
+            {t("plugins.detail.delete")}
+          </Button>
+        </DeleteBubble>
       </div>
     </div>
+  )
+}
+
+/**
+ * The question a person is asked before a pack goes, in the bubble the skills
+ * page asks it in: what goes, where it is, and the two ways out.
+ *
+ * The sentence is the caller's, because what "delete" means differs: the hub
+ * dropping its own copy, or an agent's own install taking the pack back out.
+ */
+function DeleteBubble({
+  name,
+  text,
+  detail,
+  onDelete,
+  children,
+}: {
+  name: string
+  /** What actually goes, ready to show. */
+  text: string
+  /** The directory it is, spelled as a person would write it; nothing when unknown. */
+  detail: string | null
+  onDelete: () => Promise<void>
+  children: React.ReactElement
+}) {
+  const { t } = useI18n()
+  const [open, setOpen] = React.useState(false)
+  const [busy, setBusy] = React.useState(false)
+
+  const confirm = () => {
+    setBusy(true)
+    void (async () => {
+      try {
+        await onDelete()
+      } catch (reason) {
+        /* The dialog unmounts on success, so a failure leaves this bubble up
+           with the button ready; why it failed is said where every other
+           refusal is. */
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
+        setBusy(false)
+      }
+    })()
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger render={children} />
+      <PopoverContent
+        side="top"
+        align="end"
+        sideOffset={7}
+        className="w-80 gap-3 rounded-md bg-popover p-4 shadow-none ring-1 ring-border"
+      >
+        <span className="text-[14px] leading-[18px] font-semibold">
+          {t("plugins.delete.title").replace("{name}", name)}
+        </span>
+        <span className="text-[12.5px] leading-[17px] text-copy">{text}</span>
+        {detail === null ? null : (
+          /* The directory reads as data, so it sits on its own quiet surface
+             rather than in the running text. A path carries no spaces, so
+             `break-all` is what keeps a deep one inside the bubble instead of
+             running out of it. */
+          <span className="rounded-md bg-surface-raised px-2.5 py-2 font-mono text-[11px] leading-[15px] break-all text-copy">
+            {detail}
+          </span>
+        )}
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            className="h-8 rounded-full border-border bg-transparent px-[14px] text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
+            disabled={busy}
+            onClick={() => setOpen(false)}
+          >
+            {t("plugins.action.cancel")}
+          </Button>
+          {/* Red stays a text and outline colour here: the destructive button is
+              outlined, so nothing in the panel is a red block. */}
+          <Button
+            variant="outline"
+            className="h-8 rounded-full border-destructive/35 bg-transparent px-[14px] text-[12.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive dark:border-destructive/35 dark:bg-transparent"
+            disabled={busy}
+            onClick={confirm}
+          >
+            {t("plugins.delete.confirm")}
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -626,14 +1144,28 @@ function FilesPanel({
   onBack: () => void
 }) {
   const { t } = useI18n()
+  /* Where this pack's files are read from: the hub's own copy when it holds one,
+     and otherwise the directory an agent reads it in. A pack the hub has no
+     record of is still a directory with files in it. */
+  const dir = plugin.stored ? null : (plugin.directory ?? null)
+  const list = React.useCallback(
+    () => (dir === null ? packFiles(plugin.id) : packFilesIn(dir)),
+    [dir, plugin.id]
+  )
+  const read = React.useCallback(
+    (path: string) =>
+      dir === null ? packFile(plugin.id, path) : packFileIn(dir, path),
+    [dir, plugin.id]
+  )
   /* A pack's files come from the host, so the panel shows what the pack holds
-     and nothing at all when it cannot be read. */
+     and nothing at all when it cannot be read. Another pack means another
+     directory, and the lightbox is keyed by the pack, so this starts empty. */
   const [files, setFiles] = React.useState<PluginFileEntry[]>([])
   React.useEffect(() => {
     let alive = true
     queueMicrotask(() => {
       if (!alive) return
-      void packFiles(plugin.id)
+      void list()
         .then((found) => {
           if (alive) setFiles(found)
         })
@@ -644,7 +1176,7 @@ function FilesPanel({
     return () => {
       alive = false
     }
-  }, [plugin.id])
+  }, [list])
   /* README.md is what a pack is for, so it is what opens first. */
   const fallback =
     files.find((file) => file.path === "README.md" && !file.directory)?.path ??
@@ -662,7 +1194,7 @@ function FilesPanel({
         setText("")
         return
       }
-      void packFile(plugin.id, current)
+      void read(current)
         .then((body) => {
           if (alive) setText(body ?? "")
         })
@@ -673,7 +1205,7 @@ function FilesPanel({
     return () => {
       alive = false
     }
-  }, [plugin.id, current])
+  }, [read, current])
   const loaded = text
   const name = current === null ? "" : (current.split("/").at(-1) ?? current)
 
@@ -749,20 +1281,28 @@ function FilesPanel({
 function PackLightbox({
   plugin,
   clients,
+  root,
   busy,
   tagSuggestions,
   onUpdate,
   onInstall,
   onUninstall,
+  onAdopt,
+  onCheckUpdate,
+  onDelete,
   onTagsChange,
 }: {
   plugin: PluginRow
   clients: readonly PluginClient[]
+  root: string
   busy: boolean
   tagSuggestions: string[]
   onUpdate: (plugin: PluginRow) => void
   onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
   onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onAdopt: (plugin: PluginRow) => void
+  onCheckUpdate: (plugin: PluginRow) => Promise<void>
+  onDelete: (plugin: PluginRow) => Promise<void>
   onTagsChange: (tags: string[]) => void
 }) {
   const [filesOpen, setFilesOpen] = React.useState(false)
@@ -774,24 +1314,33 @@ function PackLightbox({
         <InfoPanel
           plugin={plugin}
           clients={clients}
+          root={root}
           busy={busy}
           onUpdate={() => onUpdate(plugin)}
           onInstall={(client, scope) => onInstall(plugin, client, scope)}
           onUninstall={(client, scope) => onUninstall(plugin, client, scope)}
+          onAdopt={() => onAdopt(plugin)}
+          onCheckUpdate={() => onCheckUpdate(plugin)}
+          onDelete={() => onDelete(plugin)}
           onViewFiles={() => setFilesOpen(true)}
           onTagsChange={onTagsChange}
           tagSuggestions={tagSuggestions}
         />
       }
+      /* A pack's files are readable either way — the hub's own copy, or the
+         directory an agent reads it in — so the panel is there whenever one of
+         the two exists. */
       overlay={
-        <>
-          <div
-            className={`pointer-events-none absolute inset-0 z-10 bg-scrim transition-opacity duration-300 ${
-              filesOpen ? "opacity-100" : "opacity-0"
-            }`}
-          />
-          <FilesPanel plugin={plugin} open={filesOpen} onBack={() => setFilesOpen(false)} />
-        </>
+        plugin.stored || plugin.directory !== undefined ? (
+          <>
+            <div
+              className={`pointer-events-none absolute inset-0 z-10 bg-scrim transition-opacity duration-300 ${
+                filesOpen ? "opacity-100" : "opacity-0"
+              }`}
+            />
+            <FilesPanel plugin={plugin} open={filesOpen} onBack={() => setFilesOpen(false)} />
+          </>
+        ) : null
       }
     />
   )
@@ -801,11 +1350,15 @@ function PackLightbox({
 export function PluginDetailDialog({
   plugin,
   clients,
+  root,
   busy,
   tagSuggestions,
   onUpdate,
   onInstall,
   onUninstall,
+  onAdopt,
+  onCheckUpdate,
+  onDelete,
   onTagsChange,
   onOpenChange,
 }: {
@@ -813,12 +1366,19 @@ export function PluginDetailDialog({
   plugin: PluginRow | null
   /** The clients this hub can deliver to, with what each one already holds. */
   clients: readonly PluginClient[]
+  /** Where the hub's own library sits, for the places list to name. */
+  root: string
   busy: boolean
   /** Every category in use across the catalog, for the editor's quick picks. */
   tagSuggestions: string[]
   onUpdate: (plugin: PluginRow) => void
   onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
   onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onAdopt: (plugin: PluginRow) => void
+  /** Ask this pack's source whether it moved. */
+  onCheckUpdate: (plugin: PluginRow) => Promise<void>
+  /** Drop the pack from the library; copies an agent holds are left alone. */
+  onDelete: (plugin: PluginRow) => Promise<void>
   onTagsChange: (tags: string[]) => void
   onOpenChange: (open: boolean) => void
 }) {
@@ -829,11 +1389,15 @@ export function PluginDetailDialog({
           key={plugin.id}
           plugin={plugin}
           clients={clients}
+          root={root}
           busy={busy}
           tagSuggestions={tagSuggestions}
           onUpdate={onUpdate}
           onInstall={onInstall}
           onUninstall={onUninstall}
+          onAdopt={onAdopt}
+          onCheckUpdate={onCheckUpdate}
+          onDelete={onDelete}
           onTagsChange={onTagsChange}
         />
       )}

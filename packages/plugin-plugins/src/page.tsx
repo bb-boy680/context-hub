@@ -2,10 +2,10 @@
  * Plugins as a screen: one catalog, read either as a masonry grid of covers or
  * as a ledger, with a toolbar that narrows and pages the same set for both.
  *
- * This file holds the interface only. The rows come from `./sample.ts`, and the
- * one state the screen keeps is which packs read as installed; reading a pack's
- * own directory, installing it, and the detail view are the module's next step,
- * so nothing here opens a card.
+ * This file holds the interface only: the rows come from `./library.ts`, which
+ * folds the library's records and the clients' own answers in `./rows.ts`. Every
+ * row opens the detail lightbox — a pack no library record holds yet is read
+ * there too, and taking it in is what that lightbox offers.
  */
 import {
   CircleArrowUpIcon,
@@ -377,26 +377,22 @@ function PluginCard({
 
   return (
     <div
-      /* A pack only an agent holds has no files here to open, so the card is
-         plain unless the library holds it. */
-      role={plugin.stored ? "button" : undefined}
-      tabIndex={plugin.stored ? 0 : undefined}
-      aria-label={plugin.stored ? plugin.name : undefined}
-      onClick={plugin.stored ? onOpen : undefined}
+      /* A pack's own card opens the pack whether or not the library holds it: a
+         pack only an agent holds is still one a person wants to look at, and the
+         lightbox is where taking it in is offered. The card holds its own action
+         button, so it cannot be a real button; the two keys a button answers to
+         are handled here instead. */
+      role="button"
+      tabIndex={0}
+      aria-label={plugin.name}
+      onClick={onOpen}
       onKeyDown={(event) => {
-        /* The card holds its own action button, so it cannot be a real button;
-           the two keys a button answers to are handled here instead. */
-        if (!plugin.stored) return
         if (event.key !== "Enter" && event.key !== " ") return
         if (event.target !== event.currentTarget) return
         event.preventDefault()
         onOpen()
       }}
-      className={`mb-5 overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none ${
-        plugin.stored
-          ? "cursor-pointer hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
-          : ""
-      }`}
+      className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="relative w-full overflow-hidden bg-surface-raised"
@@ -1016,11 +1012,10 @@ export function PluginsPage() {
      page: a filter can take its row away while the lightbox is up. */
   const detail = catalog.find((plugin) => plugin.id === detailId) ?? null
 
-  /* Only a pack the library holds opens a detail view: its files panel reads
-     the files here, and a pack an agent holds alone has none. */
-  const openDetail = (plugin: PluginRow) => {
-    if (plugin.stored) setDetailId(plugin.id)
-  }
+  /* Every row opens: the lightbox says what a pack is either way, and for one the
+     hub does not hold yet it carries taking that pack in where the rest carry
+     the pack's own files. */
+  const openDetail = (plugin: PluginRow) => setDetailId(plugin.id)
 
   /* A category edited in the lightbox is that row's own from then on. */
   const setTags = (plugin: PluginRow, tags: string[]) => library.setTags(plugin.name, tags)
@@ -1322,11 +1317,15 @@ export function PluginsPage() {
       <PluginDetailDialog
         plugin={detail}
         clients={library.clients}
+        root={library.root}
         busy={library.busy}
         tagSuggestions={tagsOf(catalog)}
         onUpdate={(plugin) => actions.onUpdate(plugin)}
         onInstall={(plugin, client, scope) => actions.onInstall(plugin, client, scope)}
         onUninstall={(plugin, client, scope) => actions.onUninstall(plugin, client, scope)}
+        onAdopt={(plugin) => actions.onAdopt(plugin)}
+        onCheckUpdate={(plugin) => library.checkUpdate(plugin.name).then(() => undefined)}
+        onDelete={(plugin) => library.remove(plugin.name)}
         onTagsChange={(tags) => {
           if (detail !== null) setTags(detail, tags)
         }}

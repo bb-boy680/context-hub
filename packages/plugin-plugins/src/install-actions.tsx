@@ -105,7 +105,10 @@ function ScopeMenu({
         className="w-[272px] p-1"
       >
         {clients.map((client, index) => {
-          const held = client.delivered[plugin.id] ?? []
+          /* What this agent holds, in its own words — not what this hub delivered
+             to it. A pack the agent got from some other marketplace is just as
+             installed, and its row has to offer the way out. */
+          const here = plugin.held.find((one) => one.client === client.id)?.scopes ?? []
           const Mark = client.icon
           return (
             <div key={client.id}>
@@ -128,7 +131,7 @@ function ScopeMenu({
                 </DropdownMenuLabel>
               </DropdownMenuGroup>
               {client.scopes.map((scope) => {
-                const here = held.includes(scope)
+                const at = here.includes(scope)
                 return (
                   <DropdownMenuItem
                     key={`${client.id}:${scope}`}
@@ -137,13 +140,13 @@ function ScopeMenu({
                        time makes that several gestures instead of one. */
                     closeOnClick={false}
                     disabled={busy || !client.available}
-                    onClick={() => (here ? onUninstall(client.id, scope) : onInstall(client.id, scope))}
+                    onClick={() => (at ? onUninstall(client.id, scope) : onInstall(client.id, scope))}
                     className="gap-2.5 px-1.5 py-2 pl-4"
                   >
                     <span className="text-[13px] leading-[18px] font-semibold">
                       {t(SCOPE_LABELS[scope])}
                     </span>
-                    {here ? <CheckIcon className="ml-auto size-4 shrink-0 text-primary" /> : null}
+                    {at ? <CheckIcon className="ml-auto size-4 shrink-0 text-primary" /> : null}
                   </DropdownMenuItem>
                 )
               })}
@@ -180,8 +183,11 @@ function ChevronDownGlyph() {
  * The update action. A pack whose files were edited here is asked about first:
  * an update replaces them, and that is not something to discover afterwards.
  * One whose files match what landed needs no such confirmation.
+ *
+ * Exported because the lightbox carries it in the panel's own body rather than
+ * beside the place list, and a row's own line is not the place for it.
  */
-function UpdateAction({
+export function UpdateAction({
   plugin,
   busy,
   onUpdate,

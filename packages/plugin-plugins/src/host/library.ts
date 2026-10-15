@@ -170,6 +170,34 @@ async function walk(dir: string, at = dir): Promise<PackFileEntry[]> {
   return found
 }
 
+/**
+ * Every file of a directory, in path order, as the files panel lists them.
+ *
+ * It takes a directory rather than a pack, because a pack the hub collected and
+ * one an agent reads in place are read the same way — the difference is only
+ * which directory they are in.
+ */
+export function listDirectory(dir: string): Promise<PackFileEntry[]> {
+  return walk(dir)
+}
+
+/**
+ * Read one text file inside a directory.
+ *
+ * The path is checked against the directory before anything is opened: a pack is
+ * somebody else's directory, and the panel asks for a path by name.
+ *
+ * @throws {Error} when the path climbs out of the directory or is absolute.
+ */
+export async function readInDirectory(dir: string, file: string): Promise<string> {
+  const target = path.join(dir, file)
+  const relative = path.relative(dir, target)
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new Error(`"${file}" escapes the directory`)
+  }
+  return fs.readFile(target, "utf8")
+}
+
 /** Move a directory into place, falling back to a copy across a device boundary. */
 async function moveInto(from: string, to: string): Promise<void> {
   await fs.mkdir(path.dirname(to), { recursive: true })
@@ -316,16 +344,9 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
         return gone
       }),
 
-    async read(name, file) {
-      const target = path.join(packDir(name), file)
-      const relative = path.relative(packDir(name), target)
-      if (relative.startsWith("..") || path.isAbsolute(relative)) {
-        throw new Error(`"${file}" escapes the plugin directory`)
-      }
-      return fs.readFile(target, "utf8")
-    },
+    read: (name, file) => readInDirectory(packDir(name), file),
 
-    files: (name) => run(() => walk(packDir(name))),
+    files: (name) => run(() => listDirectory(packDir(name))),
 
     hash: (name) => folderHash(packDir(name)),
 

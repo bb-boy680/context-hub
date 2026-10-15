@@ -114,6 +114,16 @@ async function askSource(origin: PluginOrigin): Promise<Ask | null> {
 export interface PluginProbe {
   /** Ask about every pack that can be asked; the ones that cannot are listed apart. */
   checkAll(records: readonly PluginRecord[]): Promise<PluginUpdateSummary>
+  /**
+   * Ask about one pack, and keep the answer the way a batch would.
+   *
+   * A person looking at one pack should not have to check the whole library, and
+   * the answer is recorded either way: the row that shows it is read from the
+   * record, not from this answer.
+   *
+   * @throws {Error} when no record carries that name, or its source cannot be asked.
+   */
+  checkOne(records: readonly PluginRecord[], name: string): Promise<PluginUpdateCheck>
 }
 
 /** Create the probe that reads one library's packs. */
@@ -134,6 +144,20 @@ export function createPluginProbe(library: PluginLibrary): PluginProbe {
   }
 
   return {
+    async checkOne(records, name) {
+      const record = records.find((one) => one.name === name)
+      if (record === undefined) throw new Error(`no pack named ${name}`)
+      const answer = await checkOne(record)
+      await library.setChecks(
+        new Map([[record.name, {
+          at: new Date().toISOString(),
+          latest: answer.latestRevision,
+          currentHash: answer.currentHash,
+        }]])
+      )
+      return answer
+    },
+
     async checkAll(records) {
       const summary: PluginUpdateSummary = {
         checked: 0,

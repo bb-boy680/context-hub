@@ -34,7 +34,7 @@ import {
 import { modified, outdated } from "../src/revision.ts"
 import { createPluginCollector, type PackUpload } from "../src/host/collect.ts"
 import { fetchPlugin, stagingDir } from "../src/host/fetch.ts"
-import { createFsPluginLibrary } from "../src/host/library.ts"
+import { createFsPluginLibrary, listDirectory, readInDirectory } from "../src/host/library.ts"
 import { findLogo } from "../src/host/logo.ts"
 import { bestPicture, pictureOf } from "../src/pictures.ts"
 import { createPluginProbe } from "../src/host/probe.ts"
@@ -679,7 +679,6 @@ check("and the refusal names the address it came from", impostorName.includes(ro
 check("while the pack that was here is untouched", (await library.list()).length === 2)
 
 console.log("a pack's own logo")
-
 const logoPack = path.join(root, "logo-pack")
 await writePack(logoPack, "1.0.0")
 await writePicture(logoPack, "assets/logo.png", "the logo")
@@ -764,6 +763,51 @@ check(
     "acme-hello-logo-7e0b9e9c.png,other-pack-logo-e157ef72.png",
   await fs.readdir(path.join(logoHub, "assets"))
 )
+
+console.log("reading a directory an agent keeps a pack in")
+
+/* A pack no library record holds is read straight out of the directory an agent
+   named, so that directory is the boundary: everything the panel asks for is
+   resolved inside it, and a path that climbs out is refused rather than opened.
+   A pack is somebody else's directory, and the panel asks for paths by name. */
+{
+  const outside = path.join(root, "outside.txt")
+  await fs.writeFile(outside, "not part of any pack", "utf8")
+  const inside = path.join(root, "logo-pack")
+  await fs.writeFile(path.join(inside, "NOTE.md"), "# hi\n", "utf8")
+
+  const listed = await listDirectory(inside)
+  check(
+    "a directory lists what is in it",
+    listed.some((one) => one.path === "NOTE.md" && !one.directory),
+    listed.map((one) => one.path)
+  )
+  check(
+    "and reads a file inside it",
+    (await readInDirectory(inside, "NOTE.md")) === "# hi\n"
+  )
+  const climbed = await readInDirectory(inside, "../outside.txt").then(
+    () => null,
+    (error: unknown) => (error instanceof Error ? error.message : String(error))
+  )
+  check("a path that climbs out is refused", climbed !== null && climbed.includes("escapes"), climbed)
+  const absolute = await readInDirectory(inside, path.resolve(outside)).then(
+    () => null,
+    (error: unknown) => (error instanceof Error ? error.message : String(error))
+  )
+  check(
+    "and so is an absolute one, wherever it lands",
+    absolute !== null && absolute.includes("escapes"),
+    absolute
+  )
+  check(
+    "while the hub's own reader refuses the same way",
+    (await library.read("logo-pack", "../../outside.txt").then(
+      () => null,
+      (error: unknown) => (error instanceof Error ? error.message : String(error))
+    ))?.includes("escapes") === true
+  )
+}
 
 console.log("an asset store with a sink of its own")
 
@@ -929,6 +973,32 @@ check("and a commit above the tag is not an update to it", stillPinned.outdated 
    reporting a change every time. */
 const localCheck = await probe.checkAll([collected.record])
 check("a local directory is listed as unanswerable", localCheck.unanswerable.includes("acme-hello"), localCheck)
+
+/* One pack at a time, for the panel that is looking at that one: the same
+   answer as a batch would give, recorded the same way, and a refusal where a
+   batch would only have listed the pack as unanswerable. */
+console.log("asking about one pack")
+{
+  const one = await createPluginProbe(repoLibrary).checkOne(await repoLibrary.list(), "acme-hello")
+  check("asking about one pack reads its source", one.latestRevision !== "", one)
+  check(
+    "and the answer is recorded the way a batch records it",
+    (await repoLibrary.list())[0]?.checked?.latest === one.latestRevision,
+    (await repoLibrary.list())[0]?.checked
+  )
+  const named = await createPluginProbe(repoLibrary)
+    .checkOne(await repoLibrary.list(), "not-a-pack")
+    .then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error)))
+  check("a name no record carries is refused", named !== null && named.includes("not-a-pack"), named)
+  const unanswerable = await probe
+    .checkOne([collected.record], "acme-hello")
+    .then(() => null, (error: unknown) => (error instanceof Error ? error.message : String(error)))
+  check(
+    "and a source that cannot be asked is refused rather than guessed at",
+    unanswerable !== null && unanswerable.includes("cannot be asked"),
+    unanswerable
+  )
+}
 
 console.log("one directory of a repository")
 
@@ -1118,10 +1188,13 @@ const stub: PluginInstaller = {
     })
     return { message: `${name} at ${scope}` }
   },
-  remove: async (name, scope) => {
-    const at = stubHeld.findIndex((one) => one.name === name && one.scope === scope)
+  /* Installing names the pack, because this hub is the marketplace supplying it;
+     removing names the client's own id, because the client may well hold a copy
+     some other marketplace supplied, and only that id finds it. */
+  remove: async (id, scope) => {
+    const at = stubHeld.findIndex((one) => one.id === id && one.scope === scope)
     if (at !== -1) stubHeld.splice(at, 1)
-    return { message: `${name} out of ${scope}` }
+    return { message: `${id} out of ${scope}` }
   },
 }
 
@@ -1157,7 +1230,10 @@ check(
   ran.at(-1)?.join("|") === `stub|${libraryRoot}|one argument`,
   ran.at(-1)
 )
-await registered.remove("acme-hello", "user", tools)
+/* Removed by the id the client itself reported, which is what a client's own
+   commands take back — and the only thing that names a copy this hub never
+   delivered. */
+await registered.remove("acme-hello@stub", "user", tools)
 check("removing one scope leaves the other", (await heldScopes("acme-hello")) === "project")
 unregister()
 check("the disposer takes it back out", registry.installers().length === 0)

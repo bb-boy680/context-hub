@@ -165,10 +165,13 @@ export const claudeCodeInstaller: PluginInstaller = {
   },
 
   async remove(id, scope, tools) {
+    /* The id is the client's own, and it names the marketplace the pack really
+       came from: a pack this hub never delivered was installed from somewhere
+       else, and this hub's own name would point at a copy that is not there. */
     await tools.run(PROGRAM, [
       "plugin",
       "uninstall",
-      `${id}@${MARKETPLACE}`,
+      id,
       "--scope",
       scope,
       JSON_FLAG,

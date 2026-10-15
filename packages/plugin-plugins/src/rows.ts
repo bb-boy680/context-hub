@@ -16,6 +16,7 @@ import { assetRef } from "@workspace/core"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 
 import { installedRevision, type PluginOrigin } from "./contract.ts"
+import { formatPluginSource, originToSpec } from "./inspect.ts"
 import type { PluginHeld } from "./provider.ts"
 import type { PluginRecord } from "./revision.ts"
 import type { PluginHeldBy, PluginRow, PluginSource } from "./types.ts"
@@ -70,6 +71,9 @@ export function toRow(
     description: record.description,
     tags: record.tags,
     source: SOURCE_WORDS[record.source.kind],
+    /* The address as the person typed it back when the pack was collected, which
+       is the thing a "where did this come from" question is really asking. */
+    sourceAddress: formatPluginSource(originToSpec(record.source)),
     updated: ageOf(record.updatedAt, language, t),
     ...(record.icon === "" ? {} : { icon: assetRef(record.icon) }),
     ...(cover === undefined ? {} : { cover: assetRef(cover) }),
@@ -77,6 +81,9 @@ export function toRow(
     modified: current !== undefined && current !== record.hash,
     hasSource: installed !== null,
     checkedAt: record.checked?.at ?? "",
+    /* A pack nobody has asked about has no age to show; saying "never" would be
+       a claim about the source rather than about the asking. */
+    checkedAge: record.checked === undefined ? "" : ageOf(record.checked.at, language, t),
     stored: true,
     held,
   }
@@ -117,6 +124,8 @@ interface HeldBuilder {
   client: string
   label: string
   icon: ExtensionIcon
+  /** The client's own id for the pack, which is what its commands take back. */
+  id: string
   scopes: string[]
 }
 
@@ -153,6 +162,9 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
         client: answer.client,
         label: answer.label,
         icon: answer.icon,
+        /* The client's own id for the pack, which is the same in every scope it
+           holds it in. It is what that client's own commands take back. */
+        id: pack.id,
         scopes: [],
       }
       if (!found.scopes.includes(pack.scope)) found.scopes.push(pack.scope)
@@ -176,7 +188,13 @@ export function heldRow(pack: ScannedPack): PluginRow {
     /* Where this pack is: the directory the agent reads it from, which is on
        this machine. The hub has taken it from nowhere itself. */
     source: "local",
+    /* The directory the agent named, which is the only address this side knows —
+       and is what adopting it would collect from. */
+    sourceAddress: pack.source?.path ?? "",
+    ...(pack.source === undefined ? {} : { directory: pack.source.path }),
     updated: "",
+    /* Nothing has asked this pack about any source. */
+    checkedAge: "",
     /* A pack the hub has not taken in has no picture but its own, so that one
        fills both places: the tile, and the card's own box. Both are read from
        the asset library, which is where the reading of the pack put it. */

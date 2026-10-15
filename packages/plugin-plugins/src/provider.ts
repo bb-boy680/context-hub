@@ -125,9 +125,17 @@ export interface PluginInstaller {
    * that knows that name.
    */
   held(tools: PluginTools): Promise<PluginHeld[]>
-  /** Deliver one pack to this agent at one scope. */
-  install(id: string, scope: PluginInstallScope, tools: PluginTools): Promise<PluginInstallReport>
-  /** Take one pack back out of this agent at that scope. */
+  /** Deliver one pack to this agent at one scope, out of this hub's own library. */
+  install(name: string, scope: PluginInstallScope, tools: PluginTools): Promise<PluginInstallReport>
+  /**
+   * Take one pack back out of this agent at that scope.
+   *
+   * The id is the agent's own — `<name>@<marketplace>`, as the agent itself
+   * listed it — and not the pack's name. An agent holds packs this hub never
+   * delivered, and each was installed from the marketplace that supplied it, so
+   * naming this hub's own marketplace here would point at a copy that is not
+   * there and the removal would fail.
+   */
   remove(id: string, scope: PluginInstallScope, tools: PluginTools): Promise<PluginInstallReport>
   /**
    * Turn this agent's use of an installed pack on or off, without moving any
