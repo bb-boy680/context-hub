@@ -16,7 +16,9 @@ import type { IncomingMessage, ServerResponse } from "node:http"
 
 import { createAssetStore, type AssetSink, type AssetStore } from "@workspace/core"
 import { createFsAssetLibrary } from "@workspace/core/host"
+import { hostFolder } from "@workspace/core/host/fs-browse"
 import { resolveHubHome } from "@workspace/core/host/home"
+import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
 
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
 import { describePack } from "./src/host/describe.ts"
@@ -79,10 +81,29 @@ export function pluginLibrary(
   const assets =
     options.assets ??
     createAssetStore(createFsAssetLibrary(resolveHubHome(options.home)), options.sinks ?? [])
+  const home = resolveHubHome(options.home)
   const library = createFsPluginLibrary(options.home, assets)
   const collector = createPluginCollector(library)
   const probe = createPluginProbe(library)
   const updater = createPluginUpdater(library)
+  let store: ReturnType<typeof createFsWorkspaceStore> | null = null
+
+  /**
+   * The folder a client's own commands run in: the workspace in use, else the
+   * folder this host runs in.
+   *
+   * A client resolves its project files against the working directory — Claude
+   * Code writes `.claude/settings.json` where it was started — so an install
+   * into a workspace has to be started in that workspace. Started here instead,
+   * the dev server's own package becomes the project, and the pack lands in
+   * `apps/web` rather than in the folder a person picked.
+   */
+  const startFolder = async (): Promise<string> => {
+    store ??= createFsWorkspaceStore(home, { folder: await hostFolder() })
+    const page = await store.page()
+    const current = page.folders.find((folder) => folder.id === page.current)
+    return current?.path ?? (await hostFolder())
+  }
 
   return {
     name: "context-hub-plugin-library",
@@ -209,15 +230,16 @@ export function pluginLibrary(
                 await writeMarketplaceIndex(library.root, await library.list())
                 sendJson(response, 200, { root: library.root })
                 return
-              /* One program an installer asked for. The arguments are a list, so
-                 nothing here re-parses them; an exit code other than zero is the
-                 program's own answer, reported with what it printed. */
+              /* One program an installer asked for, started in the workspace in
+                 use. The arguments are a list, so nothing here re-parses them;
+                 an exit code other than zero is the program's own answer,
+                 reported with what it printed. */
               case "program": {
                 const program = requiredString(body.program, "program")
                 const args = Array.isArray(body.args)
                   ? body.args.filter((arg): arg is string => typeof arg === "string")
                   : []
-                const result = await runProgram(program, args)
+                const result = await runProgram(program, args, { cwd: await startFolder() })
                 if (result.exitCode !== 0) {
                   sendJson(response, 502, {
                     error: `${program} exited with ${String(result.exitCode)}: ${result.output}`,

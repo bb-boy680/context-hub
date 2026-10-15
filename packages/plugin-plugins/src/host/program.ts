@@ -38,9 +38,18 @@ export interface ProgramResult {
  *
  * @param program — the executable's name, resolved on `PATH`.
  * @param args — its arguments, in order; each is passed as one word.
+ * @param options.cwd — the directory to run it in. A client resolves its own
+ * project files against the working directory — Claude Code writes
+ * `.claude/settings.json` where it was started — so a command that installs into
+ * a workspace has to be started in that workspace rather than wherever this host
+ * happens to run. Omitted, the process's own directory is used.
  * @returns what it printed on standard output, and how it ended.
  */
-export function runProgram(program: string, args: readonly string[]): Promise<ProgramResult> {
+export function runProgram(
+  program: string,
+  args: readonly string[],
+  options: { cwd?: string } = {}
+): Promise<ProgramResult> {
   const line = [program, ...args].map(quote).join(" ")
   return new Promise((resolve) => {
     execFile(
@@ -50,6 +59,7 @@ export function runProgram(program: string, args: readonly string[]): Promise<Pr
         maxBuffer: 4 * 1024 * 1024,
         windowsHide: true,
         shell: true,
+        ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
       },
       (error, stdout, stderr) => {
         const output = `${String(stdout)}`.trim()

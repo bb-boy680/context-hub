@@ -37,6 +37,7 @@ import { fetchPlugin, stagingDir } from "../src/host/fetch.ts"
 import { createFsPluginLibrary, listDirectory, readInDirectory } from "../src/host/library.ts"
 import { findLogo } from "../src/host/logo.ts"
 import { bestPicture, pictureOf } from "../src/pictures.ts"
+import { runProgram } from "../src/host/program.ts"
 import { createPluginProbe } from "../src/host/probe.ts"
 import { createPluginUpdater } from "../src/host/update.ts"
 
@@ -806,6 +807,31 @@ console.log("reading a directory an agent keeps a pack in")
       () => null,
       (error: unknown) => (error instanceof Error ? error.message : String(error))
     ))?.includes("escapes") === true
+  )
+}
+
+console.log("a program runs in the folder it is given")
+
+/* A client resolves its project files against the working directory: Claude
+   Code writes `.claude/settings.json` where it was started. So an install aimed
+   at a workspace has to be started in that workspace, not in whichever package
+   this host happens to run from — otherwise the pack lands beside the dev
+   server instead of in the folder a person picked. */
+{
+  const where = path.join(root, "a-workspace")
+  await fs.mkdir(where, { recursive: true })
+  const says = ["-e", "process.stdout.write(process.cwd())"]
+  const here = await runProgram(process.execPath, says, { cwd: where })
+  check(
+    "a program started in a folder answers from that folder",
+    (await fs.realpath(here.output)) === (await fs.realpath(where)),
+    here.output
+  )
+  const home = await runProgram(process.execPath, says)
+  check(
+    "and one started with no folder answers from this host's own",
+    (await fs.realpath(home.output)) === (await fs.realpath(process.cwd())),
+    home.output
   )
 }
 
