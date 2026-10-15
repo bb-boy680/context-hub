@@ -16,10 +16,19 @@
  * time this extension reads nothing from that package: the registry to register
  * into and the tools to run a program with arrive through the `plugins` service.
  */
-import type { PluginInstallScope } from "@workspace/plugin-plugins/contract"
-import type { PluginHeld, PluginInstaller, PluginTools } from "@workspace/plugin-plugins/provider"
+import type {
+  PluginHeld,
+  PluginInstaller,
+  PluginPlace,
+  PluginSwitches,
+  PluginTools,
+} from "@workspace/plugin-plugins/provider"
 
-import { CLAUDE_CODE_ID } from "./locations.ts"
+import {
+  CLAUDE_CODE_ENABLED_KEY,
+  CLAUDE_CODE_ID,
+  CLAUDE_CODE_SETTINGS_FILE,
+} from "./locations.ts"
 
 /** The marketplace name the hub's library is registered under. */
 const MARKETPLACE = "context-hub"
@@ -28,11 +37,73 @@ const MARKETPLACE = "context-hub"
 const PROGRAM = "claude"
 const JSON_FLAG = "--json"
 
-/** The scopes this client installs into, in the order its own menu lists them. */
-/* The two places this hub can report on afterwards. Claude Code also has a
-   `local` scope, which writes a file the person keeps to themselves and this
-   side never reads, so nothing here offers it. */
-const SCOPES: readonly PluginInstallScope[] = ["user", "project"]
+/** The client's own name, as its rows read on both pages. */
+const LABEL = "Claude Code"
+
+/**
+ * The places this client keeps a pack in, in the order its own menu lists them.
+ *
+ * Both are switchable: each writes its own settings file, so switching one moves
+ * that file and nothing beside it. Claude Code also has a `local` scope, which
+ * writes a file the person keeps to themselves and this side never reads, so
+ * nothing here offers it.
+ */
+const PLACES: readonly PluginPlace[] = [
+  {
+    id: "claude-code-user",
+    label: LABEL,
+    scope: "global",
+    scopeWord: "user",
+    switchable: true,
+    file: CLAUDE_CODE_SETTINGS_FILE,
+  },
+  {
+    id: "claude-code-project",
+    label: LABEL,
+    scope: "workspace",
+    scopeWord: "project",
+    switchable: true,
+    file: CLAUDE_CODE_SETTINGS_FILE,
+    /* The repository's file decides over the machine's, so a pack the machine
+       switched on can still be switched off for one repository — which is why
+       this place is offered for a pack only the machine holds. */
+    overrides: ["user"],
+  },
+]
+
+/**
+ * What one place's settings file records about plugin enablement.
+ *
+ * Read where it sits rather than asked of the client: the client answers once
+ * per pack, so it cannot say which of two files a pack is on in. A file that is
+ * not there, or holds nothing this build can read, answers with nothing — the
+ * caller then has the client's own answer left to report.
+ *
+ * @param tools — the tools the installer was handed, which reach the files.
+ * @param place — the place whose file is read.
+ */
+async function switchesAt(
+  tools: PluginTools,
+  place: PluginPlace
+): Promise<Record<string, boolean>> {
+  const files = tools.files
+  if (files === null || place.file === undefined) return {}
+  const text = await files.read({ scope: place.scope, file: place.file }).catch(() => null)
+  if (text === null) return {}
+  try {
+    /* A byte-order mark is a file's own business, not JSON's. */
+    const document = JSON.parse(text.replace(/^\uFEFF/, "")) as Record<string, unknown>
+    const recorded = document[CLAUDE_CODE_ENABLED_KEY]
+    if (typeof recorded !== "object" || recorded === null) return {}
+    return Object.fromEntries(
+      Object.entries(recorded).filter((entry): entry is [string, boolean] => {
+        return typeof entry[1] === "boolean"
+      })
+    )
+  } catch {
+    return {}
+  }
+}
 
 /**
  * Register the library root as a marketplace, and report the root.
@@ -110,9 +181,6 @@ export function readHeld(output: string): PluginHeld[] {
       version: typeof entry.version === "string" ? entry.version : "",
       scope: entry.scope,
       enabled: entry.enabled === true,
-      /* The repository's own entry, which the client answers for the directory
-         it was asked in — the one this hub can name and write. */
-      workspaceEnabled: entry.projectEnabled === true,
       marketplace: entry.id.slice(at + 1),
       ...(path === undefined ? {} : { source: { kind: "local", path } }),
       pack: { name: "", version: "", description: "" },
@@ -142,13 +210,22 @@ async function withPacks(tools: PluginTools, packs: PluginHeld[]): Promise<Plugi
 /** Claude Code, as the plugins module uses it. */
 export const claudeCodeInstaller: PluginInstaller = {
   id: CLAUDE_CODE_ID,
-  label: "Claude Code",
-  scopes: SCOPES,
+  label: LABEL,
+  places: PLACES,
 
   available: (tools) => tools.has(PROGRAM),
 
   async held(tools) {
     return withPacks(tools, readHeld(await tools.run(PROGRAM, ["plugin", "list", JSON_FLAG])))
+  },
+
+  async switches(tools) {
+    /* Each place's file, read once and answered for every pack in it. */
+    const recorded: PluginSwitches = {}
+    for (const place of PLACES) {
+      recorded[place.scopeWord] = await switchesAt(tools, place)
+    }
+    return recorded
   },
 
   async install(id, scope, tools) {

@@ -10,13 +10,15 @@
  */
 import type { ExtensionIcon } from "@workspace/extensions"
 
-import type { PluginHeld } from "../src/provider.ts"
+import type { PluginClient } from "../src/library.ts"
+import type { PluginHeld, PluginPlace } from "../src/provider.ts"
 import type { PluginRecord } from "../src/revision.ts"
 import {
   collectScanned,
   composeRows,
   rowsForTab,
-  scopeReached,
+  placeReached,
+  placesShown,
   scopeWords,
   type ScannedAnswer,
 } from "../src/rows.ts"
@@ -58,6 +60,12 @@ const answers: ScannedAnswer[] = [
     client: "hub.target.claude-code",
     label: "Claude Code",
     icon: mark,
+    switches: {},
+    switches: {},
+    places: [
+      { id: "cc-user", label: "Claude Code", scope: "global", scopeWord: "user", switchable: true, file: ".claude/settings.json" },
+      { id: "cc-project", label: "Claude Code", scope: "workspace", scopeWord: "project", switchable: true, file: ".claude/settings.json" },
+    ],
     packs: [
       {
         name: "hud",
@@ -65,7 +73,6 @@ const answers: ScannedAnswer[] = [
         version: "0.8.0",
         scope: "user",
         enabled: true,
-        workspaceEnabled: true,
         marketplace: "hud",
         source: { kind: "local", path: "/cache/hud/0.8.0" },
         pack: {
@@ -81,7 +88,6 @@ const answers: ScannedAnswer[] = [
         version: "0.8.0",
         scope: "project",
         enabled: true,
-        workspaceEnabled: true,
         marketplace: "hud",
         source: { kind: "local", path: "/cache/hud/0.8.0" },
         pack: {
@@ -97,6 +103,10 @@ const answers: ScannedAnswer[] = [
     client: "hub.target.codex",
     label: "Codex",
     icon: mark,
+    switches: {},
+    places: [
+      { id: "codex-user", label: "Codex", scope: "global", scopeWord: "user", switchable: false },
+    ],
     packs: [
       {
         name: "hud",
@@ -106,7 +116,6 @@ const answers: ScannedAnswer[] = [
         /* The same pack, off in this agent and on in the other one: the
            repository's switch is its own, which is what the folding keeps apart. */
         enabled: false,
-        workspaceEnabled: false,
         marketplace: "curated",
         source: { kind: "local", path: "/codex/hud" },
         pack: { name: "", version: "", description: "" },
@@ -125,14 +134,20 @@ check(
   scanned[0]?.held.map((one) => one.client)
 )
 check(
-  "the scopes one agent holds it in are gathered",
-  scanned[0]?.held[0]?.scopes.join() === "user,project",
-  scanned[0]?.held[0]?.scopes
+  "the places one agent holds it in are gathered",
+  scanned[0]?.held[0]?.places.map((one) => one.scope).join() === "user,project",
+  scanned[0]?.held[0]?.places.map((one) => one.scope)
 )
 check(
-  "and the agent's own switch travels with the hold",
-  scanned[0]?.held[0]?.enabled === true && scanned[0]?.held[1]?.enabled === false,
-  scanned[0]?.held.map((one) => one.enabled)
+  "each place carries the group its own client declared, not a word this hub knows",
+  scanned[0]?.held[0]?.places.map((one) => one.group).join() === "global,workspace",
+  scanned[0]?.held[0]?.places.map((one) => one.group)
+)
+check(
+  "and the file each place records travels with the hold",
+  scanned[0]?.held[0]?.places.every((one) => one.enabled) === true &&
+    scanned[0]?.held[1]?.places.every((one) => one.enabled) === false,
+  scanned[0]?.held.map((one) => one.places.map((place) => place.enabled))
 )
 check(
   "the pack's own version answers where it declares one",
@@ -146,6 +161,11 @@ check(
       client: "hub.target.codex",
       label: "Codex",
       icon: mark,
+      switches: {},
+      switches: {},
+      places: [
+        { id: "codex-user", label: "Codex", scope: "global", scopeWord: "user", switchable: false },
+      ],
       packs: [
         {
           name: "bare",
@@ -393,22 +413,142 @@ console.log("which place a group's action reaches")
 
 /* One scope per group: no agent can hold a pack in two places at once, and a
    click that wrote both would be a click that wrote a place nobody chose. */
+const ccPlaces: PluginPlace[] = [
+  { id: "cc-user", label: "Claude Code", scope: "global", scopeWord: "user", switchable: true },
+  { id: "cc-project", label: "Claude Code", scope: "workspace", scopeWord: "project", switchable: true },
+]
+const onlyUser: PluginPlace[] = [ccPlaces[0] as PluginPlace]
 check(
-  "the workspace group reaches the repository's scope",
-  scopeReached(["user", "project"], "workspace") === "project",
-  scopeReached(["user", "project"], "workspace")
+  "the workspace group reaches the repository's place",
+  placeReached(ccPlaces, "workspace")?.scopeWord === "project",
+  placeReached(ccPlaces, "workspace")?.scopeWord
 )
 check(
   "the global group reaches the machine-wide one",
-  scopeReached(["user", "project"], "global") === "user",
-  scopeReached(["user", "project"], "global")
+  placeReached(ccPlaces, "global")?.scopeWord === "user",
+  placeReached(ccPlaces, "global")?.scopeWord
 )
 check(
   "an agent keeping nothing in the group reaches nothing",
-  scopeReached(["user"], "workspace") === undefined &&
-    scopeReached(["project"], "global") === undefined,
-  [scopeReached(["user"], "workspace"), scopeReached(["project"], "global")]
+  placeReached(onlyUser, "workspace") === undefined,
+  placeReached(onlyUser, "workspace")
 )
+check(
+  "a place whose file is silent takes the agent's own answer",
+  collectScanned([
+    {
+      client: "hub.target.claude-code",
+      label: "Claude Code",
+      icon: mark,
+      switches: { project: { "hud@hud": false } },
+      places: [
+        {
+          id: "cc-project",
+          label: "Claude Code",
+          scope: "workspace",
+          scopeWord: "project",
+          switchable: true,
+        },
+      ],
+      packs: [
+        {
+          name: "hud",
+          id: "hud@hud",
+          version: "0.8.0",
+          scope: "project",
+          enabled: true,
+          marketplace: "hud",
+          pack: { name: "", version: "", description: "" },
+        },
+      ],
+    },
+  ])[0]?.held[0]?.places[0]?.enabled === false,
+  "the file said off, so the place reads off even though the agent's answer is on"
+)
+
+console.log("what each place's switch shows")
+
+/* The agent's answer is one value with its whole file chain resolved, so it
+   cannot say what a narrower place answers: the row's line and the switch beside
+   it have to read the place's own file, or a place just switched off reads as
+   still on. */
+{
+  const clients: PluginClient[] = [
+    {
+      id: "hub.target.claude-code",
+      label: "Claude Code",
+      icon: mark,
+      places: [
+        {
+          id: "cc-user",
+          label: "Claude Code",
+          scope: "global",
+          scopeWord: "user",
+          switchable: true,
+        },
+        {
+          id: "cc-project",
+          label: "Claude Code",
+          scope: "workspace",
+          scopeWord: "project",
+          switchable: true,
+          overrides: ["user"],
+        },
+      ],
+      switches: { user: { "hud@curated": false }, project: { "hud@curated": true } },
+      available: true,
+    },
+  ]
+  const row = composeRows([], collectScanned([
+    {
+      client: "hub.target.claude-code",
+      label: "Claude Code",
+      icon: mark,
+      places: clients[0]?.places ?? [],
+      switches: clients[0]?.switches ?? {},
+      packs: [held("hud", "user")],
+    },
+  ]), "en", (key) => key)[0] as PluginRow
+
+  const shown = placesShown(row, clients)
+  check(
+    "a pack the machine holds offers the machine's place, showing its own file",
+    shown.find((one) => one.declared.scopeWord === "user")?.on === false,
+    shown.map((one) => [one.declared.scopeWord, one.on])
+  )
+  check(
+    "and the repository's place too, because its file decides over that one",
+    shown.map((one) => one.declared.scopeWord).join() === "user,project",
+    shown.map((one) => one.declared.scopeWord)
+  )
+  check(
+    "the machine's place shows what its own file says, not the agent's resolved answer",
+    shown.find((one) => one.declared.scopeWord === "user")?.on === false &&
+      row.held[0]?.enabled === true,
+    [shown.map((one) => one.on), row.held[0]?.enabled]
+  )
+  check(
+    "a place whose file is silent shows the agent's answer instead",
+    placesShown(row, [{ ...clients[0], switches: {} } as PluginClient]).every((one) => one.on)
+  )
+  check(
+    "a repository-only pack offers no machine-wide place, since that file cannot overrule it",
+    (() => {
+      const only = composeRows([], collectScanned([
+        {
+          client: "hub.target.claude-code",
+          label: "Claude Code",
+          icon: mark,
+          places: clients[0]?.places ?? [],
+          switches: clients[0]?.switches ?? {},
+          packs: [held("hud", "project")],
+        },
+      ]), "en", (key) => key)[0] as PluginRow
+      return placesShown(only, clients).map((one) => one.declared.scopeWord).join() === "project"
+    })()
+  )
+}
+
 console.log("which tab a row lands in")
 
 const catalog = composeRows([record("stored"), record("idle")], scanned, "en", (key) => key)
@@ -493,12 +633,21 @@ const scopePlaces = composeRows(
       client: "hub.target.claude-code",
       label: "Claude Code",
       icon: mark,
+      switches: {},
+      places: [
+        { id: "cc-user", label: "Claude Code", scope: "global", scopeWord: "user", switchable: true },
+        { id: "cc-project", label: "Claude Code", scope: "workspace", scopeWord: "project", switchable: true },
+      ],
       packs: [held("here", "project"), held("everywhere", "user")],
     },
     {
       client: "hub.target.codex",
       label: "Codex",
       icon: mark,
+      switches: {},
+      places: [
+        { id: "codex-user", label: "Codex", scope: "global", scopeWord: "user", switchable: false },
+      ],
       packs: [held("away", "user")],
     },
   ]),

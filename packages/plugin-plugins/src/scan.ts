@@ -17,7 +17,7 @@
  * Nothing here reaches a disk or a client: the installers and the toolkit that
  * runs a program arrive as arguments, which is what lets this run against stubs.
  */
-import type { PluginHeld, PluginInstaller, PluginTools } from "./provider.ts"
+import type { PluginHeld, PluginInstaller, PluginSwitches, PluginTools } from "./provider.ts"
 
 /** One client's answer about the packs it holds, or why there is none. */
 export interface ClientProbe {
@@ -32,6 +32,12 @@ export interface ClientProbe {
   readonly available: boolean
   /** What the client holds; empty when it is absent, or when reading it failed. */
   readonly packs: readonly PluginHeld[]
+  /**
+   * What this client's files record about each pack's switch, by place. Empty
+   * for an agent that keeps no switch, and for one whose files could not be read
+   * — a switch that cannot be read is one the page does not offer.
+   */
+  readonly switches: PluginSwitches
   /**
    * Why this client could not be read, in its own words — absent when it
    * answered. A probe that failed and a client holding nothing look the same
@@ -59,19 +65,29 @@ function messageOf(error: unknown): string {
  */
 async function probe(installer: PluginInstaller, tools: PluginTools): Promise<ClientProbe> {
   try {
-    if (!(await installer.available(tools))) return { installer, available: false, packs: [] }
+    if (!(await installer.available(tools))) {
+      return { installer, available: false, packs: [], switches: {} }
+    }
   } catch (error) {
     /* Whether the program is on this machine could not be established, so this
        client is not offered as a target — but having failed to look is not the
        same as having looked and not found it, and the reason is what says so. */
-    return { installer, available: false, packs: [], error: messageOf(error) }
+    return { installer, available: false, packs: [], switches: {}, error: messageOf(error) }
   }
   try {
-    return { installer, available: true, packs: await installer.held(tools) }
+    return {
+      installer,
+      available: true,
+      packs: await installer.held(tools),
+      /* Reading a switch is this hub's own file read rather than the client's
+         answer, so failing at it leaves the client's list standing: the page
+         then shows what each pack is, and offers no switch it could not read. */
+      switches: await installer.switches?.(tools).catch(() => ({})) ?? {},
+    }
   } catch (error) {
     /* The client is here and did not answer. What it holds is unknown, so it
        reads empty rather than gone, and its own words say why. */
-    return { installer, available: true, packs: [], error: messageOf(error) }
+    return { installer, available: true, packs: [], switches: {}, error: messageOf(error) }
   }
 }
 

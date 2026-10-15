@@ -83,9 +83,6 @@ export function readHeld(output: string): PluginHeld[] {
       version: typeof entry.version === "string" ? entry.version : "",
       scope: "user",
       enabled: entry.enabled !== false,
-      /* Codex keeps one list and no per-repository one, so there is no such
-         answer to give — and it holds no switch for this hub to offer. */
-      workspaceEnabled: false,
       marketplace: typeof entry.marketplaceName === "string" ? entry.marketplaceName : null,
       ...(typeof path === "string" && path !== "" ? { source: { kind: "local", path } } : {}),
       pack: { name: "", version: "", description: "" },
@@ -114,8 +111,18 @@ async function withPacks(tools: PluginTools, packs: PluginHeld[]): Promise<Plugi
 export const codexInstaller: PluginInstaller = {
   id: CODEX_ID,
   label: "Codex",
-  /* Codex installs a plugin for the machine, with no per-project variant. */
-  scopes: ["user"],
+  /* Codex installs a plugin for the machine, with no per-project variant, and
+     keeps no switch for one — so its single place names no file and is not the
+     hub's to move. */
+  places: [
+    {
+      id: "codex-user",
+      label: "Codex",
+      scope: "global",
+      scopeWord: "user",
+      switchable: false,
+    },
+  ],
 
   available: (tools) => tools.has(PROGRAM),
 

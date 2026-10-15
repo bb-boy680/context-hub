@@ -15,10 +15,9 @@ import { ChevronDownIcon, DownloadIcon, PowerIcon } from "lucide-react"
 
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginClient } from "./library.ts"
-import { SCOPE_LABELS, SCOPES_OF } from "./rows.ts"
+import { placesShown, SCOPE_LABELS, SCOPES } from "./rows.ts"
 import type { PluginRow } from "./types.ts"
 
-import type { AssetScope } from "@workspace/extensions"
 import { PlaceMenu } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import {
@@ -46,16 +45,14 @@ const shell =
  */
 const trigger = `${shell} bg-secondary hover:bg-accent`
 
-/** The two groups a pack's places fall into, in the order the panel lists them. */
-const SCOPES: readonly AssetScope[] = ["workspace", "global"]
-
 /**
- * The scope menu: one group per client, with an indented action per scope, each
- * showing whether the pack is already there and acting as a toggle for that one
- * place. A client that is not on this machine is listed as unavailable rather
- * than hidden, so a person knows the hub looked for it; one that could not be
- * read is listed as unread, because its scopes read empty either way and the
- * difference is the whole reason the row is still worth trusting or not.
+ * The install menu: one row per place a client can be given the pack in, run
+ * under the group that place belongs to, each showing whether the pack is
+ * already there and acting as a toggle for that one place. A client that is not
+ * on this machine is listed rather than hidden, so a person knows the hub looked
+ * for it; one that could not be read says that instead, because its places read
+ * empty either way and the difference is the whole reason the row is still worth
+ * trusting or not.
  */
 function ScopeMenu({
   plugin,
@@ -73,42 +70,38 @@ function ScopeMenu({
 }) {
   const { t } = useI18n()
 
-  /* One row per client and place it installs into, run under the group that
-     place belongs to. A client that is not on this machine is listed rather than
-     hidden, so a person knows the hub looked for it; one whose own list could
-     not be read says that instead, because its places read empty either way. */
+  /* Every place the clients declared, which is what they say they install into.
+     Nothing here decides which places those are. */
   const options = clients.flatMap((client) =>
-    client.scopes
-      .filter((scope): scope is PluginInstallScope => scope === "user" || scope === "project")
-      .map((scope) => {
-        /* What this agent holds, in its own words — not what this hub delivered
-           to it. A pack the agent got from some other marketplace is just as
-           installed, and its row has to offer the way out. */
-        const at = (plugin.held.find((one) => one.client === client.id)?.scopes ?? []).includes(
-          scope
-        )
-        return {
-          id: `${client.id}:${scope}`,
-          client: client.id,
-          scope,
-          icon: client.icon,
-          label: client.label,
-          /* The place, which is what tells this row from the client's other one. */
-          note: t(SCOPE_LABELS[scope] ?? scope),
-          selected: at,
-          blocked:
-            client.error !== undefined
-              ? t("plugins.client.unread")
-              : !client.available
-                ? t("plugins.client.absent")
-                : /* A place it is already in can always be left. A new one cannot:
-                     delivering into it asks the hub's own marketplace, which
-                     lists the packs this hub holds the files of. */
-                  plugin.stored || at
-                  ? null
-                  : t("plugins.install.notHeld"),
-        }
-      })
+    client.places.map((place) => {
+      /* What this agent holds, in its own words — not what this hub delivered to
+         it. A pack the agent got from some other marketplace is just as
+         installed, and its row has to offer the way out. */
+      const at = (plugin.held.find((one) => one.client === client.id)?.places ?? []).some(
+        (one) => one.scope === place.scopeWord
+      )
+      return {
+        id: `${client.id}:${place.scopeWord}`,
+        client: client.id,
+        place,
+        icon: client.icon,
+        label: client.label,
+        /* The place, which is what tells this row from the client's other one. */
+        note: t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord),
+        selected: at,
+        blocked:
+          client.error !== undefined
+            ? t("plugins.client.unread")
+            : !client.available
+              ? t("plugins.client.absent")
+              : /* A place it is already in can always be left. A new one cannot:
+                   delivering into it asks the hub's own marketplace, which lists
+                   the packs this hub holds the files of. */
+                plugin.stored || at
+                ? null
+                : t("plugins.install.notHeld"),
+      }
+    })
   )
   const byId = new Map(options.map((one) => [one.id, one]))
 
@@ -145,12 +138,12 @@ function ScopeMenu({
         onPick={(id) => {
           const at = byId.get(id)
           if (at === undefined) return
-          if (at.selected) onUninstall(at.client, at.scope)
-          else onInstall(at.client, at.scope)
+          if (at.selected) onUninstall(at.client, at.place.scopeWord)
+          else onInstall(at.client, at.place.scopeWord)
         }}
         groups={SCOPES.map((group) => ({
           label: t(`plugins.detail.group.${group}`),
-          options: options.filter((one) => SCOPES_OF[group].includes(one.scope)),
+          options: options.filter((one) => one.place.scope === group),
         })).filter((group) => group.options.length > 0)}
       />
     </DropdownMenu>
@@ -158,13 +151,18 @@ function ScopeMenu({
 }
 
 /**
- * The status menu: which agents hold this pack, where each keeps it, and whether
- * the repository in use loads it.
+ * The status menu: every place this pack's switch can be turned at, and what
+ * each of them currently says.
  *
- * The switch belongs to the repository's own place, because that is the one this
- * hub can name and write. The machine-wide place is the person's own — an agent
- * keeps a single switch for a pack, so the hub reports it there without offering
- * to move it.
+ * A place is offered where the pack sits, and where its file decides over one
+ * the pack sits in. The second is why the menu is not simply a list of the
+ * agent's records: a pack the machine switched on is switched off for one
+ * repository by that repository's file, even though nothing is installed there —
+ * so a place with no record is still a real switch.
+ *
+ * A place whose file names no key for the pack falls back to the agent's own
+ * answer, which is the whole chain resolved: saying nothing there means the
+ * chain decides, and that answer is what it decided.
  */
 function EnabledMenu({
   plugin,
@@ -179,24 +177,15 @@ function EnabledMenu({
 }) {
   const { t } = useI18n()
 
-  /* One row per place an agent answered with. Only the scopes this build has a
-     word for, since a client that invents a third is one no row here covers. A
-     pack no agent holds has nothing to report, so no button is drawn rather
-     than a menu with nothing in it. */
-  const known = (scope: string): scope is PluginInstallScope =>
-    scope === "user" || scope === "project"
-  const places = plugin.held.flatMap((hold) =>
-    hold.scopes.filter(known).map((scope) => ({
-      id: `${hold.client}:${scope}`,
-      client: hold.client,
-      scope,
-      hold,
-    }))
+  /* Which places can be switched, and what each answers — read from one place so
+     the row's own line and the switch beside it cannot tell different stories. */
+  const places = placesShown(plugin, clients)
+  const byId = new Map(places.map((one) => [one.id, one]))
+  /* Which agents are here at all: one that is not, or whose own list could not be
+     read, has nothing this hub may move. */
+  const reachable = new Set(
+    clients.filter((one) => one.available && one.error === undefined).map((one) => one.id)
   )
-  const byId = new Map(places.map((place) => [place.id, place]))
-  /* Which agents keep a switch at all: one that does not says so in its own
-     installer, and is nobody's to toggle. */
-  const switchable = new Set(clients.filter((one) => one.switchable).map((one) => one.id))
 
   return (
     <DropdownMenu>
@@ -217,8 +206,9 @@ function EnabledMenu({
       </DropdownMenuTrigger>
       <PlaceMenu
         title={t("plugins.menu.enabled.title")}
-        /* How many places load it, rather than how many rows the list holds. */
-        count={() => places.filter((one) => one.hold.enabled).length}
+        /* How many files switch it on, rather than how many rows the list
+           holds: a place that says nothing inherits rather than counts. */
+        count={() => places.filter((one) => one.recorded === true).length}
         align="end"
         activation="control"
         words={{
@@ -231,10 +221,11 @@ function EnabledMenu({
         trailing={(option) => {
           const place = byId.get(option.id)
           if (place === undefined) return null
-          /* The machine-wide place is the person's own, and an agent without a
-             switch has none at any place: each says whose business it is rather
-             than showing a control that would not mean anything. */
-          if (place.scope !== "project" || !switchable.has(place.client)) {
+          /* A place its own client declares unswitchable is nobody's to toggle,
+             and one this hub cannot reach has nothing it may write: each says
+             whose business it is rather than showing a control that would move
+             something nobody chose. */
+          if (!place.declared.switchable || !reachable.has(place.client)) {
             return (
               <span className="flex h-5 shrink-0 items-center rounded-full bg-secondary px-2 text-[11.5px] leading-[1.3] text-muted-foreground">
                 {t("plugins.place.self")}
@@ -243,8 +234,15 @@ function EnabledMenu({
           }
           return (
             <Switch
-              checked={place.hold.enabled}
-              onCheckedChange={(next) => onSetEnabled(place.client, place.scope, next)}
+              /* The same value the row's own line reads, and never the agent's
+                 answer for the pack: that answer is one value with the whole
+                 file chain already resolved into it, so a place this hub just
+                 switched off would show as still on wherever a wider place it
+                 sits in overrules it. */
+              checked={place.on}
+              onCheckedChange={(next) =>
+                onSetEnabled(place.client, place.declared.scopeWord, next)
+              }
               aria-label={option.label}
               className="data-unchecked:bg-secondary"
             />
@@ -253,20 +251,25 @@ function EnabledMenu({
         groups={SCOPES.map((group) => ({
           label: t(`plugins.detail.group.${group}`),
           options: places
-            .filter((one) => SCOPES_OF[group].includes(one.scope))
+            .filter((one) => one.declared.scope === group)
             .map((one) => {
-              const here =
-                one.scope === "project" && switchable.has(one.client)
+              const shown = one.declared.switchable && reachable.has(one.client)
               return {
                 id: one.id,
-                icon: one.hold.icon,
-                label: one.hold.label,
+                icon: one.icon,
+                label: one.label,
                 /* The place, then what this agent makes of it there — the two
                    things the menu exists to tell apart. */
-                note: here
+                note: shown
                   ? t("plugins.menu.enabled.note")
-                      .replace("{scope}", t(SCOPE_LABELS[one.scope] ?? one.scope))
-                      .replace("{state}", t(one.hold.enabled ? "plugins.place.on" : "plugins.place.off"))
+                      .replace(
+                        "{scope}",
+                        t(SCOPE_LABELS[one.declared.scopeWord] ?? one.declared.scopeWord)
+                      )
+                      .replace(
+                        "{state}",
+                        t(one.on ? "plugins.place.on" : "plugins.place.off")
+                      )
                   : t("plugins.place.selfManaged"),
               }
             }),

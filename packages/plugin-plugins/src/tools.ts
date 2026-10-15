@@ -7,7 +7,7 @@
  * calls its main process.
  */
 import type { PackDescription } from "./contract.ts"
-import { PluginInstallError, type PluginTools } from "./provider.ts"
+import { PluginInstallError, type PluginBridgeTools } from "./provider.ts"
 
 /** The route the plugin library answers on. */
 const ENDPOINT = "/hub/plugins"
@@ -31,7 +31,7 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 /** Build the tools that reach the host, which owns the library and the programs. */
-export function createRemotePluginTools(): PluginTools {
+export function createRemotePluginTools(): PluginBridgeTools {
   return {
     async root() {
       const answer = await call<{ root: string }>({ action: "root" })

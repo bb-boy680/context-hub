@@ -24,7 +24,9 @@ import {
 import {
   PLUGIN_SERVICE,
   type PluginInstaller,
+  type PluginPlace,
   type PluginService,
+  type PluginSwitches,
   type PluginTools,
 } from "./provider.ts"
 import type { PluginRecord, PluginUpdateCheck, PluginUpdateSummary } from "./revision.ts"
@@ -128,10 +130,15 @@ export interface PluginClient {
   label: string
   /** The mark the agent's own extension declares. */
   icon: ExtensionIcon
-  /** The scopes this agent installs into, in the order its own menu lists them. */
-  scopes: readonly PluginInstallScope[]
-  /** Whether the agent can be switched off without removing it; Codex cannot. */
-  switchable: boolean
+  /** The places it keeps packs in, in its own order, each saying if it can be switched. */
+  places: readonly PluginPlace[]
+  /**
+   * What its files record about each pack's switch, by place and by pack id.
+   *
+   * Read by the hub rather than answered by the client, which reports one value
+   * per pack: this is what says which of two files switched a pack which way.
+   */
+  switches: PluginSwitches
   /** Whether the agent is on this machine; one that is not says so instead of failing. */
   available: boolean
   /**
@@ -253,6 +260,18 @@ export function usePluginLibrary(): PluginLibrary {
     (): PluginService | null => ctx.get(PLUGIN_SERVICE) ?? null,
     [ctx]
   )
+  /**
+   * The tools an installer is handed here.
+   *
+   * The published ones reach programs; the client files are this form's own, so
+   * they are added where the form is known. An installer reads a client's
+   * settings to find out which of its files switches a pack on, which the client
+   * itself answers only once for the pack.
+   */
+  const tools = React.useMemo(
+    (): PluginTools | null => (service === null ? null : { ...service.tools, files: ctx.host.files }),
+    [service, ctx]
+  )
   /* An installer carries no mark of its own: it shows the icon its own extension
      declares, which is the same one the catalog row draws. */
   const iconFor = React.useCallback(
@@ -274,7 +293,7 @@ export function usePluginLibrary(): PluginLibrary {
     setRecords(answer.plugins)
     setRoot(answer.root)
     setMissing(answer.missing)
-    if (service === null) {
+    if (service === null || tools === null) {
       setClients([])
       setScanned([])
       return
@@ -284,14 +303,14 @@ export function usePluginLibrary(): PluginLibrary {
        or which cannot answer at all, is still listed — a person then sees that
        the hub looked for it rather than wondering why an agent they use is
        absent, and one that failed says so in its own words. */
-    const probes = await probeInstallers(service.registry.installers(), service.tools)
+    const probes = await probeInstallers(service.registry.installers(), tools)
     setClients(
       probes.map((one) => ({
         id: one.installer.id,
         label: one.installer.label,
         icon: iconFor(one.installer.id),
-        scopes: one.installer.scopes,
-        switchable: one.installer.setEnabled !== undefined,
+        places: one.installer.places,
+        switches: one.switches,
         available: one.available,
         ...(one.error === undefined ? {} : { error: one.error }),
       }))
@@ -307,11 +326,13 @@ export function usePluginLibrary(): PluginLibrary {
             client: one.installer.id,
             label: one.installer.label,
             icon: iconFor(one.installer.id),
+            places: one.installer.places,
+            switches: one.switches,
             packs: one.packs,
           }))
       )
     )
-  }, [service, revision, iconFor])
+  }, [service, revision, iconFor, tools])
 
   /** Run one write, then read everything again: any write can change more than it named. */
   const write = React.useCallback(
@@ -344,9 +365,10 @@ export function usePluginLibrary(): PluginLibrary {
       if (service === null) throw new Error("the plugin library is not running")
       const installer = service.registry.installers().find((one) => one.id === client)
       if (installer === undefined) throw new Error(`no installer named ${client}`)
+      if (tools === null) throw new Error("the plugin library is not running")
       setBusy(true)
       try {
-        await act(installer, service.tools)
+        await act(installer, tools)
         await read()
         setFailure(null)
       } catch (error: unknown) {
@@ -356,7 +378,7 @@ export function usePluginLibrary(): PluginLibrary {
         setBusy(false)
       }
     },
-    [service, read]
+    [service, tools, read]
   )
 
   /* The first read is queued rather than run during render: a state update in

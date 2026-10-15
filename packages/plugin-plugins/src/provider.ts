@@ -12,6 +12,8 @@
  * This is a service, not a contribution: a contribution carries data for the
  * screen to render, while an installer carries behaviour the module calls.
  */
+import type { AssetScope, PlaceFiles } from "@workspace/core/place-files"
+
 import type { PackDescription, PluginInstallReport, PluginInstallScope } from "./contract.ts"
 
 /** The service name the plugins module publishes and every agent plugin requires. */
@@ -49,6 +51,14 @@ export interface PluginTools {
    */
   run(program: string, args: readonly string[]): Promise<string>
   /**
+   * The client configuration files under this hub's roots, or null for a form
+   * that cannot reach a host.
+   *
+   * A client reports one answer for a pack rather than one answer per file, so
+   * an installer that may speak for two files has to read them itself.
+   */
+  readonly files: PlaceFiles | null
+  /**
    * Whether a program is on this machine.
    */
   has(program: string): Promise<boolean>
@@ -72,6 +82,50 @@ export interface PluginTools {
 }
 
 /**
+ * One place an agent keeps a pack in.
+ *
+ * The two halves are the hub's and the agent's: `scope` says which of the hub's
+ * two roots the place belongs to, and `scopeWord` is the agent's own name for
+ * it, which its records and its commands both take back.
+ */
+export interface PluginPlace {
+  /** Stable id, unique across every installer; installs are recorded against it. */
+  id: string
+  /** The agent's name, as a menu row lists it. */
+  label: string
+  /** Which root the place belongs to: the repository in use, or the machine. */
+  scope: AssetScope
+  /** The agent's own word for the place, e.g. `project`. */
+  scopeWord: PluginInstallScope
+  /**
+   * Whether the hub may switch a pack on or off here.
+   *
+   * A separate answer per place rather than one per agent: one agent can keep a
+   * switch in one of its files and none in another.
+   */
+  switchable: boolean
+  /**
+   * The file that records this place's switch, under its scope's root and
+   * `/`-separated. Only a place the hub may switch names one.
+   */
+  file?: string
+  /**
+   * The places this one's file wins over, by their own scope words.
+   *
+   * An agent's files are a chain rather than a set of alternatives: the narrower
+   * one decides, so a pack the machine switched on can still be switched off for
+   * one repository. That is what makes a place worth offering for a pack it does
+   * not hold — the switch there is real even though nothing is installed there.
+   * Named rather than read off the order these are listed in, because the order
+   * a menu shows them in and the order their files decide in are two things.
+   */
+  overrides?: readonly string[]
+}
+
+/** What every one of a client's files records, by place and by pack id. */
+export type PluginSwitches = Record<string, Record<string, boolean>>
+
+/**
  * One pack a client holds, whether or not this hub had anything to do with it.
  *
  * A client's own answer to "what is installed here" is the only source for the
@@ -87,17 +141,10 @@ export interface PluginHeld {
   version: string
   /** The place the client installed it at, in the client's own word — `user`, `project`, and so on. */
   scope: string
-  /** Whether the client currently switches it on. */
-  enabled: boolean
   /**
-   * Whether the workspace in use switches it on.
-   *
-   * A second answer beside {@link enabled} because the two can disagree: an
-   * agent keeps one switch per pack, and the repository standing in for a pack
-   * its machine has switched on may have switched it off, which is the one this
-   * hub may speak for and the one its row offers.
+   * Whether the client currently switches it on.
    */
-  workspaceEnabled: boolean
+  enabled: boolean
   /** The marketplace it came from; `null` when the client names none. */
   marketplace: string | null
   /**
@@ -120,10 +167,11 @@ export interface PluginInstaller {
   /** The agent's name, as a menu row lists it. */
   readonly label: string
   /**
-   * The scopes this agent installs into, in the order its own menu lists them.
+   * The places this agent keeps a pack in, in the order its own menu lists them.
+   *
    * An agent with no notion of scope declares the one it does have.
    */
-  readonly scopes: readonly PluginInstallScope[]
+  readonly places: readonly PluginPlace[]
   /** Whether the agent this installer drives is on this machine. */
   available(tools: PluginTools): Promise<boolean>
   /**
@@ -134,6 +182,15 @@ export interface PluginInstaller {
    * that knows that name.
    */
   held(tools: PluginTools): Promise<PluginHeld[]>
+  /**
+   * What this client's files record about each pack's switch, by place.
+   *
+   * The client's own answer is one value for a pack rather than one per file, so
+   * it cannot say which of two files a pack is on in — a hub offering a switch
+   * per place has to read the files. Absent for an agent that keeps no such
+   * switch, which is a fact about the agent rather than a gap.
+   */
+  switches?(tools: PluginTools): Promise<PluginSwitches>
   /** Deliver one pack to this agent at one scope, out of this hub's own library. */
   install(name: string, scope: PluginInstallScope, tools: PluginTools): Promise<PluginInstallReport>
   /**
@@ -180,9 +237,19 @@ export interface PluginInstallerRegistry {
 }
 
 /** The service the plugins module publishes. */
+/**
+ * The tools a bridge can answer for: everything an installer reaches, except the
+ * client files.
+ *
+ * Those live under the hub's roots and belong to the form the page runs in
+ * rather than to any one bridge, so the form adds them where it is known and a
+ * published service carries the rest.
+ */
+export type PluginBridgeTools = Omit<PluginTools, "files">
+
 export interface PluginService {
   readonly registry: PluginInstallerRegistry
-  readonly tools: PluginTools
+  readonly tools: PluginBridgeTools
 }
 
 /**

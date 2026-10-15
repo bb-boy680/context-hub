@@ -4,6 +4,7 @@
  * the same pack, with its age and its source already worded — or a pack only an
  * agent holds, which the library has yet to take in.
  */
+import type { AssetScope } from "@workspace/core/place-files"
 import type { ExtensionIcon } from "@workspace/extensions"
 
 /**
@@ -16,7 +17,21 @@ import type { ExtensionIcon } from "@workspace/extensions"
  */
 export type PluginSource = "repo" | "subdir" | "archive" | "local"
 
-/** One agent holding a pack, as a row names it. */
+/** One place a client holds a pack in, and that place's own record of it. */
+export interface PluginHeldPlace {
+  /** The client's own word for the place, as its records spell it. */
+  scope: string
+  /**
+   * The group that place belongs to, as the client declared it when it
+   * registered its places. Read from that declaration rather than matched
+   * against a word this hub knows, so an agent naming its scopes its own way
+   * still lands in the right group.
+   */
+  group: AssetScope
+  /** Whether the file that records this place switches the pack on there. */
+  enabled: boolean
+}
+
 export interface PluginHeldBy {
   /** The agent's id, which its installer is registered under. */
   client: string
@@ -24,15 +39,15 @@ export interface PluginHeldBy {
   label: string
   /** The mark the agent's own extension declares. */
   icon: ExtensionIcon
-  /** The scopes it is in there, in the agent's own words. */
-  scopes: readonly string[]
+  /** The places it is in there, in the agent's own words, each with its own record. */
+  places: readonly PluginHeldPlace[]
   /**
-   * Whether the agent currently loads it.
+   * The agent's own answer for the pack, with its whole file chain already
+   * resolved into one value.
    *
-   * One value for the whole agent, not one per scope: an agent keeps a single
-   * switch per pack, and which of its own files records that is its business.
-   * So this says "this agent has it on", and never "it is on in this place" —
-   * which is why the row shows it beside the agent rather than beside a place.
+   * One answer rather than one per file, which is why a place's own value is
+   * read from that place's file. This is what a place whose file is silent falls
+   * back to: saying nothing there means the chain decides, and this is it.
    */
   enabled: boolean
   /**

@@ -38,7 +38,7 @@ import {
   type PluginClient,
   type PluginCollected,
 } from "./library.ts"
-import { rowsForTab, SCOPE_LABELS, SCOPES_OF, type PluginTab } from "./rows.ts"
+import { rowsForTab, SCOPE_LABELS, type PluginTab } from "./rows.ts"
 import { PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import type { PluginInstallScope } from "./contract.ts"
@@ -644,15 +644,15 @@ function PluginTable({
                       {client.label}
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
-                  {client.scopes.map((scope) => (
+                  {client.places.map((place) => (
                     <DropdownMenuItem
-                      key={`${client.id}:${scope}`}
+                      key={`${client.id}:${place.scopeWord}`}
                       closeOnClick={false}
                       disabled={actions.busy || !client.available}
                       onClick={() => {
                         for (const plugin of plugins) {
                           if (checked.includes(plugin.id)) {
-                            actions.onInstall(plugin, client.id, scope)
+                            actions.onInstall(plugin, client.id, place.scopeWord)
                           }
                         }
                         onCheck([])
@@ -660,7 +660,7 @@ function PluginTable({
                       className="gap-2.5 px-1.5 py-2 pl-4"
                     >
                       <span className="text-[13px] leading-[18px] font-semibold">
-                        {t(SCOPE_LABELS[scope])}
+                        {t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord)}
                       </span>
                     </DropdownMenuItem>
                   ))}
@@ -841,16 +841,16 @@ export function PluginsPage() {
   const scopePlaces = React.useMemo(() => {
     const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
     for (const scope of SCOPE_TABS as AssetScope[]) {
-      const scopes = SCOPES_OF[scope]
       byScope[scope] = library.clients
-        .filter((client) => client.scopes.some((one) => scopes.includes(one)))
+        .filter((client) => client.places.some((one) => one.scope === scope))
         .map((client) => ({
           id: client.id,
           icon: client.icon,
           label: client.label,
           count: catalog.filter((row) =>
             row.held.some(
-              (hold) => hold.client === client.id && hold.scopes.some((one) => scopes.includes(one))
+              (hold) =>
+                hold.client === client.id && hold.places.some((one) => one.group === scope)
             )
           ).length,
         }))

@@ -15,11 +15,12 @@
 import { assetRef } from "@workspace/core"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 
-import { installedRevision, type PluginInstallScope, type PluginOrigin } from "./contract.ts"
+import { installedRevision, type PluginOrigin } from "./contract.ts"
 import { formatPluginSource, originToSpec } from "./inspect.ts"
-import type { PluginHeld } from "./provider.ts"
+import type { PluginHeld, PluginPlace, PluginSwitches } from "./provider.ts"
 import type { PluginRecord } from "./revision.ts"
-import type { PluginHeldBy, PluginRow, PluginSource } from "./types.ts"
+import type { PluginClient } from "./library.ts"
+import type { PluginHeldBy, PluginHeldPlace, PluginRow, PluginSource } from "./types.ts"
 
 /** How long a pack has been at its current revision, in the locale's own words. */
 function ageOf(iso: string, language: string | undefined, t: (key: string) => string): string {
@@ -97,6 +98,10 @@ export interface ScannedAnswer {
   label: string
   /** The mark the client's own extension declares. */
   icon: ExtensionIcon
+  /** The places it keeps packs in, as it declared them. */
+  places: readonly PluginPlace[]
+  /** What its files record about each pack's switch, by place and by pack id. */
+  switches: PluginSwitches
   /** Every pack it holds, as it reported them. */
   packs: readonly PluginHeld[]
 }
@@ -119,15 +124,15 @@ export interface ScannedPack {
   held: PluginHeldBy[]
 }
 
-/** One client's hold on a pack, while the scopes are still being gathered. */
+/** One client's hold on a pack, while the places are still being gathered. */
 interface HeldBuilder {
   client: string
   label: string
   icon: ExtensionIcon
   /** The client's own id for the pack, which is what its commands take back. */
   id: string
-  scopes: string[]
-  /** Whether the client loads it; one answer for the client, not one per scope. */
+  places: PluginHeldPlace[]
+  /** The client's own answer for the pack, its file chain already resolved. */
   enabled: boolean
 }
 
@@ -164,16 +169,32 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
         client: answer.client,
         label: answer.label,
         icon: answer.icon,
-        /* The client's own id for the pack, which is the same in every scope it
+        /* The client's own id for the pack, which is the same in every place it
            holds it in. It is what that client's own commands take back. */
         id: pack.id,
-        scopes: [],
+        places: [],
         enabled: false,
       }
-      if (!found.scopes.includes(pack.scope)) found.scopes.push(pack.scope)
-      /* The repository's own switch, which the agent keeps once for the pack
-         however many of its places hold one. */
-      if (pack.workspaceEnabled) found.enabled = true
+      /* The agent's own answer is one per pack however many of its places hold
+         one, so any of them answers for all. */
+      if (pack.enabled) found.enabled = true
+      /* One entry per place, each with the answer that place itself gives. The
+         group comes from the client's own declaration of the place, so an agent
+         naming its scopes its own way still lands where it says it does. */
+      const declared = answer.places.find((one) => one.scopeWord === pack.scope)
+      /* The file's own answer where it names the pack, and the client's single
+         answer where the file is silent: that is the value the place sees. */
+      const here = answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
+      const already = found.places.find((one) => one.scope === pack.scope)
+      if (already === undefined) {
+        found.places.push({
+          scope: pack.scope,
+          group: declared?.scope ?? "workspace",
+          enabled: here,
+        })
+      } else {
+        already.enabled = here
+      }
       entry.at.set(answer.client, found)
       byName.set(pack.name, entry)
     }
@@ -250,28 +271,100 @@ export type PluginTab = "all" | "library" | "unstored" | "updates" | AssetScope
  * simply one no tab of this page covers. The page reads this as well, so the tab
  * that groups the agents and the rows it then shows cannot drift apart.
  */
-export const SCOPES_OF: Record<AssetScope, readonly string[]> = {
-  workspace: ["project"],
-  global: ["user"],
+/**
+ * The two groups a client's places fall into, in the order every screen lists
+ * them.
+ *
+ * Which places belong to which group is not said here: each client declares it
+ * on the place itself, so an agent naming its scopes its own way still lands
+ * where it says it does. This is only the order the two are read in.
+ */
+export const SCOPES: readonly AssetScope[] = ["workspace", "global"]
+
+/**
+ * The place a group's action reaches, given the places an agent keeps.
+ *
+ * A group holding one place acts on that one. An agent that keeps none there
+ * has nothing to act on, and one that keeps several is a case no client of this
+ * hub makes — the first in the agent's own order answers.
+ *
+ * @param places — the places the agent installs into, in its own order.
+ * @param group — the group whose action is being resolved.
+ */
+export function placeReached(
+  places: readonly PluginPlace[],
+  group: AssetScope
+): PluginPlace | undefined {
+  return places.find((one) => one.scope === group)
 }
 
 /**
- * The one scope a group's action reaches, given the scopes an agent keeps.
- *
- * A group that spans two places acts on the first of them in the agent's own
- * order rather than on all of them: the workspace row then writes one place, the
- * repository's shared scope, instead of also writing the private scope beside
- * it. Which places an agent keeps is its own declaration, so an agent listing
- * only the private one still lands somewhere.
- *
- * @param scopes — the scopes the agent installs into, in its own order.
- * @param group — the group whose action is being resolved.
+ * One place as the status menu offers it: where the pack's switch can be turned,
+ * and what that place currently answers.
  */
-export function scopeReached(
-  scopes: readonly PluginInstallScope[],
-  group: AssetScope
-): PluginInstallScope | undefined {
-  return scopes.find((one) => SCOPES_OF[group].includes(one))
+export interface PluginPlaceStatus {
+  /** Key for the menu row: one agent, one place. */
+  id: string
+  /** The agent's id, which its installer is registered under. */
+  client: string
+  /** The agent's own name, as the menu row reads. */
+  label: string
+  /** The mark the agent's own extension declares. */
+  icon: ExtensionIcon
+  /** The agent's own declaration of this place, which is what says if it may be moved. */
+  declared: PluginPlace
+  /**
+   * What this place's own file says, absent when that file names no key for the
+   * pack at all. Absent is not false: a file that says nothing has left the
+   * answer to the chain, and only the agent knows what the chain decided.
+   */
+  recorded: boolean | undefined
+  /** What the row shows and what its switch moves: the file's answer, else the agent's. */
+  on: boolean
+}
+
+/**
+ * The places the status menu offers for one pack, and what each answers.
+ *
+ * A place is offered where the pack sits, and where its file decides over one
+ * the pack sits in. The second is why this is not simply a list of the agent's
+ * records: a pack the machine switched on is switched off for one repository by
+ * that repository's file, even though nothing is installed there — so a place
+ * with no record is still a real switch.
+ *
+ * `on` and `recorded` are the two answers a row needs and must not mix up. The
+ * agent's own answer for the pack is one value with its whole file chain already
+ * resolved, so a place this hub just switched off reads as still on wherever a
+ * wider place it sits in overrules it — which is why `on` comes from this place's
+ * file wherever that file speaks, and only falls back to the agent where it does
+ * not.
+ */
+export function placesShown(
+  plugin: PluginRow,
+  clients: readonly PluginClient[]
+): PluginPlaceStatus[] {
+  return plugin.held.flatMap((hold) => {
+    const client = clients.find((one) => one.id === hold.client)
+    if (client === undefined) return []
+    const sits = new Set(hold.places.map((one) => one.scope))
+    return client.places.flatMap((declared) => {
+      const here = sits.has(declared.scopeWord)
+      const over = (declared.overrides ?? []).some((one) => sits.has(one))
+      if (!here && !over) return []
+      const recorded = client.switches[declared.scopeWord]?.[hold.id]
+      return [
+        {
+          id: `${hold.client}:${declared.scopeWord}`,
+          client: hold.client,
+          label: client.label,
+          icon: client.icon,
+          declared,
+          recorded,
+          on: recorded ?? hold.enabled,
+        },
+      ]
+    })
+  })
 }
 
 /**
@@ -305,12 +398,12 @@ export function scopeWords(scopes: readonly string[], t: (key: string) => string
     .join(" · ")
 }
 
-/** Whether a client — one agent, or any of them — holds the pack in these scopes. */
-function holdsIn(row: PluginRow, scopes: readonly string[], place: string | null): boolean {
+/** Whether a client — one agent, or any of them — holds the pack in this group. */
+function holdsIn(row: PluginRow, group: AssetScope, place: string | null): boolean {
   return row.held.some(
     (hold) =>
       (place === null || hold.client === place) &&
-      hold.scopes.some((scope) => scopes.includes(scope))
+      hold.places.some((one) => one.group === group)
   )
 }
 
@@ -344,6 +437,6 @@ export function rowsForTab(
       return rows.filter((row) => row.outdated === true)
     case "workspace":
     case "global":
-      return rows.filter((row) => holdsIn(row, SCOPES_OF[value], place))
+      return rows.filter((row) => holdsIn(row, value, place))
   }
 }

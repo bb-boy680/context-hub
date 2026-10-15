@@ -8,6 +8,12 @@
  *
  * Run from the package: `node scripts/check-installer.ts`
  */
+import { promises as fs } from "node:fs"
+import { tmpdir } from "node:os"
+import path from "node:path"
+
+import { createFsPlaceFiles } from "@workspace/core/host/place-files"
+
 import { claudeCodeInstaller, readHeld } from "../src/installer.ts"
 
 let failures = 0
@@ -87,11 +93,6 @@ check(
   pony?.source?.path === "C:\\Users\\me\\.context-hub\\plugins\\ponytail",
   pony?.source
 )
-check(
-  "the repository's own switch is read beside the client's",
-  pony?.workspaceEnabled === true && hud?.workspaceEnabled === false,
-  [pony?.workspaceEnabled, hud?.workspaceEnabled]
-)
 
 const warp = packs.find((one) => one.name === "warp")
 check("a switched-off pack reads switched off", warp?.enabled === false, warp)
@@ -108,6 +109,7 @@ const tools = {
   syncMarketplace: async () => undefined,
   run: async () => LIST,
   has: async () => true,
+  files: null,
   describe: async (directory: string, name: string) => {
     asked.push(`${name}@${directory}`)
     return {
@@ -150,6 +152,148 @@ check(
   unreadable.length === 3 && unreadable[0]?.pack.description === "",
   unreadable[0]
 )
+
+console.log("the places this client keeps a pack in")
+
+check(
+  "two are declared, the machine's and the repository's",
+  claudeCodeInstaller.places.map((one) => one.scopeWord).join() === "user,project",
+  claudeCodeInstaller.places.map((one) => one.scopeWord)
+)
+check(
+  "both of them record a switch the hub may move",
+  claudeCodeInstaller.places.every((one) => one.switchable && one.file !== undefined),
+  claudeCodeInstaller.places.map((one) => [one.switchable, one.file])
+)
+check(
+  "and each is filed under the root its own file sits in",
+  claudeCodeInstaller.places.map((one) => one.scope).join() === "global,workspace",
+  claudeCodeInstaller.places.map((one) => one.scope)
+)
+check(
+  "the repository's file decides over the machine's, which is what lets one repository switch a machine-wide pack off",
+  claudeCodeInstaller.places.find((one) => one.scopeWord === "project")?.overrides?.join() === "user",
+  claudeCodeInstaller.places.find((one) => one.scopeWord === "project")?.overrides
+)
+
+console.log("the switch each place's own file records")
+
+/* The client answers once for a pack, not once per file, so its own answer
+   cannot say which of two files a pack is on in. The two files say it
+   themselves, and this is that reading. */
+const BOTH = JSON.stringify([
+  {
+    id: "ponytail@ponytail",
+    version: "5.2.0",
+    scope: "user",
+    enabled: true,
+    installPath: "C:\\Users\\me\\.claude\\plugins\\cache\\ponytail\\ponytail\\5.2.0",
+  },
+  {
+    id: "ponytail@ponytail",
+    version: "5.2.0",
+    scope: "project",
+    enabled: true,
+    installPath: "C:\\Users\\me\\.claude\\plugins\\cache\\ponytail\\ponytail\\5.2.0",
+  },
+])
+
+const SETTINGS: Record<string, string> = {
+  /* The machine has it on; the repository in use has switched it off. */
+  global: JSON.stringify({ enabledPlugins: { "ponytail@ponytail": true } }),
+  workspace: JSON.stringify({ enabledPlugins: { "ponytail@ponytail": false } }),
+}
+const reads: string[] = []
+const bothTools = {
+  ...tools,
+  run: async () => BOTH,
+  files: {
+    read: async (place: { scope: string }) => {
+      reads.push(place.scope)
+      return SETTINGS[place.scope] ?? null
+    },
+    write: async () => undefined,
+    remove: async () => undefined,
+    workspace: async () => "C:\\workspace",
+  },
+}
+
+/* The client answers once for a pack, not once per file, so its own answer
+   cannot say which of two files a pack is on in. The two files say it
+   themselves, and this is that reading. */
+const bothFiles = await claudeCodeInstaller.switches?.(bothTools)
+check(
+  "both files are read",
+  reads.sort().join() === "global,workspace",
+  reads
+)
+check(
+  "each place's own file answers for that place",
+  bothFiles?.["user"]?.["ponytail@ponytail"] === true &&
+    bothFiles?.["project"]?.["ponytail@ponytail"] === false,
+  bothFiles
+)
+check(
+  "and the client's single answer is the same for both records, which is why it cannot stand in",
+  (await claudeCodeInstaller.held(bothTools)).every((one) => one.enabled === true),
+  (await claudeCodeInstaller.held(bothTools)).map((one) => one.enabled)
+)
+{
+  /* A file that names no key for a pack has not spoken about it, and the place
+     then has no entry rather than a false one — the caller reads the client's
+     own answer instead of inventing a switch nobody recorded. */
+  const quiet = await claudeCodeInstaller.switches?.({
+    ...bothTools,
+    files: {
+      ...bothTools.files,
+      read: async () => JSON.stringify({ enabledPlugins: { "other@x": true } }),
+    },
+  })
+  check(
+    "a file naming some other pack leaves this one unrecorded",
+    quiet?.["user"]?.["ponytail@ponytail"] === undefined,
+    quiet
+  )
+  const none = await claudeCodeInstaller.switches?.({ ...bothTools, files: null })
+  check(
+    "and a form that reaches no host records nothing at any place",
+    Object.values(none ?? {}).every((one) => Object.keys(one).length === 0),
+    none
+  )
+}
+
+console.log("reading both files off a disk")
+
+/* The stub above proves the reading; this proves the two paths are the two
+   files, in a throwaway tree, which is the part a stub cannot say. */
+{
+  const root = await fs.mkdtemp(path.join(tmpdir(), "hub-plugin-switches-"))
+  const userHome = path.join(root, "home")
+  const workspace = path.join(root, "repo")
+  await fs.mkdir(path.join(userHome, ".claude"), { recursive: true })
+  await fs.mkdir(path.join(workspace, ".claude"), { recursive: true })
+  /* The machine has it on; the repository in use has switched it off. */
+  await fs.writeFile(
+    path.join(userHome, ".claude", "settings.json"),
+    JSON.stringify({ enabledPlugins: { "ponytail@ponytail": true } })
+  )
+  await fs.writeFile(
+    path.join(workspace, ".claude", "settings.json"),
+    JSON.stringify({ enabledPlugins: { "ponytail@ponytail": false } })
+  )
+
+  const recorded = await claudeCodeInstaller.switches?.({
+    ...bothTools,
+    files: createFsPlaceFiles({ home: path.join(root, "hub"), folder: workspace, userHome }),
+  })
+  check(
+    "the machine's file and the repository's are the two that get read",
+    recorded?.["user"]?.["ponytail@ponytail"] === true &&
+      recorded?.["project"]?.["ponytail@ponytail"] === false,
+    recorded
+  )
+  await fs.rm(root, { recursive: true, force: true })
+}
 
 console.log("reading lines this build cannot use")
 

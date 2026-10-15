@@ -38,7 +38,7 @@ import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
 import { PluginTile } from "./parts.tsx"
 import { packFile, packFileIn, packFiles, packFilesIn, type PluginClient } from "./library.ts"
-import { SCOPES_OF, scopeReached, scopeWords } from "./rows.ts"
+import { placeReached, SCOPES, scopeWords } from "./rows.ts"
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
@@ -67,8 +67,6 @@ import { toast } from "@workspace/ui/components/toast"
 import type { AssetScope } from "@workspace/extensions"
 
 /** The two scope groups a panel lists places under, in the order it reads them. */
-const SCOPES: readonly AssetScope[] = ["workspace", "global"]
-
 /** One picture or video on the stage. */
 interface MediaItem {
   id: string
@@ -687,9 +685,9 @@ function PlacesSection({
      delivered to it. A pack the agent got from some other marketplace is just as
      installed, and its row has to say so and offer the way out. */
   const heldIn = (client: PluginClient, scope: AssetScope): string[] =>
-    (plugin.held.find((one) => one.client === client.id)?.scopes ?? []).filter((one) =>
-      SCOPES_OF[scope].includes(one)
-    )
+    (plugin.held.find((one) => one.client === client.id)?.places ?? [])
+      .filter((one) => one.group === scope)
+      .map((one) => one.scope)
   /* Why this row cannot be taken at all: an agent that is not on this machine,
      or one whose own list could not be read — the second holds an unknown set of
      packs, which is not the same as holding none. */
@@ -707,7 +705,7 @@ function PlacesSection({
   const rows = SCOPES.map((scope) => ({
     label: t(`plugins.detail.group.${scope}`),
     options: clients.flatMap((client): PlaceOption[] => {
-      const reached = scopeReached(client.scopes, scope)
+      const reached = placeReached(client.places, scope)
       if (reached === undefined) return []
       return [
         {
@@ -716,7 +714,7 @@ function PlacesSection({
           label: client.label,
           /* The agent's own word for that one place: this hub has no path to
              show, because an installer never names one. */
-          note: scopeWords([reached], t),
+          note: scopeWords([reached.scopeWord], t),
         },
       ]
     }),
@@ -778,8 +776,8 @@ function PlacesSection({
         disabled={busy}
         aria-label={`${t("plugins.action.install")} ${client.label}`}
         onClick={() => {
-          const reached = scopeReached(client.scopes, at.scope)
-          if (reached !== undefined) onInstall(client.id, reached)
+          const reached = placeReached(client.places, at.scope)
+          if (reached !== undefined) onInstall(client.id, reached.scopeWord)
         }}
         className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
       >
@@ -1015,8 +1013,8 @@ function InfoPanel({
                place it is in, and the first refusal names what stopped it. */
             return (async () => {
               for (const hold of plugin.held) {
-                for (const scope of hold.scopes) {
-                  await onUninstall(hold.client, scope as PluginInstallScope)
+                for (const place of hold.places) {
+                  await onUninstall(hold.client, place.scope as PluginInstallScope)
                 }
               }
             })()

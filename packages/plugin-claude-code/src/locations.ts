@@ -42,6 +42,19 @@ export const CLAUDE_CODE_MCP_KEY = "mcpServers"
  */
 export const CLAUDE_CODE_DISABLED_KEY = "disabledMcpServers"
 
+/**
+ * Where Claude Code records which plugins it has switched on, under both roots
+ * alike: its own directory for the machine, `.claude` inside a project.
+ *
+ * The two are one file name because the two roots are the two directories, and
+ * the record inside is keyed by plugin id alone — one answer for a pack, not one
+ * per file. Which is why a hub that may speak for both files reads them.
+ */
+export const CLAUDE_CODE_SETTINGS_FILE = ".claude/settings.json"
+
+/** The node that file keeps the switches under, keyed by plugin id. */
+export const CLAUDE_CODE_ENABLED_KEY = "enabledPlugins"
+
 /** One place either scope reads assets from. */
 export interface ClaudeCodeLocation {
   /** What the path holds, e.g. "Skills". */
