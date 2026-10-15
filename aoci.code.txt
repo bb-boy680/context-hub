@@ -9,7 +9,6 @@ AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:用户声�
 DESIGN.md[SU7M]: F:设计 token 与组件规范 | R:- | A:- | S:唯一强调色 Coinbase Blue #0052ff 且克制使用；display 字重固定 400 不得加粗；圆角只有 pill 100px、xl 24px、full 9999px；交易绿红 #05b169 与 #cf202f 只作文本色不作背景
 README.md[SG5T]: F:模板说明与组件用法 | R:- | A:- | S:新增 UI 组件用 pnpm dlx shadcn@latest add -c apps/web，组件落在 packages/ui/src/components，业务侧统一从 @workspace/ui/components 导入
 package.json[FV8T]: F:monorepo 根脚本与工具链 | R:- | A:- | S:包管理器锁定 pnpm@10.33.4 且要求 node>=20；所有脚本经 turbo 转发到各包
-plugin.json[FE7T]: F:hub 插件库记录样本 | R:- | A:- | S:这是 hub 插件库的记录（形状同 packages/plugin-plugins/src/records.ts），不是本仓的扩展清单；末尾中文注释是待办：source 要按 url、git-subdir、local 三种形态改写
 pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不得手工编辑；改动会中断 CI 的冻结安装
 pnpm-workspace.yaml[FV7T]: F:工作区与构建白名单 | R:- | A:- | S:packages 列出 apps/*、packages/* 与 packages/agents-extensions/*（agent 扩展多一层）；allowBuilds 是安装脚本白名单，msw 为 false 表示不跑它的构建脚本
 tsconfig.json[FV5T]: F:仓库级编译基线 | R:- | A:- | S:只给 target/module/strict 等公共项，各包自己的 tsconfig 在此基础上加 include 与 jsx
@@ -78,7 +77,7 @@ check-provider.ts[TQ7S]: F:Codex MCP 提供者行为检查 | R:code:packages/age
 
 ===D:/work-space/dsh-context-hub/packages/agents-extensions/codex/src/===
 index.ts[IE8T]: F:Codex 集成注册 | R:code:packages/agents-extensions/codex/src/installer.ts,code:packages/agents-extensions/codex/src/provider.ts | A:codexExtension,createCodexMcp,codexInstaller | S:经 scope.inject 取 mcp 与 plugins 服务，任一模块禁用后其余仍可用（target 声明不依赖它们）；末尾 re-export 供外部直接引用
-installer.ts[IE8S]: F:Codex 插件交付 | R:- | A:codexInstaller,readHeld | S:用 codex plugin marketplace add 注册 hub 库根，不写 config.toml 与版本化缓存；Codex 无 per-plugin 开关故不实现 setEnabled，scope 只有 user
+installer.ts[IE8S]: F:Codex 插件交付 | R:- | A:codexInstaller,readHeld | S:用 codex plugin marketplace add 注册 hub 库根，不写 config.toml 与版本化缓存；Codex 无 per-plugin 开关故不实现 setEnabled，scope 只有 user；remove 用客户端自己报的 pluginId 而非拼市场名，否则删不到别处装来的包
 messages.ts[CL3T]: F:Codex 英文默认文案 | R:- | A:codexMessages | S:命名空间 codex.*；语言包只覆盖已有键，缺失的键由内核回退到本表
 provider.ts[IN9S]: F:Codex MCP 配置读写 | R:- | A:createCodexMcp | S:只写 ~/.codex/config.toml 的 mcp_servers 表（snake_case，与其他 JSON 客户端的 mcpServers 不同）；用 enabled 布尔关停而非删掉声明；重写时必须保留注释与单引号等原始布局
 
@@ -273,7 +272,7 @@ check-provider.ts[TQ8M]: F:Claude Code MCP 提供者检查 | R:code:packages/plu
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/src/===
 index.ts[IE9S]: F:Claude Code 集成注册 | R:code:packages/plugin-claude-code/src/installer.ts,code:packages/plugin-claude-code/src/locations.ts,code:packages/plugin-claude-code/src/provider.ts | A:claudeCodeExtension,createClaudeCodeMcp,claudeCodeInstaller | S:三个 inject（mcp/plugins/skills）各自独立，任一模块禁用其余仍可用；注册两个 skills place（项目 .claude/skills 与全局 ~/.claude/skills）
-installer.ts[IE8S]: F:Claude Code 插件交付 | R:code:packages/plugin-claude-code/src/locations.ts | A:claudeCodeInstaller,readHeld | S:先 marketplace add 注册库根再 claude plugin install --scope；不写 installed_plugins.json 与缓存；readHeld 取 readFromFolder 优先于 installPath，无 marketplace 的行丢弃
+installer.ts[IE8S]: F:Claude Code 插件交付 | R:code:packages/plugin-claude-code/src/locations.ts | A:claudeCodeInstaller,readHeld | S:先 marketplace add 注册库根再 claude plugin install --scope；不写 installed_plugins.json 与缓存；readHeld 取 readFromFolder 优先于 installPath，无 marketplace 的行丢弃；remove 收的是客户端自己报的 id（带它自己的市场名），不再拼本 hub 的市场名
 locations.ts[CE7T]: F:Claude Code 路径与键名事实 | R:- | A:CLAUDE_CODE_ID,CLAUDE_CODE_SKILL_DIR,CLAUDE_CODE_MCP_FILE,CLAUDE_CODE_GLOBAL_MCP_FILE,CLAUDE_CODE_DISABLED_KEY,SUPPORTS | S:项目技能目录是 .claude/skills 而非共享的 .agents/skills；.mcp.json 属项目、.claude.json 是客户端全局文档；停用开关是全局文档里按项目路径索引的 disabledMcpServers 列表
 messages.ts[CL3T]: F:Claude Code 英文文案 | R:- | A:claudeCodeMessages | S:命名空间 claudeCode.*，含 machineScope 与 noProject 两条拒绝
 provider.ts[IN9M]: F:Claude Code MCP 文件读写 | R:code:packages/plugin-claude-code/src/locations.ts | A:createClaudeCodeMcp | S:两个 place（.mcp.json 项目、.claude.json 全局）都是 JSONC，逐节点改写不得重排既有内容；停用列表属项目而非文件，故只有 workspace place 可开关、全局 place 的 switchable 为 false；项目键按分隔符与大小写归一匹配，客户端没记录过该目录时拒绝写入而不新建记录
@@ -334,43 +333,43 @@ records.ts[PD8S]: F:hub 自己的记录文件 | R:code:packages/plugin-mcp/src/r
 eslint.config.js[FQ3T]: F:插件模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
 package.json[FV8T]: F:插件模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./provider、./library、./vite；依赖 @headless-tree 画文件树
 tsconfig.json[FV3T]: F:插件模块编译选项 | R:- | A:- | S:与 cline 包同构，目标 ES2022、jsx react-jsx
-vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作，因为每次都是同一份库的读改写，拆开只会把它摊得更散：读在 query 里点名，写在 body 里带；每个响应都 no-store，包文件在更新时会变，缓存住的模块会显示已被替换的版本
+vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；每个响应都 no-store；files/file 二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致——两边写错过一次，使查看文件一直静默为空
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/scripts/===
-check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/inspect.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析的接受与拒绝、收进库写了什么、包里哪张图被当作自己的 logo、源动了是否被发现，以及注册表交给 installer 什么
-check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；除折合与合并外还验按作用域分组的页签（SCOPES_OF 是各 agent 自己的词汇）与行落在哪个页签
+check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒
+check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签、行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录有没有跟到行上
 check-plugin-scan.ts[TQ7M]: F:并发扫描客户端检查 | R:code:packages/plugin-plugins/src/scan.ts | A:- | S:用桩件（自己数进入次数）证明是并发而非串行、答案保持提问顺序、以及一个客户端失败只是一个答案而不是整次扫描失败
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/src/===
 add-plugin-dialog.tsx[DU7L]: F:新增插件对话框 | R:code:packages/plugin-plugins/src/library.ts | A:AddPluginDialog,AddPluginTab | S:地址是收一个包、没有可选项也没有要先查的东西；文件夹不是「一个包」——可能是包也可能是包的仓库，所以每个找到的包各占一行、各自收集
 contract.ts[CE9S]: F:插件包契约与常量 | R:- | A:PluginOrigin,PluginUpstream,PluginCheck,PackDescription,hasUpstream,PLUGIN_MANIFESTS | S:git-subdir 被刻意排除在可问来源之外：它记的 revision 是仓库的，要问的却是子目录自己的最后提交，问仓库会在别人动了无关目录时报「有更新」，故宁可答「无法回答」；包清单可能在三个位置之一，这也是「这个目录是不是包」的判据
-detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/src/library.ts | A:PluginDetailDialog | S:这里添加的图片活在窗口内（自己的 object URL）而不落盘，因为本模块不写包的目录；文件面板读宿主里真实内容，读不到就留空而不塞占位
+detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginDetailDialog,PlacesSection,SourceSection,DeleteBubble | S:位置行一行是一个客户端，id 带 scope 前缀；装没装按 plugin.held 判；文件面板按 stored 选库或 agent 目录；页脚恒两个按钮，未收录时删除让持有它的 agent 撤下来；路径跨行用 break-all
 file-tree.tsx[DU5S]: F:包文件树 | R:- | A:PluginFileTree,fileTreeKey | S:展开、焦点、方向键与 ARIA 树结构交给 headless-tree，本文件只画行；树在挂载时构建一次项目表，之后列表变化必须换 key 让它重新挂载
 index.ts[EE8T]: F:插件模块定义与导出 | R:code:packages/plugin-plugins/src/provider.ts | A:pluginsExtension,PluginsPage | S:服务在任何其他事之前发布，故同一轮启用的 agent 插件一激活就能注册；本模块不指名任何 agent
 inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/plugin-plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 是同一件事的前后，故用同样四个词；本地路径必须绝对——宿主的工作目录对在浏览器里打字的人毫无意义；认不出的形式直接带理由拒绝，因为「把词当名字去某处查」是市场的职责
-install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/plugin-plugins/src/library.ts | A:PluginActions | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是作用域菜单而非开关；菜单在 portal 里但仍是所在行的 React 子节点，点击必须 stop，否则会连带打开灯箱
-library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,PluginCollected,PluginUpdateOutcome | S:桥持有文件与关于文件的真相，这一侧只留最后一次答案并在每次写入后重问——任何一次写入都可能改到它没点名的东西（收一个包会重写索引与市场，更新会落到 agent 的副本上）；agent 自己的答案在这一侧折合，不在桥上
+install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/plugin-plugins/src/library.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单在 portal 里但仍是所在行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判
+library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,packFiles,packFilesIn | S:桥持有文件与真相，这一侧只留最后一次答案并在每次写入后重问；agent 自己的答案在这一侧折合，不在桥上；uninstall 要先从折合后的答案里查客户端自己的 id，查不到则拒绝；查文件按名字走库，按目录走 agent 那份
 messages.ts[CE7S]: F:插件模块英文文案 | R:- | A:pluginsMessages | S:命名空间 plugins.*，随包一起走，语言包无需依赖本包即可翻译；无包覆盖的键保留这里的英文
-page.tsx[AU8L]: F:插件目录页 | R:code:packages/plugin-plugins/src/add-plugin-dialog.tsx,code:packages/plugin-plugins/src/detail-dialog.tsx,code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginsPage | S:顶部注释仍写着「行来自 ./sample.ts」，但 sample.ts 已不存在、行实际来自 library.ts 与 rows.ts——照注释找会白跑一趟
+page.tsx[AU8L]: F:插件目录页 | R:code:packages/plugin-plugins/src/add-plugin-dialog.tsx,code:packages/plugin-plugins/src/detail-dialog.tsx,code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginsPage | S:卡片自带动作按钮，故不能是真 button：Enter/空格在 onKeyDown 里处理，且要求 event.target === event.currentTarget，否则行内按钮的回车会连带开灯箱；openDetail 刻意不判 stored——未收录的包同样开详情，由弹窗决定给「收录」还是给文件与安装菜单；弹窗拿的库路径是 library.root，检查更新走 library.checkUpdate
 parts.tsx[DU3T]: F:插件视图的小件 | R:- | A:PluginTile | S:与 MCP 模块同一块瓷砖、同样两个尺寸
 pictures.ts[CE7S]: F:判断哪张图是包的 | R:- | A:pictureOf,bestPicture,PICTURE_TYPES,PICTURE_DEPTH | S:规则被用两次（宿主拷进资产库，页面预览同一张）必须一致，否则行会提供库随后说不存在的图；次序：深度、名字是否就是 logo 或 icon、是否不带变体或语言，最后按路径序
-provider.ts[CE9M]: F:插件安装器服务契约 | R:code:packages/plugin-plugins/src/contract.ts | A:PluginInstaller,PluginService,PluginTools,PluginHeld,createPluginInstallerRegistry,PluginInstallError | S:是 service 而非 contribution；installer 只拿到 tools（跑程序、库根、读包说明），不自己碰磁盘或进程，这既是它能写一次驱动所有形态的原因；setEnabled 缺失是 agent 的事实而不是缺陷
+provider.ts[CE9M]: F:插件安装器服务契约 | R:code:packages/plugin-plugins/src/contract.ts | A:PluginInstaller,PluginService,PluginTools,PluginHeld,createPluginInstallerRegistry,PluginInstallError | S:是 service 而非 contribution；installer 只拿到 tools，不自己碰磁盘或进程；install 收包名（本 hub 供货），remove 收客户端自己的 id，两者形式不同且不可互换，混用会指向不存在的市场名
 records.ts[CE8M]: F:库索引文件格式 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:readIndex,serializeIndex,recordOf,ownPicturePrefix,emptyIndex | S:记录里有两种图且不可互换：icon 是包自带的那张，assets 是人加的；旧记录把自带图混在 assets 里，读取时凭「引用落在包自己的目录下」把它搬回 icon；来源词写在 source 下（Claude Code 市场 schema 的拼法），旧的 kind/git/path/etag 仍要读得回来
 revision.ts[DE8S]: F:新旧与改动判定 | R:code:packages/plugin-plugins/src/contract.ts | A:outdated,modified,checkable,PluginRecord,PluginUpdateSummary,PluginUpdateCheck | S:两个问题需要两种事实：源是否前进看记录的 revision 与检查到的 latest，文件是否被改看目录哈希与检查时的 currentHash；没人查过的记录不算落后于任何东西，这里也从不发起网络
-rows.ts[DE8M]: F:目录行的合成 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/provider.ts,code:packages/plugin-plugins/src/revision.ts | A:composeRows,collectScanned,toRow,heldRow,rowsForTab,SCOPES_OF | S:库记录与 agent 的答案合成一张表是有意的——装在 agent 里的包是不是 hub 收的都真实存在，「还没进库」这一个事实在行上才看得见；作用域页签用的是各 agent 自己的词（Claude Code 三个都叫，Codex 只有机器级），SCOPES_OF 是分组页签与其行不脱节的那一处
+rows.ts[DE8M]: F:目录行的合成 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/provider.ts,code:packages/plugin-plugins/src/revision.ts | A:composeRows,collectScanned,toRow,heldRow,rowsForTab,SCOPES_OF | S:库记录与 agent 的答案合成一张表是有意的——装在 agent 里的包是不是 hub 收的都真实存在，「还没进库」这一个事实在行上才看得见；作用域页签用的是各 agent 自己的词；折合时 agent 自己的 id 与它报的目录都要跟到行上
 scan.ts[DE7T]: F:并发询问各客户端 | R:code:packages/plugin-plugins/src/provider.ts | A:probeInstallers,ClientProbe | S:逐个问会让页面等它们之和，故一起问；一起问就得让一个失败只是它自己的答案，每个探针就地 settle、把原因带回而非抛出——在这但读不了与不在这看似一样，只有原因分得开
 tools.ts[IE8T]: F:安装器工具集的远端实现 | R:code:packages/plugin-plugins/src/provider.ts | A:createRemotePluginTools | S:安装器从不碰磁盘或进程，只报程序名与参数，由这一侧带给宿主；浏览器形态走 /hub/plugins
-types.ts[CE7T]: F:插件页面渲染形状 | R:- | A:PluginRow,PluginHeldBy,PluginSource,PluginFileEntry | S:来源词是屏幕的而不是记录的——记录写 url，行写它实际属于哪种仓库；只被 agent 持有的包在本机是目录，也按目录措辞
+types.ts[CE7T]: F:插件页面渲染形状 | R:- | A:PluginRow,PluginHeldBy,PluginSource,PluginFileEntry | S:来源词与来源地址是两件事；只被 agent 持有的包在本机是目录，且 directory 只在那种行上有（文件面板读它）；PluginHeldBy.id 是客户端自己的 id，删包只能靠它
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/src/host/===
 collect.ts[PE8M]: F:把一个包收进库 | R:code:packages/plugin-plugins/src/host/fetch.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/inspect.ts | A:createPluginCollector,PluginCollector,PackUpload | S:顺序固定且对每种来源相同：文件先落在库里不知道的暂存目录，在那里读包自己的清单，之后才移入并写行——任何一步失败在移动之前都让库原样，这就是可重试的原因；不读任何 marketplace
 describe.ts[PE7S]: F:读包自己写的说明 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/host/logo.ts | A:describePack,readManifestFields | S:目录没有清单不是错误，答空字段而不编一句话；图片经 hub 资产库存一份，故行永不指向 agent 安装目录——那个路径在卸载后立即失效
 fetch.ts[IE8M]: F:把包取到本机 | R:code:packages/plugin-plugins/src/host/names.ts,code:packages/plugin-plugins/src/inspect.ts | A:fetchPlugin,stagingDir,PluginFetchError | S:四种来源最终都落到同一个暂存目录，且只留包自己的文件：git 检出会丢掉 .git（客户端自己的缓存也是这样）；这里只产出目录，不判断包「是什么」
-library.ts[PE9L]: F:磁盘插件库 | R:code:packages/plugin-plugins/src/records.ts,code:packages/plugin-plugins/src/revision.ts | A:createFsPluginLibrary,PluginLibrary,readPackManifest,PackFileEntry | S:hub 存文件而不是指向来源，这正是库可交付的原因（同一目录可被 agent 加为市场、可提交、可搬到另一台机）；两条规则沿用自技能库：写入经单队列串行（每次都是同一索引的读改写），且索引先写、文件后删，失败时留下的是「行指向仍在的东西」而不是无人知道的目录
+library.ts[PE9L]: F:磁盘插件库 | R:code:packages/plugin-plugins/src/records.ts,code:packages/plugin-plugins/src/revision.ts | A:createFsPluginLibrary,listDirectory,readInDirectory,PackFileEntry | S:hub 存文件而不是指向来源，这正是库可交付的原因；写入经单队列串行，且索引先写、文件后删；读一个包与读一个 agent 目录是同一条实现（按目录），越界路径在开文件前就被拒
 logo.ts[PE5S]: F:找并保存包自己的图 | R:code:packages/plugin-plugins/src/pictures.ts | A:findLogo,storePicture,assetPresent | S:找到的图是复制而不是引用包内路径——记录只持有一种引用，只在包装着时能解析的引用不算引用；遍历有深度与条数上限，因为包是别人的仓库，可能带着整站图片
 marketplace.ts[PE8S]: F:库根携带的市场索引 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:writeMarketplaceIndex,marketplaceIndex,codexMarketplaceIndex | S:一个根同时服务多个客户端（Claude Code 读 .claude-plugin/marketplace.json，Codex 读 .agents/plugins/marketplace.json），各找自己的文件、忽略其他；索引是派生的，每个字段都来自各包自己的清单，从当前库状态写出而不是手工同步
 names.ts[PS7T]: F:库内路径安全校验 | R:- | A:assertSafeSegment,assertPackRelative | S:包名既是目录名也是各客户端的 id，故两件事都在此裁决：拒绝空、隐藏、含分隔符、控制字符与 Windows 保留设备名；人选的文件夹以路径列表到达，每条路径先判过才能写
-probe.ts[IE7S]: F:询问源是否前进 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:createPluginProbe,PluginProbe,CHECK_VERSION | S:市场装的只是副本，不知道源变了，故问源自己：仓库用 git ls-remote 只读 refs 且问当初取的那个 ref；压缩包用 HEAD 取校验器；本机目录答问不了
+probe.ts[IE7S]: F:询问源是否前进 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:createPluginProbe,PluginProbe,CHECK_VERSION | S:问源自己：仓库用 git ls-remote 只读 refs 且问当初取的那个 ref；压缩包用 HEAD 取校验器；本机目录答问不了；单个包与整批走同一条问法、记在同一处，故答案要从记录上读
 program.ts[RE7T]: F:运行控制台程序 | R:- | A:runProgram,hasProgram,ProgramResult | S:参数以列表传递并在此加引号，故带空格的路径仍是一个参数、用户输入不会未经引号进入 shell；客户端在 Windows 上是脚本，这才是要经 shell 启动的原因；本包唯一起子进程的地方
 update.ts[PE7S]: F:把包更新到源当前状态 | R:code:packages/plugin-plugins/src/host/fetch.ts,code:packages/plugin-plugins/src/host/library.ts | A:createPluginUpdater,PluginUpdater,PluginUpdateOutcome | S:下载本身不构成更新：落地文件可能逐字节相同（回退、只改 README、子目录没真变），故先对暂存求哈希，与记录相同就直接结束；确实变了才一步替换目录，记录在其后写
 
