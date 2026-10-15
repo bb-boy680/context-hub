@@ -174,7 +174,7 @@ messages.ts[CL3T]: F:Windsurf 英文文案 | R:- | A:windsurfMessages | S:命名
 eslint.config.js[FQ3T]: F:core 包 lint 规则 | R:- | A:- | S:globals 必须同时含 browser 与 node，本包含两端代码
 package.json[FV8T]: F:core 包对外导出表 | R:- | A:assets,net,place-files,plugins,state,workspace | S:exports 的子路径就是各模块的唯一入口；./vite 指向仓库根的 vite.ts 而非 src 下；host/* 是磁盘侧实现；新增模块必须在此登记子路径，否则 web 侧无法导入
 tsconfig.json[FV5T]: F:core 包编译选项 | R:- | A:- | S:include 必须同时含 src 与 vite.ts，否则根部的 vite 插件不进类型检查
-vite.ts[IV9L]: F:开发期宿主桥接插件 | R:code:packages/core/src/assets.ts,code:packages/core/src/net.ts,code:packages/core/src/place-files.ts,code:packages/core/src/plugins.ts,code:packages/core/src/state.ts,code:packages/core/src/workspace.ts | A:assetLibrary,stateStore,placeFiles,extensionFiles,netProxy,workspaceList | S:netProxy 刻意收窄防 SSRF：仅 https、仅公网主机（拒 loopback 与私有、链路本地段）、不跟重定向、只 GET、10s 超时、正文上限 4MB；资产与扩展文件只读（写入必须走记录它们的 store），状态文档可读写；扩展文件响应一律 no-store
+vite.ts[IV9L]: F:开发期宿主桥接插件 | R:code:packages/core/src/assets.ts,code:packages/core/src/net.ts,code:packages/core/src/place-files.ts,code:packages/core/src/plugins.ts,code:packages/core/src/state.ts,code:packages/core/src/workspace.ts | A:assetLibrary,stateStore,placeFiles,extensionFiles,netProxy,workspaceList | S:netProxy 刻意收窄防 SSRF：仅 https、仅公网主机（拒 loopback 与私有、链路本地段）、不跟重定向、只 GET、10s 超时、正文上限 4MB；资产与扩展文件只读（写入必须走记录它们的 store），状态文档可读写；扩展文件响应一律 no-store；contentTypeOf 已导出，因为插件包那条 raw 路由也要按同一张表答类型
 
 ===D:/work-space/dsh-context-hub/packages/core/scripts/===
 check-place-files.ts[TQ7S]: F:客户端文件接缝行为检查 | R:code:packages/core/src/place-files.ts,code:packages/core/src/host/place-files.ts | A:- | S:夹具要先写入 state/workspaces.json 才有 workspace 根；断言绝对路径、.. 越界、未知 scope 三类拒绝，以及读缺失文件返回 null 而非报错
@@ -202,7 +202,7 @@ workspaces-fs.ts[PD8M]: F:磁盘工作区列表 | R:code:packages/core/src/works
 
 ===D:/work-space/dsh-context-hub/packages/extensions/===
 eslint.config.js[FQ3T]: F:extensions 包 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
-package.json[FV8T]: F:extensions 包导出表 | R:- | A:- | S:exports 暴露 . 与 ./react、./builtin、./components 四个入口；内核框架依赖 @deepseek-ai/cordis
+package.json[FV8T]: F:extensions 包导出表 | R:- | A:- | S:exports 暴露 . 与 ./react、./builtin、./components 四个入口；内核框架依赖 @deepseek-ai/cordis；shiki 已下沉到 @workspace/ui，这里不再直接依赖
 tsconfig.json[FV3T]: F:extensions 包编译选项 | R:- | A:- | S:include 只有 src；不列 types（与 core 的 node 类型不同）
 
 ===D:/work-space/dsh-context-hub/packages/extensions/examples/acme-mcp/===
@@ -224,7 +224,7 @@ locale-en.ts[CL9S]: F:锁定的英文基础语言包 | R:- | A:englishLocale | S
 
 ===D:/work-space/dsh-context-hub/packages/extensions/src/components/===
 avatar-stack.tsx[CU5T]: F:重叠图标组 | R:- | A:AvatarStack,AvatarMark | S:ring 颜色由调用方 seam 参数给定（所在表面不同则值不同）；超过 max 时最后一格改画 +N 圆盘
-code-view.tsx[CU5M]: F:语法高亮代码视图 | R:- | A:CodeView,CodeCard | S:shiki highlighter 每会话只建一次且只含这些语言；用 JS 正则引擎避免引入 wasm；defaultColor=false 让配色跟随应用主题；title 缺省时复制按钮浮在文本上
+code-view.tsx[CU5M]: F:语法高亮代码视图 | R:code:packages/ui/src/lib/highlight.ts | A:CodeView,CodeCard | S:高亮器是 @workspace/ui 里那一份共享的，每会话只建一次、只含这些语言；用 JS 正则引擎避免引入 wasm；defaultColor=false 让配色跟随应用主题；title 缺省时复制按钮浮在文本上
 dialog-split.tsx[CU5T]: F:对话框左右分栏框架 | R:- | A:DialogSplit | S:左侧自适应右侧固定 360px；尺寸与分割都由本组件管，标题与关闭按钮属调用方，故此处不画关闭按钮
 filter-bar.tsx[CU7S]: F:列表筛选栏 | R:- | A:FilterBar,FilterBarWords | S:类型超过 4 个时折成 +N 片；/ 聚焦与 Esc 清空都在文档说到的键上实现，输入框内不触发；折叠行用 min-w-fit 保证不被拦腰换行
 index.ts[CE7T]: F:共享控件导出面 | R:- | A:- | S:各屏从此处导入而非具体文件，控件住在哪个模块是本包内部事务；新增控件（如 action-tab.tsx）要在此追加导出
@@ -333,39 +333,39 @@ records.ts[PD8S]: F:hub 自己的记录文件 | R:code:packages/plugin-mcp/src/r
 eslint.config.js[FQ3T]: F:插件模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
 package.json[FV8T]: F:插件模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./provider、./library、./vite；依赖 @headless-tree 画文件树
 tsconfig.json[FV3T]: F:插件模块编译选项 | R:- | A:- | S:与 cline 包同构，目标 ES2022、jsx react-jsx
-vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/contents.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；响应都 no-store；files/file/contents 三个读动作二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致；program 在工作区目录里跑——不给就把 dev server 自己的包当成项目
+vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/contents.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；响应都 no-store；读动作二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致；raw 发字节而不发文本，供文档引用包内图片；program 在工作区目录里跑
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/scripts/===
 check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒、子进程的工作目录，以及包目录里 skills/ 与 commands/ 的扫描；node scripts/check-plugin-library.ts 直接运行
-check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签、行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录有没有跟到行上，以及一行里各 scope 的措辞
+check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签与行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录跟没跟到行上，以及「包自带 logo 不填封面」
 check-plugin-scan.ts[TQ7M]: F:并发扫描客户端检查 | R:code:packages/plugin-plugins/src/scan.ts | A:- | S:用桩件（自己数进入次数）证明是并发而非串行、答案保持提问顺序、以及一个客户端失败只是一个答案而不是整次扫描失败
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/src/===
 add-plugin-dialog.tsx[DU7L]: F:新增插件对话框 | R:code:packages/plugin-plugins/src/library.ts | A:AddPluginDialog,AddPluginTab | S:地址是收一个包、没有可选项也没有要先查的东西；文件夹不是「一个包」——可能是包也可能是包的仓库，所以每个找到的包各占一行、各自收集
 contract.ts[CE9S]: F:插件包契约与常量 | R:- | A:PluginOrigin,PluginUpstream,PluginCheck,PackDescription,PackContents,PLUGIN_MANIFESTS | S:git-subdir 被刻意排除在可问来源之外：它记的 revision 是仓库的，要问的却是子目录自己的最后提交，问仓库会在别人动了无关目录时报「有更新」，故宁可答「无法回答」；包清单可能在三个位置之一，这也是「这个目录是不是包」的判据；PackContents 里的空列表与 null 不是缺数据，而是「那个页签不提供」，故卡片渲染时不能拿它当空内容画一个空页签
-detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginDetailDialog,PackPane,ContentList,PlacesSection,SourceSection,DeleteBubble | S:左栏页签条只列扫到的东西；扫描只在挂载时发一次；展示图页 keepMounted，图只存在窗口里；列表行是 item 卡片加图标砖；位置行按 plugin.held 判
+detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginDetailDialog,PackPane,ContentList,PlacesSection,SourceSection,DeleteBubble | S:页签条只列扫到的东西；展示图页 keepMounted，图只存在窗口里；位置行按 plugin.held 判；无图时渲染 README 并带上 packImageBase，都没有才落占位块
 file-tree.tsx[DU5S]: F:包文件树 | R:- | A:PluginFileTree,fileTreeKey | S:展开、焦点、方向键与 ARIA 树结构交给 headless-tree，本文件只画行；树在挂载时构建一次项目表，之后列表变化必须换 key 让它重新挂载
 index.ts[EE8T]: F:插件模块定义与导出 | R:code:packages/plugin-plugins/src/provider.ts | A:pluginsExtension,PluginsPage | S:服务在任何其他事之前发布，故同一轮启用的 agent 插件一激活就能注册；本模块不指名任何 agent
 inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/plugin-plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 是同一件事的前后，故用同样四个词；本地路径必须绝对——宿主的工作目录对在浏览器里打字的人毫无意义；认不出的形式直接带理由拒绝，因为「把词当名字去某处查」是市场的职责
 install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单是行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判；措辞从 rows.ts 取
-library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,packFiles,packFilesIn,packContents | S:桥持有文件与真相，这一侧只留最后一次答案并在每次写入后重问；agent 自己的答案在这一侧折合，不在桥上；uninstall 要先从折合后的答案里查客户端自己的 id，查不到则拒绝；读文件与读包内容都按名字走库、按目录走 agent 那份
+library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,packContents,usePackReadme,packImageBase | S:桥持有文件与真相，这一侧只留最后一次答案并在每次写入后重问；agent 自己的答案在这一侧折合，不在桥上；uninstall 要先从折合后的答案里查客户端自己的 id，查不到则拒绝；读文本、读内容、读图片都按名字走库、按目录走 agent 那份；usePackReadme 刻意不缓存，因为它要放进 effect 依赖的必须是用 useCallback 包出的读函数，放 promise 会无限重拉
 messages.ts[CE7S]: F:插件模块英文文案 | R:- | A:pluginsMessages | S:命名空间 plugins.*，随包一起走，语言包无需依赖本包即可翻译；无包覆盖的键保留这里的英文
-page.tsx[AU8L]: F:插件目录页 | R:code:packages/plugin-plugins/src/add-plugin-dialog.tsx,code:packages/plugin-plugins/src/detail-dialog.tsx,code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginsPage | S:卡片自带动作按钮，故不能是真 button：Enter/空格在 onKeyDown 里处理，且要求 event.target === event.currentTarget，否则行内按钮的回车会连带开灯箱；openDetail 刻意不判 stored——未收录的包同样开详情，由弹窗决定给「收录」还是给文件与安装菜单；弹窗拿的库路径是 library.root，检查更新走 library.checkUpdate
+page.tsx[AU8L]: F:插件目录页 | R:code:packages/plugin-plugins/src/add-plugin-dialog.tsx,code:packages/plugin-plugins/src/detail-dialog.tsx,code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginsPage | S:卡片自带动作按钮，故不能是真 button：Enter/空格在 onKeyDown 里处理，且要求 event.target === event.currentTarget，否则行内按钮的回车会连带开灯箱；openDetail 刻意不判 stored——未收录的包同样开详情，由弹窗决定给「收录」还是给文件与安装菜单；无 cover 的卡片封面渲染 README 并带上 packImageBase
 parts.tsx[DU3T]: F:插件视图的小件 | R:- | A:PluginTile | S:与 MCP 模块同一块瓷砖、同样两个尺寸
 pictures.ts[CE7S]: F:判断哪张图是包的 | R:- | A:pictureOf,bestPicture,PICTURE_TYPES,PICTURE_DEPTH | S:规则被用两次（宿主拷进资产库，页面预览同一张）必须一致，否则行会提供库随后说不存在的图；次序：深度、名字是否就是 logo 或 icon、是否不带变体或语言，最后按路径序
 provider.ts[CE9M]: F:插件安装器服务契约 | R:code:packages/plugin-plugins/src/contract.ts | A:PluginInstaller,PluginService,PluginTools,PluginHeld,createPluginInstallerRegistry,PluginInstallError | S:是 service 而非 contribution；installer 只拿到 tools，不自己碰磁盘或进程；install 收包名（本 hub 供货），remove 收客户端自己的 id，两者形式不同且不可互换，混用会指向不存在的市场名
 records.ts[CE8M]: F:库索引文件格式 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:readIndex,serializeIndex,recordOf,ownPicturePrefix,emptyIndex | S:记录里有两种图且不可互换：icon 是包自带的那张，assets 是人加的；旧记录把自带图混在 assets 里，读取时凭「引用落在包自己的目录下」把它搬回 icon；来源词写在 source 下（Claude Code 市场 schema 的拼法），旧的 kind/git/path/etag 仍要读得回来
 revision.ts[DE8S]: F:新旧与改动判定 | R:code:packages/plugin-plugins/src/contract.ts | A:outdated,modified,checkable,PluginRecord,PluginUpdateSummary,PluginUpdateCheck | S:两个问题需要两种事实：源是否前进看记录的 revision 与检查到的 latest，文件是否被改看目录哈希与检查时的 currentHash；没人查过的记录不算落后于任何东西，这里也从不发起网络
-rows.ts[DE8M]: F:目录行的合成 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/provider.ts,code:packages/plugin-plugins/src/revision.ts | A:composeRows,collectScanned,toRow,heldRow,rowsForTab,scopeWords | S:库记录与 agent 的答案合成一张表是有意的——装在 agent 里的包是不是 hub 收的都真实存在，「还没进库」这一个事实在行上才看得见；作用域页签用的是各 agent 自己的词；折合时 agent 自己的 id 与它报的目录都要跟到行上；scopeWords 会略去被同组更窄的措辞包含的那个词
+rows.ts[DE8M]: F:目录行的合成 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/provider.ts,code:packages/plugin-plugins/src/revision.ts | A:composeRows,collectScanned,toRow,heldRow,rowsForTab,scopeWords | S:库记录与 agent 的答案合成一张表是有意的——装在 agent 里的包无论 hub 收没收都真实存在，「还没进库」在行上看得见；作用域页签用各 agent 自己的词；折合时 agent 自己的 id 与它报的目录都要跟到行上；scopeWords 略去同组更窄词包含的；cover 只取 record.assets[0]，包自带的 logo 是 icon，没有 cover 的行由卡片渲染 README
 scan.ts[DE7T]: F:并发询问各客户端 | R:code:packages/plugin-plugins/src/provider.ts | A:probeInstallers,ClientProbe | S:逐个问会让页面等它们之和，故一起问；一起问就得让一个失败只是它自己的答案，每个探针就地 settle、把原因带回而非抛出——在这但读不了与不在这看似一样，只有原因分得开
 tools.ts[IE8T]: F:安装器工具集的远端实现 | R:code:packages/plugin-plugins/src/provider.ts | A:createRemotePluginTools | S:安装器从不碰磁盘或进程，只报程序名与参数，由这一侧带给宿主；浏览器形态走 /hub/plugins
-types.ts[CE7T]: F:插件页面渲染形状 | R:- | A:PluginRow,PluginHeldBy,PluginSource,PluginFileEntry | S:来源词与来源地址是两件事；只被 agent 持有的包在本机是目录，且 directory 只在那种行上有（文件面板读它）；PluginHeldBy.id 是客户端自己的 id，删包只能靠它
+types.ts[CE7T]: F:插件页面渲染形状 | R:- | A:PluginRow,PluginHeldBy,PluginSource,PluginFileEntry | S:来源词与来源地址是两件事；只被 agent 持有的包在本机是目录，directory 只在那种行上有；PluginHeldBy.id 是客户端自己的 id，删包靠它；cover 只由人加的图填，包自带 logo 是 icon
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/src/host/===
 collect.ts[PE8M]: F:把一个包收进库 | R:code:packages/plugin-plugins/src/host/fetch.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/inspect.ts | A:createPluginCollector,PluginCollector,PackUpload | S:顺序固定且对每种来源相同：文件先落在库里不知道的暂存目录，在那里读包自己的清单，之后才移入并写行——任何一步失败在移动之前都让库原样，这就是可重试的原因；不读任何 marketplace
 describe.ts[PE7S]: F:读包自己写的说明 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/host/logo.ts | A:describePack,readManifestFields | S:目录没有清单不是错误，答空字段而不编一句话；图片经 hub 资产库存一份，故行永不指向 agent 安装目录——那个路径在卸载后立即失效
 fetch.ts[IE8M]: F:把包取到本机 | R:code:packages/plugin-plugins/src/host/names.ts,code:packages/plugin-plugins/src/inspect.ts | A:fetchPlugin,stagingDir,PluginFetchError | S:四种来源最终都落到同一个暂存目录，且只留包自己的文件：git 检出会丢掉 .git（客户端自己的缓存也是这样）；这里只产出目录，不判断包「是什么」
-library.ts[PE9L]: F:磁盘插件库 | R:code:packages/plugin-plugins/src/records.ts,code:packages/plugin-plugins/src/revision.ts | A:createFsPluginLibrary,listDirectory,readInDirectory,PackFileEntry | S:hub 存文件而不是指向来源，这正是库可交付的原因；写入经单队列串行，且索引先写、文件后删；读一个包与读一个 agent 目录是同一条实现（按目录），越界路径在开文件前就被拒
+library.ts[PE9L]: F:磁盘插件库 | R:code:packages/plugin-plugins/src/records.ts,code:packages/plugin-plugins/src/revision.ts | A:createFsPluginLibrary,listDirectory,readInDirectory,readBytesInDirectory,PackFileEntry | S:hub 存文件而不是指向来源，这正是库可交付的原因；写入经单队列串行，且索引先写、文件后删；读一个包与读一个 agent 目录是同一条实现（按目录），越界路径在开文件前就被同一条判据拒；文本与字节是两个入口，因为解不出文本的字节不能拿占位文本顶替
 logo.ts[PE5S]: F:找并保存包自己的图 | R:code:packages/plugin-plugins/src/pictures.ts | A:findLogo,storePicture,assetPresent | S:找到的图是复制而不是引用包内路径——记录只持有一种引用，只在包装着时能解析的引用不算引用；遍历有深度与条数上限，因为包是别人的仓库，可能带着整站图片
 marketplace.ts[PE8S]: F:库根携带的市场索引 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:writeMarketplaceIndex,marketplaceIndex,codexMarketplaceIndex | S:一个根同时服务多个客户端（Claude Code 读 .claude-plugin/marketplace.json，Codex 读 .agents/plugins/marketplace.json），各找自己的文件、忽略其他；索引是派生的，每个字段都来自各包自己的清单，从当前库状态写出而不是手工同步
 names.ts[PS7T]: F:库内路径安全校验 | R:- | A:assertSafeSegment,assertPackRelative | S:包名既是目录名也是各客户端的 id，故两件事都在此裁决：拒绝空、隐藏、含分隔符、控制字符与 Windows 保留设备名；人选的文件夹以路径列表到达，每条路径先判过才能写
@@ -432,7 +432,7 @@ upstream.ts[PE7T]: F:读技能的上游记录 | R:code:packages/core/src/host/fo
 ===D:/work-space/dsh-context-hub/packages/ui/===
 components.json[FU5T]: F:ui 包 shadcn 生成配置 | R:- | A:- | S:aliases 全部指向本包（@workspace/ui/...），css 为 src/styles/globals.css
 eslint.config.js[FQ5T]: F:ui 包 lint 规则 | R:- | A:- | S:对 src/components 与 src/hooks 关掉 react-refresh 与 set-state-in-effect：shadcn 上游就在组件旁导出变体表与 hook，拆成独立模块等于分叉
-package.json[FV8T]: F:ui 包清单与导出 | R:- | A:- | S:exports 用通配映射：./globals.css 与 ./lib/*、./components/*、./hooks/* 各指到对应源文件，故业务侧按子路径导入而不是桶文件；依赖 @base-ui/react 与 shadcn 生态
+package.json[FV8T]: F:ui 包清单与导出 | R:- | A:- | S:exports 用通配映射：./globals.css 与 ./lib/*、./components/*、./hooks/* 各指到对应源文件，故业务侧按子路径导入而不是桶文件；rehype-raw、rehype-sanitize、shiki 是直接依赖，子包不能借传递依赖
 tsconfig.json[FV5T]: F:ui 包编译选项 | R:- | A:- | S:include 是 .（整包）；paths 映射 @workspace/ui/* 到 ./src/*
 tsconfig.lint.json[FV3T]: F:ui 包 lint 用编译配置 | R:- | A:- | S:与主配置的区别是 include 为 src 与 turbo、且设了 outDir
 
@@ -470,7 +470,7 @@ input.tsx[CU7T]: F:文本输入原语 | R:- | A:Input | S:基于 @base-ui/react/
 item.tsx[CU5M]: F:列表项原语 | R:code:packages/ui/src/components/separator.tsx | A:Item,ItemMedia,ItemContent,ItemTitle,ItemDescription,ItemActions | S:分隔线复用本包 Separator
 kbd.tsx[CU3T]: F:键位提示原语 | R:- | A:Kbd,KbdGroup | S:在 tooltip 内容里会自动换色（in-data-[slot=tooltip-content]）
 label.tsx[CU5T]: F:表单标签原语 | R:- | A:Label | S:原生 label 元素加样式，未接 @base-ui
-markdown.tsx[CU5T]: F:Markdown 渲染 | R:- | A:Markdown | S:基于 react-markdown 加 remark-gfm；元素尺寸用 em 相对单位，故字号由调用方决定——同一文档在卡片与灯箱里是两个尺度
+markdown.tsx[CU5T]: F:Markdown 渲染 | R:code:packages/ui/src/lib/highlight.ts,code:packages/ui/src/styles/globals.css | A:Markdown | S:react-markdown 加 remark-gfm，rehype-raw 解析 HTML 后紧跟 rehype-sanitize；尺寸用 em，字号由调用方定；带 language-* 的 code 才高亮，围栏块用 shiki inline 结构；图片按 imageBase 解析，无它丢相对图
 marker.tsx[CU5T]: F:行内标记原语 | R:- | A:Marker,MarkerIcon,MarkerContent,markerVariants | S:变体表随组件导出
 menubar.tsx[CU5M]: F:菜单栏原语 | R:code:packages/ui/src/components/dropdown-menu.tsx | A:Menubar,MenubarMenu,MenubarTrigger,MenubarContent,MenubarItem | S:基于 @base-ui/react 的 menu 与 menubar 两层；条目样式沿用下拉菜单那套
 message-scroller.tsx[CU5S]: F:消息滚动容器 | R:- | A:MessageScroller,MessageScrollerItem,MessageScrollerButton | S:基于 @shadcn/react/message-scroller；滚动位置与可见性各有一个 hook
@@ -505,7 +505,8 @@ use-mobile.ts[CU5T]: F:是否窄屏钩子 | R:- | A:useIsMobile | S:断点 768�
 
 ===D:/work-space/dsh-context-hub/packages/ui/src/lib/===
 utils.ts[CU7T]: F:cn 工具再导出 | R:- | A:cn | S:实现不在本仓，只是把 cn 包再导出；所有组件都从这里取 cn，换实现只改这一行
+highlight.ts[CU5T]: F:共享语法高亮器 | R:- | A:paint,loadHighlighter,THEMES | S:全仓只此一份 shiki 实例，文件视图与文档围栏块共用，两份会把同一套 grammar 编译两遍；classic 给自带外框的文件视图、inline 给文档；语言不认识时返回 null，调用方留纯文本
 
 ===D:/work-space/dsh-context-hub/packages/ui/src/styles/===
-globals.css[CU9M]: F:全局样式入口 | R:code:packages/ui/src/styles/theme.css | A:- | S:@source 指到本包之外（apps/*/src 与 */src），故 Tailwind 会扫包外源码；静态设计尺度在 @theme 里定义；主题变量在 theme.css
+globals.css[CU9M]: F:全局样式入口 | R:code:packages/ui/src/styles/theme.css | A:- | S:@source 指到本包之外（apps/*/src 与 */src），故 Tailwind 会扫包外源码；静态设计尺度在 @theme 里定义；主题变量在 theme.css；file-code 带行号与固定 11.5px，文档里的代码块两样都不该有，故另立 doc-code，只读 --shiki-light/dark
 theme.css[CU9M]: F:主题颜色 token | R:- | A:- | S:颜色 token 都是 var() 引用，故 <html> 上一个 class 就能整体换主题；dark 变体经 @custom-variant dark (&:is(.dark *)) 定义；与 globals.css 里的 :root/.dark 定义成对
