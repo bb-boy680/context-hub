@@ -337,7 +337,7 @@ vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/h
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/scripts/===
 check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒，以及子进程的工作目录
-check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签、行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录有没有跟到行上
+check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签、行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录有没有跟到行上，以及一行里各 scope 的措辞
 check-plugin-scan.ts[TQ7M]: F:并发扫描客户端检查 | R:code:packages/plugin-plugins/src/scan.ts | A:- | S:用桩件（自己数进入次数）证明是并发而非串行、答案保持提问顺序、以及一个客户端失败只是一个答案而不是整次扫描失败
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/src/===
@@ -347,7 +347,7 @@ detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/s
 file-tree.tsx[DU5S]: F:包文件树 | R:- | A:PluginFileTree,fileTreeKey | S:展开、焦点、方向键与 ARIA 树结构交给 headless-tree，本文件只画行；树在挂载时构建一次项目表，之后列表变化必须换 key 让它重新挂载
 index.ts[EE8T]: F:插件模块定义与导出 | R:code:packages/plugin-plugins/src/provider.ts | A:pluginsExtension,PluginsPage | S:服务在任何其他事之前发布，故同一轮启用的 agent 插件一激活就能注册；本模块不指名任何 agent
 inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/plugin-plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 是同一件事的前后，故用同样四个词；本地路径必须绝对——宿主的工作目录对在浏览器里打字的人毫无意义；认不出的形式直接带理由拒绝，因为「把词当名字去某处查」是市场的职责
-install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/plugin-plugins/src/library.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单在 portal 里但仍是所在行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判
+install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单是行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判；措辞从 rows.ts 取
 library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,packFiles,packFilesIn | S:桥持有文件与真相，这一侧只留最后一次答案并在每次写入后重问；agent 自己的答案在这一侧折合，不在桥上；uninstall 要先从折合后的答案里查客户端自己的 id，查不到则拒绝；查文件按名字走库，按目录走 agent 那份
 messages.ts[CE7S]: F:插件模块英文文案 | R:- | A:pluginsMessages | S:命名空间 plugins.*，随包一起走，语言包无需依赖本包即可翻译；无包覆盖的键保留这里的英文
 page.tsx[AU8L]: F:插件目录页 | R:code:packages/plugin-plugins/src/add-plugin-dialog.tsx,code:packages/plugin-plugins/src/detail-dialog.tsx,code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginsPage | S:卡片自带动作按钮，故不能是真 button：Enter/空格在 onKeyDown 里处理，且要求 event.target === event.currentTarget，否则行内按钮的回车会连带开灯箱；openDetail 刻意不判 stored——未收录的包同样开详情，由弹窗决定给「收录」还是给文件与安装菜单；弹窗拿的库路径是 library.root，检查更新走 library.checkUpdate
@@ -356,7 +356,7 @@ pictures.ts[CE7S]: F:判断哪张图是包的 | R:- | A:pictureOf,bestPicture,PI
 provider.ts[CE9M]: F:插件安装器服务契约 | R:code:packages/plugin-plugins/src/contract.ts | A:PluginInstaller,PluginService,PluginTools,PluginHeld,createPluginInstallerRegistry,PluginInstallError | S:是 service 而非 contribution；installer 只拿到 tools，不自己碰磁盘或进程；install 收包名（本 hub 供货），remove 收客户端自己的 id，两者形式不同且不可互换，混用会指向不存在的市场名
 records.ts[CE8M]: F:库索引文件格式 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:readIndex,serializeIndex,recordOf,ownPicturePrefix,emptyIndex | S:记录里有两种图且不可互换：icon 是包自带的那张，assets 是人加的；旧记录把自带图混在 assets 里，读取时凭「引用落在包自己的目录下」把它搬回 icon；来源词写在 source 下（Claude Code 市场 schema 的拼法），旧的 kind/git/path/etag 仍要读得回来
 revision.ts[DE8S]: F:新旧与改动判定 | R:code:packages/plugin-plugins/src/contract.ts | A:outdated,modified,checkable,PluginRecord,PluginUpdateSummary,PluginUpdateCheck | S:两个问题需要两种事实：源是否前进看记录的 revision 与检查到的 latest，文件是否被改看目录哈希与检查时的 currentHash；没人查过的记录不算落后于任何东西，这里也从不发起网络
-rows.ts[DE8M]: F:目录行的合成 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/provider.ts,code:packages/plugin-plugins/src/revision.ts | A:composeRows,collectScanned,toRow,heldRow,rowsForTab,SCOPES_OF | S:库记录与 agent 的答案合成一张表是有意的——装在 agent 里的包是不是 hub 收的都真实存在，「还没进库」这一个事实在行上才看得见；作用域页签用的是各 agent 自己的词；折合时 agent 自己的 id 与它报的目录都要跟到行上
+rows.ts[DE8M]: F:目录行的合成 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/provider.ts,code:packages/plugin-plugins/src/revision.ts | A:composeRows,collectScanned,toRow,heldRow,rowsForTab,scopeWords | S:库记录与 agent 的答案合成一张表是有意的——装在 agent 里的包是不是 hub 收的都真实存在，「还没进库」这一个事实在行上才看得见；作用域页签用的是各 agent 自己的词；折合时 agent 自己的 id 与它报的目录都要跟到行上；scopeWords 会略去被同组更窄的措辞包含的那个词
 scan.ts[DE7T]: F:并发询问各客户端 | R:code:packages/plugin-plugins/src/provider.ts | A:probeInstallers,ClientProbe | S:逐个问会让页面等它们之和，故一起问；一起问就得让一个失败只是它自己的答案，每个探针就地 settle、把原因带回而非抛出——在这但读不了与不在这看似一样，只有原因分得开
 tools.ts[IE8T]: F:安装器工具集的远端实现 | R:code:packages/plugin-plugins/src/provider.ts | A:createRemotePluginTools | S:安装器从不碰磁盘或进程，只报程序名与参数，由这一侧带给宿主；浏览器形态走 /hub/plugins
 types.ts[CE7T]: F:插件页面渲染形状 | R:- | A:PluginRow,PluginHeldBy,PluginSource,PluginFileEntry | S:来源词与来源地址是两件事；只被 agent 持有的包在本机是目录，且 directory 只在那种行上有（文件面板读它）；PluginHeldBy.id 是客户端自己的 id，删包只能靠它
