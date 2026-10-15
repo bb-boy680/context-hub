@@ -267,13 +267,13 @@ package.json[FV5T]: F:Claude Code 集成包清单 | R:- | A:- | S:exports 的 . 
 tsconfig.json[FV3T]: F:Claude Code 包编译选项 | R:- | A:- | S:与 cline 包同构，目标 ES2022、jsx react-jsx
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/scripts/===
-check-installer.ts[TQ7S]: F:Claude Code 插件列表解析检查 | R:code:packages/plugin-claude-code/src/installer.ts | A:- | S:夹具是 claude plugin list --json 的裁剪真实答案；断言 id 拆成 name@marketplace、readFromFolder 优先于 installPath、无法使用的行被丢弃而不是猜；不调用真实 CLI
+check-installer.ts[TQ7S]: F:Claude Code 插件列表解析检查 | R:code:packages/plugin-claude-code/src/installer.ts | A:- | S:夹具是 claude plugin list --json 的裁剪答案；断言 id 拆成 name@marketplace、readFromFolder 优先于 installPath、不可用的行被丢弃；另核对两个 place 的开关读取与 setEnabled 的命令行
 check-provider.ts[TQ8M]: F:Claude Code MCP 提供者检查 | R:code:packages/plugin-claude-code/src/provider.ts | A:- | S:夹具带注释、不同拼法的项目键与无关项目，用以证明每次写入只动一个节点；断言 machineScope 与 noProject 两种拒绝，以及卸载后两个文件回到逐字节原样
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/src/===
 index.ts[IE9S]: F:Claude Code 集成注册 | R:code:packages/plugin-claude-code/src/installer.ts,code:packages/plugin-claude-code/src/locations.ts,code:packages/plugin-claude-code/src/provider.ts | A:claudeCodeExtension,createClaudeCodeMcp,claudeCodeInstaller | S:三个 inject（mcp/plugins/skills）各自独立，任一模块禁用其余仍可用；注册两个 skills place（项目 .claude/skills 与全局 ~/.claude/skills）
 installer.ts[IE8S]: F:Claude Code 插件交付 | R:code:packages/plugin-claude-code/src/locations.ts | A:claudeCodeInstaller,readHeld | S:先 marketplace add 注册库根再 claude plugin install --scope；不写 installed_plugins.json 与缓存；readHeld 取 readFromFolder 优先于 installPath，无 marketplace 的行丢弃；remove 收的是客户端自己报的 id（带它自己的市场名），不再拼本 hub 的市场名
-locations.ts[CE7T]: F:Claude Code 路径与键名事实 | R:- | A:CLAUDE_CODE_ID,CLAUDE_CODE_SKILL_DIR,CLAUDE_CODE_MCP_FILE,CLAUDE_CODE_GLOBAL_MCP_FILE,CLAUDE_CODE_DISABLED_KEY,SUPPORTS | S:项目技能目录是 .claude/skills 而非共享的 .agents/skills；.mcp.json 属项目、.claude.json 是客户端全局文档；停用开关是全局文档里按项目路径索引的 disabledMcpServers 列表
+locations.ts[CE7T]: F:Claude Code 路径与键名事实 | R:- | A:CLAUDE_CODE_ID,CLAUDE_CODE_SKILL_DIR,CLAUDE_CODE_MCP_FILE,CLAUDE_CODE_GLOBAL_MCP_FILE,CLAUDE_CODE_DISABLED_KEY,SUPPORTS | S:项目技能目录是 .claude/skills；.mcp.json 属项目、.claude.json 是全局文档；插件开关记在 settings.json 的 enabledPlugins；服务器停用按项目路径记在全局文档
 messages.ts[CL3T]: F:Claude Code 英文文案 | R:- | A:claudeCodeMessages | S:命名空间 claudeCode.*，含 machineScope 与 noProject 两条拒绝
 provider.ts[IN9M]: F:Claude Code MCP 文件读写 | R:code:packages/plugin-claude-code/src/locations.ts | A:createClaudeCodeMcp | S:两个 place（.mcp.json 项目、.claude.json 全局）都是 JSONC，逐节点改写不得重排既有内容；停用列表属项目而非文件，故只有 workspace place 可开关、全局 place 的 switchable 为 false；项目键按分隔符与大小写归一匹配，客户端没记录过该目录时拒绝写入而不新建记录
 
@@ -333,22 +333,22 @@ records.ts[PD8S]: F:hub 自己的记录文件 | R:code:packages/plugin-mcp/src/r
 eslint.config.js[FQ3T]: F:插件模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
 package.json[FV8T]: F:插件模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./provider、./library、./vite；依赖 @headless-tree 画文件树
 tsconfig.json[FV3T]: F:插件模块编译选项 | R:- | A:- | S:与 cline 包同构，目标 ES2022、jsx react-jsx
-vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；响应都 no-store；files/file 二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致；program 在工作区目录里跑——不给就把 dev server 自己的包当成项目
+vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/contents.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；响应都 no-store；files/file/contents 三个读动作二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致；program 在工作区目录里跑——不给就把 dev server 自己的包当成项目
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/scripts/===
-check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒，以及子进程的工作目录
+check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒、子进程的工作目录，以及包目录里 skills/ 与 commands/ 的扫描；node scripts/check-plugin-library.ts 直接运行
 check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签、行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录有没有跟到行上，以及一行里各 scope 的措辞
 check-plugin-scan.ts[TQ7M]: F:并发扫描客户端检查 | R:code:packages/plugin-plugins/src/scan.ts | A:- | S:用桩件（自己数进入次数）证明是并发而非串行、答案保持提问顺序、以及一个客户端失败只是一个答案而不是整次扫描失败
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/src/===
 add-plugin-dialog.tsx[DU7L]: F:新增插件对话框 | R:code:packages/plugin-plugins/src/library.ts | A:AddPluginDialog,AddPluginTab | S:地址是收一个包、没有可选项也没有要先查的东西；文件夹不是「一个包」——可能是包也可能是包的仓库，所以每个找到的包各占一行、各自收集
-contract.ts[CE9S]: F:插件包契约与常量 | R:- | A:PluginOrigin,PluginUpstream,PluginCheck,PackDescription,hasUpstream,PLUGIN_MANIFESTS | S:git-subdir 被刻意排除在可问来源之外：它记的 revision 是仓库的，要问的却是子目录自己的最后提交，问仓库会在别人动了无关目录时报「有更新」，故宁可答「无法回答」；包清单可能在三个位置之一，这也是「这个目录是不是包」的判据
-detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginDetailDialog,PlacesSection,SourceSection,DeleteBubble | S:位置行一行是一个客户端，id 带 scope 前缀；装没装按 plugin.held 判；文件面板按 stored 选库或 agent 目录；页脚恒两个按钮，未收录时删除让持有它的 agent 撤下来；路径跨行用 break-all
+contract.ts[CE9S]: F:插件包契约与常量 | R:- | A:PluginOrigin,PluginUpstream,PluginCheck,PackDescription,PackContents,PLUGIN_MANIFESTS | S:git-subdir 被刻意排除在可问来源之外：它记的 revision 是仓库的，要问的却是子目录自己的最后提交，问仓库会在别人动了无关目录时报「有更新」，故宁可答「无法回答」；包清单可能在三个位置之一，这也是「这个目录是不是包」的判据；PackContents 里的空列表与 null 不是缺数据，而是「那个页签不提供」，故卡片渲染时不能拿它当空内容画一个空页签
+detail-dialog.tsx[DU7L]: F:插件详情弹窗 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginDetailDialog,PackPane,ContentList,PlacesSection,SourceSection,DeleteBubble | S:左栏页签条只列扫到的东西；扫描只在挂载时发一次；展示图页 keepMounted，图只存在窗口里；列表行是 item 卡片加图标砖；位置行按 plugin.held 判
 file-tree.tsx[DU5S]: F:包文件树 | R:- | A:PluginFileTree,fileTreeKey | S:展开、焦点、方向键与 ARIA 树结构交给 headless-tree，本文件只画行；树在挂载时构建一次项目表，之后列表变化必须换 key 让它重新挂载
 index.ts[EE8T]: F:插件模块定义与导出 | R:code:packages/plugin-plugins/src/provider.ts | A:pluginsExtension,PluginsPage | S:服务在任何其他事之前发布，故同一轮启用的 agent 插件一激活就能注册；本模块不指名任何 agent
 inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/plugin-plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 是同一件事的前后，故用同样四个词；本地路径必须绝对——宿主的工作目录对在浏览器里打字的人毫无意义；认不出的形式直接带理由拒绝，因为「把词当名字去某处查」是市场的职责
 install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单是行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判；措辞从 rows.ts 取
-library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,packFiles,packFilesIn | S:桥持有文件与真相，这一侧只留最后一次答案并在每次写入后重问；agent 自己的答案在这一侧折合，不在桥上；uninstall 要先从折合后的答案里查客户端自己的 id，查不到则拒绝；查文件按名字走库，按目录走 agent 那份
+library.ts[AE9L]: F:页面用的插件库状态 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/rows.ts | A:usePluginLibrary,PluginLibrary,PluginClient,packFiles,packFilesIn,packContents | S:桥持有文件与真相，这一侧只留最后一次答案并在每次写入后重问；agent 自己的答案在这一侧折合，不在桥上；uninstall 要先从折合后的答案里查客户端自己的 id，查不到则拒绝；读文件与读包内容都按名字走库、按目录走 agent 那份
 messages.ts[CE7S]: F:插件模块英文文案 | R:- | A:pluginsMessages | S:命名空间 plugins.*，随包一起走，语言包无需依赖本包即可翻译；无包覆盖的键保留这里的英文
 page.tsx[AU8L]: F:插件目录页 | R:code:packages/plugin-plugins/src/add-plugin-dialog.tsx,code:packages/plugin-plugins/src/detail-dialog.tsx,code:packages/plugin-plugins/src/library.ts,code:packages/plugin-plugins/src/rows.ts | A:PluginsPage | S:卡片自带动作按钮，故不能是真 button：Enter/空格在 onKeyDown 里处理，且要求 event.target === event.currentTarget，否则行内按钮的回车会连带开灯箱；openDetail 刻意不判 stored——未收录的包同样开详情，由弹窗决定给「收录」还是给文件与安装菜单；弹窗拿的库路径是 library.root，检查更新走 library.checkUpdate
 parts.tsx[DU3T]: F:插件视图的小件 | R:- | A:PluginTile | S:与 MCP 模块同一块瓷砖、同样两个尺寸
@@ -372,6 +372,7 @@ names.ts[PS7T]: F:库内路径安全校验 | R:- | A:assertSafeSegment,assertPac
 probe.ts[IE7S]: F:询问源是否前进 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:createPluginProbe,PluginProbe,CHECK_VERSION | S:问源自己：仓库用 git ls-remote 只读 refs 且问当初取的那个 ref；压缩包用 HEAD 取校验器；本机目录答问不了；单个包与整批走同一条问法、记在同一处，故答案要从记录上读
 program.ts[RE7T]: F:运行控制台程序 | R:- | A:runProgram,hasProgram,ProgramResult | S:参数以列表传递并在此加引号，带空格的路径仍是一个参数；客户端在 Windows 上是脚本，故经 shell 启动；cwd 可选，不给就落在宿主自己的目录，客户端的项目文件会写错地方
 update.ts[PE7S]: F:把包更新到源当前状态 | R:code:packages/plugin-plugins/src/host/fetch.ts,code:packages/plugin-plugins/src/host/library.ts | A:createPluginUpdater,PluginUpdater,PluginUpdateOutcome | S:下载本身不构成更新：落地文件可能逐字节相同（回退、只改 README、子目录没真变），故先对暂存求哈希，与记录相同就直接结束；确实变了才一步替换目录，记录在其后写
+contents.ts[PE6S]: F:读一个包目录里装了什么 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/vite.ts | A:readPackContents | S:只认三种约定位置：skills/ 下带 SKILL.md 的子目录、commands/ 下递归的每个 .md、根目录 .mcp.json 的原文；frontmatter 只取 name 与 description，写成 `description: >` 的块标量要折成一行
 
 ===D:/work-space/dsh-context-hub/packages/plugin-skills-sh/===
 eslint.config.js[FQ3T]: F:skills.sh 包 lint 规则 | R:- | A:- | S:files 只含 ts（本包无 tsx），且不含 react 插件
