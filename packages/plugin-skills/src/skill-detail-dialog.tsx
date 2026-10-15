@@ -1,38 +1,25 @@
 import {
   ArrowLeftIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ClipboardPasteIcon,
   DownloadIcon,
   ExternalLinkIcon,
   FileTextIcon,
-  ImageIcon,
   ImagePlusIcon,
   LibraryIcon,
   LinkIcon,
   MinusIcon,
   MoreHorizontalIcon,
-  PauseIcon,
-  PlayIcon,
   PlusIcon,
   RefreshCwIcon,
   Trash2Icon,
   UploadIcon,
-  Volume2Icon,
-  VolumeXIcon,
   XIcon,
 } from "lucide-react"
 import * as React from "react"
-import { Navigation, Thumbs } from "swiper/modules"
-import { Swiper, SwiperSlide } from "swiper/react"
-import type { SwiperClass } from "swiper/react"
-import "swiper/css"
-import "swiper/css/thumbs"
 
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
 import { formatAge, holdsOf, inLibrary, placeOf, placePath, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
-import { mediaKind, setPreviewsSuspended } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
@@ -46,7 +33,15 @@ import type {
 
 import { useI18n } from "@workspace/extensions/react"
 import type { AssetScope } from "@workspace/extensions"
-import { CodeCard, DialogSplit, PlaceList, TagEditor } from "@workspace/extensions/components"
+import {
+  CodeCard,
+  DialogSplit,
+  MediaGallery,
+  PlaceList,
+  TagEditor,
+  mediaKind,
+  setPreviewsSuspended,
+} from "@workspace/extensions/components"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -85,205 +80,6 @@ function DocumentStage({ text }: { text: string }) {
         {text}
       </Markdown>
     </div>
-  )
-}
-
-/** Start one video, falling back to muted when the browser blocks audible autoplay. */
-async function startPlayback(video: HTMLVideoElement) {
-  try {
-    await video.play()
-  } catch {
-    video.muted = true
-    try {
-      await video.play()
-    } catch {
-      /* Still blocked: the slide keeps its own play button. */
-    }
-  }
-}
-
-/** Ratio a slide takes before its media reports its own. */
-const FALLBACK_MEDIA_RATIO = 16 / 9
-
-/** One slide: the image itself, or a video carrying its own play control. */
-function MediaSlide({
-  item,
-  doc,
-  active,
-}: {
-  item?: MediaItem
-  /** The skill's document, shown when the skill has no media at all. */
-  doc: string
-  /** The slide Swiper currently shows; drives the video's own play state. */
-  active: boolean
-}) {
-  const videoRef = React.useRef<HTMLVideoElement | null>(null)
-  const [playing, setPlaying] = React.useState(false)
-  const [muted, setMuted] = React.useState(false)
-  const [progress, setProgress] = React.useState(0)
-  /* Media arrives in any shape — the skills here ship portrait videos — so the
-     stage takes the frame's own ratio and grows until one axis runs out. */
-  const [ratio, setRatio] = React.useState(FALLBACK_MEDIA_RATIO)
-  const { t } = useI18n()
-
-  /* Play the active slide and pause the rest; `playing` follows the video's own events. */
-  React.useEffect(() => {
-    const video = videoRef.current
-    if (!video || item?.kind !== "video") return
-    if (active) void startPlayback(video)
-    else video.pause()
-  }, [active, item?.id, item?.kind])
-
-  const togglePlay = () => {
-    const video = videoRef.current
-    if (!video) return
-    if (video.paused) void startPlayback(video)
-    else video.pause()
-  }
-
-  const seek = (ratio: number) => {
-    const video = videoRef.current
-    if (!video || !Number.isFinite(video.duration) || video.duration <= 0) return
-    video.currentTime = ratio * video.duration
-    setProgress(ratio)
-  }
-
-  const toggleMute = () => {
-    const video = videoRef.current
-    if (!video) return
-    video.muted = !video.muted
-    setMuted(video.muted)
-  }
-
-  return (
-    <div className="flex size-full items-center justify-center">
-      <div
-        /* `100cqh` is the stage area, which the media pane marks as a size
-           container: the frame keeps its ratio and stops at whichever axis runs
-           out, so a portrait video fills the height and a landscape one the
-           width. A document has no ratio to keep, so it takes the whole stage. */
-        className={`relative overflow-hidden rounded-md ${
-          item === undefined ? "size-full" : "max-h-full"
-        }`}
-        style={
-          item === undefined
-            ? undefined
-            : {
-                aspectRatio: String(ratio),
-                width: `min(100%, calc(100cqh * ${ratio}))`,
-              }
-        }
-      >
-        {!item ? (
-          <DocumentStage text={doc} />
-        ) : item.kind === "video" ? (
-          <video
-            ref={videoRef}
-            src={item.src}
-            playsInline
-            onLoadedMetadata={(event) => {
-              const media = event.currentTarget
-              if (media.videoHeight > 0) setRatio(media.videoWidth / media.videoHeight)
-            }}
-            onClick={togglePlay}
-            onPlay={() => setPlaying(true)}
-            onPause={() => setPlaying(false)}
-            onEnded={() => setPlaying(false)}
-            onVolumeChange={() => setMuted(videoRef.current?.muted ?? false)}
-            onTimeUpdate={(event) =>
-              setProgress(
-                event.currentTarget.currentTime / (event.currentTarget.duration || 1)
-              )
-            }
-            className="size-full object-cover"
-          />
-        ) : (
-          <img
-            src={item.src}
-            alt=""
-            onLoad={(event) => {
-              const media = event.currentTarget
-              if (media.naturalHeight > 0) {
-                setRatio(media.naturalWidth / media.naturalHeight)
-              }
-            }}
-            className="size-full object-cover"
-          />
-        )}
-        {item?.kind === "video" ? (
-          /* Control bar sits over a scrim so the video itself stays unobstructed. */
-          <div className="absolute inset-x-0 bottom-0 flex items-center gap-3 bg-gradient-to-t from-[#0f172ad9] to-transparent px-4 pt-8 pb-3">
-          <button
-            type="button"
-            aria-label={playing ? t("skills.media.pause") : t("skills.media.play")}
-            onClick={togglePlay}
-            className="flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/20"
-          >
-            {playing ? (
-              <PauseIcon className="size-4 fill-white text-white" />
-            ) : (
-              <PlayIcon className="size-4 fill-white text-white" />
-            )}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={0.1}
-            value={Math.round(progress * 1000) / 10}
-            aria-label={t("skills.media.seek")}
-            onChange={(event) => seek(Number(event.target.value) / 100)}
-            className="h-4 min-w-0 flex-1 cursor-pointer accent-white"
-          />
-          <button
-            type="button"
-            aria-label={t(muted ? "skills.media.unmute" : "skills.media.mute")}
-            onClick={toggleMute}
-            className="flex size-6 shrink-0 items-center justify-center rounded-full text-white transition-colors hover:bg-white/20"
-          >
-            {muted ? (
-              <VolumeXIcon className="size-4" />
-            ) : (
-              <Volume2Icon className="size-4" />
-            )}
-          </button>
-        </div>
-      ) : null}
-      </div>
-    </div>
-  )
-}
-
-/**
- * Thumbnail for a video. The active one keeps playing muted; the rest hold a
- * frame near the start, so the strip neither goes black nor decodes every
- * video in the gallery.
- */
-function VideoThumb({ src, active }: { src: string; active: boolean }) {
-  const ref = React.useRef<HTMLVideoElement | null>(null)
-
-  React.useEffect(() => {
-    const video = ref.current
-    if (!video) return
-    if (active) void video.play().catch(() => undefined)
-    else video.pause()
-  }, [active])
-
-  return (
-    <video
-      ref={ref}
-      src={src}
-      muted
-      loop
-      playsInline
-      preload="metadata"
-      onLoadedMetadata={(event) => {
-        const video = event.currentTarget
-        if (active || !Number.isFinite(video.duration)) return
-        video.currentTime = Math.min(0.5, video.duration / 2)
-      }}
-      className="size-full object-cover"
-    />
   )
 }
 
@@ -415,12 +211,6 @@ function useMediaItems(
 }
 
 /**
- * Swiper mutates its own copy of these params, so one shared template is safe;
- * shorthand booleans would replace the module defaults wholesale.
- */
-const navigationParams = { prevEl: null, nextEl: null }
-
-/**
  * Media column of the lightbox. Swiper owns paging, the thumbnails and the
  * keyboard shortcuts; the slides and the actions behind them come from the caller.
  */
@@ -434,8 +224,6 @@ function MediaPane({
 }) {
   const { t } = useI18n()
   const { items, busy } = source
-  const [activeIndex, setActiveIndex] = React.useState(0)
-  const [thumbs, setThumbs] = React.useState<SwiperClass | null>(null)
   const [dragOver, setDragOver] = React.useState(false)
   const [addOpen, setAddOpen] = React.useState(false)
   /* The second entry of the upload menu opens its link field in place, rather
@@ -443,57 +231,7 @@ function MediaPane({
   const [addFace, setAddFace] = React.useState<"menu" | "link">("menu")
   const [notice, setNotice] = React.useState<string | null>(null)
   const [link, setLink] = React.useState("")
-  const mainRef = React.useRef<SwiperClass | null>(null)
   const fileRef = React.useRef<HTMLInputElement | null>(null)
-  const prevRef = React.useRef<HTMLButtonElement | null>(null)
-  const nextRef = React.useRef<HTMLButtonElement | null>(null)
-  const count = items.length
-  const lastCount = React.useRef(count)
-
-  /* The nav buttons sit beside the Swiper, so bind them once both exist. */
-  React.useEffect(() => {
-    const instance = mainRef.current
-    const prev = prevRef.current
-    const next = nextRef.current
-    if (!instance || instance.destroyed || !prev || !next) return
-    const { navigation } = instance.params
-    if (typeof navigation !== "object") return
-    if (navigation.prevEl === prev && navigation.nextEl === next) return
-    navigation.prevEl = prev
-    navigation.nextEl = next
-    instance.navigation.init()
-    instance.navigation.update()
-  })
-
-  /* An upload appends a slide; show it, and after a removal keep a neighbour. */
-  React.useEffect(() => {
-    if (count > lastCount.current) mainRef.current?.slideTo(count - 1)
-    else if (count < lastCount.current) {
-      mainRef.current?.slideTo(Math.min(activeIndex, Math.max(0, count - 1)))
-    }
-    lastCount.current = count
-  }, [count, activeIndex])
-
-  /*
-   * Swiper's own keyboard module listens while events bubble, and the dialog
-   * stops them on the way up, so take the arrow keys during capture instead.
-   */
-  React.useEffect(() => {
-    const handle = (event: KeyboardEvent) => {
-      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
-      if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return
-      const target = event.target as HTMLElement | null
-      const tag = target?.tagName.toLowerCase()
-      if (tag === "input" || tag === "textarea" || target?.isContentEditable) return
-      const instance = mainRef.current
-      if (!instance || instance.destroyed) return
-      event.preventDefault()
-      if (event.key === "ArrowLeft") instance.slidePrev()
-      else instance.slideNext()
-    }
-    document.addEventListener("keydown", handle, true)
-    return () => document.removeEventListener("keydown", handle, true)
-  }, [])
 
   /* A screenshot should not have to be saved as a file first, so the paste
      listener is document-wide while this pane is mounted. A file copied in a
@@ -609,249 +347,155 @@ function MediaPane({
           {notice}
         </span>
       )}
-      {/* The stage takes every pixel the strip and the hint leave behind: a
-          fixed 16:9 box in this column left a band of empty panel above and
-          below it. A slide keeps its own ratio inside the stage, so the frames
-          here — portrait videos, mostly — use the full height. */}
-      <div className="relative flex min-h-0 w-full flex-1 items-center justify-center [container-type:size]">
-        <Swiper
-          modules={[Navigation, Thumbs]}
-          onSwiper={(instance) => {
-            mainRef.current = instance
-          }}
-          onBeforeInit={(instance) => {
-            /* Object form keeps Swiper's own navigation defaults. */
-            const { navigation } = instance.params
-            if (typeof navigation === "object") {
-              navigation.prevEl = prevRef.current
-              navigation.nextEl = nextRef.current
-            }
-          }}
-          navigation={navigationParams}
-          thumbs={{ swiper: thumbs !== null && !thumbs.destroyed ? thumbs : null }}
-          slidesPerView={1}
-          onSlideChange={(instance) => setActiveIndex(instance.activeIndex)}
-          className="size-full outline-none"
-        >
-          {(count > 0 ? items : [undefined]).map((item, index) => (
-            <SwiperSlide key={item?.id ?? "empty"}>
-              <MediaSlide
-                item={item}
-                doc={doc}
-                active={index === activeIndex}
-              />
-            </SwiperSlide>
-          ))}
-        </Swiper>
-
-        {count > 1 ? (
+      <MediaGallery
+        items={items}
+        empty={<DocumentStage text={doc} />}
+        onRemove={(id) => void source.remove(id)}
+        words={{
+          play: t("skills.media.play"),
+          pause: t("skills.media.pause"),
+          seek: t("skills.media.seek"),
+          mute: t("skills.media.mute"),
+          unmute: t("skills.media.unmute"),
+          previous: t("skills.media.previous"),
+          next: t("skills.media.next"),
+          image: t("skills.media.image"),
+          video: t("skills.media.video"),
+          remove: t("skills.media.remove"),
+        }}
+        action={
           <>
-            <span className="absolute top-4 left-4 z-10 flex h-[26px] items-center gap-1.5 rounded-full bg-[#0f172acc] px-2.5 text-[11px] font-semibold text-white">
-              <ImageIcon className="size-3.5" />
-              {`${activeIndex + 1} / ${count}`}
-            </span>
-            <button
-              ref={prevRef}
-              type="button"
-              aria-label={t("skills.media.previous")}
-              className="absolute top-1/2 left-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-foreground shadow-[0_2px_8px_#0F172A33] transition-opacity [&.swiper-button-disabled]:opacity-40"
-            >
-              <ChevronLeftIcon className="size-4" />
-            </button>
-            <button
-              ref={nextRef}
-              type="button"
-              aria-label={t("skills.media.next")}
-              className="absolute top-1/2 right-3 z-10 flex size-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-foreground shadow-[0_2px_8px_#0F172A33] transition-opacity [&.swiper-button-disabled]:opacity-40"
-            >
-              <ChevronRightIcon className="size-4" />
-            </button>
-          </>
-        ) : null}
-      </div>
 
-      <div className="flex max-w-full items-center gap-2.5">
-        {count > 0 ? (
-          <Swiper
-            modules={[Thumbs]}
-            onSwiper={setThumbs}
-            watchSlidesProgress
-            slidesPerView="auto"
-            spaceBetween={10}
-            className="max-w-full"
+          <Popover
+            open={addOpen}
+            onOpenChange={(next) => {
+              setAddOpen(next)
+              if (!next) setAddFace("menu")
+            }}
           >
-            {items.map((item, index) => (
-              <SwiperSlide key={item.id} className="!w-[72px]">
-                <div className="group/thumb relative h-11 w-full">
-                  <button
-                    type="button"
-                    aria-label={`${
-                      item.kind === "video"
-                        ? t("skills.media.video")
-                        : t("skills.media.image")
-                    } ${index + 1}`}
-                    aria-current={index === activeIndex}
-                    /* Swiper's Thumbs module answers pointer taps; this keeps the keyboard working. */
-                    onClick={() => mainRef.current?.slideTo(index)}
-                    className={`relative block size-full overflow-hidden rounded-md ring-inset ${
-                      index === activeIndex
-                        ? "ring-2 ring-primary"
-                        : "ring-1 ring-glass-border"
-                    }`}
-                  >
-                    {item.kind === "video" ? (
-                      <span className="relative block size-full bg-[#0f172a]">
-                        <VideoThumb src={item.src} active={index === activeIndex} />
-                        <span className="absolute right-1 bottom-1 flex size-4 items-center justify-center rounded-full bg-[#0f172ab3]">
-                          <PlayIcon className="size-2.5 fill-white text-white" />
-                        </span>
-                      </span>
-                    ) : (
-                      <img src={item.src} alt="" className="size-full object-cover" />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={t("skills.media.remove")}
-                    onClick={() => void source.remove(item.id)}
-                    className="absolute top-1 right-1 z-10 flex size-4 items-center justify-center rounded-full bg-[#0f172acc] text-white opacity-0 transition-opacity group-focus-within/thumb:opacity-100 group-hover/thumb:opacity-100 hover:bg-[#0f172a]"
-                  >
-                    <XIcon className="size-2.5" />
-                  </button>
-                </div>
-              </SwiperSlide>
-            ))}
-          </Swiper>
-        ) : null}
-
-        <Popover
-          open={addOpen}
-          onOpenChange={(next) => {
-            setAddOpen(next)
-            if (!next) setAddFace("menu")
-          }}
-        >
-          <PopoverTrigger
-            render={
-              <button
-                type="button"
-                aria-label={t("skills.media.upload")}
-                className="flex h-11 w-[72px] shrink-0 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground"
-              />
-            }
-          >
-            <PlusIcon className="size-[18px]" />
-          </PopoverTrigger>
-          <PopoverContent
-            align="start"
-            side="top"
-            className={
-              addFace === "menu"
-                ? "w-[240px] gap-0 overflow-hidden rounded-md bg-card p-0 shadow-soft ring-1 ring-border"
-                : "w-[240px] gap-2.5 rounded-md bg-card p-3 shadow-soft ring-1 ring-border"
-            }
-          >
-            {addFace === "menu" ? (
-              /* Each entry is its own row, divided by the same hairline the rest
-                 of the app uses; the menu carries no padding, so the dividers
-                 run the full width. */
-              <>
+            <PopoverTrigger
+              render={
                 <button
                   type="button"
-                  disabled={busy}
-                  onClick={() => fileRef.current?.click()}
-                  className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
-                >
-                  <UploadIcon className="size-4 shrink-0 text-copy" aria-hidden />
-                  <span className="flex min-w-0 flex-1 flex-col gap-px">
-                    <span className="truncate text-[13px] leading-[17px] font-medium">
-                      {t("skills.media.add.file")}
-                    </span>
-                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
-                      {t("skills.media.add.fileHint")}
-                    </span>
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddFace("link")}
-                  className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
-                >
-                  <LinkIcon className="size-4 shrink-0 text-copy" aria-hidden />
-                  <span className="flex min-w-0 flex-1 flex-col gap-px">
-                    <span className="truncate text-[13px] leading-[17px] font-medium">
-                      {t("skills.media.add.link")}
-                    </span>
-                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
-                      {t("skills.media.add.linkHint")}
-                    </span>
-                  </span>
-                </button>
-                {/* Paste is a gesture, not an entry: it says what to press and
-                    takes no click, so it is a row rather than a button. */}
-                <span className="flex h-12 w-full items-center gap-2.5 px-3">
-                  <ClipboardPasteIcon className="size-4 shrink-0 text-copy" aria-hidden />
-                  <span className="flex min-w-0 flex-1 flex-col gap-px">
-                    <span className="truncate text-[13px] leading-[17px] font-medium">
-                      {t("skills.media.add.paste")}
-                    </span>
-                    <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
-                      {t("skills.media.add.pasteHint")}
-                    </span>
-                  </span>
-                </span>
-              </>
-            ) : (
-              <>
-                <span className="text-[12px] font-semibold">
-                  {t("skills.media.add.linkLabel")}
-                </span>
-                <div className="flex h-[34px] items-center gap-2 rounded-md border-2 border-primary px-2.5">
-                  <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                  <input
-                    autoFocus
-                    value={link}
-                    onChange={(event) => setLink(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") addLink()
-                    }}
-                    placeholder={t("skills.media.add.placeholder")}
-                    aria-label={t("skills.media.add.linkLabel")}
-                    className="min-w-0 flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-muted-soft"
-                  />
-                </div>
-                <div className="flex items-center justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    className="h-7 rounded-full border-border bg-transparent px-3 text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
-                    onClick={() => setAddFace("menu")}
-                  >
-                    {t("skills.action.cancel")}
-                  </Button>
-                  <Button
-                    className="h-7 rounded-full px-3 text-[12.5px] font-semibold"
+                  aria-label={t("skills.media.upload")}
+                  className="flex h-11 w-[72px] shrink-0 items-center justify-center rounded-md bg-card text-muted-foreground transition-colors hover:text-foreground"
+                />
+              }
+            >
+              <PlusIcon className="size-[18px]" />
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              side="top"
+              className={
+                addFace === "menu"
+                  ? "w-[240px] gap-0 overflow-hidden rounded-md bg-card p-0 shadow-soft ring-1 ring-border"
+                  : "w-[240px] gap-2.5 rounded-md bg-card p-3 shadow-soft ring-1 ring-border"
+              }
+            >
+              {addFace === "menu" ? (
+                /* Each entry is its own row, divided by the same hairline the rest
+                   of the app uses; the menu carries no padding, so the dividers
+                   run the full width. */
+                <>
+                  <button
+                    type="button"
                     disabled={busy}
-                    onClick={addLink}
+                    onClick={() => fileRef.current?.click()}
+                    className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent disabled:opacity-50"
                   >
-                    {t("skills.media.add.action")}
-                  </Button>
-                </div>
-              </>
-            )}
-          </PopoverContent>
-        </Popover>
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          hidden
-          onChange={(event) => {
-            if (event.target.files) addFiles(event.target.files)
-            event.target.value = ""
-          }}
-        />
-      </div>
+                    <UploadIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="truncate text-[13px] leading-[17px] font-medium">
+                        {t("skills.media.add.file")}
+                      </span>
+                      <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                        {t("skills.media.add.fileHint")}
+                      </span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddFace("link")}
+                    className="flex h-12 w-full items-center gap-2.5 border-b border-border px-3 text-left transition-colors hover:bg-accent"
+                  >
+                    <LinkIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="truncate text-[13px] leading-[17px] font-medium">
+                        {t("skills.media.add.link")}
+                      </span>
+                      <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                        {t("skills.media.add.linkHint")}
+                      </span>
+                    </span>
+                  </button>
+                  {/* Paste is a gesture, not an entry: it says what to press and
+                      takes no click, so it is a row rather than a button. */}
+                  <span className="flex h-12 w-full items-center gap-2.5 px-3">
+                    <ClipboardPasteIcon className="size-4 shrink-0 text-copy" aria-hidden />
+                    <span className="flex min-w-0 flex-1 flex-col gap-px">
+                      <span className="truncate text-[13px] leading-[17px] font-medium">
+                        {t("skills.media.add.paste")}
+                      </span>
+                      <span className="truncate text-[11.5px] leading-[15px] text-muted-soft">
+                        {t("skills.media.add.pasteHint")}
+                      </span>
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="text-[12px] font-semibold">
+                    {t("skills.media.add.linkLabel")}
+                  </span>
+                  <div className="flex h-[34px] items-center gap-2 rounded-md border-2 border-primary px-2.5">
+                    <LinkIcon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    <input
+                      autoFocus
+                      value={link}
+                      onChange={(event) => setLink(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") addLink()
+                      }}
+                      placeholder={t("skills.media.add.placeholder")}
+                      aria-label={t("skills.media.add.linkLabel")}
+                      className="min-w-0 flex-1 bg-transparent font-mono text-[11px] outline-none placeholder:text-muted-soft"
+                    />
+                  </div>
+                  <div className="flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      className="h-7 rounded-full border-border bg-transparent px-3 text-[12.5px] font-semibold dark:border-input dark:bg-transparent"
+                      onClick={() => setAddFace("menu")}
+                    >
+                      {t("skills.action.cancel")}
+                    </Button>
+                    <Button
+                      className="h-7 rounded-full px-3 text-[12.5px] font-semibold"
+                      disabled={busy}
+                      onClick={addLink}
+                    >
+                      {t("skills.media.add.action")}
+                    </Button>
+                  </div>
+                </>
+              )}
+            </PopoverContent>
+          </Popover>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            hidden
+            onChange={(event) => {
+              if (event.target.files) addFiles(event.target.files)
+              event.target.value = ""
+            }}
+          />
+          </>
+        }
+      />
 
       <p className="text-xs leading-[15px] text-muted-foreground">
         {t("skills.media.hint")}

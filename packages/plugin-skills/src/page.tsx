@@ -24,10 +24,8 @@ import {
 import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
-import { AutoplayVideo } from "./autoplay-video.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
 import { holdsOf, inLibrary, modified, outdated, placePath, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
-import { cardMedia, knownAspect, rememberAspect } from "./media.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import { tagTone } from "./tags.ts"
@@ -37,6 +35,10 @@ import type { Skill } from "./types.ts"
 import { useContributions, useI18n } from "@workspace/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 import {
+  AutoplayVideo,
+  knownAspect,
+  mediaKind,
+  rememberAspect,
   ActionTab,
   FilterBar,
   Ledger,
@@ -395,6 +397,22 @@ function FileTreeCover({ skill, store }: { skill: Skill; store: SkillStore | nul
 
 /** Ratio a card falls back to before its asset reports one. */
 const FALLBACK_RATIO = 16 / 9
+
+/**
+ * The asset a card shows: the first picture when it is a video, else the cover,
+ * else the first picture. `undefined` means the card falls back to its document.
+ *
+ * A video is not drawn still — a card hands it to a preview that plays it — so
+ * which kind it is decides which of the two the card uses.
+ */
+function cardMedia(skill: Skill): { kind: "image" | "video"; src: string } | undefined {
+  const first = skill.gallery?.[0]
+  if (first !== undefined && mediaKind(first) === "video") {
+    return { kind: "video", src: first }
+  }
+  const src = skill.cover ?? first
+  return src === undefined ? undefined : { kind: mediaKind(src), src }
+}
 
 /**
  * The markers a row carries for what the last check found: the source is ahead

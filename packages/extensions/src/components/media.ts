@@ -1,12 +1,16 @@
 /**
- * Shared media helpers: what kind of asset a source is, which asset a catalog
- * card shows, and how many cover previews may decode at the same time. A
- * playing video decodes frames continuously, so the cap keeps a scrolling grid
- * from stacking decoders.
+ * The media a card and a detail pane share: what kind of thing a source is, how
+ * many covers may decode at once, and what ratio each was measured at.
+ *
+ * A playing video decodes frames continuously, so the cap keeps a scrolling grid
+ * from stacking decoders; a full-screen surface over the catalog suspends them
+ * all. The ratios are remembered so a re-mounted card lays out without a jump,
+ * and they live here rather than in a page because two pages draw the same asset.
+ *
+ * Nothing here renders. The controls that use it are in `media-gallery.tsx`, and
+ * every screen imports both through this package rather than from a plugin.
  */
 import { assetKind } from "@workspace/core"
-
-import type { Skill } from "./types.ts"
 
 /** Cover previews allowed to decode at once; later requests queue for a slot. */
 const MAX_PLAYING = 6
@@ -47,22 +51,6 @@ export function setPreviewsSuspended(next: boolean): void {
 /** data: URLs carry their own mime type; anything else is guessed from the extension. */
 export function mediaKind(src: string): "image" | "video" {
   return assetKind(src, /^data:([^;,]+)/i.exec(src)?.[1] ?? "")
-}
-
-/**
- * The asset a catalog card shows: the first asset when it is a video, else the
- * cover, else the first asset. `undefined` means the card falls back to its
- * Markdown preview.
- */
-export function cardMedia(
-  skill: Skill
-): { kind: "image" | "video"; src: string } | undefined {
-  const first = skill.gallery?.[0]
-  if (first !== undefined && mediaKind(first) === "video") {
-    return { kind: "video", src: first }
-  }
-  const src = skill.cover ?? first
-  return src === undefined ? undefined : { kind: mediaKind(src), src }
 }
 
 /** Natural aspect ratios already measured, so a re-mounted card lays out without a jump. */

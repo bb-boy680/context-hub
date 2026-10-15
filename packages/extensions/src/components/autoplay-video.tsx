@@ -1,3 +1,13 @@
+/**
+ * A muted looping preview for a card or a list row.
+ *
+ * It plays only while it is on screen, the tab is visible, no full-screen surface
+ * covers the catalog, and a free preview slot exists, so a page of video covers
+ * cannot keep every decoder busy. Scrolling a preview out of view pauses it.
+ *
+ * This is what makes a video a cover: a card draws the first asset a record has,
+ * whatever kind it is, and hands a video here rather than to an `<img>`.
+ */
 import * as React from "react"
 
 import {
@@ -7,12 +17,6 @@ import {
   releasePreview,
 } from "./media.ts"
 
-/**
- * Muted looping preview for a card or list row. It plays only while it is on
- * screen, the tab is visible, no full-screen surface covers the catalog, and a
- * free preview slot exists, so a page of video covers cannot keep every
- * decoder busy. Scrolling a preview out of view pauses it.
- */
 export function AutoplayVideo({
   src,
   className,
