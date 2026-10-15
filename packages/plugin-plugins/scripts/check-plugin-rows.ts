@@ -16,6 +16,7 @@ import {
   collectScanned,
   composeRows,
   rowsForTab,
+  scopeReached,
   scopeWords,
   type ScannedAnswer,
 } from "../src/rows.ts"
@@ -385,6 +386,31 @@ console.log("the words one agent's scopes wear")
   )
   check("an agent holding a pack nowhere says nothing", scopeWords([], t) === "")
 }
+
+console.log("which place a group's action reaches")
+
+/* The workspace group spans two places. Acting on both would write the
+   repository's shared scope from a row that also stands for the private one. */
+check(
+  "the workspace group reaches the repository's shared scope, not the private one",
+  scopeReached(["user", "project", "local"], "workspace") === "project",
+  scopeReached(["user", "project", "local"], "workspace")
+)
+check(
+  "a group of one reaches that one",
+  scopeReached(["user", "project", "local"], "global") === "user",
+  scopeReached(["user", "project", "local"], "global")
+)
+check(
+  "an agent keeping only the private scope there still lands somewhere",
+  scopeReached(["user", "local"], "workspace") === "local",
+  scopeReached(["user", "local"], "workspace")
+)
+check(
+  "an agent keeping nothing in the group reaches nothing",
+  scopeReached(["user"], "workspace") === undefined &&
+    scopeReached(["project", "local"], "global") === undefined
+)
 
 console.log("which tab a row lands in")
 

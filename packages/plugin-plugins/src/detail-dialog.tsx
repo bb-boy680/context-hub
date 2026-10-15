@@ -38,7 +38,7 @@ import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
 import { PluginTile } from "./parts.tsx"
 import { packFile, packFileIn, packFiles, packFilesIn, type PluginClient } from "./library.ts"
-import { SCOPES_OF, scopeWords } from "./rows.ts"
+import { SCOPES_OF, scopeReached, scopeWords } from "./rows.ts"
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
@@ -683,10 +683,6 @@ function PlacesSection({
      It counts where the pack really is, whether or not this hub put it there. */
   const installed = plugin.held.length + (plugin.stored ? 1 : 0)
 
-  /* The scopes of this agent that this group stands for, in the agent's own
-     order. */
-  const scopesIn = (client: PluginClient, scope: AssetScope): PluginInstallScope[] =>
-    client.scopes.filter((one) => SCOPES_OF[scope].includes(one))
   /* What this agent holds in this group, in its own words — not what this hub
      delivered to it. A pack the agent got from some other marketplace is just as
      installed, and its row has to say so and offer the way out. */
@@ -704,21 +700,26 @@ function PlacesSection({
         ? null
         : t("plugins.client.absent")
 
-  /* The rows, and what each one's action must reach. An agent that keeps packs
-     in two places inside a repository reads as one row saying both, so its id is
-     not the agent's alone. */
+  /* The rows, and what each one's action must reach. A row stands for the one
+     place its action lands in, so what it says and what a click writes agree; an
+     agent that keeps nothing in this group has no row here. A row's id carries
+     the group as well as the agent, because one agent appears in two groups. */
   const rows = SCOPES.map((scope) => ({
     label: t(`plugins.detail.group.${scope}`),
-    options: clients
-      .filter((client) => scopesIn(client, scope).length > 0)
-      .map((client): PlaceOption => ({
-        id: `${scope}:${client.id}`,
-        icon: client.icon,
-        label: client.label,
-        /* The agents' own words for their scopes, read as one line: this hub has
-           no path for a place to show, because an installer never names one. */
-        note: scopeWords(scopesIn(client, scope), t),
-      })),
+    options: clients.flatMap((client): PlaceOption[] => {
+      const reached = scopeReached(client.scopes, scope)
+      if (reached === undefined) return []
+      return [
+        {
+          id: `${scope}:${client.id}`,
+          icon: client.icon,
+          label: client.label,
+          /* The agent's own word for that one place: this hub has no path to
+             show, because an installer never names one. */
+          note: scopeWords([reached], t),
+        },
+      ]
+    }),
   }))
   const byRow = new Map(
     rows.flatMap((group) =>
@@ -777,7 +778,8 @@ function PlacesSection({
         disabled={busy}
         aria-label={`${t("plugins.action.install")} ${client.label}`}
         onClick={() => {
-          for (const one of scopesIn(client, at.scope)) onInstall(client.id, one)
+          const reached = scopeReached(client.scopes, at.scope)
+          if (reached !== undefined) onInstall(client.id, reached)
         }}
         className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
       >

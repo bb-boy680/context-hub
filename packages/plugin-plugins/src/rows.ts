@@ -15,7 +15,7 @@
 import { assetRef } from "@workspace/core"
 import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
 
-import { installedRevision, type PluginOrigin } from "./contract.ts"
+import { installedRevision, type PluginInstallScope, type PluginOrigin } from "./contract.ts"
 import { formatPluginSource, originToSpec } from "./inspect.ts"
 import type { PluginHeld } from "./provider.ts"
 import type { PluginRecord } from "./revision.ts"
@@ -247,6 +247,25 @@ export type PluginTab = "all" | "library" | "unstored" | "updates" | AssetScope
 export const SCOPES_OF: Record<AssetScope, readonly string[]> = {
   workspace: ["project", "local"],
   global: ["user"],
+}
+
+/**
+ * The one scope a group's action reaches, given the scopes an agent keeps.
+ *
+ * A group that spans two places acts on the first of them in the agent's own
+ * order rather than on all of them: the workspace row then writes one place, the
+ * repository's shared scope, instead of also writing the private scope beside
+ * it. Which places an agent keeps is its own declaration, so an agent listing
+ * only the private one still lands somewhere.
+ *
+ * @param scopes — the scopes the agent installs into, in its own order.
+ * @param group — the group whose action is being resolved.
+ */
+export function scopeReached(
+  scopes: readonly PluginInstallScope[],
+  group: AssetScope
+): PluginInstallScope | undefined {
+  return scopes.find((one) => SCOPES_OF[group].includes(one))
 }
 
 /**
