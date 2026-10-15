@@ -294,3 +294,61 @@ project 赢 → CLI 报 `enabled: true`。于是文案读文件说「已停用�
 **验证方式**：这轮的断言直接复刻用户截图那个状态（装在 `user`、user 文件 `false`、
 project 文件 `true`、客户端答案 `true`），断言该行显示 `false`。把 `on` 退回客户端答案，
 两条断言立刻变红并打出 `[["user",true],["project",true]]`——正是截图里的样子。
+
+## "用某组件"的意思是连它的默认长相一起用（2026-10-15）
+
+**问题模式**：用户说「item 使用 shadcn-ui 的 item 组件」，我用是用了 `Item`/`ItemGroup`/
+`ItemTitle`/`ItemDescription`，但把它的外壳改掉了——`ItemGroup` 上加 `divide-y divide-border`、
+`Item` 上写 `rounded-none px-0 py-3`，做出来是**没有边框的分隔线列表**。
+用户截了一张 shadcn 文档里的 `Basic Item`（白底、1px 边框、16px 圆角）说「item 少了边框」。
+
+我当时的理由是「对话框里已经有一堆卡片，再套卡片太吵」——但用户点的是
+`variant="outline"`，那是 `Item` 自带的三个 variant 之一，不是我要发明的东西。
+
+**规则**：用户点名某个组件库的某个组件时，**那个组件的默认形态就是需求的一部分**。
+要改外壳之前先问：是「这个组件刚好合用，我要按我这边的排版调」，还是
+「我要的就是它长这样」？判据是看用户有没有给截图或指名 variant——
+给了就是后者，照 `variant` 写（这里是 `Item variant="outline"`），
+不要再叠一层 `rounded-none`/`divide-y` 把它的边界抹掉。
+跨页复用同一种内容（这里是 MCP 工具页与 plugins 列表）时，先看隔壁页那句话的组件，
+再决定要不要偏离。
+
+**附带一条实操**：`ItemMedia variant="icon"` 自带 `self-start` + `translate-y-0.5`
+（把内联小图标对齐到标题基线）。放 28px 的图标砖时要 `self-center! translate-y-0!` 压掉，
+否则一行有描述时砖会贴在标题上——这和本文件「共享组件换一种数据形状调用时」那条是同一个坑，
+只是这次坑在 shadcn 自己的组件里。
+
+## 这个仓库的界面是能在浏览器里真看的（2026-10-15）
+
+**问题模式**：上一轮我告诉用户「本仓没有可用的浏览器驱动（`node_modules/.bin` 里只有
+tsc/prettier/turbo），所以界面没看过」——**这是错的**。不需要 playwright：
+Node 24 自带全局 `WebSocket`，Windows 上有 Edge，用 `--remote-debugging-port` 起
+headless 就能直接说 CDP。
+
+这一轮用它一次拿到了四个只看代码拿不到的结论：
+- `Preview` 页签上的蓝框是**我自己合成 `.click()` 触发的 `:focus-visible`**，
+  不是缺陷（改用 `Input.dispatchMouseEvent` 发真实鼠标事件后读到
+  `focusVisible:false`、`outline:3px none`，截图里框就没了）；
+- `TabsContent keepMounted` 确实生效——隐藏的展示图页仍在 DOM 里（`hidden:true`）；
+- 图标砖与行中心 `offBy: 0`（`alignSelf:center`、`translate:0px`），证明
+  `self-center!` 真的压住了 shadcn 的 `self-start`；
+- 列表的实测边框/圆角是 `1px rgb(222,225,230)` / `16px`，即用户要的那个样子。
+
+**规则**：要判断「渲染出来是什么样」「某个属性能不能生效」，先起一次 headless Edge + CDP，
+不要下「环境不允许」的结论。步骤：
+
+```bash
+EDGE="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+"$EDGE" --headless=new --disable-gpu --remote-debugging-port=9222 \
+        --user-data-dir=<temp>/profile --no-first-run about:blank &
+# 然后 fetch http://127.0.0.1:9222/json/list 拿 webSocketDebuggerUrl，
+# 用全局 WebSocket 说 Runtime.evaluate / Page.captureScreenshot
+```
+
+配套两条：
+- **点要用 `Input.dispatchMouseEvent`，不要用 `element.click()`**，否则会引入
+  真实用户永远看不到的 `:focus-visible` 蓝框，把人骗一轮。
+- 要造带 `commands/`、`.mcp.json` 之类的**测试包**时，起 `CONTEXT_HUB_HOME=<temp>`
+  的第二个 dev server，别往真实的 `~/.context-hub/plugins` 里写；
+  收尾记得连进程一起清掉（这轮清理时误杀了一个不是我起的 5173，用户自己的服务）。
+
