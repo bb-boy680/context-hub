@@ -1,6 +1,13 @@
 /**
- * The media pane on the left and the panel of facts and actions on the right,
- * with the pack's files sliding in over both.
+ * The pane of the pack's own pictures and of what it carries inside it, and the
+ * panel of facts and actions beside it, with the pack's files sliding in over
+ * both.
+ *
+ * The pane is a strip of tabs: the pictures, and one tab per thing the pack's
+ * own directory turned out to hold — its skills, its commands, its declared MCP
+ * servers. Which of the three is there is only knowable by reading the pack, so
+ * it is read as the lightbox opens and a tab is offered only when that read
+ * found something.
  *
  * A picture added here lives in this window (its own object URL) rather than on
  * disk, because nothing in this module writes a pack's directory; the files
@@ -28,17 +35,30 @@ import {
   PlugIcon,
   PlusIcon,
   RefreshCwIcon,
+  SparklesIcon,
+  SquareSlashIcon,
   Trash2Icon,
   UploadIcon,
   XIcon,
+  type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
 import { PluginTile } from "./parts.tsx"
-import { packFile, packFileIn, packFiles, packFilesIn, type PluginClient } from "./library.ts"
+import {
+  packContents,
+  packContentsIn,
+  packFile,
+  packFileIn,
+  packFiles,
+  packFilesIn,
+  type PluginClient,
+} from "./library.ts"
 import { placeReached, SCOPES, scopeWords } from "./rows.ts"
+import { NO_CONTENTS } from "./contract.ts"
+import type { PackContentItem, PackContents } from "./contract.ts"
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
@@ -58,11 +78,20 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 import {
+  Item,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemMedia,
+  ItemTitle,
+} from "@workspace/ui/components/item"
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { Spinner } from "@workspace/ui/components/spinner"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { toast } from "@workspace/ui/components/toast"
 import type { AssetScope } from "@workspace/extensions"
 
@@ -512,6 +541,192 @@ function MediaPane({ plugin }: { plugin: PluginRow }) {
         {t("plugins.media.hint")}
       </p>
     </div>
+  )
+}
+
+/** The tabs the pane can show: the pack's own pictures first, then whatever its directory turned out to carry. */
+type PackTab = "media" | "skills" | "commands" | "mcp"
+
+/**
+ * One scanned tab's list: what each thing a pack ships is called, what it says
+ * about itself, and the mark of the kind of thing it is.
+ *
+ * The rows are shadcn's own item components — the group, the media plate, the
+ * title and the description — rather than a shape drawn here, so this list
+ * answers to the same typography and spacing as the rest of the interface.
+ *
+ * Nothing here can be edited — these files belong to the pack and are written
+ * wherever it is authored — so a row is a line of reading, not a field.
+ *
+ * @param icon — the mark for what this list holds: a skill, or a command.
+ */
+function ContentList({
+  items,
+  icon: Icon,
+}: {
+  items: readonly PackContentItem[]
+  icon: LucideIcon
+}) {
+  return (
+    <ItemGroup className="gap-2.5">
+      {items.map((item, at) => (
+        /* A card rather than a ruled line: the same shape the tools tab draws
+           its own list of read-only entries in, inside the same kind of pane.
+           The padding is the variant's own. */
+        <Item key={`${String(at)}:${item.title}`} variant="outline" className="bg-card">
+          {/* The plate is the media slot's own: it sits where an item's picture
+              would. The variant nudges an inline mark onto the title's baseline
+              when a row has a description, which a plate this tall does not want
+              — the row's own `items-center` centers it, as the place rows beside
+              this list are centered. */}
+          <ItemMedia
+            variant="icon"
+            className="size-7 self-center! translate-y-0! rounded-[8px] bg-surface-raised ring-1 ring-border ring-inset"
+          >
+            <Icon className="size-[15px] text-copy" aria-hidden />
+          </ItemMedia>
+          <ItemContent>
+            <ItemTitle className="font-mono text-[13px] leading-[18px] font-semibold">
+              {item.title}
+            </ItemTitle>
+            {/* A file that says nothing about itself reads as its name alone,
+                rather than under an empty line. */}
+            {item.description === "" ? null : (
+              <ItemDescription className="text-[12.5px] leading-[17px]">
+                {item.description}
+              </ItemDescription>
+            )}
+          </ItemContent>
+        </Item>
+      ))}
+    </ItemGroup>
+  )
+}
+
+/**
+ * The left side of the lightbox: the pack's own pictures, and a tab for each of
+ * the three things its directory may carry.
+ *
+ * A pack's skills, commands and MCP servers are read from the pack itself rather
+ * than recorded anywhere, so they are read once as the lightbox opens — one
+ * request, and one answer the tabs are built from. A tab is only offered when
+ * that answer holds something: a view whose whole content is "none" is not a
+ * view, and the panel beside it already says what the pack is either way.
+ */
+function PackPane({ plugin }: { plugin: PluginRow }) {
+  const { t } = useI18n()
+  const [tab, setTab] = React.useState<PackTab>("media")
+  const [contents, setContents] = React.useState<PackContents>(NO_CONTENTS)
+
+  /* Where this pack is read from: the hub's own copy when it holds one, and
+     otherwise the directory an agent reads it in — the same pair of places its
+     files panel reads. */
+  const dir = plugin.stored ? null : (plugin.directory ?? null)
+  React.useEffect(() => {
+    let alive = true
+    queueMicrotask(() => {
+      if (!alive) return
+      void (dir === null ? packContents(plugin.id) : packContentsIn(dir))
+        .then((found) => {
+          if (alive) setContents(found)
+        })
+        /* A pack whose directory cannot be read offers no tab rather than a
+           failed one: what could not be read is the files panel's to say. */
+        .catch(() => {
+          if (alive) setContents(NO_CONTENTS)
+        })
+    })
+    return () => {
+      alive = false
+    }
+  }, [dir, plugin.id])
+
+  const offered: { id: PackTab; key: string; count?: number }[] = [
+    { id: "media", key: "plugins.detail.tab.media" },
+    ...(contents.skills.length === 0
+      ? []
+      : [
+          {
+            id: "skills" as PackTab,
+            key: "plugins.detail.tab.skills",
+            count: contents.skills.length,
+          },
+        ]),
+    ...(contents.commands.length === 0
+      ? []
+      : [
+          {
+            id: "commands" as PackTab,
+            key: "plugins.detail.tab.commands",
+            count: contents.commands.length,
+          },
+        ]),
+    ...(contents.mcp === null ? [] : [{ id: "mcp" as PackTab, key: "plugins.detail.tab.mcp" }]),
+  ]
+  /* A tab that is no longer offered — a pack read again with less in it — leaves
+     the pane on the pictures rather than on nothing. */
+  const shown = offered.some((one) => one.id === tab) ? tab : "media"
+
+  return (
+    <Tabs
+      value={shown}
+      onValueChange={(value) => setTab(value as PackTab)}
+      className="min-h-0 min-w-0 flex-1 flex-col gap-0 overflow-hidden"
+    >
+      <div className="flex h-12 shrink-0 items-center border-b border-border px-6">
+        <TabsList variant="line" className="h-12! gap-7 p-0">
+          {offered.map((one) => (
+            <TabsTrigger
+              key={one.id}
+              value={one.id}
+              className="h-12 flex-none rounded-none border-0 px-0 py-0 text-[13.5px] leading-[1.4] font-medium text-muted-foreground after:inset-x-0 after:bottom-0! after:h-0.5 after:bg-primary data-active:font-semibold data-active:text-foreground"
+            >
+              {t(one.key)}
+              {one.count === undefined ? null : (
+                <span className="font-mono text-[12px] text-muted-soft">{one.count}</span>
+              )}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </div>
+      {/* The pictures keep their own state — a picture added here lives in this
+          window and nowhere else — so that pane stays mounted while another tab
+          is on screen, rather than being emptied by a look at the skills. */}
+      <TabsContent value="media" keepMounted className="flex min-h-0 flex-1 flex-col">
+        <MediaPane plugin={plugin} />
+      </TabsContent>
+      {contents.skills.length === 0 ? null : (
+        <TabsContent
+          value="skills"
+          className="min-h-0 flex-1 scrollbar-gutter-stable overflow-y-auto px-6 py-[22px]"
+        >
+          <ContentList items={contents.skills} icon={SparklesIcon} />
+        </TabsContent>
+      )}
+      {contents.commands.length === 0 ? null : (
+        <TabsContent
+          value="commands"
+          className="min-h-0 flex-1 scrollbar-gutter-stable overflow-y-auto px-6 py-[22px]"
+        >
+          <ContentList items={contents.commands} icon={SquareSlashIcon} />
+        </TabsContent>
+      )}
+      {/* The MCP tab is the pack's own declaration read as a file: what a client
+          is handed is exactly what is written there. */}
+      {contents.mcp === null ? null : (
+        <TabsContent value="mcp" className="min-h-0 flex-1 px-6 py-[22px]">
+          <CodeCard
+            path=".mcp.json"
+            text={contents.mcp}
+            words={{
+              copy: t("plugins.detail.files.copy"),
+              copied: t("plugins.detail.files.copied"),
+            }}
+            className="h-full"
+          />
+        </TabsContent>
+      )}
+    </Tabs>
   )
 }
 
@@ -1300,7 +1515,7 @@ function PackLightbox({
 
   return (
     <DialogSplit
-      pane={<MediaPane plugin={plugin} />}
+      pane={<PackPane plugin={plugin} />}
       panel={
         <InfoPanel
           plugin={plugin}

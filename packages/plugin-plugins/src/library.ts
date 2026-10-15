@@ -18,6 +18,7 @@ import type { ExtensionIcon } from "@workspace/extensions"
 import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
 
 import {
+  type PackContents,
   type PluginInstallReport,
   type PluginInstallScope,
 } from "./contract.ts"
@@ -107,6 +108,22 @@ export async function packFileIn(dir: string, path: string): Promise<string | nu
     `${ENDPOINT}?action=file&dir=${encodeURIComponent(dir)}&path=${encodeURIComponent(path)}`
   ).catch(() => null)
   return answer?.text ?? null
+}
+
+/**
+ * What one pack carries, out of the hub's own copy.
+ *
+ * A pack's contents are read from its directory rather than from anything the
+ * library records, so this is a read of the disk each time it is asked — which
+ * is why the dialog asks once as it opens rather than on every render.
+ */
+export async function packContents(name: string): Promise<PackContents> {
+  return call<PackContents>(`${ENDPOINT}?action=contents&name=${encodeURIComponent(name)}`)
+}
+
+/** What one pack carries, read out of the directory an agent keeps it in. */
+export async function packContentsIn(dir: string): Promise<PackContents> {
+  return call<PackContents>(`${ENDPOINT}?action=contents&dir=${encodeURIComponent(dir)}`)
 }
 
 async function call<T>(path: string, body?: unknown): Promise<T> {

@@ -21,6 +21,7 @@ import { resolveHubHome } from "@workspace/core/host/home"
 import { createFsWorkspaceStore } from "@workspace/core/host/workspaces"
 
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
+import { readPackContents } from "./src/host/contents.ts"
 import { describePack } from "./src/host/describe.ts"
 import { createFsPluginLibrary, listDirectory, readInDirectory } from "./src/host/library.ts"
 import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
@@ -164,6 +165,24 @@ export function pluginLibrary(
                     ? await library.read(requiredString(url.searchParams.get("name"), "name"), file)
                     : await readInDirectory(dir, file),
               })
+              return
+            }
+
+            /* What a pack carries inside it: the skills, the commands and the
+               MCP servers its own directory holds. A pack the hub collected and
+               one an agent keeps in place are read the same way, as its files
+               are; none of this is recorded, so the directory is what answers. */
+            if (method === "GET" && action === "contents") {
+              const dir = url.searchParams.get("dir")
+              sendJson(
+                response,
+                200,
+                await readPackContents(
+                  dir === null
+                    ? library.packDir(requiredString(url.searchParams.get("name"), "name"))
+                    : dir
+                )
+              )
               return
             }
 

@@ -34,6 +34,7 @@ import {
 import { modified, outdated } from "../src/revision.ts"
 import { createPluginCollector, type PackUpload } from "../src/host/collect.ts"
 import { fetchPlugin, stagingDir } from "../src/host/fetch.ts"
+import { readPackContents } from "../src/host/contents.ts"
 import { createFsPluginLibrary, listDirectory, readInDirectory } from "../src/host/library.ts"
 import { findLogo } from "../src/host/logo.ts"
 import { bestPicture, pictureOf } from "../src/pictures.ts"
@@ -1263,6 +1264,88 @@ await registered.remove("acme-hello@stub", "user", tools)
 check("removing one scope leaves the other", (await heldScopes("acme-hello")) === "project")
 unregister()
 check("the disposer takes it back out", registry.installers().length === 0)
+
+console.log("what a pack carries inside it")
+
+/* The pack the rest of this check writes: one skill that names itself, and one
+   command that says nothing about itself at all. */
+const carried = await readPackContents(source)
+check("a skill reads under the name its own file gives", carried.skills[0]?.title === "hello", carried.skills)
+check("and carries the sentence beside it", carried.skills[0]?.description === "Say hello.")
+check(
+  "a command with no frontmatter reads as its file name",
+  carried.commands[0]?.title === "greet",
+  carried.commands
+)
+check("with nothing said about it rather than something invented", carried.commands[0]?.description === "")
+check("a pack that declares no server carries none", carried.mcp === null)
+
+/* A pack carrying the shapes the first one does not: a skill directory that is
+   not a skill, two skills out of order, a command grouped in a directory, a file
+   that is not markdown, and a declared server. */
+const shapes = path.join(root, "shapes")
+await writePack(shapes, "1.0.0")
+await fs.rm(path.join(shapes, "skills", "hello", "SKILL.md"))
+/* The directory names are not the names the skills give themselves, so a name
+   read from the wrong one of the two is a failure rather than a coincidence.
+   Alpha's description is wrapped the way a long one usually is. */
+for (const [dir, name, description] of [
+  ["zzz", "zulu", "description: A skill called zulu.\n"],
+  ["aaa", "alpha", "description: >\n  A skill called alpha, whose description\n  was wrapped by hand.\n"],
+] as const) {
+  await fs.mkdir(path.join(shapes, "skills", dir), { recursive: true })
+  await fs.writeFile(
+    path.join(shapes, "skills", dir, "SKILL.md"),
+    `---\nname: ${name}\n${description}---\n`,
+    "utf8"
+  )
+}
+await fs.mkdir(path.join(shapes, "commands", "git"), { recursive: true })
+await fs.writeFile(
+  path.join(shapes, "commands", "git", "commit.md"),
+  "---\ndescription:\n  Write a commit,\n  twice over.\n---\n",
+  "utf8"
+)
+await fs.writeFile(path.join(shapes, "commands", "notes.txt"), "not a command\n", "utf8")
+const declared = '{\n  "mcpServers": { "ping": { "command": "ping" } }\n}\n'
+await fs.writeFile(path.join(shapes, ".mcp.json"), declared, "utf8")
+
+const more = await readPackContents(shapes)
+check("a directory with no SKILL.md is not a skill", more.skills.length === 2, more.skills)
+check(
+  "skills come back in the order a list reads them",
+  more.skills.map((one) => one.title).join(",") === "alpha,zulu",
+  more.skills
+)
+/* One strict comparison rather than a look for what should be absent: a title
+   the filter failed to drop is only visible against the whole list. */
+check(
+  "the commands are the markdown files under commands/, however deep they sit",
+  more.commands.map((one) => one.title).join(",") === "commit,greet",
+  more.commands
+)
+check(
+  "a description written under its key is read as the value",
+  more.skills[0]?.description === "A skill called alpha, whose description was wrapped by hand.",
+  more.skills
+)
+check(
+  "and one wrapped by hand reads as one line",
+  more.commands[0]?.description === "Write a commit, twice over.",
+  more.commands
+)
+check("the declared servers come back exactly as written", more.mcp === declared)
+
+/* A directory holding nothing of the three is the ordinary case, not a failure:
+   it is what says the three tabs are not offered at all. */
+const bare = path.join(root, "bare")
+await fs.mkdir(bare, { recursive: true })
+const none = await readPackContents(bare)
+check(
+  "a directory carrying none of the three answers empty",
+  none.skills.length === 0 && none.commands.length === 0 && none.mcp === null,
+  none
+)
 
 await fs.rm(root, { recursive: true, force: true })
 

@@ -103,6 +103,37 @@ export interface PackDescription {
   icon?: string
 }
 
+/**
+ * One thing a pack ships that a list shows by its name and its own sentence: a
+ * skill, or a command.
+ *
+ * A pack is the only thing that knows what is inside it — none of this is
+ * recorded, and none of it can be derived from the manifest — so both fields are
+ * read from the item's own file.
+ */
+export interface PackContentItem {
+  /** What it is called: the name its frontmatter gives, else the directory or file it sits in. */
+  title: string
+  /** What it says about itself; empty when it says nothing, which reads as a line without one. */
+  description: string
+}
+
+/**
+ * What a pack carries beside its manifest, which is what the detail dialog's
+ * tabs are built from: an empty list is what says a tab is not offered at all.
+ */
+export interface PackContents {
+  /** One entry per skill the pack ships, in title order. */
+  skills: PackContentItem[]
+  /** One entry per command file the pack ships, in title order. */
+  commands: PackContentItem[]
+  /** The `.mcp.json` at the pack's root as written, or null when it carries none. */
+  mcp: string | null
+}
+
+/** A pack carrying none of the three — also what a scan that could not read the pack answers. */
+export const NO_CONTENTS: PackContents = { skills: [], commands: [], mcp: null }
+
 /** What one install changed, as the person is told it. */
 export interface PluginInstallReport {
   /** One line naming what happened, already worded for the locale it prints in. */
