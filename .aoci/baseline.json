@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-15T08:14:24Z",
+  "updated_at": "2026-10-15T08:21:34Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -47,9 +47,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "ec2e1944b0baf4ddef7dc4f37b8e61cf6c7f4376a6467a68d542922fc85d3cc8",
-      "size": 97064,
-      "normalized_sha256": "ec2e1944b0baf4ddef7dc4f37b8e61cf6c7f4376a6467a68d542922fc85d3cc8"
+      "sha256": "8a59b6c5d7620eccfbdcdb1b43495f0b52b96f94c5604ac602b27e7df44d2c5a",
+      "size": 97109,
+      "normalized_sha256": "8a59b6c5d7620eccfbdcdb1b43495f0b52b96f94c5604ac602b27e7df44d2c5a"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1349,9 +1349,9 @@
     },
     "packages/plugin-plugins/scripts/check-plugin-library.ts": {
       "role": "index",
-      "sha256": "48188463bce510d4d6022f7eca2612757d05216b113bf2984f4bdadefddc028f",
-      "size": 56241,
-      "normalized_sha256": "6a9051a1c4adea014a562049c22b1fd2780fe10475d88bb4ffcf3e945c4addf6"
+      "sha256": "ecf0986e800204cfbd6578aad1b881af1ff51d25a46b4fbe39d71a9942ee4170",
+      "size": 57365,
+      "normalized_sha256": "a8f0609c1bb31a62c30c3c3d9b12c55cdf1db6a751728c89736f86f7b13b8ecc"
     },
     "packages/plugin-plugins/scripts/check-plugin-rows.ts": {
       "role": "index",
@@ -1439,9 +1439,9 @@
     },
     "packages/plugin-plugins/src/host/program.ts": {
       "role": "index",
-      "sha256": "d1a113ffc7065391c55d1212c138408ebfb1f538e16bb36ad86e21b55d46f8ac",
-      "size": 2859,
-      "normalized_sha256": "76e8639d80f4776028f030ed89488ec749f7c5af8ec86921ccdf57e7488e0b8a"
+      "sha256": "f58397ad1dd659bb8e839761161f7c76c9839383ee4d8bb9483f76673d423c27",
+      "size": 3358,
+      "normalized_sha256": "76c1e0576079612a750edb234f0a1b50c3cf5434b1cf1112899960920226c91a"
     },
     "packages/plugin-plugins/src/host/update.ts": {
       "role": "index",
@@ -1547,9 +1547,9 @@
     },
     "packages/plugin-plugins/vite.ts": {
       "role": "index",
-      "sha256": "ed60e707375397c6630e0067b97418ff95aaaa65f4a6d2959df0af0cdb07b2e2",
-      "size": 12283,
-      "normalized_sha256": "09c15b1b9b18dbb766f333d322fa40d813daca0ac1ccdd7626dbb1406c9a5d20"
+      "sha256": "0b8a84243e71df358a2d310eadff591387943dfe9cebb3c0d2e7929358b2a0e0",
+      "size": 13433,
+      "normalized_sha256": "9acca2edbbaabe2568bed0db16e77dde4801a48609277941cb663c88983e909c"
     },
     "packages/plugin-skills-sh/eslint.config.js": {
       "role": "index",

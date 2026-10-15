@@ -333,10 +333,10 @@ records.ts[PD8S]: F:hub 自己的记录文件 | R:code:packages/plugin-mcp/src/r
 eslint.config.js[FQ3T]: F:插件模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
 package.json[FV8T]: F:插件模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./provider、./library、./vite；依赖 @headless-tree 画文件树
 tsconfig.json[FV3T]: F:插件模块编译选项 | R:- | A:- | S:与 cline 包同构，目标 ES2022、jsx react-jsx
-vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；每个响应都 no-store；files/file 二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致——两边写错过一次，使查看文件一直静默为空
+vite.ts[IV8M]: F:插件库开发期桥接 | R:code:packages/plugin-plugins/src/host/collect.ts,code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/marketplace.ts,code:packages/plugin-plugins/src/host/program.ts | A:pluginLibrary | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；响应都 no-store；files/file 二选一收 name=（库）或 dir=（agent 目录），参数名必须与客户端一致；program 在工作区目录里跑——不给就把 dev server 自己的包当成项目
 
 ===D:/work-space/dsh-context-hub/packages/plugin-plugins/scripts/===
-check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒
+check-plugin-library.ts[TQ8L]: F:插件库行为检查 | R:code:packages/plugin-plugins/src/host/library.ts,code:packages/plugin-plugins/src/host/probe.ts | A:- | S:全部跑在临时 hub home 与现场造的 git 仓库上，不碰真实库、真实 agent 或网络；覆盖地址解析、收进库写了什么、哪张图被当作 logo、源动了是否被发现、按名字问一个包、目录列举与越界路径被拒，以及子进程的工作目录
 check-plugin-rows.ts[TQ7L]: F:目录行合成检查 | R:code:packages/plugin-plugins/src/rows.ts | A:- | S:全用现造的值，无盘无客户端无网络；验折合与合并、作用域页签、行落在哪个页签、来源地址的拼法、agent 自己的 id 与目录有没有跟到行上
 check-plugin-scan.ts[TQ7M]: F:并发扫描客户端检查 | R:code:packages/plugin-plugins/src/scan.ts | A:- | S:用桩件（自己数进入次数）证明是并发而非串行、答案保持提问顺序、以及一个客户端失败只是一个答案而不是整次扫描失败
 
@@ -370,7 +370,7 @@ logo.ts[PE5S]: F:找并保存包自己的图 | R:code:packages/plugin-plugins/sr
 marketplace.ts[PE8S]: F:库根携带的市场索引 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:writeMarketplaceIndex,marketplaceIndex,codexMarketplaceIndex | S:一个根同时服务多个客户端（Claude Code 读 .claude-plugin/marketplace.json，Codex 读 .agents/plugins/marketplace.json），各找自己的文件、忽略其他；索引是派生的，每个字段都来自各包自己的清单，从当前库状态写出而不是手工同步
 names.ts[PS7T]: F:库内路径安全校验 | R:- | A:assertSafeSegment,assertPackRelative | S:包名既是目录名也是各客户端的 id，故两件事都在此裁决：拒绝空、隐藏、含分隔符、控制字符与 Windows 保留设备名；人选的文件夹以路径列表到达，每条路径先判过才能写
 probe.ts[IE7S]: F:询问源是否前进 | R:code:packages/plugin-plugins/src/contract.ts,code:packages/plugin-plugins/src/revision.ts | A:createPluginProbe,PluginProbe,CHECK_VERSION | S:问源自己：仓库用 git ls-remote 只读 refs 且问当初取的那个 ref；压缩包用 HEAD 取校验器；本机目录答问不了；单个包与整批走同一条问法、记在同一处，故答案要从记录上读
-program.ts[RE7T]: F:运行控制台程序 | R:- | A:runProgram,hasProgram,ProgramResult | S:参数以列表传递并在此加引号，故带空格的路径仍是一个参数、用户输入不会未经引号进入 shell；客户端在 Windows 上是脚本，这才是要经 shell 启动的原因；本包唯一起子进程的地方
+program.ts[RE7T]: F:运行控制台程序 | R:- | A:runProgram,hasProgram,ProgramResult | S:参数以列表传递并在此加引号，带空格的路径仍是一个参数；客户端在 Windows 上是脚本，故经 shell 启动；cwd 可选，不给就落在宿主自己的目录，客户端的项目文件会写错地方
 update.ts[PE7S]: F:把包更新到源当前状态 | R:code:packages/plugin-plugins/src/host/fetch.ts,code:packages/plugin-plugins/src/host/library.ts | A:createPluginUpdater,PluginUpdater,PluginUpdateOutcome | S:下载本身不构成更新：落地文件可能逐字节相同（回退、只改 README、子目录没真变），故先对暂存求哈希，与记录相同就直接结束；确实变了才一步替换目录，记录在其后写
 
 ===D:/work-space/dsh-context-hub/packages/plugin-skills-sh/===
