@@ -19,6 +19,8 @@ export const promptsMessages: Record<string, string> = {
 
   "prompts.action.add": "Add prompt",
   "prompts.action.install": "Install",
+  "prompts.action.copy": "Copy",
+  "prompts.action.copied": "Copied",
   "prompts.action.more": "More actions",
   "prompts.action.delete": "Delete",
 

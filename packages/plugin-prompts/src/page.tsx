@@ -1,15 +1,18 @@
 /**
  * The prompts screen: every prompt this hub keeps, drawn as cards or as a
- * ledger, with the one action a prompt carries.
+ * ledger, with the two things a prompt can be sent to.
  *
  * It is the shape the other asset pages have — the same toolbar, the same
  * filter row, the same two views — minus the parts that would have nothing to
  * say here. There is one tab, because a prompt has nowhere to be but in the
  * library: no scope it is enabled at, no source it came from, nothing missing
- * that could be gathered. What it *does* have is a destination, and that is
- * what each row's one button is about.
+ * that could be gathered. What it *does* have is a destination: an agent's
+ * files, which the row's menu writes, or no file at all, which is the copy
+ * beside it.
  */
 import {
+  CheckIcon,
+  CopyIcon,
   FileTextIcon,
   LayoutGridIcon,
   ListIcon,
@@ -29,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/componen
 
 import { AddPromptDialog } from "./add-prompt-dialog.tsx"
 import { deliver, delivered, undeliver, type Delivery } from "./deliver.ts"
-import { BatchActions, PromptActions } from "./install-menu.tsx"
+import { BatchActions, cardActionShell, PromptActions } from "./install-menu.tsx"
 import { formatAge, tokenLabel, useInstalled, usePlaceFiles, usePromptLibrary, usePromptPlaces } from "./library.ts"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
@@ -48,6 +51,9 @@ const COVER_LINES = 6
 
 /** The ratio every card's cover takes; a prompt has no picture to measure. */
 const FALLBACK_RATIO = 16 / 9
+
+/** How long the copy button wears its confirmation before it offers again. */
+const COPIED_MS = 3000
 
 /**
  * The first line of a prompt that says anything — what the ledger prints under
@@ -172,6 +178,49 @@ function EmptyState({
   )
 }
 
+/**
+ * Copy a prompt's text: the one thing a card offers that leaves no file behind.
+ *
+ * Delivering a prompt puts it where an agent reads it, which is what this module
+ * is mostly about — but a prompt is often wanted somewhere else, in a chat box or
+ * a colleague's editor, and that case has no place to deliver to. So the text
+ * itself is the destination here.
+ *
+ * The mark says a copy landed and the label never changes: a longer word would
+ * push the delivery button sideways every time this one is pressed.
+ *
+ * A clipboard that is missing or refuses leaves the button offering, with no
+ * toast: the mark is the confirmation, and a copy that did not happen simply
+ * does not claim to have.
+ */
+function CopyAction({ text }: { text: string }) {
+  const { t } = useI18n()
+  const [copied, setCopied] = React.useState(false)
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      aria-label={t(copied ? "prompts.action.copied" : "prompts.action.copy")}
+      onClick={(event) => {
+        /* The card underneath opens the prompt on a click, so this one stops. */
+        event.stopPropagation()
+        void navigator.clipboard
+          ?.writeText(text)
+          .then(() => {
+            setCopied(true)
+            window.setTimeout(() => setCopied(false), COPIED_MS)
+          })
+          .catch(() => undefined)
+      }}
+      className={cardActionShell}
+    >
+      {copied ? <CheckIcon className="size-3.5 text-primary" /> : <CopyIcon className="size-3.5" />}
+      {t("prompts.action.copy")}
+    </Button>
+  )
+}
+
 /** What one prompt carries everywhere it is drawn: age, categories, actions. */
 interface CardProps {
   prompt: StoredPrompt
@@ -245,6 +294,9 @@ function PromptCard({ prompt, updated, busy, places, onOpen, onToggle, onGenerat
             appears once it has been delivered would put the button in one place
             before and another after. */}
         <div className="flex items-center justify-end gap-2">
+          {/* Taking the text itself, which needs no agent to go to, and then
+              the delivery — the one the row is read for, so it keeps the end. */}
+          <CopyAction text={prompt.prompt} />
           {/* The stamp is raised by whichever delivery this card ran, so the
               menu's ticks re-read the files they are about. */}
           <span onClick={(event) => event.stopPropagation()}>

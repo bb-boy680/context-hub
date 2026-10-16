@@ -622,6 +622,8 @@ export const messages: Record<string, string> = {
   "prompts.view.list": "列表视图",
   "prompts.action.add": "添加提示词",
   "prompts.action.install": "安装",
+  "prompts.action.copy": "复制",
+  "prompts.action.copied": "已复制",
   "prompts.action.more": "更多操作",
   "prompts.action.delete": "删除",
   "prompts.column.prompt": "提示词",

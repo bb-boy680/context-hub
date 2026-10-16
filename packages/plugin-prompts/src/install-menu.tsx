@@ -36,8 +36,12 @@ import type { Prompt } from "./store.ts"
 /** The scopes, in the order a list of places reads them. */
 const SCOPES = ["workspace", "global"] as const
 
-/** The button shape this cluster's trigger wears, matching the other asset pages. */
-const shell =
+/**
+ * The shape of a button on a card's action row, matching the other asset pages.
+ * Exported because the row's other button is drawn by the page, and the two
+ * stand side by side: one literal, so they cannot drift apart.
+ */
+export const cardActionShell =
   "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
 /** The `⋯` that opens one agent's own actions; sized to the row it sits in. */
@@ -248,7 +252,7 @@ export function PromptActions({
             disabled={busy}
             aria-label={`${t("prompts.action.install")} ${prompt.description}`}
             onClick={(event) => event.stopPropagation()}
-            className={shell}
+            className={cardActionShell}
           />
         }
       >
@@ -312,7 +316,7 @@ export function BatchActions({
             disabled={busy || count === 0}
             aria-label={t("prompts.action.install")}
             onClick={(event) => event.stopPropagation()}
-            className={`${shell} border-border bg-transparent px-4 dark:border-input dark:bg-transparent`}
+            className={`${cardActionShell} border-border bg-transparent px-4 dark:border-input dark:bg-transparent`}
           />
         }
       >
