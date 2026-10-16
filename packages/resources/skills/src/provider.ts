@@ -12,6 +12,9 @@
  * carries: the sidebar records the chosen agents by that id, and a place
  * outside every workspace is read only while its agent is chosen.
  */
+import { Service } from "@deepseek-ai/cordis"
+import type { Context } from "@deepseek-ai/cordis"
+
 import type { AssetScope } from "@context-hub/core/place-files"
 import type { ExtensionIcon } from "@context-hub/extensions"
 
@@ -51,21 +54,40 @@ export interface SkillProvider {
 
 /** Where an agent extension registers the places it reads. */
 export interface SkillProviderRegistry {
-  /** Every provider registered right now, in registration order. */
   providers(): readonly SkillProvider[]
-  /**
-   * Add one provider.
-   *
-   * @returns a disposer that takes it back out; a provider registered inside a
-   * plugin's `inject` callback is disposed with that callback.
-   */
   register(provider: SkillProvider): () => void
 }
 
-/** What the skills module publishes as {@link SKILL_SERVICE}. */
-export interface SkillService {
-  /** Where an agent extension registers the places it reads. */
-  readonly registry: SkillProviderRegistry
+/**
+ * The service this module publishes as {@link SKILL_SERVICE}.
+ *
+ * A class, not an interface with a factory, because registering has to belong to
+ * whoever called it: `register` wraps itself in an effect on the context the
+ * caller reached this service through, so the places come out when that agent
+ * extension unloads. That only works while `register` is a prototype method —
+ * as an arrow property it would close over this service's own context, and the
+ * places would stay behind on every agent that was ever enabled.
+ */
+export class SkillService extends Service {
+  private readonly held: SkillProvider[] = []
+
+  constructor(ctx: Context) {
+    super(ctx, SKILL_SERVICE)
+  }
+
+  /** Every provider registered right now, in registration order. */
+  providers(): readonly SkillProvider[] {
+    return this.held
+  }
+
+  /** Add one provider, for as long as the plugin that added it stays loaded. */
+  register(provider: SkillProvider): () => void {
+    this.held.push(provider)
+    return this.ctx.effect(() => () => {
+      const at = this.held.indexOf(provider)
+      if (at >= 0) this.held.splice(at, 1)
+    })
+  }
 }
 
 /**

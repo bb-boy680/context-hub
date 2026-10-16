@@ -12,6 +12,9 @@
  * This is a service, not a contribution: a contribution carries data for the
  * screen to render, while an installer carries behaviour the module calls.
  */
+import { Service } from "@deepseek-ai/cordis"
+import type { Context } from "@deepseek-ai/cordis"
+
 import type { AssetScope, PlaceFiles } from "@context-hub/core/place-files"
 
 import type { PackDescription, PluginInstallReport, PluginInstallScope } from "./contract.ts"
@@ -223,20 +226,6 @@ export interface PluginInstaller {
   ): Promise<PluginInstallReport>
 }
 
-/** Where an agent extension registers how it installs plugins. */
-export interface PluginInstallerRegistry {
-  /** Every installer registered right now, in registration order. */
-  installers(): readonly PluginInstaller[]
-  /**
-   * Add one installer.
-   *
-   * @returns a disposer that takes it back out; an installer registered inside a
-   * plugin's `inject` callback is disposed with that callback.
-   */
-  register(installer: PluginInstaller): () => void
-}
-
-/** The service the plugins module publishes. */
 /**
  * The tools a bridge can answer for: everything an installer reaches, except the
  * client files.
@@ -247,9 +236,43 @@ export interface PluginInstallerRegistry {
  */
 export type PluginBridgeTools = Omit<PluginTools, "files">
 
-export interface PluginService {
-  readonly registry: PluginInstallerRegistry
+/**
+ * The service this module publishes.
+ *
+ * A class, not an interface with a factory, because registering has to belong to
+ * whoever called it: `register` wraps itself in an effect on the context the
+ * caller reached this service through. That only works while `register` is a
+ * prototype method — as an arrow property it would close over this service's own
+ * context, and every agent's installer would stay registered after that agent
+ * was switched off.
+ *
+ * The tools arrive as an argument because they are the form's: what a bridge can
+ * answer for differs between the web form and a desktop one, and the module has
+ * no business choosing.
+ */
+export class PluginService extends Service {
   readonly tools: PluginBridgeTools
+
+  private readonly held: PluginInstaller[] = []
+
+  constructor(ctx: Context, tools: PluginBridgeTools) {
+    super(ctx, PLUGIN_SERVICE)
+    this.tools = tools
+  }
+
+  /** Every installer registered right now, in registration order. */
+  installers(): readonly PluginInstaller[] {
+    return this.held
+  }
+
+  /** Add one installer, for as long as the plugin that added it stays loaded. */
+  register(installer: PluginInstaller): () => void {
+    this.held.push(installer)
+    return this.ctx.effect(() => () => {
+      const at = this.held.indexOf(installer)
+      if (at >= 0) this.held.splice(at, 1)
+    })
+  }
 }
 
 /**
@@ -264,21 +287,6 @@ declare module "@context-hub/extensions" {
   interface ExtensionServices {
     /** This module's registry and toolkit; see {@link PluginService}. */
     plugins: PluginService
-  }
-}
-
-/** Create the registry an agent extension registers into. */
-export function createPluginInstallerRegistry(): PluginInstallerRegistry {
-  const held: PluginInstaller[] = []
-  return {
-    installers: () => held,
-    register(installer) {
-      held.push(installer)
-      return () => {
-        const at = held.indexOf(installer)
-        if (at !== -1) held.splice(at, 1)
-      }
-    },
   }
 }
 

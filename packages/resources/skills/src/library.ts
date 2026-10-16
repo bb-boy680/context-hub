@@ -119,7 +119,7 @@ export function useChosenAgents(): string[] {
 function useSkillProviders(): readonly SkillProvider[] {
   const ctx = useHub()
   useExtensionSnapshot()
-  return ctx.get("skills")?.registry.providers() ?? []
+  return ctx.get("skills")?.providers() ?? []
 }
 
 /**

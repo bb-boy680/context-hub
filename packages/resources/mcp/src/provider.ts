@@ -10,10 +10,13 @@
  * This is a service, not a contribution: a contribution carries data for the
  * screen to render, while a provider carries behavior another plugin calls.
  */
+import { Service } from "@deepseek-ai/cordis"
+import type { Context } from "@deepseek-ai/cordis"
+
 import type { AssetScope, PlaceFiles, PlaceRef } from "@context-hub/core/place-files"
 
 import type { McpDeclaration } from "./declaration.ts"
-import type { McpTools } from "./toolkit.ts"
+import { mcpTools, type McpTools } from "./toolkit.ts"
 
 /** The service name the MCP module publishes and every agent plugin requires. */
 export const MCP_SERVICE = "mcp"
@@ -109,34 +112,44 @@ export interface McpProvider {
   locate?(io: McpIo, place: string, name: string): Promise<[number, number] | null>
 }
 
-/** What the MCP module publishes as {@link MCP_SERVICE}. */
-export interface McpService {
-  /** Where a client extension registers the file it reads and writes. */
-  readonly registry: McpRegistry
-  /**
-   * What that extension reads and writes the file with: the declaration
-   * helpers, the JSONC and TOML editors, and the failure shape.
-   *
-   * It travels here rather than only as a module export because an installed
-   * plugin is a directory downloaded from somewhere — GitHub, a marketplace —
-   * and it imports nothing: the package these functions live in is not on its
-   * disk. A plugin built inside this repository may import them directly
-   * instead; both ways hand it the same functions.
-   */
-  readonly tools: McpTools
-}
+/**
+ * The service this module publishes as {@link MCP_SERVICE}.
+ *
+ * The toolkit travels with it: an agent plugin is a directory downloaded from
+ * somewhere — GitHub, a marketplace — and it imports nothing, so the package
+ * the declaration helpers, the JSONC and TOML editors and the failure shape
+ * live in is not on its disk. A plugin built inside this repository may import
+ * them directly instead; both ways hand it the same functions.
+ *
+ * A class, not an interface with a factory, because registering has to belong to
+ * whoever called it: `register` wraps itself in an effect on the context the
+ * caller reached this service through. That only works while `register` is a
+ * prototype method — as an arrow property it would close over this service's own
+ * context, and every agent's client file would stay registered after that agent
+ * was switched off.
+ */
+export class McpService extends Service {
+  readonly tools: McpTools = mcpTools
 
-/** Where a client extension registers the provider it wrote. */
-export interface McpRegistry {
+  private readonly held: McpProvider[] = []
+
+  constructor(ctx: Context) {
+    super(ctx, MCP_SERVICE)
+  }
+
   /** Every provider registered right now, in registration order. */
-  providers(): readonly McpProvider[]
-  /**
-   * Add one provider.
-   *
-   * @returns a disposer that takes it back out; a provider registered inside a
-   * plugin's `inject` callback is disposed with that callback.
-   */
-  register(provider: McpProvider): () => void
+  providers(): readonly McpProvider[] {
+    return this.held
+  }
+
+  /** Add one provider, for as long as the plugin that added it stays loaded. */
+  register(provider: McpProvider): () => void {
+    this.held.push(provider)
+    return this.ctx.effect(() => () => {
+      const at = this.held.indexOf(provider)
+      if (at >= 0) this.held.splice(at, 1)
+    })
+  }
 }
 
 /**

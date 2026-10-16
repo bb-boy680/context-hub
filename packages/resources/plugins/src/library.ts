@@ -460,7 +460,7 @@ export function usePluginLibrary(): PluginLibrary {
        or which cannot answer at all, is still listed — a person then sees that
        the hub looked for it rather than wondering why an agent they use is
        absent, and one that failed says so in its own words. */
-    const probes = await probeInstallers(service.registry.installers(), tools)
+    const probes = await probeInstallers(service.installers(), tools)
     setClients(
       probes.map((one) => ({
         id: one.installer.id,
@@ -520,7 +520,7 @@ export function usePluginLibrary(): PluginLibrary {
       act: (installer: PluginInstaller, tools: PluginTools) => Promise<PluginInstallReport>
     ) => {
       if (service === null) throw new Error("the plugin library is not running")
-      const installer = service.registry.installers().find((one) => one.id === client)
+      const installer = service.installers().find((one) => one.id === client)
       if (installer === undefined) throw new Error(`no installer named ${client}`)
       if (tools === null) throw new Error("the plugin library is not running")
       setBusy(true)

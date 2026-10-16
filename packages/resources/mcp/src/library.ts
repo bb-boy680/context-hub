@@ -161,7 +161,7 @@ export function useMcpLibrary(): McpLibrary {
      disabled changes it, and the snapshot's revision is what says so. */
   const providers = React.useMemo(() => {
     void revision
-    return service?.registry.providers() ?? []
+    return service?.providers() ?? []
   }, [service, revision])
   const places = React.useMemo(
     () => placesOf(providers, iconFor).map((entry) => entry.place),
@@ -614,7 +614,7 @@ export function useMcpLibrary(): McpLibrary {
 
 /** The providers registered right now, read at call time rather than captured. */
 function currentProviders(service: McpService | null): readonly McpProvider[] {
-  return service?.registry.providers() ?? []
+  return service?.providers() ?? []
 }
 
 /** The places those providers describe, read at call time. */

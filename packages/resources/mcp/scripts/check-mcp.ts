@@ -17,7 +17,9 @@ import type { PlaceFiles } from "@context-hub/core/place-files"
 import { buildCatalog, placesOf, scanPlaces } from "../src/catalog.ts"
 import { documentOf, readRecords, recordsFromState, upsert } from "../src/records.ts"
 import type { McpCacheEntry } from "../src/probe.ts"
-import { createMcpService } from "../src/registry.ts"
+import { Context } from "@deepseek-ai/cordis"
+
+import { McpService } from "../src/provider.ts"
 import { toolTree } from "../src/schema-tree.ts"
 
 /** A stand-in for the icon a contributing extension declares. */
@@ -92,13 +94,15 @@ const OWN = { transport: "stdio", command: "npx", args: ["-y", "@x/ours"], env: 
 async function main(): Promise<void> {
   console.log("the service")
 
-  const service = createMcpService()
+  /* A bare context is enough: the service publishes itself on construction, and
+     what is under test is the registry it holds, not the kernel around it. */
+  const service = new McpService(new Context())
   check("it carries the toolkit", typeof service.tools.editJson === "function")
   check("and a TOML reader for a client that needs one", typeof service.tools.parseToml === "function")
 
   console.log("the registry")
 
-  const registry = service.registry
+  const registry = service
   check("it starts with nothing registered", registry.providers().length === 0)
   const first = provider({ id: "a", places: PLACES, entries: {} })
   const stop = registry.register(first)

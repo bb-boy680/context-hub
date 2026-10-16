@@ -16,11 +16,7 @@ import type { ExtensionDefinition } from "@context-hub/extensions"
 
 import { pluginsMessages } from "./messages.ts"
 import { PluginsPage } from "./page.tsx"
-import {
-  createPluginInstallerRegistry,
-  PLUGIN_SERVICE,
-  type PluginService,
-} from "./provider.ts"
+import { PLUGIN_SERVICE, PluginService } from "./provider.ts"
 import { createRemotePluginTools } from "./tools.ts"
 
 declare module "@deepseek-ai/cordis" {
@@ -59,13 +55,11 @@ export const pluginsExtension: ExtensionDefinition = {
   },
   activate(scope) {
     /* The service carries the registry agent plugins register into and the tools
-       an installer is handed. It is published before anything else, so an agent
-       plugin enabled in the same pass can register as soon as it activates. */
-    const service: PluginService = {
-      registry: createPluginInstallerRegistry(),
-      tools: createRemotePluginTools(),
-    }
-    scope.provide(PLUGIN_SERVICE, service)
+       an installer is handed. The tools are this form's, so they are passed in;
+       constructing the service publishes it, before anything else runs, so an
+       agent plugin enabled in the same pass can register as soon as it
+       activates. */
+    new PluginService(scope.ctx, createRemotePluginTools())
 
     scope.contribute("nav", {
       path: "/plugins",

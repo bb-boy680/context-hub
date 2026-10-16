@@ -37,7 +37,7 @@ export function activate(scope) {
 
   /* The MCP module publishes this service; with it disabled the callback simply
      never runs, and the plugin's own locale pack above still lands. */
-  scope.inject(["mcp"], (ctx, plugins) => {
+  scope.inject(["mcp"], (_ctx, plugins) => {
     /* Everything below comes from the service — there is no import to write. */
     const {
       readJsonObject,
@@ -83,40 +83,38 @@ export function activate(scope) {
       }
     }
 
-    ctx.effect(() =>
-      plugins.mcp.registry.register({
-        /* The id names this plugin, which is how the page finds the icon its
-           manifest declares — a place carries no mark of its own. */
-        id: "acme.mcp",
-        places: [{ ...PLACE, label: "Acme", switchable: false }],
+    plugins.mcp.register({
+      /* The id names this plugin, which is how the page finds the icon its
+         manifest declares — a place carries no mark of its own. */
+      id: "acme.mcp",
+      places: [{ ...PLACE, label: "Acme", switchable: false }],
 
-        async read(io, place) {
-          const held = serversIn(await read(io, place))
-          return Object.entries(held).map(([name, entry]) => ({
-            name,
-            declaration: readDeclaration(entry),
-            enabled: true,
-          }))
-        },
+      async read(io, place) {
+        const held = serversIn(await read(io, place))
+        return Object.entries(held).map(([name, entry]) => ({
+          name,
+          declaration: readDeclaration(entry),
+          enabled: true,
+        }))
+      },
 
-        async install(io, place, name, declaration) {
-          const text = await read(io, place)
-          await write(io, place, editJson(text, [KEY, name], writeDeclaration(declaration)))
-        },
+      async install(io, place, name, declaration) {
+        const text = await read(io, place)
+        await write(io, place, editJson(text, [KEY, name], writeDeclaration(declaration)))
+      },
 
-        async uninstall(io, place, name) {
-          /* Only this one entry leaves, even when it was the last: a file the
-             hub may have created is not the hub's to delete later. */
-          const text = await read(io, place)
-          await write(io, place, editJson(text, [KEY, name], undefined))
-        },
+      async uninstall(io, place, name) {
+        /* Only this one entry leaves, even when it was the last: a file the
+           hub may have created is not the hub's to delete later. */
+        const text = await read(io, place)
+        await write(io, place, editJson(text, [KEY, name], undefined))
+      },
 
-        async locate(io, place, name) {
-          const text = await read(io, place)
-          serversIn(text)
-          return text === null ? null : jsonValueLines(text, [KEY, name])
-        },
-      })
-    )
+      async locate(io, place, name) {
+        const text = await read(io, place)
+        serversIn(text)
+        return text === null ? null : jsonValueLines(text, [KEY, name])
+      },
+    })
   })
 }

@@ -57,10 +57,7 @@ await kernel.start()
 
 /** The agent ids the skills module is holding places for. */
 function placesOf(): string[] {
-  const service = kernel.ctx.get("skills") as
-    | { registry?: { providers(): readonly { id: string }[] } }
-    | undefined
-  return (service?.registry?.providers() ?? []).map((one) => one.id)
+  return (kernel.ctx.get("skills")?.providers() ?? []).map((one) => one.id)
 }
 
 console.log("with both extensions on")
@@ -68,12 +65,19 @@ check("the skills module is up", kernel.ctx.get("skills") !== undefined)
 check("Claude Code registered its skill places", placesOf().includes(CLAUDE_CODE_ID), placesOf())
 check("the module's own place is there too", placesOf().includes(SKILLS_ID), placesOf())
 
-/* When each registry becomes a Cordis `Service`, `register` must be a
-   prototype method: an arrow property would freeze `this` to the registry's own
-   context, so the disposer would belong to the registry instead of the caller
-   and the checks below would fail while everything else kept working. That
-   guard arrives with the conversion — today's registry is an object literal,
-   where `register` is an own property by construction. */
+/* The registration takes its lifetime from whoever called `register`, which it
+   reads off the context it was called through. That only works while `register`
+   is a prototype method: as an arrow property it would close over the service's
+   own context, the disposer would belong to the service, and the checks below
+   would fail while everything else kept working. */
+{
+  const service = kernel.ctx.get("skills") as unknown as Record<string, unknown>
+  check(
+    "the service's register is a prototype method, not an own property",
+    typeof Object.getPrototypeOf(service)?.register === "function" &&
+      !Object.hasOwn(service, "register")
+  )
+}
 
 console.log("\nafter disabling Claude Code")
 await kernel.ctx.extensions.disable(CLAUDE_CODE_ID)

@@ -12,8 +12,7 @@ import { FolderIcon, SparklesIcon } from "lucide-react"
 import type { ExtensionDefinition } from "@context-hub/extensions"
 
 import { skillsMessages } from "./messages.ts"
-import { SKILL_SERVICE, type SkillPlace } from "./provider.ts"
-import { createSkillService } from "./service.ts"
+import { SKILL_SERVICE, SkillService, type SkillPlace } from "./provider.ts"
 
 /** This module's own id; the kernel matches it against the manifest. */
 export const SKILLS_ID = "hub.skill.catalog"
@@ -53,10 +52,12 @@ export function skillsExtensionWith(page: ComponentType): ExtensionDefinition {
          so an agent integration registers into this module the same way whether
          it was built here or installed as a folder. This module's own place is
          the first one in it: it is in every workspace, so no agent has to be
-         chosen for it to be read. */
-      const service = createSkillService()
-      service.registry.register({ id: SKILLS_ID, places: [SHARED_PLACE] })
-      scope.provide(SKILL_SERVICE, service)
+         chosen for it to be read.
+
+         Constructing the service publishes it, and it belongs to this plugin —
+         so the places it holds, including this module's own, go away with it. */
+      const service = new SkillService(scope.ctx)
+      service.register({ id: SKILLS_ID, places: [SHARED_PLACE] })
 
       scope.contribute("nav", {
         path: "/skills",

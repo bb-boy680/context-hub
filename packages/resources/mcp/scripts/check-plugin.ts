@@ -128,7 +128,7 @@ async function main(): Promise<void> {
   await kernel.ctx.extensions.enable("acme.mcp")
 
   const service = kernel.ctx.get("mcp")
-  const registry = service?.registry
+  const registry = service
   const provider = registry?.providers().find((candidate) => candidate.id === "acme.mcp")
 
   console.log("what it registers")

@@ -12,7 +12,7 @@ import type { ExtensionDefinition } from "@context-hub/extensions"
 import { MCP_SERVICE } from "./contract.ts"
 
 import { mcpMessages } from "./messages.ts"
-import { createMcpService } from "./registry.ts"
+import { McpService } from "./provider.ts"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -45,7 +45,7 @@ export function mcpExtensionWith(page: ComponentType): ExtensionDefinition {
       provides: [MCP_SERVICE],
     },
     activate(scope) {
-      scope.provide(MCP_SERVICE, createMcpService())
+      new McpService(scope.ctx)
 
       scope.contribute("nav", {
         path: "/mcp-servers",

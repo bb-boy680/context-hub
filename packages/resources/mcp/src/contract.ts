@@ -31,7 +31,6 @@ export {
   type McpIo,
   type McpPlace,
   type McpProvider,
-  type McpRegistry,
   type McpService,
 } from "./provider.ts"
 export {

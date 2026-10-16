@@ -18,7 +18,6 @@ export * from "./store.ts"
 export * from "./registry.ts"
 export * from "./provider.ts"
 export { useSkillAgents } from "./library.ts"
-export { createSkillService } from "./service.ts"
 export { createRemoteSkillStore } from "./remote-store.ts"
 export { SKILLS_ID, skillsExtensionWith } from "./extension.ts"
 

@@ -4,7 +4,7 @@
  * service follows.
  *
  * The module knows no client. An agent plugin publishes an `McpProvider` under
- * the `mcp` service this extension provides (see `./registry.ts`), and the page
+ * the `mcp` service this extension provides (see `./provider.ts`), and the page
  * reaches every client through that registry — so adding an agent is a plugin,
  * never a case in here. Without a form that can reach files, the registry is
  * still there and the page says what it cannot do.
@@ -20,7 +20,7 @@ import { McpServersPage } from "./page.tsx"
 export * from "./contract.ts"
 export { mcpExtensionWith } from "./extension.ts"
 export { McpServersPage }
-export { createMcpService } from "./registry.ts"
+export { McpService } from "./provider.ts"
 export { failureText, useMcpLibrary } from "./library.ts"
 export * from "./types.ts"
 export {

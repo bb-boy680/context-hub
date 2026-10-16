@@ -11,6 +11,5 @@ export {
   type PromptDocument,
   type PromptPlace,
   type PromptProvider,
-  type PromptProviderRegistry,
   type PromptService,
 } from "./provider.ts"

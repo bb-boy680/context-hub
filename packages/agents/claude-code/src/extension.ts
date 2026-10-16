@@ -139,32 +139,31 @@ export function claudeCodeExtensionWith(icon: ExtensionIcon): ExtensionDefinitio
          Nothing here imports the MCP module: the registry to register into and
          the toolkit to write a file with both arrive as `plugins.mcp`, which is
          the same way a plugin installed as a folder gets them. */
-      scope.inject(["mcp"], (ctx, plugins) => {
-        const { registry, tools } = plugins.mcp
-        ctx.effect(() => registry.register(createClaudeCodeMcp(tools)))
+      scope.inject(["mcp"], (_ctx, plugins) => {
+        plugins.mcp.register(createClaudeCodeMcp(plugins.mcp.tools))
       })
 
       /* How Claude Code installs a plugin is this extension's knowledge, not the
          plugins module's: that module owns the page and the library, and this
          registers the installer it drives, through the same service. */
-      scope.inject(["plugins"], (ctx, plugins) => {
-        const { registry } = plugins.plugins
-        ctx.effect(() => registry.register(claudeCodeInstaller))
+      scope.inject(["plugins"], (_ctx, plugins) => {
+        plugins.plugins.register(claudeCodeInstaller)
       })
 
       /* The places register into the skills module, which is what makes this
-         agent one the sidebar lists and the skills page reads. */
-      scope.inject(["skills"], (ctx, plugins) => {
-        const { registry } = plugins.skills
-        ctx.effect(() => registry.register({ id: CLAUDE_CODE_ID, places }))
+         agent one the sidebar lists and the skills page reads.
+
+         No effect around it: the registration belongs to whoever called it, so
+         this extension's places leave with this extension. */
+      scope.inject(["skills"], (_ctx, plugins) => {
+        plugins.skills.register({ id: CLAUDE_CODE_ID, places })
       })
 
       /* The same places, told to the prompts module, which is what puts this
          agent in a prompt's install menu. A separate inject because the two
          modules are separate: with one of them disabled the other still works. */
-      scope.inject(["prompts"], (ctx, plugins) => {
-        const { registry } = plugins.prompts
-        ctx.effect(() => registry.register({ id: CLAUDE_CODE_ID, places: promptPlacesHere }))
+      scope.inject(["prompts"], (_ctx, plugins) => {
+        plugins.prompts.register({ id: CLAUDE_CODE_ID, places: promptPlacesHere })
       })
 
       scope.contribute("target", {

@@ -49,7 +49,7 @@ export function usePromptPlaces(): readonly PromptPlace[] {
 
   return React.useMemo(() => {
     void revision
-    return service === null ? [] : promptPlaces(service.registry.providers())
+    return service === null ? [] : promptPlaces(service.providers())
   }, [service, revision])
 }
 

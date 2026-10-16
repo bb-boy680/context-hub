@@ -15,14 +15,13 @@ import type { ExtensionDefinition } from "@context-hub/extensions"
 
 import { promptsMessages } from "./messages.ts"
 import { PromptsPage } from "./page.tsx"
-import { PROMPT_SERVICE, type PromptPlace } from "./provider.ts"
-import { createPromptService } from "./service.ts"
+import { PROMPT_SERVICE, PromptService, type PromptPlace } from "./provider.ts"
 import type { PromptStore } from "./store.ts"
 
 export { PromptsPage }
 export * from "./store.ts"
 export * from "./provider.ts"
-export { createPromptService } from "./service.ts"
+export { PromptService } from "./provider.ts"
 export { createRemotePromptStore } from "./remote-store.ts"
 export { deliver, delivered, targetOf, undeliver, type Delivery } from "./deliver.ts"
 
@@ -89,9 +88,8 @@ export const promptsExtension: ExtensionDefinition = {
        workspace place is the module's own: `.agents/` is the one directory the
        agents in this hub share, and what lands there is what this hub wrote,
        not what an agent reads a prompt out of. */
-    const service = createPromptService()
-    service.registry.register({ id: PROMPTS_ID, places: [WORKSPACE_PLACE] })
-    scope.provide(PROMPT_SERVICE, service)
+    const service = new PromptService(scope.ctx)
+    service.register({ id: PROMPTS_ID, places: [WORKSPACE_PLACE] })
 
     scope.contribute("nav", {
       path: "/prompts",

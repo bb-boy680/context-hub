@@ -6,8 +6,9 @@
  *
  * Run from the package: `node scripts/check-registry.ts`
  */
-import { readablePlaces, type SkillPlace } from "../src/provider.ts"
-import { createSkillService } from "../src/service.ts"
+import { Context } from "@deepseek-ai/cordis"
+
+import { SkillService, readablePlaces, type SkillPlace } from "../src/provider.ts"
 
 let failures = 0
 
@@ -25,8 +26,10 @@ function place(id: string, scope: "workspace" | "global", order: number): SkillP
   return { id, labelKey: `${id}.tab`, icon: () => null, scope, dir: `.${id}/skills`, order }
 }
 
-const service = createSkillService()
-const registry = service.registry
+/* A bare context is enough: the service publishes itself on construction, and
+   what is under test is the registry it holds, not the kernel around it. */
+const ctx = new Context()
+const registry = new SkillService(ctx)
 
 console.log("registry")
 

@@ -11,6 +11,8 @@
  */
 import { execFile } from "node:child_process"
 import { promises as fs } from "node:fs"
+
+import { Context } from "@deepseek-ai/cordis"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
@@ -26,7 +28,7 @@ import {
 import { formatPluginSource, parsePluginSource } from "../src/inspect.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../src/records.ts"
 import {
-  createPluginInstallerRegistry,
+  PluginService,
   type PluginHeld,
   type PluginInstaller,
   type PluginTools,
@@ -1396,7 +1398,10 @@ async function heldScopes(name: string): Promise<string> {
     .join()
 }
 
-const registry = createPluginInstallerRegistry()
+/* A bare context is enough: the service publishes itself on construction, and
+   what is under test is the registry it holds, not the kernel around it. Its
+   tools are the form's, and no installer below reads them from here. */
+const registry = new PluginService(new Context(), tools)
 check("a fresh registry holds no installer", registry.installers().length === 0)
 const unregister = registry.register(stub)
 check("registering one lists it", registry.installers().map((one) => one.id).join() === "hub.target.stub")

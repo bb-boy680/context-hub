@@ -14,6 +14,9 @@
  * strings a catalog row prints; a place is what an action writes to, which is a
  * different answer and has to be checked before it is used.
  */
+import { Service } from "@deepseek-ai/cordis"
+import type { Context } from "@deepseek-ai/cordis"
+
 import type { AssetScope } from "@context-hub/core/place-files"
 import type { ExtensionIcon } from "@context-hub/extensions"
 
@@ -88,23 +91,36 @@ export interface PromptProvider {
   readonly places: readonly PromptPlace[]
 }
 
-/** Where an agent extension registers the places it takes prompts in. */
-export interface PromptProviderRegistry {
-  /** Every provider registered right now, in registration order. */
-  providers(): readonly PromptProvider[]
-  /**
-   * Add one provider.
-   *
-   * @returns a disposer that takes it back out; a provider registered inside a
-   * plugin's `inject` callback is disposed with that callback.
-   */
-  register(provider: PromptProvider): () => void
-}
+/**
+ * The service this module publishes as {@link PROMPT_SERVICE}.
+ *
+ * A class, not an interface with a factory, because registering has to belong to
+ * whoever called it: `register` wraps itself in an effect on the context the
+ * caller reached this service through. That only works while `register` is a
+ * prototype method — as an arrow property it would close over this service's own
+ * context, and every agent's places would stay on the page after that agent was
+ * switched off.
+ */
+export class PromptService extends Service {
+  private readonly held: PromptProvider[] = []
 
-/** What the prompts module publishes as {@link PROMPT_SERVICE}. */
-export interface PromptService {
-  /** Where an agent extension registers the places it takes prompts in. */
-  readonly registry: PromptProviderRegistry
+  constructor(ctx: Context) {
+    super(ctx, PROMPT_SERVICE)
+  }
+
+  /** Every provider registered right now, in registration order. */
+  providers(): readonly PromptProvider[] {
+    return this.held
+  }
+
+  /** Add one provider, for as long as the plugin that added it stays loaded. */
+  register(provider: PromptProvider): () => void {
+    this.held.push(provider)
+    return this.ctx.effect(() => () => {
+      const at = this.held.indexOf(provider)
+      if (at >= 0) this.held.splice(at, 1)
+    })
+  }
 }
 
 /**
