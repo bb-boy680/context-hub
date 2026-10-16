@@ -8,6 +8,7 @@
  */
 import { PlugZapIcon, XIcon } from "lucide-react"
 import * as React from "react"
+import { useImmer } from "use-immer"
 
 import { cn } from "cn"
 
@@ -63,7 +64,7 @@ export function AddServerDialog({
   onClose: () => void
 }) {
   const { t } = useI18n()
-  const [values, setValues] = React.useState<ServerFormValues>(() =>
+  const [values, updateValues] = useImmer<ServerFormValues>(() =>
     remote ? { ...NEW_SERVER, transport: "sse" } : NEW_SERVER
   )
   const [record, setRecord] = React.useState<ServerRecordValues>(NEW_RECORD)
@@ -75,7 +76,11 @@ export function AddServerDialog({
   /* A message marks a field until that field is filled, so the two follow every
      edit rather than waiting for the next click. */
   const change = (next: ServerFormValues) => {
-    setValues(next)
+    /* The form hands back the whole shape rather than one field, so the fields
+       are written onto the draft as they arrive. */
+    updateValues((draft) => {
+      Object.assign(draft, next)
+    })
     if (errors !== null) setErrors(formErrors(next, t))
   }
 

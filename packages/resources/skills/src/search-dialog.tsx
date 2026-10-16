@@ -20,6 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
+import { useImmer } from "use-immer"
 
 import type { RegistryPage, RemoteSkill, SkillRegistry } from "./registry.ts"
 import type { SkillStore } from "./store.ts"
@@ -299,8 +300,10 @@ export function SearchSkillsDialog({
   const [error, setError] = React.useState<string | null>(null)
   /** What the library holds: its own rows, plus what this visit installed. */
   const [held, setHeld] = React.useState<HeldSkill[]>([])
-  /** What a registry filled in per row, by row key; the search answer carries the rest. */
-  const [details, setDetails] = React.useState<Record<string, Partial<RemoteSkill>>>({})
+  /* What a registry filled in per row, by row key; the search answer carries the
+     rest. A row's description arrives on its own, so this is written one key at
+     a time — which is what a draft is for. */
+  const [details, updateDetails] = useImmer<Record<string, Partial<RemoteSkill>>>({})
   /** Answers a newer search has already replaced. */
   const generation = React.useRef(0)
 
@@ -353,13 +356,19 @@ export function SearchSkillsDialog({
       source,
       found.items.filter((row) => row.description === undefined),
       (key, detail) => {
-        if (live) setDetails((current) => ({ ...current, [key]: detail }))
+        if (live) {
+          updateDetails((current) => {
+            current[key] = detail
+          })
+        }
       }
     )
     return () => {
       live = false
     }
-  }, [open, found, source])
+    /* `updateDetails` is stable — `useImmer` builds it once — so naming it here
+       does not re-run this on every render. */
+  }, [open, found, source, updateDetails])
 
   /* Every open re-reads what the library holds, so a row never offers what is already in. */
   React.useEffect(() => {
@@ -396,7 +405,7 @@ export function SearchSkillsDialog({
       setPending([])
       setError(null)
       setHeld([])
-      setDetails({})
+      updateDetails({})
     }
     onOpenChange(next)
   }
