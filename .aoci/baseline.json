@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-16T08:18:19Z",
+  "updated_at": "2026-10-16T08:27:51Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -47,9 +47,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "24a8e95bb185fd08d353d05e809754187c967d62c27c6d192dbe123d9099d737",
-      "size": 108168,
-      "normalized_sha256": "24a8e95bb185fd08d353d05e809754187c967d62c27c6d192dbe123d9099d737"
+      "sha256": "bcb81d32b98ab054cebfc491f2f4d7c567f8dbd9e1267567350dea4fcf3986ac",
+      "size": 108186,
+      "normalized_sha256": "bcb81d32b98ab054cebfc491f2f4d7c567f8dbd9e1267567350dea4fcf3986ac"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1019,9 +1019,9 @@
     },
     "packages/locale-zh-cn/src/messages.ts": {
       "role": "index",
-      "sha256": "bb4a6e331ba6fdc54403f946f4137b6b171445bf648048f94877294907a25384",
-      "size": 36713,
-      "normalized_sha256": "f6f231d88718847fccf677ce34af0f72c1c371072308e47c30b5f9f6522fcf6c"
+      "sha256": "dcfb3f97d661df28cf18e872fe856c786b3642f05f9c2360def34d1f1fa9d800",
+      "size": 36790,
+      "normalized_sha256": "68517707c2a17e2504c5b3c515d48ae44c53ebb6ce1d8f5860196c28d07c6949"
     },
     "packages/locale-zh-cn/tsconfig.json": {
       "role": "index",
@@ -1637,9 +1637,9 @@
     },
     "packages/plugin-prompts/src/install-menu.tsx": {
       "role": "index",
-      "sha256": "274990ec6b06707a444d92c98a3d0b5e8b1b048e725d690c22e8b50d3aee17da",
-      "size": 11895,
-      "normalized_sha256": "274990ec6b06707a444d92c98a3d0b5e8b1b048e725d690c22e8b50d3aee17da"
+      "sha256": "464617890cfff95b43902690ce6c29ae3d0f34669765e47e7acf74f5415dfbea",
+      "size": 12076,
+      "normalized_sha256": "464617890cfff95b43902690ce6c29ae3d0f34669765e47e7acf74f5415dfbea"
     },
     "packages/plugin-prompts/src/instruction.ts": {
       "role": "index",
@@ -1655,15 +1655,15 @@
     },
     "packages/plugin-prompts/src/messages.ts": {
       "role": "index",
-      "sha256": "421587e7bd0348c0071de0b0db931088e688d0ccb4b4971fa847d33cc2445c72",
-      "size": 3856,
-      "normalized_sha256": "421587e7bd0348c0071de0b0db931088e688d0ccb4b4971fa847d33cc2445c72"
+      "sha256": "5238fcd28e8776b45f3fde3e12aabf0e2a6ed4ce9612d8bcc102902ddedd5e13",
+      "size": 3926,
+      "normalized_sha256": "5238fcd28e8776b45f3fde3e12aabf0e2a6ed4ce9612d8bcc102902ddedd5e13"
     },
     "packages/plugin-prompts/src/page.tsx": {
       "role": "index",
-      "sha256": "5f1fc1db3dfc09db54bd3c6ba8c3ed40e080cd17a195fb5f73ec540ad08718d8",
-      "size": 27418,
-      "normalized_sha256": "5f1fc1db3dfc09db54bd3c6ba8c3ed40e080cd17a195fb5f73ec540ad08718d8"
+      "sha256": "c058eb70f60c22b9f1ebc3a35c1d39b028f84d3443fbf55445ca2836b241d725",
+      "size": 29385,
+      "normalized_sha256": "c058eb70f60c22b9f1ebc3a35c1d39b028f84d3443fbf55445ca2836b241d725"
     },
     "packages/plugin-prompts/src/prompt-detail-dialog.tsx": {
       "role": "index",
