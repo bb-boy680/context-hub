@@ -8,6 +8,10 @@
 /* Sources outside this package; paths are relative to this stylesheet. */
 @source "../../../apps/*/src/**/*.{ts,tsx}";
 @source "../../../*/src/**/*.{ts,tsx}";
+/* Grouped packages sit one level deeper: resources/skills, agents/cursor.
+   Without this the classes only those pages use are never generated, which
+   reads as a broken layout rather than as a missing stylesheet. */
+@source "../../../*/*/src/**/*.{ts,tsx}";
 
 /* Static scales from the design canvas. */
 @theme {

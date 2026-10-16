@@ -12,6 +12,6 @@
       "@context-hub/shadcn-ui/*": ["./src/*"]
     }
   },
-  "include": ["."],
+  "include": ["src"],
   "exclude": ["node_modules", "dist"]
 }
