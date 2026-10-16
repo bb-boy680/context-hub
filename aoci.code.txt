@@ -227,16 +227,18 @@ avatar-stack.tsx[CU5T]: F:重叠图标组 | R:- | A:AvatarStack,AvatarMark | S:r
 code-view.tsx[CU5M]: F:语法高亮代码视图 | R:code:packages/ui/src/lib/highlight.ts | A:CodeView,CodeCard | S:高亮器是 @workspace/ui 里那一份共享的，每会话只建一次、只含这些语言；用 JS 正则引擎避免引入 wasm；defaultColor=false 让配色跟随应用主题；title 缺省时复制按钮浮在文本上
 dialog-split.tsx[CU5T]: F:对话框左右分栏框架 | R:- | A:DialogSplit | S:左侧自适应右侧固定 360px；尺寸与分割都由本组件管，标题与关闭按钮属调用方，故此处不画关闭按钮
 filter-bar.tsx[CU7S]: F:列表筛选栏 | R:- | A:FilterBar,FilterBarWords | S:类型超过 4 个时折成 +N 片；/ 聚焦与 Esc 清空都在文档说到的键上实现，输入框内不触发；折叠行用 min-w-fit 保证不被拦腰换行
-index.ts[CE7T]: F:共享控件导出面 | R:- | A:- | S:各屏从此处导入而非具体文件，控件住在哪个模块是本包内部事务；新增控件必须在此追加导出，否则两屏都拿不到；媒体三件套也经这里
+index.ts[CE7T]: F:共享控件导出面 | R:- | A:- | S:各屏从此处导入而非具体文件，控件住在哪个模块是本包内部事务；新增控件必须在此登记导出，否则调用方拿不到；位置列表、媒体画廊、上传面板与可编辑代码视图都经这里
 ledger.tsx[CU7M]: F:带批量选择的记录表 | R:- | A:Ledger,LedgerColumn,LedgerBatch | S:无 cell 的列即勾选列、其表头是全选框；批量条恒常绘制（不随选择出现消失，否则行在指针下位移）；勾选格要 stopPropagation，否则会同时触发行点击；列宽按设计比例分配余量
 page-body.tsx[CU5T]: F:页面主体与页脚槽 | R:- | A:PageBody | S:页脚是 slot 而不是普通行，用 mt-auto 顶到底，避免窗口尚有余量时页脚跟着内容跑
 pagination.tsx[CU5S]: F:分页控件 | R:- | A:TablePagination | S:未传 onNext/onPrev 时 wired 为 false，控件仍绘制但禁用，供数据还是样例的页面保持布局；compact 只留页码与两个步进按钮
-place-picker.tsx[CU8L]: F:位置列表的三种呈现 | R:code:packages/extensions/src/components/avatar-stack.tsx | A:PlaceMenu,PlaceScopePicker,PlaceList,PlaceOption,PlaceGroup | S:菜单超过 8 项才出搜索且滚动交给内层列表；activation=control 时行本身不可点（行内自带控件就不当动作）；菜单点击必须 stopPropagation，否则卡片上选位置会连带打开详情；PlaceList 按组各自折叠
+place-picker.tsx[CU8L]: F:位置列表的三种呈现 | R:code:packages/extensions/src/components/avatar-stack.tsx | A:PlaceMenu,PlaceScopePicker,PlaceList,PlaceOption,PlaceGroup | S:菜单超过 8 项才出搜索且滚动交给内层列表；activation=control 时行本身不可点；菜单点击必须 stopPropagation，否则卡片上选位置会连带打开详情；PlaceList 按组各自折叠，且只有 action 一个口子——不读 blocked，置灰要自己画；菜单外观与应用其它行菜单一致（w-[280px]、p-1.5、shadow-soft）
 tag-editor.tsx[CU5S]: F:标签编辑行 | R:- | A:TagEditor,TagEditorWords | S:候选项已排除已有值；新增去空白且去重，重复不加；文案全由调用方传入，labelFor 做值到展示名的映射
 action-tab.tsx[DU5S]: F:带批量动作的页签 | R:- | A:ActionTab | S:按下不打开菜单（此页签上按下就是切页签），故守卫读菜单打开的原因而非到达触发器的点击；批量跑时图标变菊花；画 button 而非 tab 原语，由调用方放进自己的列表
 autoplay-video.tsx[CU5T]: F:静音循环视频预览 | R:code:packages/extensions/src/components/media.ts | A:AutoplayVideo | S:只在可见、标签页在前台、没有全屏面板遮住、且有空闲预览槽时才播，滚出视野即暂停；卡片的视频封面交给它而不是 img，所以「第一个资产是视频」不等于破图
 media-gallery.tsx[CU7L]: F:舞台与缩略图条的图片画廊 | R:code:packages/extensions/src/components/media.ts | A:MediaGallery,MediaItem,MediaGalleryWords | S:Swiper 持有翻页与拇指条；台上的视频会播、其余暂停，拇指条只有当前那格在播，故多个视频不会一起解码；媒体按自身比例画，调用方须把舞台标成 size container
 media.ts[CU5S]: F:媒体种类与预览调度 | R:- | A:mediaKind,knownAspect,rememberAspect,acquirePreview,releasePreview,setPreviewsSuspended | S:同时解码的封面预览有上限——播着的视频在持续解码，不设限时滚动的网格会堆积解码器；比例记忆放在这里而不是页面，因为两个页面画同一批资产
+code-editor.tsx[CU6S]: F:可就地编辑的代码视图 | R:code:packages/ui/src/lib/highlight.ts | A:CodeEditor | S:两层叠放：下层画色与行号、上层透明 textarea 管光标，故两层都不许换行；paddingLeft 必须等于行号列的 14px+2rem+12px，否则颜色与字错位；输入法组合期间要让 textarea 显示自己的字
+media-pane.tsx[CU7M]: F:媒体上传与拖放面板 | R:code:packages/extensions/src/components/media-gallery.tsx | A:MediaPane,MediaSource,MediaPaneWords | S:粘贴监听挂在 document 上，只有 onScreen=false 才关，因为面板在切走的标签页里仍挂载；dragleave 会因子元素触发，要用 relatedTarget 判断；words 全部由调用方传，三种资产文案表不同
 
 ===D:/work-space/dsh-context-hub/packages/extensions/src/===
 cordis.ts[CR9T]: F:内核框架唯一导入点 | R:- | A:Context,Service | S:TypeScript 只有在包根被当作值导入时才会把 augment 的 Context 成员并入符号，所以所有模块必须经本文件导入框架，不得直接 import @deepseek-ai/cordis
@@ -262,7 +264,7 @@ check-messages.ts[TL7T]: F:中文包键覆盖检查 | R:code:packages/locale-zh-
 
 ===D:/work-space/dsh-context-hub/packages/locale-zh-cn/src/===
 index.ts[CL7T]: F:简体中文语言包声明 | R:code:packages/locale-zh-cn/src/messages.ts | A:simplifiedChineseLocale,zhCNMessages | S:kind 为 declarative（内核不为它跑代码）、defaultEnabled 为 false；id 用 hub.locale.zh-CN
-messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键与 extensions 的英文基础表一一对应，缺键回退英文；各插件的 mcp.*/plugins.*/skills.*/prompts.* 键都收在这一个文件里；新增英文键必须同步这里，否则 check-messages 报缺
+messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键与各包英文基础表一一对应，缺键回退英文；mcp.*/plugins.*/skills.*/prompts.*/claudeCode.* 全收在这一个文件里；新增英文键必须同步这里，否则 check-messages 报缺
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/===
 eslint.config.js[FQ3T]: F:Claude Code 包 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
@@ -274,10 +276,10 @@ check-installer.ts[TQ7L]: F:Claude Code 插件列表解析检查 | R:code:packag
 check-provider.ts[TQ8M]: F:Claude Code MCP 提供者检查 | R:code:packages/plugin-claude-code/src/provider.ts | A:- | S:夹具带注释、不同拼法的项目键与无关项目，用以证明每次写入只动一个节点；断言 machineScope 与 noProject 两种拒绝，以及卸载后两个文件回到逐字节原样
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/src/===
-index.ts[IE9S]: F:Claude Code 集成注册 | R:code:packages/plugin-claude-code/src/installer.ts,code:packages/plugin-claude-code/src/locations.ts,code:packages/plugin-claude-code/src/provider.ts | A:claudeCodeExtension,createClaudeCodeMcp,claudeCodeInstaller | S:四个 inject（mcp/plugins/skills/prompts）各自独立，任一模块禁用其余仍可用；工作区与全局各注册一个 skills place 与一个提示词 place
+index.ts[IE9S]: F:Claude Code 集成注册 | R:code:packages/plugin-claude-code/src/installer.ts,code:packages/plugin-claude-code/src/locations.ts,code:packages/plugin-claude-code/src/provider.ts | A:claudeCodeExtension,createClaudeCodeMcp,claudeCodeInstaller | S:四个 inject（mcp/plugins/skills/prompts）各自独立，任一模块禁用其余仍可用；工作区与全局各注册一个 skills place 与一个提示词 place；提示词 place 的 documents 只在全局那条声明 CLAUDE.md——项目侧 CLAUDE.md 是别人也提交也读的文件，那一项不给
 installer.ts[IE8M]: F:Claude Code 插件交付 | R:code:packages/plugin-claude-code/src/locations.ts | A:claudeCodeInstaller,readHeld | S:先 marketplace add 注册库根再 claude plugin install --scope；不写 installed_plugins.json 与缓存；readHeld 取 readFromFolder 优先于 installPath，并把 projectPath 与在用文件夹不符的记录整条剔除（客户端列的是它记得的所有仓库，不是这一处的）；remove 收客户端自己报的 id（带它自己的市场名），不再拼本 hub 的市场名
 locations.ts[CE7T]: F:Claude Code 路径与键名事实 | R:- | A:CLAUDE_CODE_SKILL_DIR,CLAUDE_CODE_MCP_FILE,CLAUDE_CODE_GLOBAL_MCP_FILE,CLAUDE_CODE_DISABLED_KEY,CLAUDE_CODE_COMMAND_DIR,CLAUDE_CODE_RULE_DIR | S:项目技能目录是 .claude/skills；提示词目录 .claude/commands 与规则目录 .claude/rules 是机器可读的落点，全局指令文件是 .claude/CLAUDE.md（项目侧 CLAUDE.md 是共享文件，不由交付动作写）
-messages.ts[CL3T]: F:Claude Code 英文文案 | R:- | A:claudeCodeMessages | S:命名空间 claudeCode.*，含 machineScope 与 noProject 两条拒绝
+messages.ts[CL3T]: F:Claude Code 英文文案 | R:- | A:claudeCodeMessages | S:命名空间 claudeCode.*，菜单项文案随注册它的 place 模块走
 provider.ts[IN9M]: F:Claude Code MCP 文件读写 | R:code:packages/plugin-claude-code/src/locations.ts | A:createClaudeCodeMcp | S:两个 place（.mcp.json 项目、.claude.json 全局）都是 JSONC，逐节点改写不得重排既有内容；停用列表属项目而非文件，故只有 workspace place 可开关、全局 place 的 switchable 为 false；项目键经 normalizeProjectPath 归一匹配，客户端没记录过该目录时拒绝写入而不新建记录
 
 ===D:/work-space/dsh-context-hub/packages/plugin-mcp/===
@@ -416,7 +418,7 @@ registry.ts[CE3T]: F:远端注册表类型再导出 | R:- | A:- | S:类型来自
 remote-store.ts[IE8M]: F:技能库的远端实现 | R:code:packages/plugin-skills/src/store.ts | A:createRemoteSkillStore | S:按当前形态提供的通道说话（浏览器走 dev 桥或宿主自带服务，桌面形态换成调主进程的），插件其余部分不知道差别
 search-dialog.tsx[DU7L]: F:远端搜索对话框 | R:- | A:SearchSkillsDialog | S:注册表来自 source 插件，一个都没启用时对话框说明缺什么而不是列出本机取不到的行；真实安装走库自己的 package 路径，故落地的技能与新增对话框带来的一样
 service.ts[CE8T]: F:技能位置注册表服务 | R:code:packages/plugin-skills/src/provider.ts | A:createSkillService | S:本模块管库、加载与屏幕，provider 只记一个 agent 自己的目录，注册是把两者接起来的那一步
-skill-detail-dialog.tsx[DU8L]: F:技能详情灯箱 | R:code:packages/plugin-skills/src/library.ts,code:packages/plugin-skills/src/store.ts | A:SkillDetailDialog | S:灯箱打开时全局暂停卡片预览，避免视频在背后继续解码；舞台与缩略图条是 @workspace/extensions 的共享画廊（Swiper 与自动播都在那份里），上传控件作为它的 action 传入，故本文件不再自己持有 Swiper 实例与当前页
+skill-detail-dialog.tsx[DU8L]: F:技能详情灯箱 | R:code:packages/plugin-skills/src/library.ts,code:packages/plugin-skills/src/store.ts,code:packages/extensions/src/components/media-pane.tsx | A:SkillDetailDialog | S:灯箱打开时全局暂停卡片预览，避免视频在背后继续解码；舞台、缩略图条与上传面板都是 @workspace/extensions 的共享实现，本文件只传 empty（技能文档）与一个 MediaSource；Swiper 实例、当前页与上传菜单都已在那一份里
 store.ts[CE9L]: F:技能库接缝与形状 | R:- | A:SkillStore,SkillSummary,SkillDetail,SkillQuery,SkillPage,PlaceSkillsView | S:一个实现直接在拥有它的进程里读写磁盘，浏览器与桌面形态只把同样的调用经各自通道传过去，故这里不假设任何传输；上游记录里的 hash 是 CLI 装的时候算的，后续一次同源比对说明上游有没有动、一次对本地副本的比对说明文件有没有被手改
 tags.ts[CU3T]: F:分类标签配色 | R:- | A:tagTone | S:设计把唯一强调色留给动作，故每个标签片都是中性的
 types.ts[CE7T]: F:技能页渲染形状 | R:code:packages/plugin-skills/src/store.ts | A:Skill,SkillLocation,SkillHold,MediaItem | S:位置里 both 与 library 是 hub 自己的两种情形，其余是位置的 id；linkAt 说明库与位置都能到达同一批文件时链接在哪侧，takenAt 说明那些位置已自有同名技能
@@ -506,7 +508,7 @@ use-mobile.ts[CU5T]: F:是否窄屏钩子 | R:- | A:useIsMobile | S:断点 768�
 
 ===D:/work-space/dsh-context-hub/packages/ui/src/lib/===
 utils.ts[CU7T]: F:cn 工具再导出 | R:- | A:cn | S:实现不在本仓，只是把 cn 包再导出；所有组件都从这里取 cn，换实现只改这一行
-highlight.ts[CU5T]: F:共享语法高亮器 | R:- | A:paint,loadHighlighter,THEMES | S:全仓只此一份 shiki 实例，文件视图与文档围栏块共用，两份会把同一套 grammar 编译两遍；classic 给自带外框的文件视图、inline 给文档；语言不认识时返回 null，调用方留纯文本
+highlight.ts[CU5T]: F:共享语法高亮器 | R:- | A:paint,paintNow,loadHighlighter,THEMES | S:全仓只此一份 shiki 实例（两份会把 grammar 编译两遍）；classic 给文件视图、inline 给文档；语言不认识时返回 null，调用方留纯文本；paintNow 是给编辑器的同步出口，未建好时也 null
 
 ===D:/work-space/dsh-context-hub/packages/ui/src/styles/===
 globals.css[CU9M]: F:全局样式入口 | R:code:packages/ui/src/styles/theme.css | A:- | S:@source 指到本包之外（apps/*/src 与 */src），故 Tailwind 会扫包外源码；静态设计尺度在 @theme 里定义；主题变量在 theme.css；file-code 带行号与固定 11.5px，文档里的代码块两样都不该有，故另立 doc-code，只读 --shiki-light/dark
@@ -516,29 +518,30 @@ theme.css[CU9M]: F:主题颜色 token | R:- | A:- | S:颜色 token 都是 var() 
 eslint.config.js[FQ3T]: F:提示词模块 lint 规则 | R:- | A:- | S:与其他插件包同源且不含 react-refresh；改规则时要同步全部插件包
 package.json[FV8T]: F:提示词模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./host、./vite；依赖里不含 plugin-skills——PromptPlace 在本包自己声明，少一条跨包边
 tsconfig.json[FV3T]: F:提示词模块编译选项 | R:- | A:- | S:include 必须同时含 src 与 vite.ts，否则开发桥整份不进类型检查
-vite.ts[IV8S]: F:提示词库开发期桥接 | R:code:packages/plugin-prompts/src/host/prompts-fs.ts,code:packages/plugin-prompts/src/store.ts | A:promptLibrary | S:只管库的读写；投递到 Agent 目录走 place-files 桥，两个根由它一处裁决
+vite.ts[IV8S]: F:提示词库开发期桥接 | R:code:packages/plugin-prompts/src/host/prompts-fs.ts,code:packages/plugin-prompts/src/store.ts | A:promptLibrary | S:只管库的读写；投递到 Agent 目录走 place-files 桥，两个根由它一处裁决；PATCH 只认 body 里出现的字段，空数组是「全部取消标签」而不是「没说」；上传的字节直接作 body，不走 base64
 
 ===D:/work-space/dsh-context-hub/packages/plugin-prompts/scripts/===
-check-prompt-store.ts[TQ7S]: F:提示词库行为检查 | R:code:packages/plugin-prompts/src/host/prompts-fs.ts | A:- | S:跑在临时 hub home 上；钉住的是拒绘而不是恢复——库只有一个文件，旁边没有可重建的东西，所以解析失败必须原样留着、不能覆写
-check-prompt-text.ts[TQ7M]: F:文件名、命令文件与分节的行为检查 | R:code:packages/plugin-prompts/src/slug.ts,code:packages/plugin-prompts/src/command-file.ts,code:packages/plugin-prompts/src/instruction.ts | A:- | S:危险名字与近似合法名字成对断言，因为下游校验按 / 切分、拦不住反斜杠与盘符
+check-prompt-store.ts[TQ7S]: F:提示词库行为检查 | R:code:packages/plugin-prompts/src/host/prompts-fs.ts | A:- | S:跑在临时 hub home 上；库只一个文件，解析失败必须原样留着、不能覆写；另钉住 id 落文件（改描述不换身份）、删行连带删图、同字节两个提示词得两个 ref
+check-prompt-text.ts[TQ7M]: F:文件名、命令文件、分节与落点的行为检查 | R:code:packages/plugin-prompts/src/slug.ts,code:packages/plugin-prompts/src/command-file.ts,code:packages/plugin-prompts/src/instruction.ts,code:packages/plugin-prompts/src/deliver.ts | A:- | S:危险名字与近似合法名字成对断言，因为下游校验按 / 切分、拦不住反斜杠与盘符；targetOf 的用例钉住未声明的 document id 与不声明 documents 的位置都必须抛错，而不是写到别处
+check-prompt-delivery.ts[TQ8M]: F:提示词投递的落盘行为检查 | R:code:packages/plugin-prompts/src/deliver.ts,code:packages/plugin-prompts/src/instruction.ts,code:packages/core/src/host/place-files.ts | A:- | S:三个根（home、folder、userHome）都必须显式传临时目录——userHome 缺省是运行者的真实 home，global 作用域的用例会真的往里写文件；覆盖目录自动建出、追加段落幂等、CRLF 保留、爬出作用域的路径被拒
 
 ===D:/work-space/dsh-context-hub/packages/plugin-prompts/src/===
 add-prompt-dialog.tsx[DU6S]: F:添加提示词弹窗 | R:code:packages/plugin-prompts/src/store.ts | A:AddPromptDialog | S:描述与提示词都是必填，先缺哪个报哪个并留在对话框里；提交失败也开着，草稿不因一次失败被丢掉
 command-file.ts[DG7T]: F:提示词落成文件时的文本 | R:code:packages/plugin-prompts/src/slug.ts | A:commandFile,describeBody | S:frontmatter 的 description 含冒号、井号或前导符号时必须加引号，否则 agent 读到的是坏 YAML
-contract.ts[CE5T]: F:给 agent 扩展的提示词契约面 | R:code:packages/plugin-prompts/src/provider.ts | A:- | S:不带渲染，故检查可在纯 Node 下跑；agent 包必须 import 它一次，否则 ExtensionServices 的合并不进编译程序
-deliver.ts[DG8S]: F:四种交付动作 | R:code:packages/plugin-prompts/src/command-file.ts,code:packages/plugin-prompts/src/instruction.ts,code:packages/plugin-prompts/src/slug.ts,code:packages/plugin-prompts/src/provider.ts | A:Delivery,targetOf,delivered,deliver,undeliver | S:安装与生成 Commands 写同一个文件，差别只在 frontmatter；文件名由 description 现算，所以改描述就是换一个投递地址
-index.ts[EE8T]: F:提示词模块定义与导出 | R:code:packages/plugin-prompts/src/provider.ts,code:packages/plugin-prompts/src/service.ts | A:promptsExtension,PromptsPage | S:不注册自己的 place——提示词没有每个 agent 共享的目录，只存在于它被投递的地方
-install-menu.tsx[DU8M]: F:交付菜单与每行的二级菜单 | R:code:packages/plugin-prompts/src/provider.ts,code:packages/plugin-prompts/src/deliver.ts | A:PromptActions,BatchActions,cardActionShell | S:PlaceMenu 传了自定义 trailing 就不再画勾，勾要自己补；⋯ 压在行上必须 stopPropagation，否则连带触发安装；卡片动作行两枚按钮共用 cardActionShell，复制那枚由 page.tsx 绘制，两处必须取同一份
+contract.ts[CE5T]: F:给 agent 扩展的提示词契约面 | R:code:packages/plugin-prompts/src/provider.ts | A:- | S:不带渲染，故检查可在纯 Node 下跑；agent 包必须 import 它一次，否则 ExtensionServices 的合并不进编译程序；provider.ts 新增的公开类型必须在此再导出，否则 agent 包看不到
+deliver.ts[DG8S]: F:四种交付动作 | R:code:packages/plugin-prompts/src/command-file.ts,code:packages/plugin-prompts/src/instruction.ts,code:packages/plugin-prompts/src/slug.ts,code:packages/plugin-prompts/src/provider.ts | A:Delivery,targetOf,delivered,deliver,undeliver | S:安装与生成 Commands 写同一个文件，差别只在 frontmatter；文件名由 description 现算，所以改描述就是换一个投递地址；instructions 按 place.documents 里的 id 取目标文件，未声明即抛错；端口只会整文件替换，故追加必须先读；instructions 撤不回，那个文件里有用户自己的字
+index.ts[EE8T]: F:提示词模块定义与导出 | R:code:packages/plugin-prompts/src/provider.ts,code:packages/plugin-prompts/src/service.ts | A:promptsExtension,PromptsPage | S:本模块注册自己的「工作区」place（.agents/commands、.agents/rules 与两个根文件），因为它不属于任何 agent；agent 的 place 由各 agent 扩展经同一个 registry 注册，两者在 activate 里合到一处
+install-menu.tsx[DU8M]: F:交付菜单与每行的二级菜单 | R:code:packages/plugin-prompts/src/provider.ts,code:packages/plugin-prompts/src/deliver.ts | A:PromptActions,BatchActions,cardActionShell | S:PlaceMenu 传了自定义 trailing 就不再画勾，勾要自己补；⋯ 压在行上必须 stopPropagation，否则连带触发安装；卡片动作行两枚按钮共用 cardActionShell，复制那枚由 page.tsx 绘制，两处必须取同一份；GenerateItems 按 place.documents 渲染，没声明的行只有 Commands 与 Rule
 instruction.ts[DG7T]: F:往指令文件里加一节 | R:- | A:withSection | S:幂等靠自带的两行注释标记——同名分节替换而不是再追加一份；文件换行与其余字节逐字保留
-library.ts[AG8S]: F:提示词页面的数据钩子 | R:code:packages/plugin-prompts/src/store.ts,code:packages/plugin-prompts/src/deliver.ts,code:packages/plugin-prompts/src/provider.ts | A:usePromptLibrary,usePromptPlaces,usePlaceFiles,useInstalled,formatAge,tokenLabel | S:位置列表跟随扩展快照的 revision，agent 启停要能当场长出来；已投递状态每次从文件重读，不另记一份
-messages.ts[CL5T]: F:提示词模块英文文案 | R:- | A:promptsMessages | S:命名空间 prompts.* 随包一起走；无包覆盖的键保留这里的英文，新增键必须同步 zh-CN 否则 check-messages 报缺
-page.tsx[AU8L]: F:提示词页 | R:code:packages/plugin-prompts/src/library.ts,code:packages/plugin-prompts/src/install-menu.tsx,code:packages/plugin-prompts/src/add-prompt-dialog.tsx,code:packages/plugin-prompts/src/prompt-detail-dialog.tsx | A:PromptsPage,CopyAction | S:只有一个页签——提示词没有可筛的作用域或来源；卡片照 skills 版式：封面恒 16:9 且从正文第一行开始，description 用同一个 line-clamp-2 + text-copy 段落；复制按钮的标签固定写「复制」，已复制只换图标，改文案会把旁边的安装按钮挤走
-prompt-detail-dialog.tsx[DU6S]: F:提示词详情弹窗 | R:code:packages/plugin-prompts/src/install-menu.tsx,code:packages/plugin-prompts/src/library.ts | A:PromptDetailDialog | S:不持有副本，读的就是打开它的那一行；删除只清库里的记录，已投递出去的副本保持原样
-provider.ts[CE9S]: F:提示词交付目标契约 | R:- | A:PROMPT_SERVICE,PromptPlace,PromptProvider,PromptProviderRegistry,PromptService,promptPlaces | S:commandDir/ruleDir/instructionFile 是机器可读的落点，与给人看的 target.locations 不是一回事；没声明 instructionFile 的行就不出那一项
-remote-store.ts[IG7T]: F:提示词库的远端实现 | R:code:packages/plugin-prompts/src/store.ts | A:createRemotePromptStore | S:方法名与接口一一对应，换成桌面形态只换这一处；行名进路径前先编码，避免名字里的字符被当成路由
+library.ts[AG8S]: F:提示词页面的数据钩子 | R:code:packages/plugin-prompts/src/store.ts,code:packages/plugin-prompts/src/deliver.ts,code:packages/plugin-prompts/src/provider.ts | A:usePromptStore,usePromptLibrary,usePromptPlaces,usePlaceFiles,useInstalled,formatAge | S:位置列表跟随扩展快照的 revision，agent 启停要能当场长出来；已投递状态每次从文件重读，不另记一份；写完 reload 整库，不做乐观预览——服务端写进什么，界面上就是什么
+messages.ts[CL5T]: F:提示词模块英文文案 | R:- | A:promptsMessages | S:命名空间 prompts.* 随包一起走；无包覆盖的键保留这里英文，新增键必须同步 zh-CN，否则 check-messages 报缺；菜单项文案可来自别的包，只要那个包也注册了 locale
+page.tsx[AU8L]: F:提示词页 | R:code:packages/plugin-prompts/src/library.ts,code:packages/plugin-prompts/src/install-menu.tsx,code:packages/plugin-prompts/src/add-prompt-dialog.tsx,code:packages/plugin-prompts/src/prompt-detail-dialog.tsx | A:PromptsPage,CopyAction | S:只有一个页签——提示词没有可筛的作用域或来源；卡片封面先看 assets[0]（图按自身比例、视频自动播），没有才渲染正文 markdown，尺寸徽标两种封面都画；复制按钮的标签固定写「复制」，已复制只换图标，改文案会把旁边的安装按钮挤走
+prompt-detail-dialog.tsx[DU6S]: F:提示词详情弹窗 | R:code:packages/plugin-prompts/src/install-menu.tsx,code:packages/plugin-prompts/src/library.ts,code:packages/extensions/src/components/media-pane.tsx | A:PromptDetailDialog | S:不持有副本，读的就是打开它的那一行；两页不 keepMounted（Swiper 量不出尺寸），草稿提到弹窗层所以切走不丢；描述双击改而 id 不变；删除只清库记录与它自己的图，已投递副本原样
+provider.ts[CE9S]: F:提示词交付目标契约 | R:- | A:PROMPT_SERVICE,PromptPlace,PromptDocument,PromptProvider,PromptProviderRegistry,PromptService | S:commandDir/ruleDir 是机器可读的落点，与给人看的 target.locations 不是一回事；documents 是这个位置能追加成段落的文件清单，没声明就不出那几项；generatedOnly 表示该位置只收写出来的成品，不收提示词原文的安装
+remote-store.ts[IG7T]: F:提示词库的远端实现 | R:code:packages/plugin-prompts/src/store.ts | A:createRemotePromptStore | S:方法名与接口一一对应，换成桌面形态只换这一处；行名进路径前先编码，避免名字里的字符被当成路由；assetUrl 不带 base——base 是库的路由前缀，资产在同一个源的 /hub/files 上
 service.ts[CE5T]: F:提示词目标注册表服务 | R:code:packages/plugin-prompts/src/provider.ts | A:createPromptService | S:register 返回 disposer，插件禁用时它的位置随之摘除，页面不会留下已卸载 agent 的行
 slug.ts[DG7T]: F:名称到文件名的唯一转换点 | R:- | A:slugOf | S:信任边界在此：下游按 / 切分查 ..，反斜杠能绕过，故这里就限定到字母数字并拒 Windows 保留设备名
-store.ts[CG7T]: F:提示词库接缝与形状 | R:- | A:Prompt,StoredPrompt,PromptPage,PromptDraft,PromptStore | S:没有存储的 id——行名由 description 现算，改描述等于换身份；正文随行一起返回，因为卡片拿它当封面、投递也写它
+store.ts[CG7T]: F:提示词库接缝与形状 | R:- | A:Prompt,PromptAsset,StoredPrompt,PromptPage,PromptPatch,PromptStore | S:id 创建时落盘、之后不随描述改，改描述是改正不是换身份；描述仍按 slug 唯一（投递文件名由它现算）；正文随行返回，卡片当封面、投递也写；assets 是这一行的图，删行连带删掉
 
 ===D:/work-space/dsh-context-hub/packages/plugin-prompts/src/host/===
-prompts-fs.ts[PD8M]: F:磁盘提示词库 | R:code:packages/plugin-prompts/src/store.ts,code:packages/plugin-prompts/src/slug.ts | A:createFsPromptStore,promptsFile | S:库是 <home>/prompts/prompts.json 一个 JSON 数组，解析失败一律拒绝而不重建；未知字段随行走，因为文件是人手写的
+prompts-fs.ts[PD8M]: F:磁盘提示词库 | R:code:packages/plugin-prompts/src/store.ts,code:packages/plugin-prompts/src/slug.ts | A:createFsPromptStore,promptsFile | S:库是 <home>/prompts/prompts.json 一个 JSON 数组，解析失败一律拒绝而不重建；未知字段随行走，因为文件是人手写的；id 创建时落盘、之后不随描述改；上传的文件重包成 <id>-<原名>，因为资产目录扁平且按内容寻址，不这样就两个提示词共用一个文件；删行连带删它自己的图，先写索引后删文件
