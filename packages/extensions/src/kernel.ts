@@ -4,6 +4,7 @@
  * {@link PlatformHost} they pass in; the services and catalog above it stay
  * identical across web, desktop, and executable builds.
  */
+import { createContributionPoints } from "./contributions.ts"
 import { Context } from "./cordis.ts"
 
 import { I18nService } from "./i18n.ts"
@@ -39,6 +40,9 @@ export async function createHubKernel(options: KernelOptions): Promise<HubKernel
   for (const [name, value] of Object.entries(options.services ?? {})) {
     ctx.provide(name, value)
   }
+  /* The points first: a plugin declares them in its own `inject`, so they have
+     to exist before any plugin is mounted. */
+  createContributionPoints(ctx)
   const extensions = ctx.plugin(ExtensionService, { catalog: options.extensions })
   await extensions.await()
   const i18n = ctx.plugin(I18nService)

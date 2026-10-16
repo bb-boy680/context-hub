@@ -174,7 +174,16 @@ async function main(): Promise<void> {
 
   await kernel.ctx.extensions.disable("test.provider")
   await kernel.ctx.extensions.disable("test.consumer")
-  check("disabled entries report nothing published", kernel.ctx.extensions.snapshot().entries.every((entry) => entry.provides.length === 0))
+  /* What a row says it provides comes from its manifest, so it does not change
+     when the extension is switched off — that is the declaration, and it stays
+     true. What does change is whether the service is there to reach. */
+  check("disabling the provider takes its service out of the context", kernel.ctx.get("counter") === undefined)
+  check(
+    "the declaration is still reported, because it is a declaration",
+    kernel.ctx.extensions
+      .snapshot()
+      .entries.find((entry) => entry.manifest.id === "test.provider")?.provides.join(",") === "counter"
+  )
 
   console.log(`\n${checked - failures}/${checked} checks passed`)
   if (failures > 0) process.exitCode = 1
