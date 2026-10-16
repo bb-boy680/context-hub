@@ -10,7 +10,7 @@
  * the instructions report, which is how the check proves `${VAR}` expansion
  * reached the child.
  *
- * Spawned by `check-probe.ts`; not meant to be run by hand.
+ * Spawned by `probe.test.ts`; not meant to be run by hand.
  */
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
