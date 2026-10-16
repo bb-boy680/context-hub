@@ -18,7 +18,7 @@ import type { McpDeclaration } from "../src/declaration.ts"
 import { PROBE_VERSION, cacheEntryOf, createProbeCache } from "../src/host/cache.ts"
 import { probeDeclaration } from "../src/host/probe.ts"
 import { createRecordStore } from "../src/host/records.ts"
-import { readMcpCall } from "../src/probe.ts"
+import { readMcpCall, readMcpQuery } from "../src/probe.ts"
 
 /** Whether a file is there. */
 async function exists(file: string): Promise<boolean> {
@@ -346,10 +346,24 @@ describe("the state document earlier builds kept the records in", () => {
 })
 
 describe("the wire", () => {
-  it("reads a cache, a probe, a records and a save call", () => {
-    expect(readMcpCall({ action: "cache", names: ["github"] }).action, "a cache call reads").toBe(
-      "cache"
+  it("reads a cache and a records call off a query", () => {
+    expect(
+      readMcpQuery(new URLSearchParams("action=cache&names=github"))?.action,
+      "a cache call reads"
+    ).toBe("cache")
+    expect(readMcpQuery(new URLSearchParams("action=records"))?.action, "a records call reads").toBe(
+      "records"
     )
+  })
+
+  it("reads no action as the question the page asks before offering probes", () => {
+    /* A read with no action answers whether a host is there at all, and reads
+       nothing to say so — a records file that cannot be read is not the same
+       answer as no host. */
+    expect(readMcpQuery(new URLSearchParams(""))).toBeNull()
+  })
+
+  it("reads a probe and a save call off a body", () => {
     expect(
       readMcpCall({
         action: "probe",
@@ -358,7 +372,6 @@ describe("the wire", () => {
       }).action,
       "a probe call reads"
     ).toBe("probe")
-    expect(readMcpCall({ action: "records" }).action, "a records call reads").toBe("records")
     expect(
       readMcpCall({ action: "save-records", records: [] }).action,
       "a save call carries its records"
@@ -367,6 +380,10 @@ describe("the wire", () => {
 
   it("refuses an unknown action, a save with no records, a bad scope and the rest", () => {
     expect(() => readMcpCall({ action: "nope" }), "an unknown action is refused").toThrow()
+    expect(() => readMcpQuery(new URLSearchParams("action=nope")), "a query naming one too").toThrow()
+    /* A read is not a write: sent as a body it names nothing this route writes. */
+    expect(() => readMcpCall({ action: "cache" }), "a cache call is refused as a write").toThrow()
+    expect(() => readMcpCall({ action: "records" }), "and so is a records call").toThrow()
     expect(() => readMcpCall({ action: "save-records" }), "a save call without records is refused").toThrow()
     expect(
       () =>
@@ -381,13 +398,12 @@ describe("the wire", () => {
       () => readMcpCall({ action: "probe", declaration: { transport: "stdio" }, scope: "global" }),
       "a stdio declaration without a command is refused"
     ).toThrow()
-    expect(() => readMcpCall({ action: "cache" }), "a cache call without names is refused").toThrow()
   })
 
-  it("keeps only the names it was handed", () => {
-    expect(
-      (readMcpCall({ action: "cache", names: ["github", 7, ""] }) as { names: string[] }).names,
-      "and the names it does carry are the ones kept"
-    ).toEqual(["github"])
+  it("keeps only the names it was handed, minus the empty ones", () => {
+    /* Over a query every value is a string, so what can be dropped is an empty
+       one; a name that is merely odd is kept and asked for. */
+    const read = readMcpQuery(new URLSearchParams("action=cache&names=github&names=&names=7"))
+    expect(read?.action === "cache" ? read.names : null).toEqual(["github", "7"])
   })
 })

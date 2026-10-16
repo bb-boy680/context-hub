@@ -20,7 +20,7 @@ import { createFsWorkspaceStore } from "@context-hub/core/host/workspaces"
 import { cacheEntryOf, createProbeCache } from "./src/host/cache.ts"
 import { probeDeclaration } from "./src/host/probe.ts"
 import { createRecordStore } from "./src/host/records.ts"
-import { MCP_ROUTE, readMcpCall } from "./src/probe.ts"
+import { MCP_ROUTE, readMcpCall, readMcpQuery } from "./src/probe.ts"
 
 /** The handler that serves MCP probes and their cache. */
 export function createMcpHandler(options: { home?: string } = {}): HubMiddleware {
@@ -47,34 +47,39 @@ export function createMcpHandler(options: { home?: string } = {}): HubMiddleware
       next()
       return
     }
-    /* The browser asks whether a host answers before it offers probes. */
-    if (request.method === "GET") {
-      sendJson(response, 200, { ok: true })
-      return
-    }
-    if (request.method !== "POST") {
-      response.statusCode = 405
-      response.end()
-      return
-    }
+    const method = request.method ?? "GET"
 
     try {
+      /* GET /hub/mcp — a read names its action in the query, and no action at
+         all is the bare question the page asks before offering probes. It
+         answers that one without reading anything, because a records file that
+         cannot be read is not the same as no host answering. */
+      if (method === "GET") {
+        const read = readMcpQuery(url.searchParams)
+        if (read === null) {
+          sendJson(response, 200, { ok: true })
+          return
+        }
+        if (read.action === "records") {
+          sendJson(response, 200, { value: await records.read(), file: records.file })
+          return
+        }
+        /* An answer is asked for by name; nothing else decides whether it is there. */
+        sendJson(response, 200, { entries: await cache.compare(read.names) })
+        return
+      }
+
+      if (method !== "POST") {
+        sendError(response, new Error(`unsupported method ${method}`), 405)
+        return
+      }
+
       const body = JSON.parse((await readBody(request)).toString("utf8")) as unknown
       const call = readMcpCall(body)
 
-      if (call.action === "records") {
-        sendJson(response, 200, { value: await records.read(), file: records.file })
-        return
-      }
       if (call.action === "save-records") {
         await records.save(call.records)
         sendJson(response, 200, { ok: true })
-        return
-      }
-
-      if (call.action === "cache") {
-        /* An answer is asked for by name; nothing else decides whether it is there. */
-        sendJson(response, 200, { entries: await cache.compare(call.names) })
         return
       }
 

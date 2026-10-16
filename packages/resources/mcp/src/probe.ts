@@ -123,17 +123,44 @@ export interface McpProbePort {
   probe(request: McpProbeRequest): Promise<McpCacheEntry>
 }
 
-/** One call as the route reads it off a request body. */
+/** One read, as the route reads it off a query. */
+export type McpReadCall = { action: "records" } | { action: "cache"; names: string[] }
+
+/**
+ * Read one read off a query, or null when the request is asking the liveness
+ * question instead.
+ *
+ * A read names its action in the query rather than in a body because there is
+ * no body to name it in: `curl` can send one, and a caller that only wants to
+ * know the cache answers without an encoder.
+ *
+ * @param params — the query, of no known shape: it crossed a wire.
+ * @returns the call, or null for the route itself.
+ * @throws when the query names an action this route does not read.
+ */
+export function readMcpQuery(params: URLSearchParams): McpReadCall | null {
+  const action = params.get("action")
+  /* No action at all is the question the page asks before offering probes. */
+  if (action === null) return null
+  if (action === "records") return { action: "records" }
+  if (action === "cache") {
+    return {
+      action: "cache",
+      names: params.getAll("names").filter((name) => name !== ""),
+    }
+  }
+  throw new Error(`unknown action: ${action}`)
+}
+
+/** One write, as the route reads it off a request body. */
 export type McpCall =
-  | { action: "cache"; names: string[] }
   | ({ action: "probe" } & McpProbeRequest)
-  | { action: "records" }
   | { action: "save-records"; records: unknown[] }
 
 const SCOPES: readonly string[] = ["workspace", "global"]
 
 /**
- * Read one call off a request body.
+ * Read one write off a request body.
  *
  * @param body — the parsed body, of no known type: it crossed a wire.
  * @returns the call, with the fields this route understands.
@@ -144,6 +171,7 @@ export function readMcpCall(body: unknown): McpCall {
   if (typeof body !== "object" || body === null) throw new Error("a call is an object")
   const held = body as {
     action?: unknown
+    /** The names a probe keeps, not the names a cache read asks about. */
     names?: unknown
     name?: unknown
     declaration?: unknown
@@ -152,17 +180,9 @@ export function readMcpCall(body: unknown): McpCall {
     save?: unknown
     records?: unknown
   }
-  if (held.action === "records") return { action: "records" }
   if (held.action === "save-records") {
     if (!Array.isArray(held.records)) throw new Error("a save call carries its records")
     return { action: "save-records", records: held.records }
-  }
-  if (held.action === "cache") {
-    if (!Array.isArray(held.names)) throw new Error("a cache call carries its names")
-    return {
-      action: "cache",
-      names: held.names.filter((name): name is string => typeof name === "string" && name !== ""),
-    }
   }
   if (held.action === "probe") {
     const declaration = readWireDeclaration(held.declaration)
@@ -193,40 +213,68 @@ export async function probeAvailable(base = ""): Promise<boolean> {
 }
 
 /**
- * One MCP call, as a browser makes it: a POST whose answer is JSON.
+ * One call to this route, answered as JSON.
+ *
+ * @param url — the whole address, query and all.
+ * @param init — what the call is; the method is what says read or write.
+ * @throws when the host refused the call, with the reason it gave.
+ */
+async function ask<T>(url: string, init: RequestInit): Promise<T> {
+  const answer = await fetch(url, init)
+  if (!answer.ok) {
+    /* The route refuses with `{ error }`, and that sentence is the only one
+       that says what went wrong; the status alone reads as a transport fault. */
+    const failure = (await answer.json().catch(() => ({}))) as { error?: string }
+    throw new Error(failure.error ?? `${answer.status} ${answer.statusText}`)
+  }
+  return (await answer.json()) as T
+}
+
+/**
+ * One read, as a browser makes it: a GET whose answer is JSON.
+ *
+ * @param query — the query the call carries, starting with its action.
+ * @param base — the origin the route is reached on; empty means this one.
+ */
+export function callMcpGet<T>(query: string, base = ""): Promise<T> {
+  return ask<T>(`${base}${MCP_ROUTE}${query}`, { method: "GET" })
+}
+
+/**
+ * One write, as a browser makes it: a POST whose answer is JSON.
  *
  * @param body — the call, in the shape {@link readMcpCall} reads.
  * @param base — the origin the route is reached on; empty means this one.
- * @throws when the host refused the call.
  */
-export async function callMcp(body: unknown, base = ""): Promise<unknown> {
-  const answer = await fetch(`${base}${MCP_ROUTE}`, {
+export function callMcp<T = unknown>(body: unknown, base = ""): Promise<T> {
+  return ask<T>(`${base}${MCP_ROUTE}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   })
-  if (!answer.ok) throw new Error(`${answer.status} ${answer.statusText}`)
-  return answer.json()
 }
 
 /**
- * The browser's probe port: both calls are one POST each.
+ * The browser's probe port: a read in the query, a write in the body.
  *
  * @param base — the origin the route is reached on; empty means this one.
- * @returns the port; a call the host refused rejects with its status.
+ * @returns the port; a call the host refused rejects with its reason.
  */
 export function createRemoteProbe(base = ""): McpProbePort {
   return {
     async cache(names) {
-      const answer = (await callMcp({ action: "cache", names }, base)) as {
-        entries?: Record<string, McpCacheEntry | null>
-      }
+      const query = names.map((name) => `&names=${encodeURIComponent(name)}`).join("")
+      const answer = await callMcpGet<{ entries?: Record<string, McpCacheEntry | null> }>(
+        `?action=cache${query}`,
+        base
+      )
       return answer.entries ?? {}
     },
     async probe(request) {
-      const answer = (await callMcp({ action: "probe", ...request }, base)) as {
-        entry: McpCacheEntry
-      }
+      const answer = await callMcp<{ entry: McpCacheEntry }>(
+        { action: "probe", ...request },
+        base
+      )
       return answer.entry
     },
   }

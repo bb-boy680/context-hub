@@ -14,7 +14,7 @@
  */
 import type { McpDeclaration } from "./declaration.ts"
 import { readDeclaration, writeDeclaration } from "./declaration.ts"
-import { callMcp } from "./probe.ts"
+import { callMcp, callMcpGet } from "./probe.ts"
 import type { McpRecord } from "./types.ts"
 
 /** One record as the file stores it. */
@@ -141,10 +141,10 @@ export interface McpRecordsPort {
 export function createRemoteRecords(base = ""): McpRecordsPort {
   return {
     async read() {
-      const answer = (await callMcp({ action: "records" }, base)) as {
-        value?: unknown
-        file?: unknown
-      }
+      const answer = await callMcpGet<{ value?: unknown; file?: unknown }>(
+        "?action=records",
+        base
+      )
       return {
         document: answer.value ?? null,
         file: typeof answer.file === "string" ? answer.file : "",
