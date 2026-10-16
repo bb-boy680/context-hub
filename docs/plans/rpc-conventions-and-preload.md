@@ -530,6 +530,23 @@ skills 目录读了 **854 次**——**界面完全正常**，因为每轮答案
 2. **40 个 `__test__/*.test.ts` 是否纳入索引**：这是范围策略的选择——索引此前只覆盖
    `src` 与配置，测试是新加的。纳入意味着以后每个测试文件都要维护一条认知条目。
 
+#### 顺带查清的一条：行尾（与上面两条分开，不阻塞）
+
+mcp 那边报告「工作区文件是 CRLF、与 `.gitattributes` 的 `eol=lf` 冲突」。核实结论：
+
+- **仓库内容是干净的**：所有 blob 与索引都是纯 LF（`probe.ts` blob `CR=0`），
+  `.gitattributes` 的 `text=auto eol=lf` 在 `add` 时正常归一化。CRLF 只存在于**这个
+  checkout 的工作区**，且是**全仓**状态（受管文本 482 个：纯 CRLF 275 / 混行尾 2 / 纯 LF 205），
+  早于本次改动（两个混行尾文件在本次任务的提交数都是 0）。
+- **基线同时记 `sha256` 与 `normalized_sha256`**。`DESIGN.md` 是 `raw=异 / normalized=同`，
+  差的 269 字节正好是一行一个 `\r`——**基线是从一个 CRLF 的工作区录的**。
+- 推论：如果把工作区按 `.gitattributes` 的意图转成 LF，**全仓会一次性进入
+  `line_ending_only` 桶**。这是**非语义的独立桶**（与 `stale` 61 / `unbaselined` 242 分开），
+  不要求重新作者化——所以它既不阻塞，也**不该混进那 305 条的裁决里**。
+- 两个混行尾文件（`apps/web/src/components/extension-detail-dialog.tsx`、
+  `packages/extensions/src/kernel.ts`）各有一行是 LF，blob 里已归一化，对仓库无害。
+  **本次不改**（那是无关噪音）。
+
 起因不变：四个资产页面今天都**只在进入页面时**才读数据，读取逻辑住在各自的 React hook 里。
 组件卸载 state 一起丢，再进来重读一遍。于是全局 Ctrl+K 在任何"从未进过那四个页面"的
 会话里查不到任何真实资产。
