@@ -33,6 +33,7 @@
     "typescript-eslint": "^8"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./extension": "./src/extension.ts"
   }
 }
