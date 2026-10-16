@@ -7,7 +7,7 @@
  * Acme Code is a made-up client, kept here as the worked example: one
  * workspace file, JSONC, the same `mcpServers` key the JSON clients use, and no
  * switch of its own. It is copied verbatim into a plugin space by
- * `packages/plugin-mcp/scripts/check-plugin.ts`, which runs it against real
+ * `packages/resources/mcp/scripts/check-plugin.ts`, which runs it against real
  * files.
  *
  * What it needs, and where each arrives:
