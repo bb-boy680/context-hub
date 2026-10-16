@@ -17,6 +17,7 @@
  *   written by hand before this module existed — so a field this module does not
  *   know is carried through a write rather than dropped.
  */
+import { randomUUID } from "node:crypto"
 import { promises as fs } from "node:fs"
 
 import { assetKind, assetRef, createAssetStore, readSource } from "@workspace/core"
@@ -84,6 +85,17 @@ function stringsOf(value: unknown): string[] {
 }
 
 /**
+ * A row's title.
+ *
+ * A library written by hand before the field existed carries none, and the
+ * description stands in: the description was the title then, and what a
+ * delivery names its file after has to come out where it already was.
+ */
+function titleOf(held: unknown, description: string): string {
+  return typeof held === "string" && held.trim() !== "" ? held : description
+}
+
+/**
  * One row out of the file, checked as it is read.
  *
  * A file a person may edit is a file that may hold something else, so a row
@@ -95,9 +107,14 @@ function rowOf(value: unknown, at: number): Row {
     throw new Error(`${LIBRARY_FILE}: entry ${at} is not an object`)
   }
   const held = value as Record<string, unknown>
+  const description = textOf(held.description, "description")
   return {
     ...held,
-    description: textOf(held.description, "description"),
+    /* A row written before the title existed reads as one titled by its
+       description: what it is called on screen, and the file it delivers to,
+       both come out where they already were. */
+    name: titleOf(held.name, description),
+    description,
     prompt: textOf(held.prompt, "prompt"),
     tags: stringsOf(held.tags),
     updatedAt: typeof held.updatedAt === "string" ? held.updatedAt : "",
@@ -113,30 +130,13 @@ function lineOf(row: Row): Record<string, unknown> {
 /**
  * The id one row answers to.
  *
- * Written down when the row is created, so a description can be corrected
- * without moving the row. A library a person wrote by hand carries none, and
- * the one its description makes stands in until something writes the row again.
+ * Written down when the row is created, so a title can be corrected without
+ * moving the row. A library a person wrote by hand carries none, and the one
+ * its title makes stands in until something writes the row again.
  */
 function idOf(row: Row): string {
   const held = row.id
-  return typeof held === "string" && held.trim() !== "" ? held : slugOf(row.description)
-}
-
-/**
- * An id no row in this library answers to.
- *
- * Correcting a description leaves the row answering to the id it was written
- * with, so the name it gave up is free again — and a row created under that
- * name has to answer to something else. The description still decides what a
- * delivery writes, so the suffix never reaches a file.
- */
-function freeId(rows: Row[], wanted: string): string {
-  const held = (candidate: string) => rows.some((row) => idOf(row) === candidate)
-  if (!held(wanted)) return wanted
-  for (let count = 2; ; count += 1) {
-    const candidate = `${wanted}-${count}`
-    if (!held(candidate)) return candidate
-  }
+  return typeof held === "string" && held.trim() !== "" ? held : slugOf(row.name)
 }
 
 /**
@@ -261,19 +261,22 @@ export function createFsPromptStore(options: PromptStoreOptions = {}): PromptSto
 
     create: (draft: PromptDraft) =>
       run(async () => {
+        const name = textOf(draft.name, "name")
         const description = textOf(draft.description, "description")
         const rows = await load()
-        /* What a delivery writes is named after the description, so a second
-           row whose description says the same thing would write over the first
-           one's file instead of sitting beside it. */
-        const named = slugOf(description)
-        if (rows.some((row) => slugOf(row.description) === named)) {
-          throw new Error(`"${description}" is already in this library`)
+        /* What a delivery writes is named after the title, so a second row whose
+           title would reach that same file would write over the first one's
+           instead of sitting beside it. Two rows may say the same thing about
+           themselves; they may not deliver to one file. */
+        const named = slugOf(name)
+        if (rows.some((row) => slugOf(row.name) === named)) {
+          throw new Error(`"${name}" is already in this library`)
         }
         const row: Row = {
-          /* Two rows cannot answer to one id, and a corrected description may
-             have left this name held by a row that no longer uses it. */
-          id: freeId(rows, named),
+          /* Opaque and generated, so nothing about the wording decides what the
+             row is: correcting a title corrects the row rather than making one. */
+          id: randomUUID(),
+          name,
           description,
           prompt: draft.prompt,
           tags: [...new Set((draft.tags ?? []).map((tag) => tag.trim()).filter(Boolean))],
@@ -289,6 +292,7 @@ export function createFsPromptStore(options: PromptStoreOptions = {}): PromptSto
         /* Every field is checked before the row is looked up, so an edit that
            names nothing is refused rather than stamping the row for no change. */
         const text = patch.prompt === undefined ? undefined : textOf(patch.prompt, "prompt")
+        const name = patch.name === undefined ? undefined : textOf(patch.name, "name")
         const description =
           patch.description === undefined ? undefined : textOf(patch.description, "description")
         const tags =
@@ -298,18 +302,21 @@ export function createFsPromptStore(options: PromptStoreOptions = {}): PromptSto
         const rows = await load()
         const index = at(rows, id)
         const row = rows[index] as Row
-        if (description !== undefined && description !== row.description) {
-          /* Correcting a description does not move the row, but it may not take
-             what another row's delivery writes to either. */
-          const named = slugOf(description)
-          if (rows.some((one, position) => position !== index && slugOf(one.description) === named)) {
-            throw new Error(`"${description}" is already in this library`)
+        if (name !== undefined && name !== row.name) {
+          /* Correcting a title does not move the row, but it may not reach the
+             file another row's delivery writes to either. */
+          const named = slugOf(name)
+          if (rows.some((one, position) => position !== index && slugOf(one.name) === named)) {
+            throw new Error(`"${name}" is already in this library`)
           }
         }
-        if (text === undefined && description === undefined && tags === undefined) return withId(row)
+        if (text === undefined && name === undefined && description === undefined && tags === undefined) {
+          return withId(row)
+        }
         const next: Row = {
           ...row,
           ...(text === undefined ? {} : { prompt: text }),
+          ...(name === undefined ? {} : { name }),
           ...(description === undefined ? {} : { description }),
           ...(tags === undefined ? {} : { tags }),
           updatedAt: new Date().toISOString(),

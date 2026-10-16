@@ -15,6 +15,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 
 import { createFsPromptStore, promptsFile } from "../src/host/prompts-fs.ts"
+import { slugOf } from "../src/slug.ts"
 
 let failures = 0
 
@@ -41,11 +42,19 @@ check("an empty read does not create the file", (await fs.stat(file).catch(() =>
 
 /* Create writes the array the file is meant to be. */
 const created = await store.create({
+  name: "Review a diff",
   description: "Review a diff before committing",
   prompt: "Review the diff.\nReport what it changes.\n",
   tags: ["code quality", "code quality"],
 })
-check("create keys the row by its description", created.id === "review-a-diff-before-committing", created.id)
+/* The id is opaque and generated, so nothing about the wording decides what the
+   row is — which is what lets a name be corrected without making another row. */
+check(
+  "create gives the row an id of its own",
+  created.id.trim() !== "" && created.id !== slugOf("Review a diff"),
+  created.id
+)
+check("create keeps the name as written", created.name === "Review a diff", created.name)
 check("create keeps the description as written", created.description === "Review a diff before committing")
 check("create de-duplicates its tags", created.tags.length === 1, created.tags)
 
@@ -54,7 +63,7 @@ check("the library is one array", Array.isArray(written) && written.length === 1
 check(
   "a row holds the person's fields in their own names",
   JSON.stringify(Object.keys(written[0] ?? {}).sort()) ===
-    JSON.stringify(["assets", "description", "id", "prompt", "tags", "updatedAt"]),
+    JSON.stringify(["assets", "description", "id", "name", "prompt", "tags", "updatedAt"]),
   written[0]
 )
 /* The library stores what a person typed, trailing newline and all: settling
@@ -69,24 +78,30 @@ check(
 )
 check("nothing else was added to the hub home", (await fs.readdir(home)).join(" ") === "prompts", await fs.readdir(home))
 
-/* The id is written down when the row is, so a description can be corrected
-   later without the row becoming another one. */
+/* The id is written down when the row is, so a title can be corrected later
+   without the row becoming another one. */
 const listed = await store.list()
 check("list returns what was created", listed.total === 1, listed.total)
 check("the row comes back with its id", listed.items[0]?.id === created.id, listed.items[0])
 check("the id is written into the file", written[0]?.id === created.id, written[0]?.id)
-/* A library written by hand before this module existed carries no id, and the
-   one its description makes stands in for it as it is read. */
+/* A library written by hand before the title existed carries neither a name nor
+   an id: the description stands in as the title, so what a delivery names its
+   file after comes out where it already was. */
 await fs.writeFile(file, JSON.stringify([{ description: "Hand written", prompt: "x" }]))
 const derived = await createFsPromptStore({ home }).list()
 check(
-  "a row with no id answers to the name its description makes",
+  "a row with no name reads as one titled by its description",
+  derived.items[0]?.name === "Hand written",
+  derived.items[0]
+)
+check(
+  "and a row with no id answers to the name that title makes",
   derived.items[0]?.id === "hand-written",
   derived.items[0]
 )
 await fs.writeFile(
   file,
-  JSON.stringify([{ description: "Hand written", prompt: "x", id: "kept" }])
+  JSON.stringify([{ name: "Kept", description: "Hand written", prompt: "x", id: "kept" }])
 )
 check(
   "a row with an id answers to that one",
@@ -96,23 +111,40 @@ check(
 await fs.writeFile(file, JSON.stringify([written[0]], null, 2))
 check("the library is back to the one row", (await store.list()).total === 1)
 
-/* Two descriptions whose file name would collide are one place to write. */
+/* Two names whose file name would collide are one place to write. */
 let refused: unknown = null
 await store
-  .create({ description: "review a diff before committing", prompt: "other" })
+  .create({ name: "review a diff", description: "Something else", prompt: "other" })
   .catch((error: unknown) => {
     refused = error
   })
-check("a colliding description is refused", refused instanceof Error, refused)
+check("a colliding name is refused", refused instanceof Error, refused)
 check("being refused writes nothing", (await store.list()).total === 1)
+
+/* The description is not what a collision is about: two rows may describe
+   themselves the same way, as long as they reach two different files. */
+const alike = await store.create({
+  name: "Another title",
+  description: "Review a diff before committing",
+  prompt: "third",
+})
+check(
+  "a description another row already carries is not a collision",
+  alike.description === created.description,
+  alike
+)
+check("and that row is added rather than refused", (await store.list()).total === 2)
+await store.remove(alike.id)
 
 /* A field this module does not know survives a write: the file is hand-editable. */
 const hand = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>[]
 hand[0] = { ...hand[0], author: "me", assets: ["assets/one.png"] }
 await fs.writeFile(file, JSON.stringify(hand, null, 2))
-await createFsPromptStore({ home })
-  .create({ description: "Added by hand", prompt: "second" })
-  .catch(() => undefined)
+const byHand = await createFsPromptStore({ home }).create({
+  name: "Added by hand",
+  description: "Added by hand",
+  prompt: "second",
+})
 const afterAdd = JSON.parse(await fs.readFile(file, "utf8")) as Record<string, unknown>[]
 check("a field written by hand is still there", afterAdd[0]?.author === "me", afterAdd[0])
 check("a media reference written by hand is still there", JSON.stringify(afterAdd[0]?.assets) === '["assets/one.png"]', afterAdd[0]?.assets)
@@ -122,7 +154,7 @@ check("the stored prompt's text is unchanged", afterAdd[0]?.prompt === "Review t
    since the file was written behind the first one's back above and its own copy
    of the library is stale by now — reading through it would check a memory
    rather than the file. */
-await createFsPromptStore({ home }).remove("added-by-hand")
+await createFsPromptStore({ home }).remove(byHand.id)
 const kept = await createFsPromptStore({ home }).list()
 check("remove takes the row out", kept.total === 1 && kept.items[0]?.id === created.id, kept.items.map((one) => one.id))
 check("removing an unknown name is harmless", await createFsPromptStore({ home }).remove("never-existed").then(() => true).catch(() => false))
@@ -165,12 +197,12 @@ await createFsPromptStore({ home })
 check("editing a row that is not there is refused", unknownEdit instanceof Error, unknownEdit)
 check("the refusal names the row", (unknownEdit as Error | null)?.message.includes("never-existed") === true, unknownEdit)
 
-/* Correcting the description is a correction, not a second row: the row keeps
-   the id it was written with, so nothing that already points at it moves. */
+/* Correcting the title is a correction, not a second row: the row keeps the id
+   it was written with, so nothing that already points at it moves. */
 const renamed = await createFsPromptStore({ home }).update(created.id, {
-  description: "Review a diff before pushing",
+  name: "Review a diff before pushing",
 })
-check("the description is the corrected one", renamed.description === "Review a diff before pushing", renamed)
+check("the name is the corrected one", renamed.name === "Review a diff before pushing", renamed)
 check("the row keeps the id it was written with", renamed.id === created.id, renamed.id)
 check(
   "and the file still holds that id",
@@ -181,29 +213,28 @@ check(
   "the row is still reached by its old id",
   (await createFsPromptStore({ home }).list()).items[0]?.id === created.id
 )
-/* The name is freed, not hoarded: another row may take the description the
-   first one has given up — under an id of its own, since the first row still
-   answers to the one it was written with. */
+/* The title it gave up is free again: another row may take it, and answers to
+   an id of its own because ids are generated rather than made out of names. */
 const took = await createFsPromptStore({ home }).create({
+  name: "Review a diff",
   description: "Review a diff before committing",
   prompt: "another",
 })
-check("a description another row gave up can be taken", took.id !== created.id, [took.id, created.id])
-check("and it answers to a name of its own", took.id === "review-a-diff-before-committing-2", took.id)
+check("a name another row gave up can be taken", took.id !== created.id, [took.id, created.id])
 check("the row that gave the name up keeps its own", (await createFsPromptStore({ home }).list()).items[0]?.id === created.id)
 
 /* But two rows may not deliver to one file. */
 let takenName: unknown = null
 await createFsPromptStore({ home })
-  .update(created.id, { description: "Review a diff before committing" })
+  .update(created.id, { name: "Review a diff" })
   .catch((failure: unknown) => {
     takenName = failure
   })
 check("an edit may not take what another row delivers to", takenName instanceof Error, takenName)
 check(
   "and the row it was refused for is unchanged",
-  (await textOf()).description === "Review a diff before pushing",
-  (await textOf()).description
+  (await textOf()).name === "Review a diff before pushing",
+  (await textOf()).name
 )
 
 /* An edit that says nothing changes nothing, rather than stamping the row. */
@@ -217,11 +248,11 @@ check(
   (await textOf()).updatedAt
 )
 
-/* The description goes back, so the rest of this file reads one row: the row
-   that took the freed name is dropped again. */
+/* The name goes back to what it was, so the rest of this file reads one row:
+   the row that took the freed name is dropped again. */
 await createFsPromptStore({ home }).remove(took.id)
 await createFsPromptStore({ home }).update(created.id, {
-  description: "Review a diff before committing",
+  name: "Review a diff",
 })
 check(
   "the library is the row this file started with",
@@ -250,6 +281,7 @@ check(
    content-addressed, so a shared reference would make one row's delete the
    other row's loss. */
 const second = await createFsPromptStore({ home }).create({
+  name: "Another prompt",
   description: "Another prompt",
   prompt: "second",
 })
@@ -345,9 +377,9 @@ check(
 /* Concurrent creates all land: every change is a read-modify-write of one file. */
 const racing = createFsPromptStore({ home })
 await Promise.all([
-  racing.create({ description: "Racing one", prompt: "one" }),
-  racing.create({ description: "Racing two", prompt: "two" }),
-  racing.create({ description: "Racing three", prompt: "three" }),
+  racing.create({ name: "Racing one", description: "Racing one", prompt: "one" }),
+  racing.create({ name: "Racing two", description: "Racing two", prompt: "two" }),
+  racing.create({ name: "Racing three", description: "Racing three", prompt: "three" }),
 ])
 const raced = await createFsPromptStore({ home }).list()
 check("three concurrent creates all land", raced.total === 4, raced.total)
@@ -372,7 +404,7 @@ check("the unreadable file was not written over", (await fs.readFile(file, "utf8
 
 /* And a write is refused too, rather than replacing what it could not read. */
 await createFsPromptStore({ home })
-  .create({ description: "Nope", prompt: "nope" })
+  .create({ name: "Nope", description: "Nope", prompt: "nope" })
   .catch(() => undefined)
 check("a write against an unparsable library leaves it alone", (await fs.readFile(file, "utf8")) === broken)
 

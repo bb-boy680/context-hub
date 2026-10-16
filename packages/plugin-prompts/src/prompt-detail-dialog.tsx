@@ -43,7 +43,7 @@ import {
 } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
-import { Dialog, DialogClose, DialogTitle } from "@workspace/ui/components/dialog"
+import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@workspace/ui/components/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,13 +58,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
+import { Separator } from "@workspace/ui/components/separator"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { toast } from "@workspace/ui/components/toast"
 
 import type { Delivery } from "./deliver.ts"
 import { GenerateItems } from "./install-menu.tsx"
-import { tokenLabel, useInstalled, usePromptStore, type Installed } from "./library.ts"
+import { useInstalled, usePromptStore, type Installed } from "./library.ts"
+import { PromptMeta, PromptTile } from "./parts.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptStore, StoredPrompt } from "./store.ts"
 
@@ -415,7 +417,7 @@ function PlaceGenerate({
               <PlusIcon className="size-[15px]" aria-hidden />
             )}
             {t(held ? "prompts.action.remove" : "prompts.action.install")}
-            <span className="sr-only">{prompt.description}</span>
+            <span className="sr-only">{prompt.name}</span>
           </DropdownMenuItem>
         ) : null}
         {installs ? <DropdownMenuSeparator /> : null}
@@ -500,10 +502,9 @@ function DeleteBubble({
  * in — the same line the MCP server panel shows its own description in, at the
  * same size and ink.
  *
- * A prompt has no name apart from this: it is what the row is read by, what the
- * catalog searches, and what a delivery names its file after. So it is also the
- * one thing in this panel that is edited in place, and correcting it is a
- * correction to the row rather than a second row.
+ * Correcting it is a correction to the row rather than a second row: the row is
+ * known by its id, so a description can be rewritten as often as it takes
+ * without anything that points at the row moving.
  *
  * The field starts from what the line shows, so fixing a word is fixing it
  * rather than retyping the sentence.
@@ -567,6 +568,90 @@ function DescriptionLine({
   )
 }
 
+/**
+ * The title line, which a double click turns into a field to write one in.
+ *
+ * It is one line rather than a paragraph, so Enter commits it where the
+ * description's Enter only breaks the line. A title with nothing in it is
+ * refused the quiet way: the line goes back to what the library holds, rather
+ * than asking the store for a file name it would not have anyway.
+ */
+function NameLine({ text, onWrite }: { text: string; onWrite: (name: string) => void }) {
+  const { t } = useI18n()
+  const [draft, setDraft] = React.useState<string | null>(null)
+  /* Escape unmounts the field, and the removal raises a blur that must not
+     commit what the person just threw away. */
+  const thrown = React.useRef(false)
+
+  const commit = (written: string) => {
+    setDraft(null)
+    if (thrown.current) {
+      thrown.current = false
+      return
+    }
+    const title = written.trim()
+    if (title !== "" && title !== text) onWrite(title)
+  }
+
+  if (draft !== null) {
+    return (
+      <input
+        autoFocus
+        value={draft}
+        aria-label={t("prompts.detail.name.edit")}
+        onChange={(event) => setDraft(event.target.value)}
+        onBlur={() => commit(draft)}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation()
+            thrown.current = true
+            setDraft(null)
+          }
+          /* Enter is the commit, and it goes through the blur rather than
+             around it, so a title is written exactly once. */
+          if (event.key === "Enter") {
+            event.preventDefault()
+            event.currentTarget.blur()
+          }
+        }}
+        className="w-full min-w-0 bg-transparent text-[16px] leading-[21px] font-semibold outline-none"
+      />
+    )
+  }
+
+  return (
+    <span
+      onDoubleClick={() => setDraft(text)}
+      title={t("prompts.detail.name.edit")}
+      className="block cursor-text truncate"
+    >
+      {text}
+    </span>
+  )
+}
+
+/** A hairline between two groups, with the canvas's own 17px of air. */
+function Rule() {
+  return (
+    <div className="flex h-[17px] items-center">
+      <Separator />
+    </div>
+  )
+}
+
+/**
+ * One line of the panel: what it is called, and what it says — the shape the
+ * plugin panel prints its own record facts in.
+ */
+function MetaRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex h-[30px] items-center justify-between gap-2">
+      <span className="text-[12.5px] text-muted-foreground">{label}</span>
+      <span className="font-mono text-[12.5px] text-foreground">{value}</span>
+    </div>
+  )
+}
+
 /** The panel beside the pictures: what the prompt is, and what can be done with it. */
 function InfoPanel({
   prompt,
@@ -579,6 +664,7 @@ function InfoPanel({
   onToggle,
   onGenerate,
   onDelete,
+  onRename,
   onDescribe,
   onTags,
   tagSuggestions,
@@ -595,6 +681,7 @@ function InfoPanel({
   onToggle: (place: PromptPlace) => void
   onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
   onDelete: () => void
+  onRename: (name: string) => void
   onDescribe: (description: string) => void
   onTags: (tags: string[]) => void
   /** Every category in use across the library, for the editor's quick picks. */
@@ -605,21 +692,21 @@ function InfoPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* No heading: a prompt's only name is its description, and that belongs
-          with the rest of what the row says about itself rather than set apart
-          above it. What the strip carries instead is how big it is and when it
-          last changed — the two facts that are about the row rather than in it.
-          The title stays for a reader that cannot see the panel. */}
-      <div className="flex h-14 shrink-0 items-center gap-2 border-b border-border px-5">
-        <DialogTitle className="sr-only">{prompt.description}</DialogTitle>
-        <span className="truncate text-[12.5px] leading-[1.4] text-muted-foreground">
-          {t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))}
-        </span>
-        {updated === "" ? null : <span className="text-muted-soft">·</span>}
-        {updated === "" ? null : (
-          <span className="truncate text-[12.5px] leading-[1.4] text-muted-soft">{updated}</span>
-        )}
-        <span className="flex-1" />
+      {/* The title block, which is the one the MCP servers and the plugin packs
+          open with: the row's own tile, its title, and where it lives and how
+          big it is beneath. The title is the one line here that is edited in
+          place — it is what a delivery names its file after, so a typo in it
+          has to have a way back. */}
+      <header className="flex h-[84px] shrink-0 items-center gap-3 border-b border-border px-5">
+        <PromptTile />
+        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+          <DialogTitle className="min-w-0 truncate font-mono text-[16px] leading-[21px] font-semibold">
+            <NameLine text={prompt.name} onWrite={onRename} />
+          </DialogTitle>
+          <DialogDescription className="flex min-w-0 items-center gap-2">
+            <PromptMeta body={prompt.prompt} />
+          </DialogDescription>
+        </div>
         <DialogClose
           render={
             <Button
@@ -632,7 +719,7 @@ function InfoPanel({
         >
           <XIcon className="size-4 text-copy" />
         </DialogClose>
-      </div>
+      </header>
 
       {/* Everything between the heading and the footer scrolls: a machine-wide
           list of places alone outruns the panel, and the actions have to stay
@@ -664,6 +751,17 @@ function InfoPanel({
           onToggle={onToggle}
           onGenerate={onGenerate}
         />
+
+        {/* When this last moved, which is a fact about the record rather than
+            about where it goes — so it sits at the panel's foot, behind the
+            hairline the other panels put between two groups. A row the hub
+            never wrote carries no such time. */}
+        {updated === "" ? null : (
+          <>
+            <Rule />
+            <MetaRow label={t("prompts.detail.updated")} value={updated} />
+          </>
+        )}
       </div>
 
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-t border-border px-5">
@@ -692,7 +790,7 @@ function InfoPanel({
         {/* Deleting is another class of action, so it takes the far end of the
             row rather than sitting beside the one that reads the prompt out. */}
         <span className="flex-1" />
-        <DeleteBubble name={prompt.description} busy={busy} onDelete={onDelete}>
+        <DeleteBubble name={prompt.name} busy={busy} onDelete={onDelete}>
           <Button
             variant="outline"
             disabled={busy}
@@ -782,6 +880,7 @@ function BodyTab({
  * @param onGenerate — write one of the three derived forms into a place.
  * @param onDelete — remove the prompt from the library.
  * @param onChanged — the stored row changed; the caller re-reads its page.
+ * @param onRename — correct the prompt's title.
  * @param onDescribe — correct the prompt's description.
  * @param onTags — replace the prompt's categories.
  * @param tagSuggestions — every category in use across the library.
@@ -799,6 +898,7 @@ export function PromptDetailDialog({
   onGenerate,
   onDelete,
   onChanged,
+  onRename,
   onDescribe,
   onTags,
   tagSuggestions,
@@ -816,6 +916,7 @@ export function PromptDetailDialog({
   onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => void
   onDelete: (prompt: StoredPrompt) => void
   onChanged: () => void
+  onRename: (prompt: StoredPrompt, name: string) => void
   onDescribe: (prompt: StoredPrompt, description: string) => void
   onTags: (prompt: StoredPrompt, tags: string[]) => void
   /** Every category in use across the library, for the editor's quick picks. */
@@ -839,6 +940,7 @@ export function PromptDetailDialog({
           onGenerate={(place, action, document) => onGenerate(prompt, place, action, document)}
           onDelete={() => onDelete(prompt)}
           onChanged={onChanged}
+          onRename={(name) => onRename(prompt, name)}
           onDescribe={(description) => onDescribe(prompt, description)}
           onTags={(tags) => onTags(prompt, tags)}
           tagSuggestions={tagSuggestions}
@@ -860,6 +962,7 @@ function Lightbox({
   onGenerate,
   onDelete,
   onChanged,
+  onRename,
   onDescribe,
   onTags,
   tagSuggestions,
@@ -876,6 +979,7 @@ function Lightbox({
   onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
   onDelete: () => void
   onChanged: () => void
+  onRename: (name: string) => void
   onDescribe: (description: string) => void
   onTags: (tags: string[]) => void
   /** Every category in use across the library, for the editor's quick picks. */
@@ -982,6 +1086,7 @@ function Lightbox({
             acted(() => onGenerate(place, action, document))
           }
           onDelete={onDelete}
+          onRename={onRename}
           onDescribe={onDescribe}
           onTags={onTags}
           tagSuggestions={tagSuggestions}

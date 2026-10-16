@@ -783,3 +783,44 @@ rm -f <repo>/.claude/commands/<name>.md  ~/.claude/commands/<name>.md
 
 判据：给 UI 测试选路径时先跑 `git check-ignore -v <路径>`；
 不 ignored 的目标一律留给宿主层。收尾复查用 `git status --short` 而不是只看脚本自己的清理。
+
+## 会打到用户机器的清理命令：先看它匹配的是"我的"还是"所有的"（2026-10-16）
+
+**问题模式**：这轮为了给 headless Chrome 腾出调试端口，我反复跑
+`taskkill //F //IM chrome.exe //T`——`//IM` 是**按镜像名匹配，杀掉机器上所有 chrome.exe**。
+用户正开着的浏览器窗口被我一并杀掉，用户问「你为啥一直 kill 我的 chrome 进程？」。
+
+驱动脚本本身是对的：`spawn` 拿到了句柄，`chrome.kill()` 只收自己那一个。
+可我图省事加了一句"清场"，把"我需要端口空出来"变成了"把所有 Chrome 关掉"。
+
+**规则**：清理/重启类命令写之前先问一句——**这条命令的匹配范围是"我启动的那个"还是"机器上所有的"？**
+- 进程：用 `spawn` 返回的句柄 `.kill()`，或按 PID（`netstat -ano | grep ":<port>" | grep LISTENING`
+  取 pid 再 `taskkill //F //PID <pid>`）。**禁止 `//IM`**，除非用户明确说"把所有 X 关掉"。
+- 端口被占：换一个端口（`--strictPort` 之外还会自动 +1）比清场便宜，绝不为此杀别人的进程。
+- 上一次的收尾残留不值得"顺手清干净"。判断不清就留着，在汇报里说一句。
+
+判据：命令里出现 `//IM`、`pkill -f <宽泛模式>`、`killall`、`rm -rf ~/...` 这类**按名字/模式**匹配的
+目标时，停一下。只有按 PID、按我自己 spawn 的句柄、按我独占的端口做事，才是安全的。
+
+## 手写一个像素之前先 `ls packages/ui/src/components/`（2026-10-16）
+
+**问题模式**：给提示词面板的分组之间加一条分割线，我写了
+`<span className="h-px w-full bg-border" />`，用户指出「分割线应该用 shadcn-ui 的啊」。
+`packages/ui/src/components/separator.tsx` 一直都在（`Separator`，`data-horizontal:h-px`），
+MCP 模块里甚至有一个 `Rule()` 包了 17px 留白可以直接照抄。我照抄了 `Rule()` 的**结构**
+却把里面的 `Separator` 换成了手写 span——离正确只差一步，但那一步是我自己省掉的。
+
+这和本文件「"用某组件"的意思是连它的默认长相一起用」是同一条根因的两种表现：
+那条是**用了组件却改掉外壳**，这条是**根本没查有没有组件**。
+
+**规则**：要写任何 `h-px` / `w-px` / 圆角 / 阴影 / 骨架这类**基础视觉原子**之前，
+先跑一次 `ls packages/ui/src/components/ | grep -i <你要的东西>`（separator / skeleton / badge /
+avatar / spinner…）。命中就直接用，别再手写；没命中才手写，并在注释里说清为什么没有现成的。
+
+跨模块抄一段 UI 时，**整段照抄**，不要"抄结构、换零件"——`Rule()` 里那个 `<span>` 是
+MCP 那个文件自己的旧写法，不代表可以继续扩散。抄之前先看被抄的模块有没有用仓库组件，
+用了就跟上。
+
+**附带**：`react-hooks/set-state-in-effect`、`purity` 之外的"仓库约定"大多是隐性的，
+`AGENTS.md` 只说"引入新模式前，优先使用仓库已有工具链"。所以判据要落到**可执行的搜索**上，
+不要靠"我记得好像没有"。

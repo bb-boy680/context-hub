@@ -67,8 +67,12 @@ const WORKSPACE: PromptPlace = {
 /** The same place in the machine-wide scope, where the roots differ. */
 const GLOBAL: PromptPlace = { ...WORKSPACE, id: "workspace-global", scope: "global" }
 
+/* The title and the description are deliberately different sentences with
+   different file names: every assertion below about `code-review.md` is an
+   assertion that the delivered file is named after the title. */
 const prompt: Prompt = {
-  description: "Code Review",
+  name: "Code Review",
+  description: "Reads the diff and says what it changes",
   prompt: "Review the diff.\nReport what it changes.",
   tags: [],
   updatedAt: "",
@@ -87,7 +91,15 @@ await deliver(files, WORKSPACE, prompt, "commands")
 const command = await read(at(".agents", "commands", "code-review.md"))
 check("a command lands under .agents/commands, directory and all", command !== null)
 check("and carries the block an agent reads", command.startsWith("---\nname:"), command.slice(0, 40))
-check("with the prompt's own name in it", command.includes("Code Review"), command)
+check("with the prompt's own name in it", command.includes("name: Code Review"), command)
+/* The block's description is the row's own, not the body's opening line cut to
+   eighty characters — which is what a row with no description of its own falls
+   back to. */
+check(
+  "and with its own description, not the body's first line",
+  command.includes("description: Reads the diff and says what it changes"),
+  command
+)
 check("and the prompt's own text", command.includes("Review the diff."), command)
 check(
   "and the run is reported as delivered",
@@ -156,7 +168,7 @@ check(
 )
 
 /* A prompt that was never added to a document is not reported as delivered. */
-const other: Prompt = { ...prompt, description: "Something Else", prompt: "Else." }
+const other: Prompt = { ...prompt, name: "Something Else", prompt: "Else." }
 check(
   "a prompt that was never delivered is not reported as delivered",
   (await delivered(files, WORKSPACE, other, "instructions", "agents")) === false

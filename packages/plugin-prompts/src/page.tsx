@@ -45,6 +45,7 @@ import { AddPromptDialog } from "./add-prompt-dialog.tsx"
 import { deliver, delivered, undeliver, type Delivery } from "./deliver.ts"
 import { BatchActions, cardActionShell, PromptActions } from "./install-menu.tsx"
 import { formatAge, tokenLabel, useInstalled, usePlaceFiles, usePromptLibrary, usePromptPlaces } from "./library.ts"
+import { PromptMeta, PromptTile } from "./parts.tsx"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
@@ -64,14 +65,6 @@ const FALLBACK_RATIO = 16 / 9
 const COPIED_MS = 3000
 
 /**
- * The first line of a prompt that says anything — what the ledger prints under
- * the description, and the one line a row has room for.
- */
-function firstLine(prompt: string): string {
-  return prompt.split("\n").find((line) => line.trim() !== "") ?? ""
-}
-
-/**
  * What fills a card's cover box: the first picture a person added to the
  * prompt, drawn or played by whatever kind it is — and, when there is none, the
  * prompt itself rendered as the document it is. A card is a thumbnail, so the
@@ -83,7 +76,6 @@ function firstLine(prompt: string): string {
  * disagree about what the prompt has.
  */
 function PromptCover({ prompt, store }: { prompt: StoredPrompt; store: PromptStore | null }) {
-  const { t } = useI18n()
   const source = prompt.assets[0]
   const [broken, setBroken] = React.useState(false)
   const [ratio, setRatio] = React.useState<number | undefined>(() =>
@@ -147,12 +139,6 @@ function PromptCover({ prompt, store }: { prompt: StoredPrompt; store: PromptSto
           ) : null}
         </div>
       )}
-      {/* How big the prompt is stays on the cover it sits under, whatever that
-          cover turned out to be: it is the one number a card can give about the
-          text without printing the text. */}
-      <span className="absolute right-3 bottom-3 rounded-full bg-card/95 px-[9px] py-[3px] font-mono text-[11px] leading-none text-muted-foreground ring-1 ring-border">
-        {t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))}
-      </span>
     </div>
   )
 }
@@ -291,7 +277,7 @@ function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, on
     <div
       role="button"
       tabIndex={0}
-      aria-label={prompt.description}
+      aria-label={prompt.name}
       onClick={onOpen}
       onKeyDown={(event) => {
         /* The card holds its own action button, so it cannot be a real button;
@@ -310,20 +296,27 @@ function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, on
           pills sit inside the cover, on whichever of the two it is. */}
       <PromptCover key={prompt.assets[0]} prompt={prompt} store={store} />
       <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
-        {/* The description is what the row is read by, and it takes the very
-            paragraph a skill card gives its own description: same size, same
-            ink, same two-line clamp. It is a sentence rather than a file name,
-            so it is set in the body face and not in monospace. */}
-        <div className="flex items-start justify-between gap-2">
-          <p className="line-clamp-2 min-w-0 text-[13px] leading-[18px] text-copy">
-            {prompt.description}
-          </p>
+        {/* The title block reads as the MCP and plugin cards do: the row's own
+            tile, then its title, with where it lives and how big it is beneath.
+            The description follows as a paragraph of its own, so the two lines
+            above stay the same height whatever the description runs to. The age
+            sits at the end of that block rather than under the paragraph, so a
+            long description cannot push it out of the row. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <PromptTile />
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+            <span className="truncate font-mono text-[13.5px] leading-[1.3] font-semibold">
+              {prompt.name}
+            </span>
+            <PromptMeta body={prompt.prompt} />
+          </div>
           {updated === "" ? null : (
             <span className="shrink-0 self-start text-[12px] leading-[15px] text-muted-soft">
               {updated}
             </span>
           )}
         </div>
+        <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">{prompt.description}</p>
         {/* The action sits at the row's end on its own: where a prompt has been
             delivered is what the menu's ticks answer, and a line that only
             appears once it has been delivered would put the button in one place
@@ -384,6 +377,7 @@ export function PromptsPage() {
         ? library.rows
         : library.rows.filter(
             (row) =>
+              row.name.toLowerCase().includes(needle) ||
               row.description.toLowerCase().includes(needle) ||
               row.prompt.toLowerCase().includes(needle) ||
               row.tags.some((item) => item.toLowerCase().includes(needle))
@@ -521,7 +515,7 @@ export function PromptsPage() {
         setDetailId(null)
         toast.add({
           type: "success",
-          title: t("prompts.done.deleted").replace("{name}", prompt.description),
+          title: t("prompts.done.deleted").replace("{name}", prompt.name),
         })
       } catch (failure) {
         refuse(failure)
@@ -552,14 +546,13 @@ export function PromptsPage() {
       width: "31.2%",
       cell: (prompt) => (
         <span className="flex min-w-0 flex-col gap-1">
-          {/* The description leads, the prompt's own opening follows: the two
-              things a row is looked up by, in the order a person reads them.
-              The first line wears what a skill's name wears in this ledger. */}
-          <span className="truncate text-[14px] leading-[18px] font-semibold">
+          {/* The title leads and the description follows: the pair a skill's
+              ledger draws, at that ledger's own sizes. The prompt's own opening
+              is not here — the description already says what the row is for,
+              and the text itself is one click away in the panel. */}
+          <span className="truncate text-[14px] leading-[18px] font-semibold">{prompt.name}</span>
+          <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
             {prompt.description}
-          </span>
-          <span className="truncate font-mono text-[12px] leading-[16px] text-muted-foreground">
-            {firstLine(prompt.prompt)}
           </span>
         </span>
       ),
@@ -779,7 +772,7 @@ export function PromptsPage() {
                 rowKey={(prompt) => prompt.id}
                 checked={checked}
                 onCheck={setChecked}
-                selectLabel={(prompt) => prompt.description}
+                selectLabel={(prompt) => prompt.name}
                 selectAllLabel={t("prompts.column.prompt")}
                 batch={{
                   label: t("prompts.batch.selected").replace("{count}", String(checked.length)),
@@ -834,6 +827,7 @@ export function PromptsPage() {
         onGenerate={(prompt, place, action, document) => void generate(prompt, place, action, document)}
         onDelete={(prompt) => void drop(prompt)}
         onChanged={() => void library.reload()}
+        onRename={(prompt, name) => void describe(prompt, { name })}
         onDescribe={(prompt, description) => void describe(prompt, { description })}
         onTags={(prompt, tags) => void describe(prompt, { tags })}
         tagSuggestions={library.tags}

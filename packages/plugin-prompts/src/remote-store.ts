@@ -9,6 +9,7 @@ import { assetRef } from "@workspace/core"
 import type {
   PromptAsset,
   PromptDraft,
+  PromptPatch,
   PromptPage,
   PromptStore,
   StoredPrompt,
@@ -48,10 +49,15 @@ export function createRemotePromptStore(base = "/hub/prompts"): PromptStore {
       call<StoredPrompt>(
         base,
         "",
-        write({ description: draft.description, prompt: draft.prompt, tags: draft.tags ?? [] })
+        write({
+          name: draft.name,
+          description: draft.description,
+          prompt: draft.prompt,
+          tags: draft.tags ?? [],
+        })
       ),
 
-    update: (id: string, patch: { prompt: string }) =>
+    update: (id: string, patch: PromptPatch) =>
       call<StoredPrompt>(base, `/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

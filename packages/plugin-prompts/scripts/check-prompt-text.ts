@@ -257,7 +257,16 @@ const place: PromptPlace = {
   generatedOnly: true,
   order: 0,
 }
-const prompt = { description: "Code Review", prompt: "Body.", tags: [], updatedAt: "", assets: [] }
+/* The title, not the description, is what these files are named after: the two
+   say different things here so a path built from the wrong one shows up. */
+const prompt = {
+  name: "Code Review",
+  description: "Reads the diff and says what it changes",
+  prompt: "Body.",
+  tags: [],
+  updatedAt: "",
+  assets: [],
+}
 
 check(
   "a command goes under the place's command directory",

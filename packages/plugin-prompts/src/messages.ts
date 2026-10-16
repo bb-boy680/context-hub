@@ -78,7 +78,8 @@ export const promptsMessages: Record<string, string> = {
   "prompts.media.video": "Show video",
   "prompts.media.upload": "Upload image or video",
   "prompts.media.remove": "Remove media",
-  "prompts.media.hint": "These pictures are kept for this prompt in the hub; a delivery writes the text alone.",
+  "prompts.media.hint":
+    "Drag in an image, GIF, or video, click + to upload, or press Ctrl+V to paste · 16:9 recommended",
   "prompts.media.drop.title": "Drop to upload",
   "prompts.media.drop.formats": "PNG · JPG · GIF · WebP · MP4 · WebM",
   "prompts.media.paste.done": "Pasted {count} file(s)",
@@ -103,17 +104,20 @@ export const promptsMessages: Record<string, string> = {
 
   "prompts.add.title": "Add a prompt",
   "prompts.add.hint":
-    "The description becomes the file name where the prompt is ever delivered; the prompt itself is what gets written.",
+    "The name becomes the file name where the prompt is ever delivered; the prompt itself is what gets written.",
+  "prompts.add.name": "Name",
+  "prompts.add.namePlaceholder": "Review a diff before committing",
   "prompts.add.description": "Description",
-  "prompts.add.descriptionPlaceholder": "Review a diff before committing",
+  "prompts.add.descriptionPlaceholder":
+    "Reads a staged diff and reports what it changes, in the order a reviewer would.",
   "prompts.add.prompt": "Prompt",
-  "prompts.add.promptPlaceholder": "Review the diff and report what it changes.",
   "prompts.add.tags": "Tags",
   "prompts.add.addTag": "Add",
   "prompts.add.tagPlaceholder": "New tag",
   "prompts.add.removeTag": "Remove {tag}",
   "prompts.add.submit": "Add",
   "prompts.add.cancel": "Cancel",
+  "prompts.add.needName": "A prompt needs a name.",
   "prompts.add.needDescription": "A prompt needs a description.",
   "prompts.add.needPrompt": "A prompt needs its content.",
 
@@ -122,10 +126,13 @@ export const promptsMessages: Record<string, string> = {
     "The prompt is removed from the library. Copies already delivered to an agent are left where they are.",
   "prompts.delete.confirm": "Delete",
 
+  "prompts.source.local": "Local",
   "prompts.detail.tokens": "{tokens} tokens",
   "prompts.detail.category.add": "Add a tag",
   "prompts.detail.category.placeholder": "New tag",
   "prompts.detail.category.remove": "Remove {tag}",
+  "prompts.detail.updated": "Updated",
+  "prompts.detail.name.edit": "Double-click to correct the name",
   "prompts.detail.description.edit": "Double-click to correct the description",
   "prompts.detail.tab.pictures": "Pictures",
   "prompts.detail.tab.body": "Prompt",

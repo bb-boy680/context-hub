@@ -100,15 +100,18 @@ export function promptLibrary(options: { home?: string } = {}) {
             /* POST /hub/prompts — add one. */
             if (rest === "" && method === "POST") {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                name?: unknown
                 description?: unknown
                 prompt?: unknown
                 tags?: unknown
               }
+              const name = required(body.name, "prompt name")
               const description = required(body.description, "prompt description")
               sendJson(
                 response,
                 200,
                 await store.create({
+                  name,
                   description,
                   /* The dialog refuses an empty prompt, so an empty one here is
                      a caller that made the body up; the store refuses it too. */
@@ -119,17 +122,18 @@ export function promptLibrary(options: { home?: string } = {}) {
               return
             }
 
-            /* PATCH /hub/prompts/<id> — change one prompt's text, its
+            /* PATCH /hub/prompts/<id> — change one prompt's name, its text, its
                description, its categories, or any of them. A field the body
                omits is left as it is. */
             if (rest !== "" && section === "" && method === "PATCH") {
               const body = JSON.parse((await readBody(request)).toString("utf8")) as {
+                name?: unknown
                 prompt?: unknown
                 description?: unknown
                 tags?: unknown
               }
-              const patch: { prompt?: string; description?: string; tags?: string[] } = {}
-              for (const field of ["prompt", "description"] as const) {
+              const patch: { name?: string; prompt?: string; description?: string; tags?: string[] } = {}
+              for (const field of ["name", "prompt", "description"] as const) {
                 if (body[field] === undefined) continue
                 /* Sent and unusable is a caller that made the body up; the store
                    refuses an empty field too, so this only says it sooner. */
@@ -139,7 +143,7 @@ export function promptLibrary(options: { home?: string } = {}) {
                  it is taken as sent rather than read as "nothing was said". */
               if (body.tags !== undefined) patch.tags = tagsOf(body.tags)
               if (Object.keys(patch).length === 0) {
-                sendError(response, new Error("an edit needs a prompt, a description, or tags"))
+                sendError(response, new Error("an edit needs a name, a prompt, a description, or tags"))
                 return
               }
               sendJson(response, 200, await store.update(id, patch))

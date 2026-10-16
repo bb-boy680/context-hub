@@ -48,7 +48,7 @@ export function targetOf(
     return { scope: place.scope, file: target.file }
   }
   const dir = action === "rule" ? place.ruleDir : place.commandDir
-  return { scope: place.scope, file: `${dir}/${slugOf(prompt.description)}.md` }
+  return { scope: place.scope, file: `${dir}/${slugOf(prompt.name)}.md` }
 }
 
 /** Whether one delivery is already in place, read from the file it writes. */
@@ -72,20 +72,21 @@ export async function delivered(
      document holds everything the person wrote, so the answer is whether this
      prompt's section is among it. */
   if (action !== "instructions") return true
-  return text.includes(`<!-- context-hub:${slugOf(prompt.description)} -->`)
+  return text.includes(`<!-- context-hub:${slugOf(prompt.name)} -->`)
 }
 
 /** The text one delivery puts in the file it writes. */
 function textOf(prompt: Prompt, action: Delivery, existing: string | null): string {
   if (action === "instructions") {
     return withSection(existing, {
-      slug: slugOf(prompt.description),
-      title: prompt.description,
+      slug: slugOf(prompt.name),
+      title: prompt.name,
       body: prompt.prompt,
     })
   }
   return commandFile({
-    name: prompt.description,
+    name: prompt.name,
+    description: prompt.description,
     body: prompt.prompt,
     /* Only a generated command carries the block an agent reads its name and
        description out of; an install is the prompt as it was written. */

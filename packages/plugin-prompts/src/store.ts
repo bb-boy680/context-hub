@@ -4,30 +4,41 @@
  * owns the disk; the browser form sends the same calls over its own channel, so
  * nothing here assumes a transport.
  *
- * A record is written the way a person reads it: `description` names it,
- * `prompt` is the text. The field names are the file's own, so the file and
- * this shape stay one thing and a hand edit needs no translation.
+ * A record is written the way a person reads it: `name` is the short title,
+ * `description` the sentence under it, `prompt` the text. The field names are
+ * the file's own, so the file and this shape stay one thing and a hand edit
+ * needs no translation.
  *
- * A row is known by an id that is written down the first time the row is, so a
- * description can be corrected without the row changing what it is: the id is
- * what the page keys on, what a delivery names its file after when it writes,
- * and what `update` and `remove` are given. A description that would name a row
- * another one already answers to is refused.
+ * A row is known by an id, opaque and written down the first time the row is,
+ * so a name can be corrected without the row changing what it is: the id is what
+ * the page keys on and what `update` and `remove` are given. The name is what a
+ * delivery names its file after, so a second row whose name would reach that
+ * same file is refused — which is a collision between two file names, not a
+ * claim on the wording.
  */
 import type { AssetKind } from "@workspace/core"
 
 /** One prompt, as the library stores it and as a card draws it. */
 export interface Prompt {
   /**
-   * The name it is known by.
+   * The row's identity, opaque and never rewritten.
    *
-   * Written when the row is created, from the description as it was then, and
-   * never rewritten: fixing a typo in the description is a correction to the
-   * row, not a second row. A file written by hand before this module existed
-   * carries none, and one is derived for it as it is read.
+   * Written when the row is created, so a name can be corrected without the row
+   * becoming another one. A file written by hand before this module existed
+   * carries none, and the name its description makes stands in for it as it is
+   * read.
    */
   id?: string
-  /** The name it is read by, and what a delivered file is named from. */
+  /**
+   * The short title, and what a delivered file is named from.
+   *
+   * A title is a phrase and a description is a sentence, so they are two fields
+   * rather than one: the file name has to stay usable in an agent's own command
+   * list, and a description written well runs past that. A row written before
+   * this field existed carries none, and its description stands in as it is read.
+   */
+  name: string
+  /** The sentence under the title: what it is for, in as much detail as helps. */
   description: string
   /** The prompt itself. */
   prompt: string
@@ -53,9 +64,9 @@ export interface PromptAsset {
   kind: AssetKind
 }
 
-/** One row with the name it answers to; `id` is derived, never stored. */
+/** One row with the id it answers to; a hand-written row gets one as it is read. */
 export interface StoredPrompt extends Prompt {
-  /** The file name `description` makes, which is the row's key. */
+  /** The id `update` and `remove` are given, and what the page keys on. */
   id: string
 }
 
@@ -71,6 +82,7 @@ export interface PromptPage {
 
 /** What the add dialog hands over. */
 export interface PromptDraft {
+  name: string
   description: string
   prompt: string
   tags?: readonly string[]
@@ -80,10 +92,11 @@ export interface PromptDraft {
  * What an edit hands over.
  *
  * Every field is optional and an omitted one is left as it is. Correcting the
- * description is the same act as correcting the text — a row read wrong and put
- * right — which is why it does not move the row to another id.
+ * name or the description is the same act as correcting the text — a row read
+ * wrong and put right — which is why it does not move the row to another id.
  */
 export interface PromptPatch {
+  name?: string
   description?: string
   prompt?: string
   tags?: readonly string[]
@@ -96,15 +109,15 @@ export interface PromptStore {
   /**
    * Add one.
    *
-   * @throws when another prompt's file name would be the same one; the file
-   * name is what a delivery writes, so two of them cannot share it.
+   * @throws when another prompt's file name would be the same one; the name is
+   * what a delivery writes, so two of them cannot share a file.
    */
   create(draft: PromptDraft): Promise<StoredPrompt>
   /**
-   * Change one prompt: its text, its description, or both.
+   * Change one prompt: its name, its description, its text, or any of them.
    *
-   * @throws when no row answers to `id`, or when the new description would name
-   * a row another one already answers to.
+   * @throws when no row answers to `id`, or when the new name would reach the
+   * file another row already delivers to.
    */
   update(id: string, patch: PromptPatch): Promise<StoredPrompt>
   /** Delete one by its id. A row that is not there is not an error. */
