@@ -38,6 +38,19 @@ import type { StateStore } from "./src/state.ts"
 import type { NetReply, NetRequest } from "./src/net.ts"
 import type { WorkspaceStore } from "./src/workspace.ts"
 
+/**
+ * The path under one route, or null when this handler does not own the request.
+ *
+ * `""` is the route itself. Requiring the separator is what keeps a path that
+ * merely starts with the same letters — `/hub/workspacesX` — from being read as
+ * this route carrying an id of `X`.
+ */
+function under(route: string, pathname: string): string | null {
+  if (pathname === route) return ""
+  if (!pathname.startsWith(`${route}/`)) return null
+  return pathname.slice(route.length + 1)
+}
+
 /** Serve one file, honouring `Range` so media players can seek. */
 async function sendFile(
   home: string,
@@ -130,11 +143,11 @@ export function createStateHandler(
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(STATE_ROUTE)) {
+    const name = under(STATE_ROUTE, url.pathname)
+    if (name === null) {
       next()
       return
     }
-    const name = url.pathname.slice(STATE_ROUTE.length).replace(/^\//, "")
     const method = request.method ?? "GET"
     try {
       if (name === "" && method === "GET") {
@@ -170,7 +183,8 @@ export function createPlaceFileHandler(options: { home?: string; folder?: string
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(PLACE_FILES_ROUTE)) {
+    /* One route, and the call names its own action in the body. */
+    if (under(PLACE_FILES_ROUTE, url.pathname) !== "") {
       next()
       return
     }
@@ -239,7 +253,8 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(EXTENSION_ROUTE)) {
+    const rest = under(EXTENSION_ROUTE, url.pathname)
+    if (rest === null) {
       next()
       return
     }
@@ -247,7 +262,6 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
       response.writeHead(405).end()
       return
     }
-    const rest = url.pathname.slice(EXTENSION_ROUTE.length).replace(/^\//, "")
     try {
       if (rest === "") {
         sendJson(response, 200, { ids: await store.list() })
@@ -279,7 +293,8 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
 export function createNetHandler(): HubMiddleware {
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(NET_ROUTE)) {
+    /* One route, and the call names its own action in the body. */
+    if (under(NET_ROUTE, url.pathname) !== "") {
       next()
       return
     }
@@ -382,11 +397,11 @@ export function createWorkspaceHandler(options: { home?: string; folder?: string
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(WORKSPACE_ROUTE)) {
+    const action = under(WORKSPACE_ROUTE, url.pathname)
+    if (action === null) {
       next()
       return
     }
-    const action = url.pathname.slice(WORKSPACE_ROUTE.length).replace(/^\//, "")
     const method = request.method ?? "GET"
     try {
       const store = await getStore()
