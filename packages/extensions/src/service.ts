@@ -83,6 +83,16 @@ export class ExtensionService extends Service {
   static inject = ["host"]
 
   private readonly host: PlatformHost
+  /**
+   * The context this service was composed in.
+   *
+   * Not `this.ctx`: a `Service`'s `ctx` is read through the tracker, which
+   * rebinds it to whichever context is calling. Every extension is mounted
+   * here, so a plugin mounted through that rebound context is not a child of
+   * this one — injected services stop resolving as properties on it, and a
+   * plugin would have to reach for `ctx.get` instead of `ctx.skills`.
+   */
+  private readonly owner: Context
   private readonly entries = new Map<string, Entry>()
   private readonly fibers = new Map<string, Fiber>()
   /** Reverse lookup for `internal/status`, which reports every fiber by identity. */
@@ -94,6 +104,7 @@ export class ExtensionService extends Service {
 
   constructor(ctx: Context, config: ExtensionServiceConfig) {
     super(ctx, "extensions")
+    this.owner = ctx
     const host = ctx.get("host")
     if (host === undefined) throw new Error("extensions: host service unavailable")
     this.host = host
@@ -242,7 +253,7 @@ export class ExtensionService extends Service {
         ctx: pluginCtx,
         host: this.host,
         /* Resolved now: a fiber's injected services do not survive activation. */
-        i18n: this.ctx.get("i18n"),
+        i18n: this.owner.get("i18n"),
         contribute: (point, value) => {
           pluginCtx.effect(() => this.contribute(entry, point, value))
         },
@@ -251,9 +262,11 @@ export class ExtensionService extends Service {
         },
         inject: (names, setup) => {
           pluginCtx.inject([...names], (inner) => {
-            /* A published service is reached with `get`, not as a property of
-               the callback's context: property access resolves along a fiber's
-               own chain, and a sibling extension's service is not on it. */
+            /* The callback reads its services from this map rather than as
+               properties of its context. Both work — the callback runs on a
+               fiber that declares them — but the map is the shape this kernel
+               promises, so a plugin never has to know whether a name is on its
+               own chain. */
             const services: Record<string, unknown> = {}
             for (const name of names) services[name] = inner.get(name)
             setup(inner, services as never)
@@ -265,7 +278,7 @@ export class ExtensionService extends Service {
     Object.defineProperty(plugin, "name", { value: id, configurable: true })
     if (inject !== undefined) plugin.inject = inject
 
-    const fiber = this.ctx.plugin(plugin)
+    const fiber = this.owner.plugin(plugin)
     this.fibers.set(id, fiber)
     this.owners.set(fiber, id)
     if ((await this.sync(entry, fiber)) !== undefined) {
@@ -411,6 +424,6 @@ export class ExtensionService extends Service {
   private publish(): void {
     this.revision += 1
     this.cached = this.buildSnapshot()
-    this.ctx.emit("extensions/changed", this.cached)
+    this.owner.emit("extensions/changed", this.cached)
   }
 }

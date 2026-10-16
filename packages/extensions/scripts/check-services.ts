@@ -92,15 +92,14 @@ const consumer: ExtensionDefinition = {
          plugin reads. The context is there too, for effects and events. */
       log.push(`services carried: ${typeof services.counter?.bump === "function"}`)
       log.push(`bumped: ${services.counter.bump()}`)
-      /* A sibling's service is not a property of the callback's own context:
-         property access resolves along the fiber's own chain, and that service
-         is not on it. */
-      try {
-        void (ctx as unknown as Record<string, unknown>).counter
-        log.push("property access resolved")
-      } catch {
-        log.push("property access refused")
-      }
+      /* And the same service is a property of that context, because the callback
+         runs on a fiber that declares it. This used to be asserted the other way
+         round: the kernel mounted extensions through `this.ctx`, which a Service
+         reads through the tracker, so a plugin ended up on a context that was
+         not this one's child and property access threw. That was the deviation,
+         not the contract — Cordis resolves an injected name as a property, and
+         the dsh-shaped plugin writes `ctx.skills.register(...)`. */
+      log.push(`property access: ${typeof (ctx as unknown as Record<string, unknown>).counter}`)
       log.push(`get resolved: ${String(ctx.get("counter") !== undefined)}`)
       ctx.effect(() => () => log.push("consumer disconnected"))
     })
@@ -139,7 +138,11 @@ async function main(): Promise<void> {
   check("the services map carries it", log.includes("services carried: true"), log)
   check("and it is the live service", log.includes("bumped: 1"), log)
   check("the callback can reach the service by name", log.includes("get resolved: true"), log)
-  check("its property is not on the callback's own chain", log.includes("property access refused"), log)
+  check(
+    "the same service is a property of the callback's context",
+    log.includes("property access: object"),
+    log
+  )
   check(
     "the catalog says what the provider publishes",
     JSON.stringify(kernel.ctx.extensions.snapshot().entries.find((e) => e.manifest.id === "test.provider")?.provides) === '["counter"]',
