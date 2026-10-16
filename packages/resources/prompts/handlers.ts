@@ -9,6 +9,8 @@
  * the place files bridge, which owns both roots, and works the same for every
  * module that writes a client's own files.
  */
+import { type IncomingMessage } from "node:http"
+
 import {
   readBody,
   sendError,
@@ -62,131 +64,121 @@ export function createPromptHandler(options: { home?: string } = {}): HubMiddlew
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    const rest = under(PROMPT_ROUTE, url.pathname)
-    if (rest === null) {
+    /* One route, and nothing is addressed by a path: every action names itself,
+       and a call that carries a file names it in the query because the body is
+       the file. */
+    if (under(PROMPT_ROUTE, url.pathname) !== "") {
       next()
       return
     }
     const method = request.method ?? "GET"
-    /* `<id>`, then the part of the row the request is about. Nothing deeper is
-       a route here, so a third segment is refused rather than dropped. */
-    const [rawId = "", section = "", ...deeper] = rest.split("/")
 
     try {
       const store = await getStore()
-      /* Decoded here rather than before the try: a malformed escape is a bad
-         request, not a failure of this carrier. */
-      const id = decodeURIComponent(rawId)
-      if (deeper.length > 0) throw new Error(`unknown route ${url.pathname}`)
 
       /* GET /hub/prompts — the whole library, which is what a page draws. */
-      if (rest === "" && method === "GET") {
+      if (method === "GET") {
         sendJson(response, 200, await store.list())
         return
       }
 
-      /* POST /hub/prompts — add one. */
-      if (rest === "" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          name?: unknown
-          description?: unknown
-          prompt?: unknown
-          tags?: unknown
-        }
-        const name = required(body.name, "prompt name")
-        const description = required(body.description, "prompt description")
-        sendJson(
-          response,
-          200,
-          await store.create({
-            name,
-            description,
-            /* The dialog refuses an empty prompt, so an empty one here is
-               a caller that made the body up; the store refuses it too. */
-            prompt: typeof body.prompt === "string" ? body.prompt : "",
-            tags: tagsOf(body.tags),
-          })
-        )
+      if (method !== "POST") {
+        sendError(response, new Error(`unsupported method ${method}`), 405)
         return
       }
 
-      /* PATCH /hub/prompts/<id> — change one prompt's name, its text, its
-         description, its categories, or any of them. A field the body
-         omits is left as it is. */
-      if (rest !== "" && section === "" && method === "PATCH") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          name?: unknown
-          prompt?: unknown
-          description?: unknown
-          tags?: unknown
-        }
-        const patch: { name?: string; prompt?: string; description?: string; tags?: string[] } = {}
-        for (const field of ["name", "prompt", "description"] as const) {
-          if (body[field] === undefined) continue
-          /* Sent and unusable is a caller that made the body up; the store
-             refuses an empty field too, so this only says it sooner. */
-          patch[field] = required(body[field], `prompt ${field}`)
-        }
-        /* An empty list is a real answer — every category taken off — so
-           it is taken as sent rather than read as "nothing was said". */
-        if (body.tags !== undefined) patch.tags = tagsOf(body.tags)
-        if (Object.keys(patch).length === 0) {
-          sendError(response, new Error("an edit needs a name, a prompt, a description, or tags"))
+      /* Uploaded bytes are the body itself rather than base64 in JSON, so this
+         is the one call that cannot carry its action in the body. */
+      if (url.searchParams.get("action") === "put-asset") {
+        sendJson(response, 200, await putAsset(store, url, request))
+        return
+      }
+
+      const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<string, unknown>
+
+      switch (body.action) {
+        case "create": {
+          const name = required(body.name, "prompt name")
+          const description = required(body.description, "prompt description")
+          sendJson(
+            response,
+            200,
+            await store.create({
+              name,
+              description,
+              /* The dialog refuses an empty prompt, so an empty one here is
+                 a caller that made the body up; the store refuses it too. */
+              prompt: typeof body.prompt === "string" ? body.prompt : "",
+              tags: tagsOf(body.tags),
+            })
+          )
           return
         }
-        sendJson(response, 200, await store.update(id, patch))
-        return
-      }
 
-      /* POST /hub/prompts/<id>/source — record a pasted address. */
-      if (section === "source" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          source?: unknown
-        }
-        sendJson(response, 200, await store.addAssetSource(id, required(body.source, "asset source")))
-        return
-      }
-
-      /* POST /hub/prompts/<id>/assets?name=… — take over uploaded bytes,
-         sent as the body itself rather than base64 in JSON. */
-      if (section === "assets" && method === "POST") {
-        const name = url.searchParams.get("name")
-        if (name === null) {
-          sendError(response, new Error("missing asset name"))
+        /* A field the body omits is left as it is; an empty list of tags is a
+           real answer — every category taken off — so it is taken as sent
+           rather than read as "nothing was said". */
+        case "update": {
+          const patch: { name?: string; prompt?: string; description?: string; tags?: string[] } = {}
+          for (const field of ["name", "prompt", "description"] as const) {
+            if (body[field] === undefined) continue
+            /* Sent and unusable is a caller that made the body up; the store
+               refuses an empty field too, so this only says it sooner. */
+            patch[field] = required(body[field], `prompt ${field}`)
+          }
+          if (body.tags !== undefined) patch.tags = tagsOf(body.tags)
+          if (Object.keys(patch).length === 0) {
+            throw new Error("an edit needs a name, a prompt, a description, or tags")
+          }
+          sendJson(response, 200, await store.update(required(body.id, "prompt id"), patch))
           return
         }
-        const bytes = await readBody(request)
-        const part = new Uint8Array(bytes.byteLength)
-        part.set(bytes)
-        const file = new File([part], name, {
-          type: request.headers["content-type"] ?? "",
-        })
-        sendJson(response, 200, await store.putAsset(id, file))
-        return
-      }
 
-      /* DELETE /hub/prompts/<id>/assets?ref=… — drop one reference. */
-      if (section === "assets" && method === "DELETE") {
-        const ref = url.searchParams.get("ref")
-        if (ref === null) {
-          sendError(response, new Error("missing asset reference"))
+        case "remove":
+          await store.remove(required(body.id, "prompt id"))
+          sendJson(response, 200, { ok: true })
           return
-        }
-        await store.deleteAsset(id, ref)
-        sendJson(response, 200, { ok: true })
-        return
-      }
 
-      /* DELETE /hub/prompts/<id> — take one out. */
-      if (rest !== "" && section === "" && method === "DELETE") {
-        await store.remove(id)
-        sendJson(response, 200, { ok: true })
-        return
-      }
+        /* A pasted address, as opposed to uploaded bytes. */
+        case "add-asset-source":
+          sendJson(
+            response,
+            200,
+            await store.addAssetSource(
+              required(body.id, "prompt id"),
+              required(body.source, "asset source")
+            )
+          )
+          return
 
-      sendError(response, new Error(`unknown route ${url.pathname}`))
+        case "delete-asset":
+          await store.deleteAsset(
+            required(body.id, "prompt id"),
+            required(body.ref, "asset reference")
+          )
+          sendJson(response, 200, { ok: true })
+          return
+
+        default:
+          throw new Error(`unknown action: ${String(body.action)}`)
+      }
     } catch (error) {
       sendError(response, error)
     }
   }
+}
+
+/** Take over uploaded bytes, named by the caller and typed by its own header. */
+async function putAsset(
+  store: PromptStore,
+  url: URL,
+  request: IncomingMessage
+): Promise<unknown> {
+  const id = required(url.searchParams.get("id"), "prompt id")
+  const name = required(url.searchParams.get("name"), "asset name")
+  const bytes = await readBody(request)
+  const part = new Uint8Array(bytes.byteLength)
+  part.set(bytes)
+  const file = new File([part], name, { type: request.headers["content-type"] ?? "" })
+  return store.putAsset(id, file)
 }

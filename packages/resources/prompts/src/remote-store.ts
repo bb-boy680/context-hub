@@ -29,11 +29,11 @@ async function call<T>(base: string, path: string, init?: RequestInit): Promise<
 }
 
 /** What a write sends; the shape the bridge's body reader expects. */
-function write(body: unknown): RequestInit {
+function write(action: string, args: Record<string, unknown> = {}): RequestInit {
   return {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ action, ...args }),
   }
 }
 
@@ -50,7 +50,7 @@ export function createRemotePromptStore(base = PROMPT_ROUTE): PromptStore {
       call<StoredPrompt>(
         base,
         "",
-        write({
+        write("create", {
           name: draft.name,
           description: draft.description,
           prompt: draft.prompt,
@@ -59,22 +59,16 @@ export function createRemotePromptStore(base = PROMPT_ROUTE): PromptStore {
       ),
 
     update: (id: string, patch: PromptPatch) =>
-      call<StoredPrompt>(base, `/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      }),
+      call<StoredPrompt>(base, "", write("update", { id, ...patch })),
 
-    remove: (id: string) =>
-      call<{ ok: true }>(base, `/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
-        () => undefined
-      ),
+    remove: (id: string) => call<{ ok: true }>(base, "", write("remove", { id })).then(() => undefined),
 
     putAsset: (id: string, file: File) =>
-      /* Raw bytes: the file object is the body, so no multipart encoder is needed. */
+      /* Raw bytes: the file object is the body, so the call names its own id and
+         the file's name in the query instead. */
       call<PromptAsset>(
         base,
-        `/${encodeURIComponent(id)}/assets?name=${encodeURIComponent(file.name)}`,
+        `?action=put-asset&id=${encodeURIComponent(id)}&name=${encodeURIComponent(file.name)}`,
         {
           method: "POST",
           headers: { "Content-Type": file.type || "application/octet-stream" },
@@ -83,14 +77,10 @@ export function createRemotePromptStore(base = PROMPT_ROUTE): PromptStore {
       ),
 
     addAssetSource: (id: string, source: string) =>
-      call<PromptAsset>(base, `/${encodeURIComponent(id)}/source`, write({ source })),
+      call<PromptAsset>(base, "", write("add-asset-source", { id, source })),
 
     deleteAsset: (id: string, ref: string) =>
-      call<{ ok: true }>(
-        base,
-        `/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
-        { method: "DELETE" }
-      ).then(() => undefined),
+      call<{ ok: true }>(base, "", write("delete-asset", { id, ref })).then(() => undefined),
 
     /* `base` here is the library's own route prefix, and stored media is served
        from the hub's asset route on the same origin — so this one does not
