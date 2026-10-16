@@ -6,6 +6,7 @@
   "scripts": {
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -22,15 +23,16 @@
     "react": "^19.2.8"
   },
   "devDependencies": {
+    "@context-hub/core": "workspace:*",
     "@eslint/js": "^10",
     "@types/node": "^24",
     "@types/react": "^19",
-    "@context-hub/core": "workspace:*",
     "eslint": "^10",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17",
     "typescript": "~6",
-    "typescript-eslint": "^8"
+    "typescript-eslint": "^8",
+    "vitest": "^5.0.5"
   },
   "exports": {
     ".": "./src/index.ts",

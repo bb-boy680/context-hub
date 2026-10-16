@@ -17,6 +17,7 @@ export default defineConfig({
       "packages/core/vitest.config.ts",
       "packages/extensions/vitest.config.ts",
       "packages/shadcn-ui/vitest.config.ts",
+      "packages/agents/claude-code/vitest.config.ts",
       "packages/i18n/zh-cn/vitest.config.ts",
       "packages/resources/skills/vitest.config.ts",
       "packages/resources/prompts/vitest.config.ts",
