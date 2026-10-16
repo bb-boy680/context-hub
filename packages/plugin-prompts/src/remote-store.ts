@@ -4,7 +4,15 @@
  * this for one that calls its main process. Nothing else in the plugin knows
  * the difference.
  */
-import type { PromptDraft, PromptPage, PromptStore, StoredPrompt } from "./store.ts"
+import { assetRef } from "@workspace/core"
+
+import type {
+  PromptAsset,
+  PromptDraft,
+  PromptPage,
+  PromptStore,
+  StoredPrompt,
+} from "./store.ts"
 
 /** What the bridge answers with when it refuses. */
 type ErrorBody = { error?: string }
@@ -43,9 +51,43 @@ export function createRemotePromptStore(base = "/hub/prompts"): PromptStore {
         write({ description: draft.description, prompt: draft.prompt, tags: draft.tags ?? [] })
       ),
 
+    update: (id: string, patch: { prompt: string }) =>
+      call<StoredPrompt>(base, `/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      }),
+
     remove: (id: string) =>
       call<{ ok: true }>(base, `/${encodeURIComponent(id)}`, { method: "DELETE" }).then(
         () => undefined
       ),
+
+    putAsset: (id: string, file: File) =>
+      /* Raw bytes: the file object is the body, so no multipart encoder is needed. */
+      call<PromptAsset>(
+        base,
+        `/${encodeURIComponent(id)}/assets?name=${encodeURIComponent(file.name)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": file.type || "application/octet-stream" },
+          body: file,
+        }
+      ),
+
+    addAssetSource: (id: string, source: string) =>
+      call<PromptAsset>(base, `/${encodeURIComponent(id)}/source`, write({ source })),
+
+    deleteAsset: (id: string, ref: string) =>
+      call<{ ok: true }>(
+        base,
+        `/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
+        { method: "DELETE" }
+      ).then(() => undefined),
+
+    /* `base` here is the library's own route prefix, and stored media is served
+       from the hub's asset route on the same origin — so this one does not
+       carry it. */
+    assetUrl: (ref) => assetRef(ref),
   }
 }

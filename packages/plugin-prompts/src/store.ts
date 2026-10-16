@@ -8,15 +8,26 @@
  * `prompt` is the text. The field names are the file's own, so the file and
  * this shape stay one thing and a hand edit needs no translation.
  *
- * There is no separate id. A row is known by the file name its description
- * makes — the same name a delivery writes — so nothing has to stay in step with
- * a second identity, and a description that would collide with another row's
- * name is refused rather than allowed to overwrite it.
+ * A row is known by an id that is written down the first time the row is, so a
+ * description can be corrected without the row changing what it is: the id is
+ * what the page keys on, what a delivery names its file after when it writes,
+ * and what `update` and `remove` are given. A description that would name a row
+ * another one already answers to is refused.
  */
+import type { AssetKind } from "@workspace/core"
 
 /** One prompt, as the library stores it and as a card draws it. */
 export interface Prompt {
-  /** The name it is known by, and what its file name is made from. */
+  /**
+   * The name it is known by.
+   *
+   * Written when the row is created, from the description as it was then, and
+   * never rewritten: fixing a typo in the description is a correction to the
+   * row, not a second row. A file written by hand before this module existed
+   * carries none, and one is derived for it as it is read.
+   */
+  id?: string
+  /** The name it is read by, and what a delivered file is named from. */
   description: string
   /** The prompt itself. */
   prompt: string
@@ -27,11 +38,19 @@ export interface Prompt {
   /**
    * Media references, kept where a person put them.
    *
-   * Nothing writes one yet: a prompt is its text, and the card draws that. The
-   * field is here because the library file has it, and dropping a field a
-   * person may have written by hand would be losing their data.
+   * The text of a prompt is what a card draws, so these are shown where the
+   * whole prompt is read — the detail dialog's picture tab — and nowhere else.
+   * Each is a remote URL the hub only references, or a path into the hub's own
+   * asset directory.
    */
   assets: string[]
+}
+
+/** One piece of media a prompt references. */
+export interface PromptAsset {
+  /** The recorded reference: a remote URL, or a path relative to the hub home. */
+  ref: string
+  kind: AssetKind
 }
 
 /** One row with the name it answers to; `id` is derived, never stored. */
@@ -57,6 +76,19 @@ export interface PromptDraft {
   tags?: readonly string[]
 }
 
+/**
+ * What an edit hands over.
+ *
+ * Every field is optional and an omitted one is left as it is. Correcting the
+ * description is the same act as correcting the text — a row read wrong and put
+ * right — which is why it does not move the row to another id.
+ */
+export interface PromptPatch {
+  description?: string
+  prompt?: string
+  tags?: readonly string[]
+}
+
 /** Reading and changing the library. */
 export interface PromptStore {
   /** Every prompt, with the categories in use. */
@@ -68,6 +100,24 @@ export interface PromptStore {
    * name is what a delivery writes, so two of them cannot share it.
    */
   create(draft: PromptDraft): Promise<StoredPrompt>
+  /**
+   * Change one prompt: its text, its description, or both.
+   *
+   * @throws when no row answers to `id`, or when the new description would name
+   * a row another one already answers to.
+   */
+  update(id: string, patch: PromptPatch): Promise<StoredPrompt>
   /** Delete one by its id. A row that is not there is not an error. */
   remove(id: string): Promise<void>
+  /** Take over one uploaded file, record it, and answer with its reference. */
+  putAsset(id: string, file: File): Promise<PromptAsset>
+  /**
+   * Add one pasted source. A remote address is recorded as it is; a `data:`
+   * source is stored as a file the hub owns.
+   */
+  addAssetSource(id: string, source: string): Promise<PromptAsset>
+  /** Drop one reference, deleting the stored file when the hub owns it. */
+  deleteAsset(id: string, ref: string): Promise<void>
+  /** The URL that shows one reference; a remote URL passes through unchanged. */
+  assetUrl(ref: string): string
 }

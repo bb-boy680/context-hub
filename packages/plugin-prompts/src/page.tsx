@@ -36,7 +36,7 @@ import { BatchActions, cardActionShell, PromptActions } from "./install-menu.tsx
 import { formatAge, tokenLabel, useInstalled, usePlaceFiles, usePromptLibrary, usePromptPlaces } from "./library.ts"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
-import type { PromptDraft, StoredPrompt } from "./store.ts"
+import type { PromptDraft, PromptPatch, StoredPrompt } from "./store.ts"
 
 /* The canvas spends its one accent on actions, so a category chip is neutral
    and the chip's own geometry carries what it means. */
@@ -453,6 +453,26 @@ export function PromptsPage() {
     [library, refuse]
   )
 
+  /**
+   * Change the two things about a prompt that are edited in the panel rather
+   * than in the editor: what it is called, and what it has been filed under.
+   */
+  const describe = React.useCallback(
+    async (prompt: StoredPrompt, patch: PromptPatch) => {
+      setBusy(true)
+      try {
+        await library.update(prompt.id, patch)
+      } catch (failure) {
+        /* The line goes back to what the library holds, and why it would not
+           take the new one is said the way every other refusal is. */
+        refuse(failure)
+      } finally {
+        setBusy(false)
+      }
+    },
+    [library, refuse]
+  )
+
   const drop = React.useCallback(
     async (prompt: StoredPrompt) => {
       setBusy(true)
@@ -759,6 +779,8 @@ export function PromptsPage() {
 
       <PromptDetailDialog
         prompt={detail}
+        updated={detail === null ? "" : formatAge(detail.updatedAt, state.active)}
+        root={library.root === "" ? null : library.root}
         places={places}
         files={files}
         busy={busy}
@@ -769,6 +791,10 @@ export function PromptsPage() {
         onToggle={(prompt, place) => void toggle(prompt, place)}
         onGenerate={(prompt, place, action) => void generate(prompt, place, action)}
         onDelete={(prompt) => void drop(prompt)}
+        onChanged={() => void library.reload()}
+        onDescribe={(prompt, description) => void describe(prompt, { description })}
+        onTags={(prompt, tags) => void describe(prompt, { tags })}
+        tagSuggestions={library.tags}
       />
     </div>
   )

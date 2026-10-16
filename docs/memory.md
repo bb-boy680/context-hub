@@ -665,3 +665,83 @@ store 的每一条读写、交付的四条路径、以及"必填"的判据从 na
 交付是这个模块的主语（整个 `⋯` 菜单都挂在它下面），所以它在行尾、复制在它左边——
 `justify-end` 的行里，最后那个才是行末。复制自己的**标签不能变长**（`复制` → `已复制` 会把安装挤走 13px），
 确认只换图标与颜色，和本仓 `code-view.tsx` 的 `CopyButton` 一致，宽度抖动只有这一个办法能免。
+
+## 新模块的弹窗/菜单/标签页，先去"兄弟模块"里抄，不要自己搭（2026-10-16）
+
+**问题模式**：给 Prompts 写详情弹窗时，我按需求描述自己拼了一套东西——
+胶囊式的标签页（`bg-secondary` 药丸）、`AlertDialog` 做删除二次确认、`w-[210px]` 自定宽度的 `⋯` 菜单。
+用户连着三次纠正：标签页要像 Plugins 那样（`TabsList variant="line"` 下划线式）、
+删除确认要和别的模块一致（锚在按钮上的 `Popover` 气泡）、
+`⋯` 菜单要用应用自己的菜单外观（`w-[200px] flex-col gap-0.5 rounded-md p-1.5 ring-1 ring-border shadow-soft`）。
+
+**这些全都已经在仓库里**：`plugin-plugins/src/detail-dialog.tsx` 有完整的 `Tabs` 用法，
+`plugin-skills` 和 `plugin-plugins` 各有一个 `DeleteBubble`，
+`apps/web/src/components/workspace-group.tsx` 是菜单外观的来源。
+我一样都没看，全是自己写的——而写出来的东西在形状上就是"另一个 app"。
+
+**规则**：做**新模块的同类界面**（弹窗、详情面板、行菜单、标签页、确认框、空状态）之前，
+**先打开一个已经存在的同类文件读一遍**，把它的原语抄过来：
+- 标签页 → `plugin-plugins/src/detail-dialog.tsx` 的 `Tabs variant="line"`
+- 删除确认 → `plugin-skills` / `plugin-plugins` 的 `DeleteBubble`（`Popover`，不是 `AlertDialog`）
+- 行菜单外观 → `apps/web/src/components/workspace-group.tsx`
+- 详情弹窗骨架 → `DialogSplit` + 左 pane 右 panel
+
+判据：**自问"这个控件在仓库里有没有第二个实例"**。有的话，先读那个实例再看自己的需求；
+`grep -rn "<控件名>" packages apps` 就能回答。
+"需求里没写要哪种"不是自己设计的理由——需求写的是功能，形状是这个仓库已有的约定。
+
+## 测量能告诉我在哪，不能告诉我可不可见（2026-10-16）
+
+**问题模式**：CodeEditor 两层叠加的自动检查报"两层的文字 y 差 2px"，
+我当成缺陷，做了一轮修正（把行号从 `inline-block` 改成绝对定位）——
+**改完更糟**：行号被 `right-full` 推出可视区，横向反而差了 44px，
+重影截图一看就是坏掉的样子。
+
+回退后拿 3× 缩放的重影图（同一段文字，一层高亮、一层红字半透明）对着看：
+**两层的字形完全重合，行号也对齐**。
+那 2px 是行号的 `inline-block` 给**行盒**加的 strut，把 `first.getClientRects()` 的盒子顶高了 2px，
+字体本身没动。
+
+**规则**：判断"视觉上对没对齐"，**不要拿两个 DOM 盒子的坐标相减**——
+行盒、strut、margin collapse 都会让盒子动而字形不动。
+判据是**同一内容两种颜色的重叠渲染**：截图，放大（`Emulation.setDeviceMetricsOverride` 的
+`deviceScaleFactor: 3`），看是不是有重影。有重影才是错位。
+DOM 测量只用来生成假设和定位"问题大概在哪一段"，**不要用它当结论，更不要据此改代码**。
+
+## 探针脚本里注入的 JS，转义要按"两层"算（2026-10-16）
+
+**问题模式**：CDP 探针里写 `go(`...split("\n")...`)`，
+这层是**模板字面量**：`\n` 在写进字符串时就已经变成真换行，
+注入到页面的代码成了 `split("<真换行>")` → `SyntaxError: Invalid or unexpected token`。
+我改了三次才定位，前两次改的方向都不对（先怀疑引号、再怀疑 `String.raw`）。
+
+**规则**：探针脚本里的注入代码，转义是**两层**的，写的时候要问"这层是模板字面量还是普通字符串"：
+- 要让页面收到 `\n`（两个字符），模板字面量里得写 `\n`；
+- 更稳的写法是绕开转义：`split(String.fromCharCode(10))`、或者把代码拼成普通字符串再 `JSON.stringify` 注入。
+
+判据：**注入出语法错误时，先 `cat -A` 看那一行的真实字节**，别靠脑补。
+`grep -c 'split("\\n")'` 数一下有几个是对的，比逐行读快。
+
+## 会写"永远为真"的断言，是因为我边写边知道它没意义（2026-10-16）
+
+**问题模式**：给标签编辑器补断言时写了
+`check("the panel draws the row's categories", tagsNow.includes("code quality") === false || true, ...)`——
+`|| true` 让这条永远是绿的。这正是 `docs/memory.md` 里"扫描类脚本必须先自证"那条说的形态，
+我又犯了一次。
+
+**规则**：写完 `check(...)` 立刻回头看**这个条件在什么输入下会是 false**；
+答不上来的就删掉，或者先造一个已知的反例把它跑红一次。
+"我加了一条测试"和"这条测试能失败"是两件事，后者才是覆盖率。
+
+## 真机验收会写进用户的真实目录：先说，再收（2026-10-16）
+
+**问题模式**：走"安装到 Agent"这条链路时，dev bridge 的 place 根是**真实机器上的路径**
+（workspace `<repo>/.claude/commands`、global `~/.claude/commands`），
+夹具只能隔离 hub home，隔离不了这两个。于是测试真的往用户仓库和用户 home 写了两个文件。
+
+**规则**：涉及"写到 Agent 目录"的真机测试，**跑之前就把这件事说出来**，跑完立刻删掉并复查：
+```
+rm -f <repo>/.claude/commands/<name>.md  ~/.claude/commands/<name>.md
+```
+更好的做法是**不要用真实 prompt 名**（用一个一眼能认出来的测试名，如 `zz-probe-*`），
+这样"有没有残留"用 `ls` 就能判断，也不会撞上用户自己的东西。

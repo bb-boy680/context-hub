@@ -40,15 +40,21 @@ const PLACE_SEARCH_MIN = 8
 /** How many places of one scope a detail panel lists before it offers the rest. */
 const PLACES_VISIBLE = 8
 
-/** The width both menus share. */
-const PANEL = "w-[280px]"
+/**
+ * The menu's own surface: the chrome every other menu in this app already
+ * wears, so a menu reads as a menu wherever it is opened. Wider than the
+ * sidebar's row menu because these rows carry a second line and a control
+ * beside it.
+ */
+const PANEL =
+  "flex w-[280px] flex-col gap-0.5 rounded-md p-1.5 ring-1 ring-border shadow-soft"
 
 /**
  * Row chrome: a 50px menu row (8px padding around a 34px text column) and the
  * roomier row a detail panel draws, both built on the same 28px tile.
  */
-const MENU_ROW = "items-start gap-2.5 py-2"
-const MENU_ROW_CONTROL = "items-center gap-2.5 py-2"
+const MENU_ROW = "items-start gap-2.5 rounded-sm px-2.5 py-2"
+const MENU_ROW_CONTROL = "items-center gap-2.5 rounded-sm px-2.5 py-2"
 const ROW_TILE =
   "flex size-7 shrink-0 items-center justify-center overflow-clip rounded-lg bg-surface-raised ring-1 ring-border ring-inset"
 const MENU_NAME = "truncate text-[13.5px] leading-[18px] font-semibold"
@@ -276,8 +282,9 @@ export function PlaceMenu(
          a place would also open the asset it belongs to. */
       onClick={(event) => event.stopPropagation()}
       /* A searchable menu scrolls its own list, under a field that stays put,
-         so the popup itself must not be the scroller. */
-      className={`${PANEL} ${searchable ? "overflow-hidden p-0" : ""}`}
+         so the popup itself must not be the scroller — and the field is a
+         full-width row, so the panel's own padding steps aside for it. */
+      className={`${PANEL} ${searchable ? "gap-0 overflow-hidden p-0" : ""}`}
     >
       {searchable ? (
         <div className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3">
@@ -322,7 +329,7 @@ export function PlaceMenu(
           )}
         </div>
       ) : null}
-      <div className={searchable ? "max-h-[400px] overflow-y-auto p-1" : "p-1"}>
+      <div className={searchable ? "max-h-[400px] overflow-y-auto p-1.5" : ""}>
         <DropdownMenuGroup>
           <DropdownMenuLabel className="flex items-center justify-between gap-2">
             <span>{title}</span>

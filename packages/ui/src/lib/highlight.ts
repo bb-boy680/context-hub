@@ -20,6 +20,14 @@ export const THEMES = { light: "github-light", dark: "github-dark" } as const
 let highlighter: Promise<HighlighterCore> | null = null
 
 /**
+ * The built instance, for the callers that cannot wait a microtask for it.
+ *
+ * An editor repaints on every keystroke, and a promise per keystroke is both
+ * slower than the work it wraps and one render out of step with what is typed.
+ */
+let built: HighlighterCore | null = null
+
+/**
  * The highlighter, built on first use.
  *
  * The JavaScript engine keeps wasm out of the bundle, and loading the grammars
@@ -44,8 +52,46 @@ export function loadHighlighter(): Promise<HighlighterCore> {
       import("shiki/langs/toml.mjs"),
     ],
     engine: createJavaScriptRegexEngine(),
+  }).then((instance) => {
+    built = instance
+    return instance
   })
   return highlighter
+}
+
+/** One piece of text coloured, or nothing when this highlighter cannot read it. */
+function htmlOf(
+  instance: HighlighterCore,
+  text: string,
+  lang: string,
+  structure: "classic" | "inline"
+): string | null {
+  try {
+    return instance.codeToHtml(text, {
+      lang,
+      themes: THEMES,
+      defaultColor: false,
+      structure,
+    })
+  } catch {
+    /* Shiki refuses a language it cannot read; that is a plain block, not a
+       failure, and the text the caller already shows is the whole of it. */
+    return null
+  }
+}
+
+/**
+ * The same markup, without waiting for a highlighter that is already built.
+ *
+ * @returns the markup, or `null` when there is no highlighter yet — the caller
+ * draws its text plainly, which is what it does while loading anyway.
+ */
+export function paintNow(
+  text: string,
+  lang: string,
+  structure: "classic" | "inline"
+): string | null {
+  return built === null ? null : htmlOf(built, text, lang, structure)
 }
 
 /**
@@ -65,17 +111,5 @@ export async function paint(
   lang: string,
   structure: "classic" | "inline"
 ): Promise<string | null> {
-  const instance = await loadHighlighter()
-  try {
-    return instance.codeToHtml(text, {
-      lang,
-      themes: THEMES,
-      defaultColor: false,
-      structure,
-    })
-  } catch {
-    /* Shiki refuses a language it cannot read; that is a plain block, not a
-       failure, and the text the caller already shows is the whole of it. */
-    return null
-  }
+  return htmlOf(await loadHighlighter(), text, lang, structure)
 }

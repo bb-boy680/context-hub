@@ -59,11 +59,52 @@ const MORE =
 const NO_CHEVRON = "[&>svg:last-child]:hidden"
 
 /**
- * One agent's own ways of writing a prompt out.
+ * One agent's own ways of writing a prompt out, as menu entries.
  *
- * A submenu rather than three more rows in the list above it: the list is about
- * *where*, and these are about *what*, and the two questions have different
- * answers at every row.
+ * Exported because the detail panel lists agents flat rather than inside a
+ * menu: the same entries hang off the same row in both places, and only the
+ * surface around them differs.
+ *
+ * The list is about *where*, and these are about *what*: the two questions have
+ * different answers at every row, which is why they are not more rows of it.
+ */
+export function GenerateItems({
+  place,
+  onGenerate,
+}: {
+  place: PromptPlace
+  onGenerate: (place: PromptPlace, action: Delivery) => void
+}) {
+  const { t } = useI18n()
+
+  return (
+    <>
+      <DropdownMenuItem onClick={() => onGenerate(place, "commands")}>
+        {t("prompts.menu.commands")}
+      </DropdownMenuItem>
+      <DropdownMenuItem onClick={() => onGenerate(place, "rule")}>
+        {t("prompts.menu.rule")}
+      </DropdownMenuItem>
+      {/* The action appears because the place declares an instruction file.
+          A menu that decided it per agent would be a list of agents to keep
+          in step, which is the thing this registry exists to avoid. */}
+      {place.instructionFile === undefined ? null : (
+        <>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => onGenerate(place, "instructions")}>
+            {t("prompts.menu.instructions")}
+          </DropdownMenuItem>
+        </>
+      )}
+    </>
+  )
+}
+
+/**
+ * Those same entries, as a submenu of the row that names the agent.
+ *
+ * A submenu rather than three more rows in the list above it, because the list
+ * is shared by every prompt in the library and these belong to one row of it.
  */
 function PlaceMore({
   place,
@@ -95,23 +136,7 @@ function PlaceMore({
         className="w-[210px]"
         onClick={(event) => event.stopPropagation()}
       >
-        <DropdownMenuItem onClick={() => onGenerate(place, "commands")}>
-          {t("prompts.menu.commands")}
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => onGenerate(place, "rule")}>
-          {t("prompts.menu.rule")}
-        </DropdownMenuItem>
-        {/* The action appears because the place declares an instruction file.
-            A menu that decided it per agent would be a list of agents to keep
-            in step, which is the thing this registry exists to avoid. */}
-        {place.instructionFile === undefined ? null : (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => onGenerate(place, "instructions")}>
-              {t("prompts.menu.instructions")}
-            </DropdownMenuItem>
-          </>
-        )}
+        <GenerateItems place={place} onGenerate={onGenerate} />
       </DropdownMenuSubContent>
     </DropdownMenuSub>
   )

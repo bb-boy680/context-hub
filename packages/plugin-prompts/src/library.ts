@@ -16,7 +16,7 @@ import { useExtensionSnapshot, useHub } from "@workspace/extensions/react"
 
 import { delivered } from "./deliver.ts"
 import { promptPlaces, type PromptPlace } from "./provider.ts"
-import type { PromptDraft, PromptStore, StoredPrompt } from "./store.ts"
+import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
 
 /** What the page draws and can do. */
 export interface PromptLibrary {
@@ -31,6 +31,7 @@ export interface PromptLibrary {
   error: string | null
   reload: () => Promise<void>
   add: (draft: PromptDraft) => Promise<void>
+  update: (id: string, patch: PromptPatch) => Promise<void>
   remove: (prompt: StoredPrompt) => Promise<void>
 }
 
@@ -57,6 +58,12 @@ export function usePlaceFiles(): PlaceFiles | null {
   return useHub().host.files
 }
 
+/** The form's prompt library, or `null` when this form cannot reach one. */
+export function usePromptStore(): PromptStore | null {
+  const ctx = useHub()
+  return React.useMemo(() => ctx.get("hub.prompts") ?? null, [ctx])
+}
+
 /**
  * Read and change the prompt library.
  *
@@ -65,8 +72,7 @@ export function usePlaceFiles(): PlaceFiles | null {
  * be paying for the same read twice.
  */
 export function usePromptLibrary(): PromptLibrary {
-  const ctx = useHub()
-  const store = React.useMemo(() => ctx.get("hub.prompts") ?? null, [ctx])
+  const store = usePromptStore()
 
   const [rows, setRows] = React.useState<StoredPrompt[]>([])
   const [tags, setTags] = React.useState<string[]>([])
@@ -111,6 +117,15 @@ export function usePromptLibrary(): PromptLibrary {
     [store, reload]
   )
 
+  const update = React.useCallback(
+    async (id: string, patch: PromptPatch) => {
+      if (store === null) throw new Error("this form has no prompt library")
+      await store.update(id, patch)
+      await reload()
+    },
+    [store, reload]
+  )
+
   const remove = React.useCallback(
     async (prompt: StoredPrompt) => {
       if (store === null) throw new Error("this form has no prompt library")
@@ -120,7 +135,7 @@ export function usePromptLibrary(): PromptLibrary {
     [store, reload]
   )
 
-  return { store, root, rows, tags, loading, error, reload, add, remove }
+  return { store, root, rows, tags, loading, error, reload, add, update, remove }
 }
 
 /** A past timestamp as an age the list can print, localized to the active locale. */
