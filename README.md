@@ -56,6 +56,35 @@ server through `process.execPath`, and clones a real git repository — so:
 `pnpm install` in a sandboxed shell hangs rather than failing — the sandbox drops
 packets instead of refusing them. Run it with the sandbox off.
 
+### Where an asset page's data comes from
+
+The four asset libraries (Skills, MCP, Plugins, Prompts) are **read once, at
+startup**, not when a page that draws them is opened. Each module publishes its
+own read as a service — `catalog.skills`, `catalog.mcp`, `catalog.plugins`,
+`catalog.prompts` — and `apps/web/src/lib/preload.ts` starts all four after the
+kernel is up, without waiting for the answers. The page watches that read
+through `useCatalog`; it does not make one of its own.
+
+A page that opens before the read lands starts it itself, which is the same read
+answered twice rather than a second one. What this buys: leaving a page no
+longer throws its rows away, and something outside the page — a global search,
+say — can see what the hub holds without having visited it.
+
+Two rules to keep in mind when adding to this:
+
+- **A library that has never been read has nothing to read again.** Its watchers
+  ignore changes until someone asks, because the kernel's own startup is a
+  stream of extensions arriving; following that reads half of them and throws it
+  away.
+- **A service that both calls and watches the same thing must tell its watchers
+  only when the answer changed.** `workspaces.refresh()` announces only a
+  different list for exactly this reason: the libraries that ask it for the
+  folder in use are the ones subscribed to it.
+
+`createCatalog` (`packages/extensions/src/catalog.ts`) is where the races live —
+one read at a time, a late answer dropped rather than written over a newer one,
+and a failure that keeps the last answer and reports itself instead of rejecting.
+
 ### Adding a route to the API
 
 1. Add a `createXHandler(): HubMiddleware` to the owning package's `handlers.ts`

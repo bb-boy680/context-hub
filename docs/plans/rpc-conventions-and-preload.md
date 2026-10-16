@@ -433,6 +433,74 @@ list 不变；create / PATCH→update / source / assets / remove 五处改；`:1
 
 ## 阶段 C：启动时并行预加载 + 共享状态
 
+**状态：完成。** `createCatalog` / `useCatalog` 落地，四个库各自成为服务并在启动时预加载，
+`pnpm test` **914 个用例全绿**，typecheck / lint / build 全过。
+
+| 步子 | 提交 |
+|---|---|
+| C-一 通用目录层 + 依赖 | `7a6a44b` |
+| C-二 Prompts + `preload.ts` + `workspaces` single-flight | `431f8b8` |
+| C-三 Skills | `ce0a965` |
+| C-四/五 MCP、Plugins | `5daea42` |
+| 三个启动期 bug 的修复 | `75b519e` |
+| C.4 两处 `use-immer` | `3cac8fa` |
+
+### 落地形状
+
+```
+packages/extensions/src/catalog.ts        createCatalog / mapLimit        （React-free）
+packages/extensions/src/react.tsx         useCatalog                      （+ use-sync-external-store）
+packages/resources/<pkg>/src/library-store.ts   各库的服务：构造不发请求，apply 里发布
+apps/web/src/lib/preload.ts               启动时把四个读一起点着，不等答案
+```
+
+服务名：`catalog.skills` / `catalog.prompts` / `catalog.mcp` / `catalog.plugins`。
+**构造不发任何请求**，所以把它挂在纯 Node 测试里不会自己起探测。
+
+### 端到端验收（构建后的形态 + 隔离 hub home + seed 数据）
+
+`node apps/web/server.ts --port 0 --static apps/web/dist --home <tmp> --folder <tmp>`，
+浏览器（`browser-automation` + `--bridge`）里逐个开。四个页面**进页面新增请求都是 0**：
+
+| 页面 | 看到的 | 进页面新增请求 |
+|---|---|---|
+| Skills | seed 的 `wire-skill` + 文件树 | 0 |
+| Prompts | seed 的 `wire-prompt`（卡片正文=提示词） | 0 |
+| MCP | 真实探测结果（`context7`，"Checked 1 min ago"） | 0 |
+| Plugins | 客户端真装的 3 个包（含封面与版本） | 0 |
+
+另外：切工作区 → 每个库**恰好重读一次**；Skills 里打字 → 只重读**带 `q=` 的那一次**
+（不再重读 place，因为 place 与查询无关）；启动时每个读**发出 1 次**（见下面的"已知代价"）。
+
+### 这一轮抓到的三个 bug（都不是测试能抓到的）
+
+**1. 订阅者同时是调用者 → 死循环。** 各库的读里 `await workspaces.refresh()`，同时又订阅
+`workspaces` 的变化；而 `refresh()` 每次调用都无条件广播。于是 启动后
+`POST /hub/place-files` **2065 次**、`GET /hub/workspaces` **1091 次**、
+skills 目录读了 **854 次**——**界面完全正常**，因为每轮答案都一样。
+修法：`announce()` 只在"要给的东西真的变了"时广播（按值比较 `WorkspacePage`）。
+
+**2. 两个 store 根本没注册。** `SkillLibrary` / `PromptLibrary` 拿着一个 catalog 却没继承
+`Service`，于是启动时按名字找不到它们，两个库**一次都没被读过**，页面永远画空库。
+没有任何测试失败、没有任何报错。**这正是 C-二 那一轮"验收通过"的原因**——
+那唯一一次 `GET /hub/prompts` 是 `apps/web` 的**探活**请求，不是目录在读；
+而"进页面没有第二个请求"是因为压根没有第一个。
+
+**3. 没读过的库不该因为内核启动而重读。** `extensions/changed` 在内核启动的尾巴上还会
+因为 fiber 异步落定而 emit，那时四个库都还没被要求读过。加了
+`started` 守卫：没人要过读，就没有可刷新的。
+
+### 已知代价 / 未做
+
+- **启动时每个库读 2–3 次**（不是 1 次）：内核启动尾部的 `extensions/changed`
+  仍会触发一两次重读。有界、只在启动、答案正确；要再省需要在
+  `extensions/changed` 时比较"我关心的那部分注册表有没有变"，那是另一件事。
+- **MCP 的探测现在在启动时发生**（实测：启动即连上了 `context7`）。
+  用户已确认这个行为变更；只在缓存里没有答案的 server 上跑。
+  **实测的一个副作用**：`--home` 能隔离 hub 自己的文件，**隔离不了用户的 agent 配置**——
+  扫描会读真实的 `~/.claude.json` 等。开机即读是设计使然，但值得知道。
+- **`aoci_maintain` 待跑**（见风险 5）。
+
 起因不变：四个资产页面今天都**只在进入页面时**才读数据，读取逻辑住在各自的 React hook 里。
 组件卸载 state 一起丢，再进来重读一遍。于是全局 Ctrl+K 在任何"从未进过那四个页面"的
 会话里查不到任何真实资产。
@@ -611,12 +679,13 @@ return kernel                              // .then 立刻渲染，加载在后�
 | P0 | plugins 的 project 补进根 vitest 配置 | `pnpm test` 收满 | ✅ `2e66267` |
 | A | 6 份 `bridge.test.ts`；五个客户端加 `base` | 全绿；种错参数名变红 | ✅ `c051262`…`b254d22` |
 | B | 逐模块统一（prompts → mcp → plugins → skills → core） | 该模块 `bridge.test.ts` 绿 + curl 读写各一条 | ✅ `36d887e`…`7ad8dd8` |
-| C-一 | `extensions/src/catalog.ts` + `useCatalog` + 三个依赖 + `catalog.test.ts` | 该包 typecheck / lint / 测试绿 | |
-| C-二 | Prompts（最简，先做） | 进页面不产生第二个请求 | |
-| C-三 | Skills | 切 workspace 重读；打字仍只重读一次 | |
-| C-四 | MCP | 并发 ≤3；已有答案不重探 | |
-| C-五 | Plugins | `mapLimit` 生效；`restore` 仍只在页面触发 | |
-| C-六 | `preload.ts` 接线 + README + `docs/memory.md` + `aoci_maintain` | 见验收 | |
+| C-一 | `extensions/src/catalog.ts` + `useCatalog` + 三个依赖 + `catalog.test.ts` | 该包 typecheck / lint / 测试绿 | ✅ `7a6a44b` |
+| C-二 | Prompts（最简，先做） | 进页面不产生第二个请求 | ✅ `431f8b8` |
+| C-三 | Skills | 切 workspace 重读；打字仍只重读一次 | ✅ `ce0a965` |
+| C-四 | MCP | 并发 ≤3；已有答案不重探 | ✅ `5daea42` |
+| C-五 | Plugins | `mapLimit` 生效；`restore` 仍只在页面触发 | ✅ `5daea42` |
+| C-六 | README + `docs/memory.md` + 归档 | 见验收 | ✅ |
+| — | `aoci_maintain` | 树静下来之后 | ⬜ |
 
 **每一步单独提交**，commit message 按仓库现有风格。跨包改动要按 `AGENTS.md` 的
 "搜索与代码修改"把两端、类型引用、字符串字面量、测试、文档都搜一遍。
