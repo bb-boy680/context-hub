@@ -3,6 +3,17 @@
 > **状态：未开始。** 用户明确要求先把这一阶段抽出来、不要实现——中间还要改造别的地方。
 > 开始前请先读「开始前必须核对」一节，里面有几条是在这轮里被证伪或过期的前提。
 
+**本文档的路径已在目录重构后更新过一次**（`packages/` 现按领域分组：
+`resources/skills`、`agents/claude-code`、`search/skills-sh`、`i18n/zh-cn`、`shadcn-ui`，
+scope 由 `@workspace` 改为 `@context-hub`）。三条相关的现状：
+
+- `.aoci/` 与 `aoci.code.txt` 里的路径**仍是旧的**——维护按用户决定推迟到本轮改造全部做完，
+  再跑一次 `aoci_maintain`。那几个文件由工具拥有，**不要手改**。
+- `docs/plans/archive/*` 与 `docs/memory.md` 里的旧名按"是否还在被使用"分别处理：
+  归档记录是带日期的历史、保持原样；`memory.md` 是活规则、已跟着改名。
+- `apps/web/src/lib/hub.ts` 目前**只注册了 claude-code 一个 agent 扩展**（测试期的收窄），
+  其余 12 个包的依赖仍在 `package.json` 里但不 import。
+
 ## Context
 
 上一轮（`docs/plans/backend-boundary-and-preload.md`）立起了后端边界，已经完成：
@@ -25,12 +36,12 @@
    prompts 从「`description` 就是名字、`id` 由 description 算 slug」改成了
    **「独立 `name` 字段 + 不透明 `id`、可由 `update`/`remove` 定位」**。
    凡是按旧口径写的地方（`PromptPage` 的键、去重键、投递文件名、幂等标记）
-   都要按 `packages/plugin-prompts/src/store.ts` 的**当前**内容重新核。
+   都要按 `packages/resources/prompts/src/store.ts` 的**当前**内容重新核。
 2. **"统一 RPC 约定是为了让载体只有一条代码路径"是错的**，别再用这个理由。
    载体看到的是不透明的 `(request, response, next)`，四套约定对载体**零成本**。
    真实收益只有两条：加 action 的人不用先学这个模块用哪套；检查脚本不用为每个模块特判。
-3. **先量再动**：四套约定共 1205 行（`plugin-skills` 481 行/28 处 `searchParams`、
-   `plugin-plugins` 389 行/6 个 action 分支、`plugin-prompts` 207 行、`plugin-mcp` 128 行）。
+3. **先量再动**：四套约定共 1205 行（`resources/skills` 481 行/28 处 `searchParams`、
+   `resources/plugins` 389 行/6 个 action 分支、`resources/prompts` 207 行、`resources/mcp` 128 行）。
    最重的是 skills，也是功能最多、最承重的——它是这一步的主要风险来源。
 4. 路由常量**已经做完**，不要重做。
 
@@ -58,18 +69,18 @@
 body 是 `{ action: <name>, ...args }`；响应一律 JSON，失败 4xx + `{ error: string }`。
 
 选它的理由：GET 读**可直接 curl**，而 curl 是这套桥当前唯一的验证手段
-（`docs/memory.md` 明写）；它是 `plugin-plugins` 的现有约定，最大的模块不用动。
+（`docs/memory.md` 明写）；它是 `resources/plugins` 的现有约定，最大的模块不用动。
 
 现状四套（改前先按当前代码核对一遍）：
 
 | 模块 | 现状 |
 |---|---|
-| `plugin-skills` | GET 与 POST 都用 query 里的 `?action=`；路径子路由（`/<id>/assets`、`/<id>/files/<path>`）再叠 REST 方法；资产上传走裸字节 |
-| `plugin-plugins` | 读用 query、写用 body（**目标约定**） |
-| `plugin-prompts` | 纯 REST（`PATCH`/`POST`/`DELETE`） |
-| `plugin-mcp` | POST + body 里的 `action` |
+| `resources/skills` | GET 与 POST 都用 query 里的 `?action=`；路径子路由（`/<id>/assets`、`/<id>/files/<path>`）再叠 REST 方法；资产上传走裸字节 |
+| `resources/plugins` | 读用 query、写用 body（**目标约定**） |
+| `resources/prompts` | 纯 REST（`PATCH`/`POST`/`DELETE`） |
+| `resources/mcp` | POST + body 里的 `action` |
 
-`plugin-mcp` 的读改成 GET；两端 client 侧各收一个 `callGet` / `callPost`。
+`resources/mcp` 的读改成 GET；两端 client 侧各收一个 `callGet` / `callPost`。
 
 **验收**：每改完一个模块，用 curl 真打读写各一条，并确认该模块页面照常工作。
 **逐个模块做，不一次改完**——这是本阶段唯一有功能回归风险的地方。
@@ -100,7 +111,7 @@ body 是 `{ action: <name>, ...args }`；响应一律 JSON，失败 4xx + `{ err
 |---|---|---|---|
 | `immer` | `^11`（当前 `11.1.21`） | `packages/extensions` | 按键合并 + "没改就返回原引用"这个判据；手写 spread 两者都给不了 |
 | `use-sync-external-store` | `^1.7.0`（lockfile 已在，peer `react ^19` ✓） | `packages/extensions` | React 内置只有裸 `useSyncExternalStore`；selector 版让"只在该 slice 变化时重渲染"成立 |
-| `use-immer` | `^0.11.0`（peer `react ^19` ✓） | `plugin-skills`、`plugin-mcp` | 两处本地表单 state 的按键/多字段更新 |
+| `use-immer` | `^0.11.0`（peer `react ^19` ✓） | `resources/skills`、`resources/mcp` | 两处本地表单 state 的按键/多字段更新 |
 
 **不需要 `enableMapSet()`**（不对 `Set` 做 immer 化）。
 安装一律带 `dangerouslyDisableSandbox: true`（`docs/memory.md` 已记两次沙箱丢包导致 pnpm 挂死）。
@@ -139,7 +150,7 @@ export function mapLimit<T, R>(limit: number, items: readonly T[],
 ```
 
 代际守卫内置，**四个库不再各自持 generation ref**
-（`plugin-plugins/src/library.ts:443-491` 今天根本没有，并发 `read()` 会互相覆盖——顺带修掉）。
+（`resources/plugins/src/library.ts:443-491` 今天根本没有，并发 `read()` 会互相覆盖——顺带修掉）。
 失败只写 `failure`，**`value` 不清空、不抛给调用方**（后端可能不存在，降级必须是默认行为）。
 
 `packages/extensions/scripts/check-catalog.ts` 的断言：并发 `load()` 只调一次 `read`；
@@ -169,11 +180,11 @@ export function useCatalog<S, T>(catalog: Catalog<S>,
 **原样搬进去**（机械搬移），hook 缩成 `useCatalog(...)`，无编排时自己兜底 `load()` 一次。
 
 `places` 从"组件传给 hook"改成"store 从 `ctx` 自己算"——`readablePlaces`
-（`plugin-skills/src/library.ts`）已是导出纯函数。store 自己订阅 `hub.workspaces` 与
+（`resources/skills/src/library.ts`）已是导出纯函数。store 自己订阅 `hub.workspaces` 与
 `extensions/changed` 做 reload（今天页面就是靠它们当 reload key，语义不变）。
 
 - **Prompts**（最简，先做）：`rows`/`tags`/`root`/`loading`/`error`/generation →
-  一次 `store.list()`。**⚠ 动手前重读 `plugin-prompts/src/store.ts`**——见「开始前必须核对」第 1 条。
+  一次 `store.list()`。**⚠ 动手前重读 `resources/prompts/src/store.ts`**——见「开始前必须核对」第 1 条。
 - **Skills**：`page`/`held`/`tags`/`loading`/`error`/generation；
   `list` + 每 place `placeSkills` + `tags` 照旧 `Promise.all`。
 - **MCP**：`records`/`scan`/`checks`/`testing`/`busy`/`failure`/`canProbe`；
@@ -186,8 +197,8 @@ export function useCatalog<S, T>(catalog: Catalog<S>,
 
 | 位置 | 现状 | 换成 |
 |---|---|---|
-| `plugin-skills/src/search-dialog.tsx:303,356` | `details: Record<string, Partial<RemoteSkill>>` + `setDetails(c => ({...c, [key]: detail}))` | `useImmer` + 按键赋值 |
-| `plugin-mcp/src/add-server-dialog.tsx:67` | `values: ServerFormValues` 多字段表单对象 | `useImmer` + 逐字段赋值 |
+| `resources/skills/src/search-dialog.tsx:303,356` | `details: Record<string, Partial<RemoteSkill>>` + `setDetails(c => ({...c, [key]: detail}))` | `useImmer` + 按键赋值 |
+| `resources/mcp/src/add-server-dialog.tsx:67` | `values: ServerFormValues` 多字段表单对象 | `useImmer` + 逐字段赋值 |
 
 （行号是写作时的；动手前按当前代码核对。）实施中若又发现同型的按键/多字段 state 一并换；
 **没有就到此为止，不为了用而用**。
@@ -239,13 +250,13 @@ return kernel          // .then 立刻渲染，加载在后台继续
 
 ## 风险
 
-1. **统一 RPC 约定要动 `plugin-prompts` 的整个 store 与页面**（REST → action 信封），
+1. **统一 RPC 约定要动 `resources/prompts` 的整个 store 与页面**（REST → action 信封），
    是阶段 B 唯一有功能回归风险的一步。对策：逐个模块做、每步 curl 真打读写各一条。
 2. **MCP probe = 启动用户配置的 MCP 服务器进程**（每 server 一个子进程、30s 超时，
-   `plugin-mcp/src/host/probe.ts`），并写 `cache.json`。只对缓存无答案的名字跑，
+   `resources/mcp/src/host/probe.ts`），并写 `cache.json`。只对缓存无答案的名字跑，
    但**这是行为变更**：以前"进页面才起服务器"，以后"应用一起来就起"。
    参照实现（deepseek-harness）根本不做这件事。实施后要实测首屏代价。
-3. **Plugins 的 `describe` 名义是读、实际写盘**：`plugin-plugins/src/host/describe.ts` →
+3. **Plugins 的 `describe` 名义是读、实际写盘**：`resources/plugins/src/host/describe.ts` →
    `host/logo.ts` 的 `assets.put()`。预加载会把这次写提前并放大（每 pack 一次）。
 4. **`use-immer` 实际落点只有两处**，做完只出现在两个文件里是**预期内的**。
    参照实现连 `use-immer` 都没装。不要为了让依赖"值回票价"去 immer 化标量 state。

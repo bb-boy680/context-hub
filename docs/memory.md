@@ -495,7 +495,7 @@ EDGE="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 - **不要用「我这里用不上」为理由砍掉一个已经存在的分支**。视频当封面在 skills 里是**支持的**（用播放器画，
   不是 `<img>`），我的「省事」实际上是把能力砍了。看到自己想收窄一个既有行为时，先找出它在别处是怎么实现的。
 - 同一套东西已经在两个包里各抄一份时（`knownAspect`/`rememberAspect` 当时就是两份），**该抽共用而不是再抄第三份**。
-  用户选择了抽到 `@workspace/extensions/components`（`swiper` 依赖也跟着从 skills 挪过去）。
+  用户选择了抽到 `@context-hub/extensions/components`（`swiper` 依赖也跟着从 skills 挪过去）。
 - 手改大段 JSX 用脚本按行号删/缩进**很容易切错块**（这轮把 Popover 切成了半截，只能 `git checkout` 重来）。
   结构化改动优先用 Edit 工具配唯一锚点；真要按行删，先打印边界行确认。
 
@@ -601,7 +601,7 @@ if (place.file.split("/").includes("..")) throw new Error(…)
 只对比 `innerText` 会把"版式全错"当成"内容对了"。
 
 **附带一条**：`FALLBACK_RATIO` 这类常量住在 `plugin-skills/src/page.tsx` 的模块作用域里，
-跨包抄一份时容易连名字一起漏。本仓的共享常量在 `@workspace/extensions/components`
+跨包抄一份时容易连名字一起漏。本仓的共享常量在 `@context-hub/extensions/components`
 （`knownAspect` / `mediaKind` 等），但纯比例常量不在——抄的时候要连值一起搬。
 
 ## 用户说「不需要 X、需要 Y」时，先查 X 是不是已经被我当成了**身份**（2026-10-16）
