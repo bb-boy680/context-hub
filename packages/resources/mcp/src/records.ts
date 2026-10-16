@@ -138,17 +138,20 @@ export interface McpRecordsPort {
 }
 
 /** The browser's record port: the host owns the file, so both calls go through it. */
-export function createRemoteRecords(): McpRecordsPort {
+export function createRemoteRecords(base = ""): McpRecordsPort {
   return {
     async read() {
-      const answer = (await callMcp({ action: "records" })) as { value?: unknown; file?: unknown }
+      const answer = (await callMcp({ action: "records" }, base)) as {
+        value?: unknown
+        file?: unknown
+      }
       return {
         document: answer.value ?? null,
         file: typeof answer.file === "string" ? answer.file : "",
       }
     },
     async save(document) {
-      await callMcp({ action: "save-records", records: document })
+      await callMcp({ action: "save-records", records: document }, base)
     },
   }
 }

@@ -182,9 +182,9 @@ export function readMcpCall(body: unknown): McpCall {
 }
 
 /** Whether a host answers for probes; without one the page offers none. */
-export async function probeAvailable(): Promise<boolean> {
+export async function probeAvailable(base = ""): Promise<boolean> {
   try {
-    const answer = await fetch(MCP_ROUTE, { method: "GET" })
+    const answer = await fetch(`${base}${MCP_ROUTE}`, { method: "GET" })
     return answer.ok
   } catch {
     /* No host behind this origin: the page offers no probe. */
@@ -196,10 +196,11 @@ export async function probeAvailable(): Promise<boolean> {
  * One MCP call, as a browser makes it: a POST whose answer is JSON.
  *
  * @param body — the call, in the shape {@link readMcpCall} reads.
+ * @param base — the origin the route is reached on; empty means this one.
  * @throws when the host refused the call.
  */
-export async function callMcp(body: unknown): Promise<unknown> {
-  const answer = await fetch(MCP_ROUTE, {
+export async function callMcp(body: unknown, base = ""): Promise<unknown> {
+  const answer = await fetch(`${base}${MCP_ROUTE}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -211,18 +212,19 @@ export async function callMcp(body: unknown): Promise<unknown> {
 /**
  * The browser's probe port: both calls are one POST each.
  *
+ * @param base — the origin the route is reached on; empty means this one.
  * @returns the port; a call the host refused rejects with its status.
  */
-export function createRemoteProbe(): McpProbePort {
+export function createRemoteProbe(base = ""): McpProbePort {
   return {
     async cache(names) {
-      const answer = (await callMcp({ action: "cache", names })) as {
+      const answer = (await callMcp({ action: "cache", names }, base)) as {
         entries?: Record<string, McpCacheEntry | null>
       }
       return answer.entries ?? {}
     },
     async probe(request) {
-      const answer = (await callMcp({ action: "probe", ...request })) as {
+      const answer = (await callMcp({ action: "probe", ...request }, base)) as {
         entry: McpCacheEntry
       }
       return answer.entry
