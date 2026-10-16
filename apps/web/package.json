@@ -12,18 +12,6 @@
     "start": "node server.ts --static dist"
   },
   "dependencies": {
-    "@context-hub/cline": "workspace:*",
-    "@context-hub/codex": "workspace:*",
-    "@context-hub/command-code": "workspace:*",
-    "@context-hub/copilot": "workspace:*",
-    "@context-hub/cursor": "workspace:*",
-    "@context-hub/gemini-cli": "workspace:*",
-    "@context-hub/kiro-cli": "workspace:*",
-    "@context-hub/minimax-code": "workspace:*",
-    "@context-hub/qoder": "workspace:*",
-    "@context-hub/qwen-code": "workspace:*",
-    "@context-hub/trae": "workspace:*",
-    "@context-hub/windsurf": "workspace:*",
     "@context-hub/core": "workspace:*",
     "@context-hub/extensions": "workspace:*",
     "@context-hub/zh-cn": "workspace:*",
