@@ -18,6 +18,15 @@
  */
 import type { AssetKind } from "@workspace/core"
 
+/**
+ * Route this library answers on, whichever channel the form carries it over.
+ *
+ * One home for it on both sides of the wire: the browser store and the host
+ * bridge each used to spell it themselves, so the two ends of a call could
+ * drift apart with nothing to notice — a route is a string, not a type.
+ */
+export const PROMPT_ROUTE = "/hub/prompts"
+
 /** One prompt, as the library stores it and as a card draws it. */
 export interface Prompt {
   /**

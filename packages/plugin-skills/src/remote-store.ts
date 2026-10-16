@@ -6,23 +6,24 @@
  */
 import { assetRef } from "@workspace/core"
 
-import type {
-  ImportedSkill,
-  PackageSkill,
-  SkillAsset,
-  SkillDetail,
-  SkillDraft,
-  SkillImport,
-  SkillPage,
-  SkillPatch,
-  SkillPlaceRef,
-  SkillQuery,
-  SkillStore,
-  SkillUpdateCheck,
-  SkillUpdateSummary,
-  PlaceSkillDetail as PlaceSkillRecord,
-  PlaceSkillsView as PlaceSkills,
-  SkillInstall,
+import {
+  SKILL_ROUTE,
+  type ImportedSkill,
+  type PackageSkill,
+  type SkillAsset,
+  type SkillDetail,
+  type SkillDraft,
+  type SkillImport,
+  type SkillPage,
+  type SkillPatch,
+  type SkillPlaceRef,
+  type SkillQuery,
+  type SkillStore,
+  type SkillUpdateCheck,
+  type SkillUpdateSummary,
+  type PlaceSkillDetail as PlaceSkillRecord,
+  type PlaceSkillsView as PlaceSkills,
+  type SkillInstall,
 } from "./store.ts"
 
 /** One page of the catalog as the bridge returns it. */
@@ -70,23 +71,23 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     root: "host",
 
     async refresh(): Promise<void> {
-      await call(base, "/hub/skills?action=refresh", { method: "POST" })
+      await call(base, `${SKILL_ROUTE}?action=refresh`, { method: "POST" })
     },
 
     tags(): Promise<string[]> {
-      return call<string[]>(base, "/hub/skills?action=tags")
+      return call<string[]>(base, `${SKILL_ROUTE}?action=tags`)
     },
 
     list(input?: SkillQuery): Promise<SkillPage> {
-      return call<SkillPage>(base, `/hub/skills${query(input)}`)
+      return call<SkillPage>(base, `${SKILL_ROUTE}${query(input)}`)
     },
 
     get(id: string): Promise<SkillDetail> {
-      return call<SkillDetail>(base, `/hub/skills/${encodeURIComponent(id)}`)
+      return call<SkillDetail>(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}`)
     },
 
     create(draft: SkillDraft): Promise<SkillDetail> {
-      return call<SkillDetail>(base, "/hub/skills", {
+      return call<SkillDetail>(base, `${SKILL_ROUTE}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draft),
@@ -94,7 +95,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     },
 
     update(id: string, patch: SkillPatch): Promise<SkillDetail> {
-      return call<SkillDetail>(base, `/hub/skills/${encodeURIComponent(id)}`, {
+      return call<SkillDetail>(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
@@ -102,7 +103,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     },
 
     async remove(id: string): Promise<void> {
-      await call(base, `/hub/skills/${encodeURIComponent(id)}`, {
+      await call(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}`, {
         method: "DELETE",
       })
     },
@@ -110,13 +111,13 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     async readFile(id: string, file: string): Promise<string> {
       const body = await call<{ text: string }>(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/files/${file}`
+        `${SKILL_ROUTE}/${encodeURIComponent(id)}/files/${file}`
       )
       return body.text
     },
 
     async writeFile(id: string, file: string, text: string): Promise<void> {
-      await call(base, `/hub/skills/${encodeURIComponent(id)}/files/${file}`, {
+      await call(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}/files/${file}`, {
         method: "PUT",
         body: text,
       })
@@ -126,7 +127,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       /* Raw bytes: the file object is the body, so no multipart encoder is needed. */
       return call<SkillAsset>(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/assets?name=${encodeURIComponent(file.name)}`,
+        `${SKILL_ROUTE}/${encodeURIComponent(id)}/assets?name=${encodeURIComponent(file.name)}`,
         {
           method: "POST",
           headers: { "Content-Type": file.type || "application/octet-stream" },
@@ -138,7 +139,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     addAssetSource(id: string, source: string): Promise<SkillAsset> {
       return call<SkillAsset>(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/source`,
+        `${SKILL_ROUTE}/${encodeURIComponent(id)}/source`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -150,7 +151,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     async deleteAsset(id: string, ref: string): Promise<void> {
       await call(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
+        `${SKILL_ROUTE}/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
         { method: "DELETE" }
       )
     },
@@ -158,12 +159,12 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     listPackage(source: string): Promise<PackageSkill[]> {
       return call<PackageSkill[]>(
         base,
-        `/hub/skills?action=package&source=${encodeURIComponent(source)}`
+        `${SKILL_ROUTE}?action=package&source=${encodeURIComponent(source)}`
       )
     },
 
     installPackage(source: string, skills: string[]): Promise<SkillImport> {
-      return call<SkillImport>(base, "/hub/skills?action=install", {
+      return call<SkillImport>(base, `${SKILL_ROUTE}?action=install`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source, skills }),
@@ -171,7 +172,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     },
 
     importFolder(skills: ImportedSkill[]): Promise<SkillImport> {
-      return call<SkillImport>(base, "/hub/skills?action=import", {
+      return call<SkillImport>(base, `${SKILL_ROUTE}?action=import`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ skills }),
@@ -181,20 +182,20 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     assetUrl: (ref) => assetRef(ref, base),
 
     placeSkills(ref: SkillPlaceRef): Promise<PlaceSkills | null> {
-      return call<PlaceSkills | null>(base, `/hub/skills?action=place${placeQuery(ref)}`)
+      return call<PlaceSkills | null>(base, `${SKILL_ROUTE}?action=place${placeQuery(ref)}`)
     },
 
     placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
       return call<PlaceSkillRecord | null>(
         base,
-        `/hub/skills?action=place-skill&id=${encodeURIComponent(id)}${placeQuery(ref)}`
+        `${SKILL_ROUTE}?action=place-skill&id=${encodeURIComponent(id)}${placeQuery(ref)}`
       )
     },
 
     async placeFile(id: string, file: string, ref: SkillPlaceRef): Promise<string> {
       const body = await call<{ text: string }>(
         base,
-        `/hub/skills?action=place-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
+        `${SKILL_ROUTE}?action=place-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
       )
       return body.text
     },
@@ -202,7 +203,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     async installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const body = await call<{ mode: SkillInstall }>(
         base,
-        "/hub/skills?action=install-place",
+        `${SKILL_ROUTE}?action=install-place`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -215,7 +216,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     async adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const body = await call<{ mode: SkillInstall }>(
         base,
-        "/hub/skills?action=adopt-place",
+        `${SKILL_ROUTE}?action=adopt-place`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -226,7 +227,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     },
 
     async deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void> {
-      await call(base, "/hub/skills?action=delete-place", {
+      await call(base, `${SKILL_ROUTE}?action=delete-place`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...placeBody(ref) }),
@@ -234,7 +235,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     },
 
     async removeFrom(id: string, ref: SkillPlaceRef): Promise<void> {
-      await call(base, "/hub/skills?action=remove-place", {
+      await call(base, `${SKILL_ROUTE}?action=remove-place`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...placeBody(ref) }),
@@ -244,18 +245,18 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     checkUpdate(id: string): Promise<SkillUpdateCheck> {
       return call<SkillUpdateCheck>(
         base,
-        `/hub/skills/${encodeURIComponent(id)}/update`
+        `${SKILL_ROUTE}/${encodeURIComponent(id)}/update`
       )
     },
 
     checkUpdates(): Promise<SkillUpdateSummary> {
-      return call<SkillUpdateSummary>(base, "/hub/skills?action=check-updates", {
+      return call<SkillUpdateSummary>(base, `${SKILL_ROUTE}?action=check-updates`, {
         method: "POST",
       })
     },
 
     async updateFromUpstream(id: string): Promise<void> {
-      await call(base, `/hub/skills/${encodeURIComponent(id)}/update`, {
+      await call(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}/update`, {
         method: "POST",
       })
     },

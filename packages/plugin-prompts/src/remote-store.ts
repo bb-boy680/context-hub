@@ -6,13 +6,14 @@
  */
 import { assetRef } from "@workspace/core"
 
-import type {
-  PromptAsset,
-  PromptDraft,
-  PromptPatch,
-  PromptPage,
-  PromptStore,
-  StoredPrompt,
+import {
+  PROMPT_ROUTE,
+  type PromptAsset,
+  type PromptDraft,
+  type PromptPatch,
+  type PromptPage,
+  type PromptStore,
+  type StoredPrompt,
 } from "./store.ts"
 
 /** What the bridge answers with when it refuses. */
@@ -41,7 +42,7 @@ function write(body: unknown): RequestInit {
  *
  * @param base — the route prefix the form serves the library on.
  */
-export function createRemotePromptStore(base = "/hub/prompts"): PromptStore {
+export function createRemotePromptStore(base = PROMPT_ROUTE): PromptStore {
   return {
     list: () => call<PromptPage>(base, ""),
 

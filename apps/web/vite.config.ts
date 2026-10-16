@@ -1,38 +1,28 @@
 import path from "path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
-import {
-  assetLibrary,
-  extensionFiles,
-  netProxy,
-  placeFiles,
-  stateStore,
-  workspaceList,
-} from "@workspace/core/vite"
-import { skillLibrary } from "@workspace/plugin-skills/vite"
-import { mcpProbe } from "@workspace/plugin-mcp/vite"
-import { pluginLibrary } from "@workspace/plugin-plugins/vite"
-import { promptLibrary } from "@workspace/plugin-prompts/vite"
 import { defineConfig } from "vite"
 
-// https://vite.dev/config/
+import { DEV_HUB_PORT } from "./hub-port.ts"
+
+/**
+ * The dev server serves the page's source and nothing else.
+ *
+ * The backend is not mounted here. It is `server.ts`, the same process a built
+ * form and a desktop or command-line form run, started alongside this one by
+ * `dev.ts`; `/hub` is forwarded to it so the app's own requests stay relative
+ * and the same handlers run before and after a build.
+ *
+ * https://vite.dev/config/
+ */
 export default defineConfig({
-  /* The dev server also serves the hub's own directory, so the browser form
-     works against real files while the product forms mount their own host. */
-  plugins: [
-    react(),
-    tailwindcss(),
-    assetLibrary(),
-    stateStore(),
-    extensionFiles(),
-    workspaceList(),
-    netProxy(),
-    skillLibrary(),
-    placeFiles(),
-    mcpProbe(),
-    pluginLibrary(),
-    promptLibrary(),
-  ],
+  plugins: [react(), tailwindcss()],
+  server: {
+    proxy: {
+      /* Everything the hub owns is under one prefix, so one rule covers it. */
+      "/hub": { target: `http://127.0.0.1:${DEV_HUB_PORT}` },
+    },
+  },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

@@ -32,6 +32,6 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./host": "./src/host/skills-fs.ts",
-    "./vite": "./vite.ts"
+    "./handlers": "./handlers.ts"
   }
 }

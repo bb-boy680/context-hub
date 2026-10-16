@@ -13,6 +13,15 @@
  * This module imports nothing and runs on both sides of the wire.
  */
 
+/**
+ * Route this library answers on, whichever channel the form carries it over.
+ *
+ * One home for it on both sides of the wire. The browser tools and the host
+ * bridge each spelled it themselves, which is how the two ends of a call drift
+ * apart with nothing to notice: a route is a string, so no type check sees it.
+ */
+export const PLUGIN_ROUTE = "/hub/plugins"
+
 /** How a plugin pack was obtained, which is also how it is asked about later. */
 export type PluginOrigin =
   /** A git repository, at one revision. `ref` is the branch or tag the person named. */

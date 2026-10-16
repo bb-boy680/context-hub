@@ -29,10 +29,12 @@
     "./host/fs-browse": "./src/host/fs-browse.ts",
     "./host/folder-hash": "./src/host/folder-hash.ts",
     "./host/home": "./src/host/home.ts",
+    "./host/http": "./src/host/http.ts",
+    "./host/server": "./src/host/server.ts",
     "./host/plugins": "./src/host/plugins-fs.ts",
     "./host/place-files": "./src/host/place-files.ts",
     "./host/state": "./src/host/state-fs.ts",
     "./host/workspaces": "./src/host/workspaces-fs.ts",
-    "./vite": "./vite.ts"
+    "./handlers": "./handlers.ts"
   }
 }

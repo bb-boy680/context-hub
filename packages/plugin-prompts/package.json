@@ -30,6 +30,6 @@
     ".": "./src/index.ts",
     "./contract": "./src/contract.ts",
     "./host": "./src/host/prompts-fs.ts",
-    "./vite": "./vite.ts"
+    "./handlers": "./handlers.ts"
   }
 }

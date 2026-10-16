@@ -18,6 +18,7 @@ import type { ExtensionIcon } from "@workspace/extensions"
 import { useExtensionSnapshot, useHub, useI18n } from "@workspace/extensions/react"
 
 import {
+  PLUGIN_ROUTE,
   type PackContents,
   type PluginInstallReport,
   type PluginInstallScope,
@@ -36,7 +37,7 @@ import { probeInstallers } from "./scan.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
 /** The route the library answers on. */
-const ENDPOINT = "/hub/plugins"
+const ENDPOINT = PLUGIN_ROUTE
 
 /** What one call to the bridge returns when it refuses. */
 interface ErrorBody {

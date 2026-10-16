@@ -6,18 +6,7 @@
  * itself, so `startHub` offers those only when a host answers for them; without
  * a host the skills page has no catalog and says so.
  */
-import { clineExtension } from "@workspace/agent-cline"
-import { codexExtension } from "@workspace/agent-codex"
-import { commandCodeExtension } from "@workspace/agent-command-code"
-import { copilotExtension } from "@workspace/agent-copilot"
-import { cursorExtension } from "@workspace/agent-cursor"
-import { geminiCliExtension } from "@workspace/agent-gemini-cli"
-import { kiroCliExtension } from "@workspace/agent-kiro-cli"
-import { minimaxCodeExtension } from "@workspace/agent-minimax-code"
-import { qoderExtension } from "@workspace/agent-qoder"
-import { qwenCodeExtension } from "@workspace/agent-qwen-code"
-import { traeExtension } from "@workspace/agent-trae"
-import { windsurfExtension } from "@workspace/agent-windsurf"
+import { claudeCodeExtension } from "@workspace/plugin-claude-code"
 import { STATE_ROUTE } from "@workspace/core/state"
 import { createRemoteNet } from "@workspace/core/net"
 import {
@@ -30,21 +19,14 @@ import {
   type StoragePort,
 } from "@workspace/extensions"
 import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
-import { claudeCodeExtension } from "@workspace/plugin-claude-code"
 import { mcpExtension } from "@workspace/plugin-mcp"
 import { pluginsExtension } from "@workspace/plugin-plugins"
-import { createRemotePromptStore, promptsExtension } from "@workspace/plugin-prompts"
-import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
+import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@workspace/plugin-prompts"
+import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import { skillsShExtension } from "@workspace/plugin-skills-sh"
 import * as ui from "./ui-kit.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
-
-/** Path the active form serves the skill library on, when it serves one at all. */
-const SKILLS_ENDPOINT = "/hub/skills"
-
-/** The same for the prompt library: it has a route, and no query to narrow it. */
-const PROMPTS_ENDPOINT = "/hub/prompts"
 
 /**
  * Where the build before the host-backed state kept each document, and how it
@@ -112,7 +94,7 @@ async function openState(): Promise<Record<string, unknown>> {
 /** Whether a host answers for the skill library; without one the page has none. */
 async function skillStoreAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(`${SKILLS_ENDPOINT}?limit=0`, { method: "GET" })
+    const response = await fetch(`${SKILL_ROUTE}?limit=0`, { method: "GET" })
     return response.ok
   } catch {
     /* No host behind this origin: the plugin offers no library. */
@@ -123,7 +105,7 @@ async function skillStoreAvailable(): Promise<boolean> {
 /** The same question for the prompt library, asked at its own route. */
 async function promptStoreAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(PROMPTS_ENDPOINT, { method: "GET" })
+    const response = await fetch(PROMPT_ROUTE, { method: "GET" })
     return response.ok
   } catch {
     /* No host behind this origin: the page says it has no library. */
@@ -180,7 +162,7 @@ export async function startHub(): Promise<HubKernel> {
   }
   const services: Record<string, unknown> = { "hub.ui": ui }
   if (await promptStoreAvailable()) {
-    services["hub.prompts"] = createRemotePromptStore(PROMPTS_ENDPOINT)
+    services["hub.prompts"] = createRemotePromptStore(PROMPT_ROUTE)
   }
   if (await skillStoreAvailable()) {
     services["hub.skills"] = createRemoteSkillStore()
@@ -197,19 +179,11 @@ export async function startHub(): Promise<HubKernel> {
       promptsExtension,
       mcpExtension,
       pluginsExtension,
+      /* Only the agent integrations this build is being tried against. The
+         others are still written and still shipped; they are left out here so
+         the page's module graph is small enough to boot quickly while the
+         carrier is worked on. Add them back to the list to bring them in. */
       claudeCodeExtension,
-      codexExtension,
-      clineExtension,
-      commandCodeExtension,
-      copilotExtension,
-      cursorExtension,
-      geminiCliExtension,
-      kiroCliExtension,
-      minimaxCodeExtension,
-      qoderExtension,
-      qwenCodeExtension,
-      traeExtension,
-      windsurfExtension,
       skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),

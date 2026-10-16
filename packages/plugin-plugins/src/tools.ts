@@ -6,11 +6,11 @@
  * dev bridge or the host's own server; a desktop form swaps this for one that
  * calls its main process.
  */
-import type { PackDescription } from "./contract.ts"
+import { PLUGIN_ROUTE, type PackDescription } from "./contract.ts"
 import { PluginInstallError, type PluginBridgeTools } from "./provider.ts"
 
 /** The route the plugin library answers on. */
-const ENDPOINT = "/hub/plugins"
+const ENDPOINT = PLUGIN_ROUTE
 
 /** What one call to the bridge returns when it refuses. */
 interface ErrorBody {

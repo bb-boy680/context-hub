@@ -6,6 +6,15 @@
  */
 import type { AssetScope } from "@workspace/extensions"
 
+/**
+ * Route this library answers on, whichever channel the form carries it over.
+ *
+ * One home for it on both sides of the wire. The browser store spelled it 25
+ * times and the host bridge once, which is how the two ends of a call drift
+ * apart with nothing to notice: a route is a string, so no type check sees it.
+ */
+export const SKILL_ROUTE = "/hub/skills"
+
 /** Where a skill came from: this machine, the hub build, or a registry. */
 export type SkillOrigin = "local" | "builtin" | "registry"
 

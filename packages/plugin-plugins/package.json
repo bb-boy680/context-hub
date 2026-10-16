@@ -33,6 +33,6 @@
     "./contract": "./src/contract.ts",
     "./provider": "./src/provider.ts",
     "./library": "./src/library.ts",
-    "./vite": "./vite.ts"
+    "./handlers": "./handlers.ts"
   }
 }
