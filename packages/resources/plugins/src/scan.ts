@@ -1,11 +1,13 @@
 /**
- * Asking every client what it holds, all at once, and keeping each answer on its
- * own.
+ * Asking every client what it holds, a few at a time, and keeping each answer on
+ * its own.
  *
  * One client's command line says nothing about another's, so asking them in turn
  * only makes the page wait for the sum of them: a client whose program is slow —
  * or whose own timeout has to expire before it gives up — holds back every row
- * behind it. They are asked together instead.
+ * behind it. They are asked together instead. Together within reason, though:
+ * every one of these is a real program started on somebody's machine, so a
+ * registry of a dozen agents is several programs at once rather than a dozen.
  *
  * Together means one of them failing must not become the answer for all of them.
  * So each probe is settled where it is, and what a failing one carries back is
@@ -17,7 +19,20 @@
  * Nothing here reaches a disk or a client: the installers and the toolkit that
  * runs a program arrive as arguments, which is what lets this run against stubs.
  */
+import { mapLimit } from "@context-hub/extensions"
+
 import type { PluginHeld, PluginInstaller, PluginSwitches, PluginTools } from "./provider.ts"
+
+/**
+ * How many clients are asked at once.
+ *
+ * Four is the point where one slow client stops being every client's wait,
+ * without asking a machine for more programs at once than a person sitting at it
+ * would expect. Each probe runs the client's own command line, and a client that
+ * is not there still costs a lookup, so this is a ceiling on someone else's
+ * processes rather than on this hub's own work.
+ */
+const PROBE_CONCURRENCY = 4
 
 /** One client's answer about the packs it holds, or why there is none. */
 export interface ClientProbe {
@@ -92,7 +107,7 @@ async function probe(installer: PluginInstaller, tools: PluginTools): Promise<Cl
 }
 
 /**
- * Ask every client what it holds, all at once.
+ * Ask every client what it holds, a few at a time.
  *
  * @param installers — the registered installers, in the order they registered.
  * @param tools — the toolkit handed to each installer.
@@ -104,6 +119,6 @@ export function probeInstallers(
   tools: PluginTools
 ): Promise<ClientProbe[]> {
   /* `probe` settles rather than throws, so this gathers every client: no
-     rejection reaches here to cut the list short. */
-  return Promise.all(installers.map((installer) => probe(installer, tools)))
+     rejection reaches the limit below to cut the list short. */
+  return mapLimit(PROBE_CONCURRENCY, installers, (installer) => probe(installer, tools))
 }

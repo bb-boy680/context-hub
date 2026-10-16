@@ -23,7 +23,7 @@ export {
   type McpStdioDeclaration,
   type McpTransport,
 } from "./declaration.ts"
-export { McpError, mcpFailure, type McpFailure } from "./failure.ts"
+export { McpError, failureText, mcpFailure, type McpFailure } from "./failure.ts"
 export { editJson, jsonValueLines, parseJsonc, readJsonObject, valueAt } from "./jsonc.ts"
 export {
   MCP_SERVICE,

@@ -16,6 +16,7 @@ import type { ExtensionModule } from "@context-hub/extensions"
 
 import { pluginsMessages } from "./messages.ts"
 import { PluginsPage } from "./page.tsx"
+import { PLUGIN_LIBRARY_SERVICE, PluginLibrary } from "./library-store.ts"
 import { PLUGIN_SERVICE, PluginService } from "./provider.ts"
 import { createRemotePluginTools } from "./tools.ts"
 
@@ -36,7 +37,8 @@ export * from "./records.ts"
 export * from "./inspect.ts"
 export * from "./provider.ts"
 export { createRemotePluginTools } from "./tools.ts"
-export { usePluginLibrary, packFile, packFiles, type PluginLibrary } from "./library.ts"
+export { PluginLibrary, PLUGIN_LIBRARY_SERVICE } from "./library-store.ts"
+export { usePluginLibrary, packFile, packFiles } from "./library.ts"
 export * from "./types.ts"
 
 export const pluginsExtension: ExtensionModule = {
@@ -51,7 +53,7 @@ export const pluginsExtension: ExtensionModule = {
     icon: PlugIcon,
     defaultEnabled: true,
     permissions: ["assets.read", "assets.write"],
-    provides: [PLUGIN_SERVICE],
+    provides: [PLUGIN_SERVICE, PLUGIN_LIBRARY_SERVICE],
   },
   inject: ["nav", "routes", "locales"],
 
@@ -62,6 +64,13 @@ export const pluginsExtension: ExtensionModule = {
        agent plugin enabled in the same pass can register as soon as it
        activates. */
     new PluginService(ctx, createRemotePluginTools())
+
+    /* The shared read of the library. Constructed here and read by name from the
+       form's own startup, so the rows are already there when a page opens rather
+       than being read again on the way in — and constructed after the registry,
+       which is where it reads the clients from. It reads nothing yet: a module
+       enabled is not a module asked to start probing a machine. */
+    new PluginLibrary(ctx)
 
     ctx.nav.register({
       path: "/plugins",

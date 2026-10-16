@@ -22,10 +22,10 @@ import * as React from "react"
 
 import { cn } from "cn"
 
+import { failureText } from "./contract.ts"
 import { installedCount, MCP_SCOPES, placesInScope, placesOf, type McpPlaceState } from "./installs.ts"
 import { FilesPane } from "./detail-files.tsx"
 import { ToolsPane } from "./detail-tools.tsx"
-import { failureText } from "./library.ts"
 import { entryOf } from "./records.ts"
 import { ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"

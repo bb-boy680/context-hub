@@ -11,8 +11,7 @@ import * as React from "react"
 
 import { cn } from "cn"
 
-import { mcpFailure } from "./contract.ts"
-import { failureText } from "./library.ts"
+import { failureText, mcpFailure } from "./contract.ts"
 import type { McpProbeReport } from "./probe.ts"
 import {
   ServerForm,

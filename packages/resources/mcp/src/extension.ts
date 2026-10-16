@@ -11,6 +11,7 @@ import type { WorkspaceService } from "@context-hub/core/workspace"
 import type { ExtensionModule } from "@context-hub/extensions"
 import { MCP_SERVICE } from "./contract.ts"
 
+import { MCP_LIBRARY_SERVICE, McpLibrary } from "./library-store.ts"
 import { mcpMessages } from "./messages.ts"
 import { McpService } from "./provider.ts"
 
@@ -42,12 +43,18 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
       icon: ServerIcon,
       defaultEnabled: true,
       permissions: ["storage.self", "filesystem"],
-      provides: [MCP_SERVICE],
+      provides: [MCP_SERVICE, MCP_LIBRARY_SERVICE],
     },
     inject: ["nav", "routes", "locales"],
 
     apply(ctx) {
       new McpService(ctx)
+
+      /* The shared read of every client file. Constructed here and read by name
+         from the form's own startup, so the rows are already there when a page
+         opens rather than being read again on the way in. Constructing it asks
+         for nothing: what it reads, it reads when something asks it to. */
+      new McpLibrary(ctx)
 
       ctx.nav.register({
         path: "/mcp-servers",

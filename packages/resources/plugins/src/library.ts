@@ -2,20 +2,21 @@
  * The library as the page uses it: the rows, what each agent already holds, and
  * the writes the screen offers.
  *
- * The bridge holds the files and the truth about them; this side keeps the last
- * answer it was given and asks again after every write, because every write can
- * change more than it named — collecting a pack rewrites the index and the
- * marketplace, and an update can land on agent copies too.
+ * The bridge holds the files and the truth about them; the read that collects
+ * both halves of the answer lives in `./library-store.ts`, and this file is how
+ * the page watches it and what every write goes through. Every write asks for
+ * that read again, because every write can change more than it named — collecting
+ * a pack rewrites the index and the marketplace, and an update can land on agent
+ * copies too.
  *
- * The agents' own answers are folded here, not in the bridge: what each agent
- * holds is read by that agent's extension, and this side only joins the answers
- * into the rows the page draws.
+ * The agents' own answers are not folded in the bridge: what each agent holds is
+ * read by that agent's extension, and the fold that turns those answers into rows
+ * happens on this side, in `./rows.ts`.
  */
-import { PlugIcon } from "lucide-react"
 import * as React from "react"
 
-import type { ExtensionIcon } from "@context-hub/extensions"
-import { useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
+import { createCatalog, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
+import { useCatalog, useHub, useI18n } from "@context-hub/extensions/react"
 
 import {
   PLUGIN_ROUTE,
@@ -23,6 +24,7 @@ import {
   type PluginInstallReport,
   type PluginInstallScope,
 } from "./contract.ts"
+import { NOTHING_READ, PLUGIN_LIBRARY_SERVICE, type PluginLibraryValue } from "./library-store.ts"
 import {
   PLUGIN_SERVICE,
   type PluginInstaller,
@@ -32,8 +34,7 @@ import {
   type PluginTools,
 } from "./provider.ts"
 import type { PluginRecord, PluginUpdateCheck, PluginUpdateSummary } from "./revision.ts"
-import { collectScanned, composeRows, type ScannedPack } from "./rows.ts"
-import { probeInstallers } from "./scan.ts"
+import { composeRows } from "./rows.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
 /** The route the library answers on. */
@@ -42,14 +43,6 @@ const ENDPOINT = PLUGIN_ROUTE
 /** What one call to the bridge returns when it refuses. */
 interface ErrorBody {
   error?: string
-}
-
-/** The list answer. */
-interface ListAnswer {
-  root: string
-  plugins: PluginRecord[]
-  /** The records whose files are gone, by name. */
-  missing: string[]
 }
 
 /**
@@ -217,7 +210,17 @@ export function usePackReadme(plugin: PluginRow): string | null | undefined {
   return text
 }
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+/**
+ * One call to this route, answered as JSON.
+ *
+ * Shared with `./library-store.ts`, which is where the library's own read lives
+ * now and which reaches the same route through this one helper.
+ *
+ * @param path — the whole path, query and all.
+ * @param body — what to send; absent makes it a read.
+ * @throws {Error} when the host refused it, with the reason it gave.
+ */
+export async function call<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
     ...(body === undefined
@@ -372,43 +375,26 @@ export interface PluginUpdateOutcome {
   overwroteEdits: boolean
 }
 
-/** Nothing to follow when this form provides no workspace list. */
-const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
-
 /**
- * The workspace in use, as the form keeps it.
- *
- * A client resolves its own project files against the folder it is started in —
- * Claude Code writes `.claude/settings.json` where it was run — so switching
- * workspaces changes what every client holds and which of its files switches a
- * pack on. The id is therefore a reload key rather than context a read may
- * ignore.
- *
- * @returns the current workspace's id, or `null` when this form has none.
+ * What a page watches when this module is not loaded: always empty, never
+ * reading. It exists so that watching a library is one code path rather than a
+ * hook called inside a condition.
  */
-function useCurrentWorkspace(): string | null {
-  const ctx = useHub()
-  const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
-  const subscribe = React.useCallback(
-    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
-    [workspaces]
-  )
-  const read = React.useCallback(
-    () => workspaces?.current()?.current ?? null,
-    [workspaces]
-  )
-  return React.useSyncExternalStore(subscribe, read)
-}
+const NO_LIBRARY: Catalog<PluginLibraryValue> = createCatalog({
+  initial: NOTHING_READ,
+  read: async () => NOTHING_READ,
+})
 
 /* Which agents this hub can deliver to is a plugin question, not a library one:
    the installers live in the agent plugins, and this page reads the registry
-   they registered into. The snapshot's revision is what says the catalog
-   changed, so enabling an agent adds it to the menu without a reload. */
+   they registered into. That registry is what the library's own read asks, and
+   it reads again whenever the catalog changes, so enabling an agent adds it to
+   the menu without a reload of the page. */
 export function usePluginLibrary(): PluginLibrary {
   const { t, state } = useI18n()
   const ctx = useHub()
-  const snapshot = useExtensionSnapshot()
-  const revision = snapshot.revision
+  const shared = React.useMemo(() => ctx.get(PLUGIN_LIBRARY_SERVICE) ?? null, [ctx])
+  const catalog = shared ?? NO_LIBRARY
   const service = React.useMemo(
     (): PluginService | null => ctx.get(PLUGIN_SERVICE) ?? null,
     [ctx]
@@ -425,71 +411,22 @@ export function usePluginLibrary(): PluginLibrary {
     (): PluginTools | null => (service === null ? null : { ...service.tools, files: ctx.host.files }),
     [service, ctx]
   )
-  const workspace = useCurrentWorkspace()
-  /* An installer carries no mark of its own: it shows the icon its own extension
-     declares, which is the same one the catalog row draws. */
-  const iconFor = React.useCallback(
-    (id: string): ExtensionIcon =>
-      snapshot.entries.find((entry) => entry.manifest.id === id)?.manifest.icon ?? PlugIcon,
-    [snapshot]
-  )
-  const [records, setRecords] = React.useState<PluginRecord[]>([])
-  const [scanned, setScanned] = React.useState<ScannedPack[]>([])
-  const [clients, setClients] = React.useState<PluginClient[]>([])
-  const [root, setRoot] = React.useState("")
   const [busy, setBusy] = React.useState(false)
-  const [failure, setFailure] = React.useState<string | null>(null)
-  const [missing, setMissing] = React.useState<readonly string[]>([])
+  const [writeFailure, setWriteFailure] = React.useState<string | null>(null)
 
-  const read = React.useCallback(async () => {
-    void revision
-    /* The workspace in use is a reload key: it decides which folder each client
-       is asked in, and which of its files the switches are read from. */
-    void workspace
-    const answer = await call<ListAnswer>(`${ENDPOINT}?action=list`)
-    setRecords(answer.plugins)
-    setRoot(answer.root)
-    setMissing(answer.missing)
-    if (service === null || tools === null) {
-      setClients([])
-      setScanned([])
-      return
-    }
-    /* Every client is asked at once, and each answer stands on its own: see
-       ./scan.ts for why both of those matter. An agent whose program is missing,
-       or which cannot answer at all, is still listed — a person then sees that
-       the hub looked for it rather than wondering why an agent they use is
-       absent, and one that failed says so in its own words. */
-    const probes = await probeInstallers(service.installers(), tools)
-    setClients(
-      probes.map((one) => ({
-        id: one.installer.id,
-        label: one.installer.label,
-        icon: iconFor(one.installer.id),
-        places: one.installer.places,
-        switches: one.switches,
-        available: one.available,
-        ...(one.error === undefined ? {} : { error: one.error }),
-      }))
-    )
-    /* Only a client that answered contributes packs to the rows: one that failed
-       knows of none, and drawing its empty answer as "holds nothing" is the one
-       thing the error is carried to prevent. */
-    setScanned(
-      collectScanned(
-        probes
-          .filter((one) => one.error === undefined)
-          .map((one) => ({
-            client: one.installer.id,
-            label: one.installer.label,
-            icon: iconFor(one.installer.id),
-            places: one.installer.places,
-            switches: one.switches,
-            packs: one.packs,
-          }))
-      )
-    )
-  }, [service, revision, iconFor, tools, workspace])
+  React.useEffect(() => {
+    /* Somebody has to be the first to ask. A form's startup does this before
+       anything is drawn; until it does, the page is what asks. */
+    void shared?.load()
+  }, [shared])
+
+  const value = useCatalog(catalog, (snapshot) => snapshot.value ?? NOTHING_READ)
+  const readFailure = useCatalog(catalog, (snapshot) => snapshot.failure)
+
+  /** Read the library again: what every write ends with, and what the person's own refresh button asks for. */
+  const reload = React.useCallback(async () => {
+    await shared?.reload()
+  }, [shared])
 
   /** Run one write, then read everything again: any write can change more than it named. */
   const write = React.useCallback(
@@ -497,22 +434,21 @@ export function usePluginLibrary(): PluginLibrary {
       setBusy(true)
       try {
         const answer = await call<T>(ENDPOINT, body)
-        await read()
-        setFailure(null)
+        await reload()
+        setWriteFailure(null)
         return answer
       } finally {
         setBusy(false)
       }
     },
-    [read]
+    [reload]
   )
 
   /**
    * Run one installer's own action, then read everything again.
    *
-   * The failure lands in `failure` as well as in the returned rejection: the
-   * agent's own words name the real cause, and a caller that only toasts would
-   * lose them on the next render.
+   * The failure is kept as well as thrown: the agent's own words name the real
+   * cause, and a caller that only toasts would lose them on the next render.
    */
   const deliver = React.useCallback(
     async (
@@ -526,39 +462,27 @@ export function usePluginLibrary(): PluginLibrary {
       setBusy(true)
       try {
         await act(installer, tools)
-        await read()
-        setFailure(null)
+        await reload()
+        setWriteFailure(null)
       } catch (error: unknown) {
-        setFailure(error instanceof Error ? error.message : String(error))
+        setWriteFailure(reasonOf(error))
         throw error
       } finally {
         setBusy(false)
       }
     },
-    [service, tools, read]
+    [service, tools, reload]
   )
-
-  /* The first read is queued rather than run during render: a state update in
-     an effect's own body is what the hooks lint refuses. */
-  React.useEffect(() => {
-    let alive = true
-    queueMicrotask(() => {
-      if (!alive) return
-      void read().catch((error: unknown) => {
-        if (alive) setFailure(error instanceof Error ? error.message : String(error))
-      })
-    })
-    return () => {
-      alive = false
-    }
-  }, [read])
 
   /**
    * Fetch one pack again from the address its record carries.
    *
    * A repair rather than a write the person asked for: it neither takes the busy
    * flag nor reads again on its own, so a page can run several at once, report
-   * on each as it lands, and read once at the end.
+   * on each as it lands, and read once at the end. Nothing starts it but the page
+   * seeing a pack in `missing` — a read that finds one is not a reason to fetch
+   * it, which is what keeps a library read at startup from turning into a
+   * download.
    *
    * @param name — the pack whose files are gone.
    * @returns the record as it stands once the files are back.
@@ -566,9 +490,13 @@ export function usePluginLibrary(): PluginLibrary {
   const restore = async (name: string): Promise<PluginRecord> =>
     call<PluginRecord>(ENDPOINT, { action: "restore", name })
 
+  /* What the clients hold, as the read folded it; every write that acts on a
+     client's own record reads it from here. */
+  const scanned = value.scanned
+
   const rows = React.useMemo(
-    () => composeRows(records, scanned, state.active, t),
-    [records, scanned, state.active, t]
+    () => composeRows(value.records, scanned, state.active, t),
+    [value.records, scanned, state.active, t]
   )
 
   /**
@@ -602,12 +530,16 @@ export function usePluginLibrary(): PluginLibrary {
 
   return {
     rows,
-    clients,
-    root,
+    clients: value.clients,
+    root: value.root,
+    /* A write in flight, and only a write: a read never blocks the screen — the
+       page draws the last answer it has while another one is being made. */
     busy,
-    failure,
-    missing,
-    refresh: read,
+    /* A read that failed keeps the library it last read and says so; a write that
+       failed keeps its own words, which name what the person just did. */
+    failure: writeFailure ?? readFailure,
+    missing: value.missing,
+    refresh: reload,
     checkUpdates: () => write<PluginUpdateSummary>({ action: "check-updates" }),
     checkUpdate: (name) => write<PluginUpdateCheck>({ action: "check-update", name }),
     update: (name) => write<PluginUpdateOutcome>({ action: "update", name }),
@@ -627,9 +559,7 @@ export function usePluginLibrary(): PluginLibrary {
          marketplace the pack really came from, and an agent holds packs this hub
          never delivered. It answered with that id when it was asked what it
          holds, so this side never has to guess at it. */
-      const own = scanned
-        .find((one) => one.name === name)
-        ?.held.find((one) => one.client === client)?.id
+      const own = heldId(name, client)
       if (own === undefined) {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }

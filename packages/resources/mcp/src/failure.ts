@@ -49,3 +49,22 @@ export function mcpFailure(error: unknown, fallback: string): McpFailure {
   const detail = error instanceof Error ? error.message : String(error)
   return { key: fallback, detail }
 }
+
+/**
+ * The sentence one failure reads as: its key resolved, its placeholders filled.
+ *
+ * It travels with the failure rather than with a page because a failure can be
+ * reported where no page is: a probe answers a library that outlives every
+ * page drawn from it, and what it reports has to be a sentence before it gets
+ * there.
+ *
+ * @param t — the active locale's lookup.
+ * @param failure — the failure, as the extension that produced it named it.
+ */
+export function failureText(t: (key: string) => string, failure: McpFailure): string {
+  let text = t(failure.key)
+  for (const [name, value] of Object.entries(failure.params ?? {})) {
+    text = text.replace(`{${name}}`, value)
+  }
+  return text
+}

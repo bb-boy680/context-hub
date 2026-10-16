@@ -21,7 +21,8 @@ export * from "./contract.ts"
 export { mcpModuleWith } from "./extension.ts"
 export { McpServersPage }
 export { McpService } from "./provider.ts"
-export { failureText, useMcpLibrary } from "./library.ts"
+export { useMcpLibrary } from "./library.ts"
+export { MCP_LIBRARY_SERVICE, McpLibrary } from "./library-store.ts"
 export * from "./types.ts"
 export {
   buildCatalog,
