@@ -8,6 +8,7 @@
  */
 export {
   PROMPT_SERVICE,
+  type PromptDocument,
   type PromptPlace,
   type PromptProvider,
   type PromptProviderRegistry,

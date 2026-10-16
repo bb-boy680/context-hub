@@ -9,13 +9,13 @@
  * library and the page, and the agents own the question of where "somewhere" is
  * — each declares its own directories when it activates.
  */
-import { FileTextIcon } from "lucide-react"
+import { FileTextIcon, FolderIcon } from "lucide-react"
 
 import type { ExtensionDefinition } from "@workspace/extensions"
 
 import { promptsMessages } from "./messages.ts"
 import { PromptsPage } from "./page.tsx"
-import { PROMPT_SERVICE } from "./provider.ts"
+import { PROMPT_SERVICE, type PromptPlace } from "./provider.ts"
 import { createPromptService } from "./service.ts"
 import type { PromptStore } from "./store.ts"
 
@@ -36,6 +36,37 @@ declare module "@deepseek-ai/cordis" {
 /** This module's own id; the kernel matches it against the manifest. */
 const PROMPTS_ID = "hub.prompt.catalog"
 
+/**
+ * The place every workspace has, which no agent owns: where this hub writes the
+ * forms it makes out of a prompt.
+ *
+ * `.agents/` is the directory the agents in this hub already share — the skills
+ * module keeps its own `.agents/skills` there — so a command or a rule written
+ * under it is found by whoever has been taught to look, rather than being put
+ * in one agent's own directory. It takes no install: there is no file a prompt
+ * itself would be written to here, only the forms made from one.
+ */
+const WORKSPACE_PLACE: PromptPlace = {
+  id: "workspace",
+  /* No agent owns this one, so it answers to this module. */
+  agent: PROMPTS_ID,
+  labelKey: "prompts.location.workspace",
+  icon: FolderIcon,
+  scope: "workspace",
+  commandDir: ".agents/commands",
+  ruleDir: ".agents/rules",
+  /* The two files a project keeps its standing conventions in. Both are named
+     by the workspace's own root, and both are written into rather than over. */
+  documents: [
+    { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
+    { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
+  ],
+  generatedOnly: true,
+  /* Before the agents' own places, which all rank 20: what this hub writes for
+     the workspace is not one agent's business. */
+  order: 0,
+}
+
 export const promptsExtension: ExtensionDefinition = {
   manifest: {
     id: PROMPTS_ID,
@@ -54,11 +85,13 @@ export const promptsExtension: ExtensionDefinition = {
   activate(scope) {
     /* The delivery targets travel through the registry rather than a
        contribution point, so an agent integration registers into this module
-       the same way whether it was built here or installed as a folder. This
-       module registers no place of its own: unlike a skill, a prompt has no
-       directory every agent already shares — it only exists where it was sent,
-       so the library the form owns is the only other place it lives. */
-    scope.provide(PROMPT_SERVICE, createPromptService())
+       the same way whether it was built here or installed as a folder. The
+       workspace place is the module's own: `.agents/` is the one directory the
+       agents in this hub share, and what lands there is what this hub wrote,
+       not what an agent reads a prompt out of. */
+    const service = createPromptService()
+    service.registry.register({ id: PROMPTS_ID, places: [WORKSPACE_PLACE] })
+    scope.provide(PROMPT_SERVICE, service)
 
     scope.contribute("nav", {
       path: "/prompts",

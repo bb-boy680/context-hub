@@ -98,7 +98,15 @@ const CLAUDE_CODE_PROMPT_PLACES: PromptPlace[] = [
     scope: "global",
     commandDir: CLAUDE_CODE_COMMAND_DIR,
     ruleDir: CLAUDE_CODE_RULE_DIR,
-    instructionFile: CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE,
+    /* The one file a prompt is added to here, named the way the menu that
+       offers it reads. */
+    documents: [
+      {
+        id: "claude",
+        labelKey: "claudeCode.menu.instructions",
+        file: CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE,
+      },
+    ],
     order: 20,
   },
 ]

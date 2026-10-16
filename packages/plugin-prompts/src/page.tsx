@@ -279,7 +279,7 @@ interface CardProps {
   places: readonly PromptPlace[]
   onOpen: () => void
   onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }
 
 function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, onGenerate }: CardProps) {
@@ -417,18 +417,23 @@ export function PromptsPage() {
 
   /** Carry one of the four forms into one place, and say so. */
   const generate = React.useCallback(
-    async (prompt: StoredPrompt, place: PromptPlace, action: Delivery) => {
+    async (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => {
       if (files === null) {
         refuse(new Error(t("prompts.menu.blocked")))
         return
       }
       setBusy(true)
       try {
-        await deliver(files, place, prompt, action)
+        await deliver(files, place, prompt, action, document)
         setStamp((current) => current + 1)
+        /* A section says which file it went into; a file is its own answer. */
+        const where = place.documents?.find((one) => one.id === document)
         toast.add({
           type: "success",
-          title: t(`prompts.done.${action}`).replace("{agent}", t(place.labelKey)),
+          title:
+            where === undefined
+              ? t(`prompts.done.${action}`).replace("{agent}", t(place.labelKey))
+              : t("prompts.done.document").replace("{file}", t(where.labelKey)),
         })
       } catch (failure) {
         refuse(failure)
@@ -535,7 +540,8 @@ export function PromptsPage() {
     places,
     onOpen: () => setDetailId(prompt.id),
     onToggle: (place: PromptPlace) => void toggle(prompt, place),
-    onGenerate: (place: PromptPlace, action: Delivery) => void generate(prompt, place, action),
+    onGenerate: (place: PromptPlace, action: Delivery, document?: string) =>
+      void generate(prompt, place, action, document),
   })
 
   const columns: LedgerColumn<StoredPrompt>[] = [
@@ -790,9 +796,9 @@ export function PromptsPage() {
                           void generate(prompt, place, "install")
                         }
                       }}
-                      onGenerate={(place, action) => {
+                      onGenerate={(place, action, chosen) => {
                         for (const prompt of rows.filter((row) => checked.includes(row.id))) {
-                          void generate(prompt, place, action)
+                          void generate(prompt, place, action, chosen)
                         }
                       }}
                     />
@@ -825,7 +831,7 @@ export function PromptsPage() {
           if (!open) setDetailId(null)
         }}
         onToggle={(prompt, place) => void toggle(prompt, place)}
-        onGenerate={(prompt, place, action) => void generate(prompt, place, action)}
+        onGenerate={(prompt, place, action, document) => void generate(prompt, place, action, document)}
         onDelete={(prompt) => void drop(prompt)}
         onChanged={() => void library.reload()}
         onDescribe={(prompt, description) => void describe(prompt, { description })}
@@ -854,7 +860,7 @@ function LedgerAction({
   files: PlaceFiles | null
   busy: boolean
   onToggle: (prompt: StoredPrompt, place: PromptPlace) => Promise<void>
-  onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery) => Promise<void>
+  onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => Promise<void>
 }) {
   const [stamp, setStamp] = React.useState(0)
   const installed = useInstalled(prompt, places, files, stamp)

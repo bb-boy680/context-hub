@@ -61,6 +61,10 @@ const NO_CHEVRON = "[&>svg:last-child]:hidden"
 /**
  * One agent's own ways of writing a prompt out, as menu entries.
  *
+ * The two files a prompt becomes, and then one entry for every document this
+ * place says it keeps — a place that declares none simply has two, rather than
+ * being offered an action that would fail.
+ *
  * Exported because the detail panel lists agents flat rather than inside a
  * menu: the same entries hang off the same row in both places, and only the
  * surface around them differs.
@@ -73,7 +77,7 @@ export function GenerateItems({
   onGenerate,
 }: {
   place: PromptPlace
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }) {
   const { t } = useI18n()
 
@@ -85,15 +89,21 @@ export function GenerateItems({
       <DropdownMenuItem onClick={() => onGenerate(place, "rule")}>
         {t("prompts.menu.rule")}
       </DropdownMenuItem>
-      {/* The action appears because the place declares an instruction file.
-          A menu that decided it per agent would be a list of agents to keep
-          in step, which is the thing this registry exists to avoid. */}
-      {place.instructionFile === undefined ? null : (
+      {/* The actions that follow appear because the place declares the files
+          they write. A menu that decided them per agent would be a list of
+          agents to keep in step, which is the thing this registry exists to
+          avoid. */}
+      {place.documents === undefined || place.documents.length === 0 ? null : (
         <>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => onGenerate(place, "instructions")}>
-            {t("prompts.menu.instructions")}
-          </DropdownMenuItem>
+          {place.documents.map((document) => (
+            <DropdownMenuItem
+              key={document.id}
+              onClick={() => onGenerate(place, "instructions", document.id)}
+            >
+              {t(document.labelKey)}
+            </DropdownMenuItem>
+          ))}
         </>
       )}
     </>
@@ -111,7 +121,7 @@ function PlaceMore({
   onGenerate,
 }: {
   place: PromptPlace
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }) {
   const { t } = useI18n()
 
@@ -155,7 +165,8 @@ function PlaceMore({
  * @param files — the form's client-file port; `null` makes every row say so.
  * @param words — the strings this menu draws, in the active locale.
  * @param onPick — deliver what is being sent into a place.
- * @param onGenerate — write one of the three derived forms into a place.
+ * @param onGenerate — write one of the derived forms into a place; a document's
+ *   id says which file a section goes into.
  */
 function PlaceChoices({
   places,
@@ -170,7 +181,7 @@ function PlaceChoices({
   files: PlaceFiles | null
   words: PlaceWords
   onPick: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }) {
   const { t } = useI18n()
 
@@ -245,7 +256,8 @@ function usePlaceWords(): PlaceWords {
  * @param files — the form's client-file port; `null` makes every row say so.
  * @param busy — a delivery is in flight; the trigger waits.
  * @param onToggle — install into a place, or take it back out of one.
- * @param onGenerate — write one of the three derived forms into a place.
+ * @param onGenerate — write one of the derived forms into a place; a document's
+ *   id says which file a section goes into.
  */
 export function PromptActions({
   prompt,
@@ -262,7 +274,7 @@ export function PromptActions({
   files: PlaceFiles | null
   busy: boolean
   onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }) {
   const { t } = useI18n()
   const words = usePlaceWords()
@@ -326,7 +338,7 @@ export function BatchActions({
   files: PlaceFiles | null
   busy: boolean
   onDeliver: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }) {
   const { t } = useI18n()
   const words = usePlaceWords()

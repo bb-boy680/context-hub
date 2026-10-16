@@ -21,8 +21,24 @@ import type { ExtensionIcon } from "@workspace/extensions"
 export const PROMPT_SERVICE = "prompts"
 
 /**
- * One place an agent takes prompts in, declared as two directories and the file
- * beside them.
+ * One file a prompt can be added to as a marked section.
+ *
+ * The file belongs to whoever writes in it, so nothing here ever replaces it:
+ * the section goes in under a marker of this hub's own, and a second delivery
+ * of the same prompt replaces that section rather than adding a second one.
+ */
+export interface PromptDocument {
+  /** Stable id; what a delivery names when it asks for this one. */
+  readonly id: string
+  /** Message key for the file's name, as the row that offers it reads. */
+  readonly labelKey: string
+  /** Path of the file, relative to the same root the two directories are read under. */
+  readonly file: string
+}
+
+/**
+ * One place an agent takes prompts in, declared as two directories and the
+ * files beside them.
  *
  * A directory rather than a file: a prompt becomes its own file, named after the
  * prompt, and the name is only known once someone has written one. Both roots a
@@ -44,11 +60,22 @@ export interface PromptPlace {
   /** Where a generated rule goes, e.g. ".claude/rules". */
   readonly ruleDir: string
   /**
-   * The instruction file a prompt can be added to, relative to the same root.
-   * Absent where the agent reads none: the action that writes one is then not
+   * The files a prompt can be added to, in the order a menu offers them.
+   * Absent where the place holds none: the actions that write one are then not
    * offered at all, rather than offered and failing.
    */
-  readonly instructionFile?: string
+  readonly documents?: readonly PromptDocument[]
+  /**
+   * Whether this place takes only what a prompt is written *out* as — a
+   * command, a rule, a section of one of its documents — and not the prompt
+   * itself.
+   *
+   * A place that belongs to an agent has a directory the agent reads a prompt
+   * out of, so putting one there is a thing to offer. A place that is a
+   * workspace's own output directory has no such reading: it is where the
+   * generated forms land, and "install the prompt here" names no file.
+   */
+  readonly generatedOnly?: boolean
   /** Sort rank among the places of its own scope. */
   readonly order: number
 }

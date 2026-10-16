@@ -59,6 +59,7 @@ export const promptsMessages: Record<string, string> = {
   "prompts.place.searchClear": "Clear the search",
   "prompts.place.searchEmpty": "No agent matches",
   "prompts.place.none": "No agent takes prompts yet",
+  "prompts.location.workspace": "Workspace",
   "prompts.location.library": "Prompt library",
   "prompts.place.body": "This hub",
   "prompts.place.generates": "Commands and rules, from the ⋯",
@@ -96,7 +97,8 @@ export const promptsMessages: Record<string, string> = {
   "prompts.menu.installTo": "Install to",
   "prompts.menu.commands": "Generate a command",
   "prompts.menu.rule": "Generate a rule",
-  "prompts.menu.instructions": "Add to CLAUDE.md",
+  "prompts.menu.document.agents": "Add to AGENTS.md",
+  "prompts.menu.document.design": "Add to DESIGN.md",
   "prompts.menu.blocked": "This form cannot reach that file",
 
   "prompts.add.title": "Add a prompt",
@@ -138,6 +140,6 @@ export const promptsMessages: Record<string, string> = {
   "prompts.done.remove": "Taken back from {agent}",
   "prompts.done.commands": "A command was generated for {agent}",
   "prompts.done.rule": "A rule was generated for {agent}",
-  "prompts.done.instructions": "Added to {agent}'s CLAUDE.md",
+  "prompts.done.document": "Added to {file}",
   "prompts.done.deleted": "Deleted “{name}”",
 }

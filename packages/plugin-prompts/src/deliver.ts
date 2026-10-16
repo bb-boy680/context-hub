@@ -28,24 +28,27 @@ export type Delivery = "install" | "commands" | "rule" | "instructions"
  * @param place — the agent place it goes to.
  * @param prompt — the prompt being delivered.
  * @param action — which of the four.
- * @throws when the action writes an instruction file and the place declares
- * none — the menu does not offer that row, so reaching it means a caller made
- * the action up.
+ * @param document — which of the place's files to add to; required by, and only
+ * read by, `instructions`.
+ * @throws when the action adds to a document and the place declares no such one
+ * — the menu does not offer that row, so reaching it means a caller made the
+ * action up.
  */
 export function targetOf(
   place: PromptPlace,
   prompt: Prompt,
-  action: Delivery
+  action: Delivery,
+  document?: string
 ): PlaceRef {
-  const file = slugOf(prompt.description)
   if (action === "instructions") {
-    if (place.instructionFile === undefined) {
-      throw new Error(`${place.id} reads no instruction file`)
+    const target = place.documents?.find((one) => one.id === document)
+    if (target === undefined) {
+      throw new Error(`${place.id} has no ${document ?? "instruction"} file to add to`)
     }
-    return { scope: place.scope, file: place.instructionFile }
+    return { scope: place.scope, file: target.file }
   }
   const dir = action === "rule" ? place.ruleDir : place.commandDir
-  return { scope: place.scope, file: `${dir}/${file}.md` }
+  return { scope: place.scope, file: `${dir}/${slugOf(prompt.description)}.md` }
 }
 
 /** Whether one delivery is already in place, read from the file it writes. */
@@ -53,20 +56,21 @@ export async function delivered(
   files: PlaceFiles,
   place: PromptPlace,
   prompt: Prompt,
-  action: Delivery
+  action: Delivery,
+  document?: string
 ): Promise<boolean> {
   let ref: PlaceRef
   try {
-    ref = targetOf(place, prompt, action)
+    ref = targetOf(place, prompt, action, document)
   } catch {
     /* An action this place cannot take is not one it has taken. */
     return false
   }
   const text = await files.read(ref)
   if (text === null) return false
-  /* A command is its own file, so the file being there is the whole answer. An
-     instruction file holds everything the person wrote, so the answer is
-     whether this prompt's section is among it. */
+  /* A command is its own file, so the file being there is the whole answer. A
+     document holds everything the person wrote, so the answer is whether this
+     prompt's section is among it. */
   if (action !== "instructions") return true
   return text.includes(`<!-- context-hub:${slugOf(prompt.description)} -->`)
 }
@@ -96,17 +100,19 @@ function textOf(prompt: Prompt, action: Delivery, existing: string | null): stri
  * @param place — the agent place it goes to.
  * @param prompt — the prompt being delivered.
  * @param action — which of the four.
+ * @param document — which of the place's files to add to; `instructions` only.
  */
 export async function deliver(
   files: PlaceFiles,
   place: PromptPlace,
   prompt: Prompt,
-  action: Delivery
+  action: Delivery,
+  document?: string
 ): Promise<void> {
-  const ref = targetOf(place, prompt, action)
-  /* The read is what makes an instruction file additive: the section goes into
-     what is already there rather than replacing it. It is also what makes the
-     write safe — a whole-file write is the only kind this port has. */
+  const ref = targetOf(place, prompt, action, document)
+  /* The read is what makes a document additive: the section goes into what is
+     already there rather than replacing it. It is also what makes the write
+     safe — a whole-file write is the only kind this port has. */
   const existing = await files.read(ref)
   await files.write(ref, textOf(prompt, action, existing))
 }
@@ -115,20 +121,21 @@ export async function deliver(
  * Take one delivery back.
  *
  * @returns whether anything was there to take back.
- * @throws when asked to take back an instruction-file section: that file holds
- * the person's own text too, and removing a section from it is an edit this
- * action does not have in hand.
+ * @throws when asked to take back a document's section: that file holds the
+ * person's own text too, and removing a section from it is an edit this action
+ * does not have in hand.
  */
 export async function undeliver(
   files: PlaceFiles,
   place: PromptPlace,
   prompt: Prompt,
-  action: Delivery
+  action: Delivery,
+  document?: string
 ): Promise<boolean> {
   if (action === "instructions") {
-    throw new Error("an instruction file's section is not removed from here")
+    throw new Error("a document's section is not removed from here")
   }
-  const ref = targetOf(place, prompt, action)
+  const ref = targetOf(place, prompt, action, document)
   if ((await files.read(ref)) === null) return false
   await files.remove(ref)
   return true

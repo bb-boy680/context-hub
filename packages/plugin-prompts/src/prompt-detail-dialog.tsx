@@ -72,6 +72,17 @@ import type { PromptStore, StoredPrompt } from "./store.ts"
 const SCOPES = ["workspace", "global"] as const
 
 /**
+ * The directory a place writes its generated forms under.
+ *
+ * Both directories a place declares sit under one root, which is what a row
+ * with nothing else to say about itself shows a person.
+ */
+function generatedUnder(place: PromptPlace): string {
+  const parts = place.commandDir.split("/")
+  return parts.length > 1 ? parts.slice(0, -1).join("/") : place.commandDir
+}
+
+/**
  * The name a prompt's text is coloured and titled under.
  *
  * A prompt has no file name to read a grammar off, and the ones written with
@@ -274,12 +285,16 @@ function PlacesSection({
         id: place.id,
         icon: place.icon,
         label: t(place.labelKey),
-        /* A place already holding this prompt says so with its own mark. What
-           the second line says is what the `⋯` beside it is for — the directory
-           an agent reads is not something a person acts on from here, and the
-           one thing this row can do that is not obvious is write the prompt out
-           as a command or a rule. */
-        note: t("prompts.place.generates"),
+        /* The second line is whichever of the two answers the row cannot give
+           by its name. An agent's name says what it is but not what its `⋯` is
+           for, so that row explains the menu. A place that is only a directory
+           has no name to recognise, so that row gives the directory — and it
+           gives the root both directories sit under, since writing
+           `.agents/commands` there would name one of the two forms the menu
+           offers rather than the place they share. */
+        ...(place.generatedOnly === true
+          ? { where: generatedUnder(place) }
+          : { note: t("prompts.place.generates") }),
         selected: installed[place.id] === true,
       })),
   }))
@@ -356,9 +371,13 @@ function PlaceGenerate({
   busy: boolean
   files: PlaceFiles | null
   onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
 }) {
   const { t } = useI18n()
+  /* A place that takes only what a prompt is written out as has nothing to
+     install into: it is where the generated forms land, and "install the
+     prompt here" would name no file. */
+  const installs = place.generatedOnly !== true
 
   return (
     <DropdownMenu>
@@ -381,23 +400,25 @@ function PlaceGenerate({
            menu here reads as a menu anywhere else in the app. */
         className="flex w-[200px] flex-col gap-0.5 rounded-md p-1.5 ring-1 ring-border shadow-soft"
       >
-        <DropdownMenuItem
-          /* A form that cannot reach the file says so where the action is,
-             rather than refusing once it has been pressed. */
-          disabled={files === null || busy}
-          title={files === null ? t("prompts.menu.blocked") : undefined}
-          className="h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
-          onClick={() => onToggle(place)}
-        >
-          {held ? (
-            <MinusIcon className="size-[15px]" aria-hidden />
-          ) : (
-            <PlusIcon className="size-[15px]" aria-hidden />
-          )}
-          {t(held ? "prompts.action.remove" : "prompts.action.install")}
-          <span className="sr-only">{prompt.description}</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
+        {installs ? (
+          <DropdownMenuItem
+            /* A form that cannot reach the file says so where the action is,
+               rather than refusing once it has been pressed. */
+            disabled={files === null || busy}
+            title={files === null ? t("prompts.menu.blocked") : undefined}
+            className="h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
+            onClick={() => onToggle(place)}
+          >
+            {held ? (
+              <MinusIcon className="size-[15px]" aria-hidden />
+            ) : (
+              <PlusIcon className="size-[15px]" aria-hidden />
+            )}
+            {t(held ? "prompts.action.remove" : "prompts.action.install")}
+            <span className="sr-only">{prompt.description}</span>
+          </DropdownMenuItem>
+        ) : null}
+        {installs ? <DropdownMenuSeparator /> : null}
         <GenerateItems place={place} onGenerate={onGenerate} />
       </DropdownMenuContent>
     </DropdownMenu>
@@ -572,7 +593,7 @@ function InfoPanel({
   files: PlaceFiles | null
   busy: boolean
   onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
   onDelete: () => void
   onDescribe: (description: string) => void
   onTags: (tags: string[]) => void
@@ -792,7 +813,7 @@ export function PromptDetailDialog({
   stamp: number
   onOpenChange: (open: boolean) => void
   onToggle: (prompt: StoredPrompt, place: PromptPlace) => void
-  onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery) => void
+  onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => void
   onDelete: (prompt: StoredPrompt) => void
   onChanged: () => void
   onDescribe: (prompt: StoredPrompt, description: string) => void
@@ -815,7 +836,7 @@ export function PromptDetailDialog({
           busy={busy}
           stamp={stamp}
           onToggle={(place) => onToggle(prompt, place)}
-          onGenerate={(place, action) => onGenerate(prompt, place, action)}
+          onGenerate={(place, action, document) => onGenerate(prompt, place, action, document)}
           onDelete={() => onDelete(prompt)}
           onChanged={onChanged}
           onDescribe={(description) => onDescribe(prompt, description)}
@@ -852,7 +873,7 @@ function Lightbox({
   busy: boolean
   stamp: number
   onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
   onDelete: () => void
   onChanged: () => void
   onDescribe: (description: string) => void
@@ -957,7 +978,9 @@ function Lightbox({
           files={files}
           busy={busy}
           onToggle={(place) => acted(() => onToggle(place))}
-          onGenerate={(place, action) => acted(() => onGenerate(place, action))}
+          onGenerate={(place, action, document) =>
+            acted(() => onGenerate(place, action, document))
+          }
           onDelete={onDelete}
           onDescribe={onDescribe}
           onTags={onTags}

@@ -1,7 +1,7 @@
 /**
- * Behaviour check for the three functions that turn a prompt into text on
- * disk: the file name, the command file, and the section added to an
- * instruction file.
+ * Behaviour check for the functions that turn a prompt into text on disk and
+ * say where it goes: the file name, the command file, the section added to a
+ * document, and the target each action resolves to.
  *
  * These are the parts of the module that can be checked without a disk, a
  * browser or a kernel, and they are also the parts where a wrong answer is
@@ -13,6 +13,8 @@
  * Run from the package: `node scripts/check-prompt-text.ts`
  */
 import { commandFile, describeBody } from "../src/command-file.ts"
+import { targetOf } from "../src/deliver.ts"
+import type { PromptPlace } from "../src/provider.ts"
 import { slugOf } from "../src/slug.ts"
 import { withSection } from "../src/instruction.ts"
 
@@ -237,6 +239,85 @@ check(
   pair
 )
 check("the first prompt is still there once", pair.split("<!-- context-hub:code-review -->").length === 2, pair)
+
+/* Where each action writes, which is the other thing a wrong answer to would
+   be quiet about: a path that climbs, or a document the place never declared. */
+const place: PromptPlace = {
+  id: "workspace",
+  agent: "hub.prompt.catalog",
+  labelKey: "prompts.location.workspace",
+  icon: () => null,
+  scope: "workspace",
+  commandDir: ".agents/commands",
+  ruleDir: ".agents/rules",
+  documents: [
+    { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
+    { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
+  ],
+  generatedOnly: true,
+  order: 0,
+}
+const prompt = { description: "Code Review", prompt: "Body.", tags: [], updatedAt: "", assets: [] }
+
+check(
+  "a command goes under the place's command directory",
+  targetOf(place, prompt, "commands").file === ".agents/commands/code-review.md",
+  targetOf(place, prompt, "commands")
+)
+check(
+  "a rule goes under its own directory",
+  targetOf(place, prompt, "rule").file === ".agents/rules/code-review.md",
+  targetOf(place, prompt, "rule")
+)
+check(
+  "an install goes where a command goes",
+  targetOf(place, prompt, "install").file === targetOf(place, prompt, "commands").file
+)
+check(
+  "a document is the file the place declared",
+  targetOf(place, prompt, "instructions", "design").file === "DESIGN.md",
+  targetOf(place, prompt, "instructions", "design")
+)
+check(
+  "the place's own scope is the scope written to",
+  targetOf(place, prompt, "rule").scope === "workspace"
+)
+
+/* A document this place does not keep is a caller that made the action up, not
+   a write somewhere surprising. */
+let noDocument: unknown = null
+try {
+  targetOf(place, prompt, "instructions", "nope")
+} catch (failure) {
+  noDocument = failure
+}
+check("a document the place does not declare is refused", noDocument instanceof Error, noDocument)
+check(
+  "and the refusal names the place",
+  (noDocument as Error | null)?.message.includes("workspace") === true,
+  noDocument
+)
+
+let noId: unknown = null
+try {
+  targetOf(place, prompt, "instructions")
+} catch (failure) {
+  noId = failure
+}
+check("asking for a document by no name is refused", noId instanceof Error, noId)
+
+const bare: PromptPlace = { ...place, documents: undefined }
+let none: unknown = null
+try {
+  targetOf(bare, prompt, "instructions", "agents")
+} catch (failure) {
+  none = failure
+}
+check("a place that keeps no documents is refused", none instanceof Error, none)
+check(
+  "while its commands and rules still work",
+  targetOf(bare, prompt, "rule").file === ".agents/rules/code-review.md"
+)
 
 console.log(failures === 0 ? "\nall checks passed" : `\n${failures} failed`)
 process.exitCode = failures === 0 ? 0 : 1
