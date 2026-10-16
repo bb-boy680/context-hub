@@ -129,7 +129,7 @@ describe("replacing a document", () => {
   })
 
   it("holds the new value", async () => {
-    expect((await store().read("extensions"))?.skills).toBe(false)
+    expect(await store().read("extensions")).toEqual({ skills: false })
   })
 
   /* The write is atomic: a reader never sees a temporary file, and none is left. */
