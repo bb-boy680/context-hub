@@ -499,7 +499,36 @@ skills 目录读了 **854 次**——**界面完全正常**，因为每轮答案
   用户已确认这个行为变更；只在缓存里没有答案的 server 上跑。
   **实测的一个副作用**：`--home` 能隔离 hub 自己的文件，**隔离不了用户的 agent 配置**——
   扫描会读真实的 `~/.claude.json` 等。开机即读是设计使然，但值得知道。
-- **`aoci_maintain` 待跑**（见风险 5）。
+- **`aoci_maintain` 待跑**（见风险 5）。**已跑一次，返回 `blocked`，需要用户裁决**，
+  详见下面一节。
+
+### `aoci_maintain` 的实际结果：blocked，卡在范围与孤儿裁决
+
+跑了一次（工作树干净、无第三方写入），返回 `status: stopped` / `result: blocked`，
+**不是语义问题**，是治理层要显式决定的三件事：
+
+| 事实 | 数量 |
+|---|---|
+| 基线里指向**旧布局**的条目（`packages/agents-extensions/*`、`packages/plugin-*`、`packages/ui/*`） | **orphan 305** |
+| 基线里已不存在、需要新作者的路径 | missing 242 / unbaselined 242 |
+| 基线仍在但内容变了的 | stale 61 |
+| 新增、待纳入范围的 `__test__/*.test.ts` | **observed_new 40** |
+| 逻辑计划总量 | 303（≤50/批，约 7 批） |
+| 工具自己判定需要人工复核的 | `requires_human_review: 222` |
+
+范围策略是 `observe_change_policy: review_required`，而**自动批准的阈值是
+「一次移除 ≤25 条或 ≤25%」**——这里要移除 305 条，**远超阈值**，
+所以 `next_action` 是 `explicit_orphan_remove_or_resolve_blocker`，
+`next_commands` 指向 `aoci scope status` / `aoci scope acknowledge --reviewed-by`。
+
+**为什么停下来问**：这是对认知索引的**批量删除（305 条）+ 范围策略变更（40 个测试文件）**，
+之后再作者化 242 条，是一个独立的、以「批准」为前置的工作流。本轮改造（P0/A/B/C）
+已全部落地并验证，认知层落后是**已知且被用户推迟过**的状态，不是新引入的回归。
+
+两条需要用户定的：
+1. **305 条旧布局条目**：确认删除（它们是重命名前的路径，代码已经不在那些位置了）；
+2. **40 个 `__test__/*.test.ts` 是否纳入索引**：这是范围策略的选择——索引此前只覆盖
+   `src` 与配置，测试是新加的。纳入意味着以后每个测试文件都要维护一条认知条目。
 
 起因不变：四个资产页面今天都**只在进入页面时**才读数据，读取逻辑住在各自的 React hook 里。
 组件卸载 state 一起丢，再进来重读一遍。于是全局 Ctrl+K 在任何"从未进过那四个页面"的
@@ -685,7 +714,7 @@ return kernel                              // .then 立刻渲染，加载在后�
 | C-四 | MCP | 并发 ≤3；已有答案不重探 | ✅ `5daea42` |
 | C-五 | Plugins | `mapLimit` 生效；`restore` 仍只在页面触发 | ✅ `5daea42` |
 | C-六 | README + `docs/memory.md` + 归档 | 见验收 | ✅ |
-| — | `aoci_maintain` | 树静下来之后 | ⬜ |
+| — | `aoci_maintain` | 树静下来之后 | ⏸ 跑过，blocked，待裁决 |
 
 **每一步单独提交**，commit message 按仓库现有风格。跨包改动要按 `AGENTS.md` 的
 "搜索与代码修改"把两端、类型引用、字符串字面量、测试、文档都搜一遍。
