@@ -17,17 +17,36 @@ interface ErrorBody {
   error?: string
 }
 
-async function call<T>(base: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(`${base}${ENDPOINT}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  })
+/**
+ * One call to this route, answered as JSON.
+ *
+ * @param url — the whole address, query and all.
+ * @param init — what the call is; the method is what says read or write.
+ * @throws {PluginInstallError} when the host refused it, with the reason it gave.
+ */
+async function ask<T>(url: string, init: RequestInit): Promise<T> {
+  const response = await fetch(url, init)
   if (!response.ok) {
+    /* The route refuses with `{ error }`, and that sentence is the only one
+       that says what went wrong; the status alone reads as a transport fault. */
     const detail = (await response.json().catch(() => ({}))) as ErrorBody
     throw new PluginInstallError(detail.error ?? `${String(response.status)} ${response.statusText}`)
   }
   return (await response.json()) as T
+}
+
+/** One read, named by its action in the query. */
+function callGet<T>(base: string, query: string): Promise<T> {
+  return ask<T>(`${base}${ENDPOINT}${query}`, { method: "GET" })
+}
+
+/** One write, named by its action in the body. */
+function call<T>(base: string, body: Record<string, unknown>): Promise<T> {
+  return ask<T>(`${base}${ENDPOINT}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
 }
 
 /**
@@ -38,7 +57,7 @@ async function call<T>(base: string, body: Record<string, unknown>): Promise<T> 
 export function createRemotePluginTools(base = ""): PluginBridgeTools {
   return {
     async root() {
-      const answer = await call<{ root: string }>(base, { action: "root" })
+      const answer = await callGet<{ root: string }>(base, "?action=root")
       return answer.root
     },
 
@@ -56,7 +75,10 @@ export function createRemotePluginTools(base = ""): PluginBridgeTools {
     },
 
     async has(program) {
-      const answer = await call<{ present: boolean }>(base, { action: "program-exists", program })
+      const answer = await callGet<{ present: boolean }>(
+        base,
+        `?action=program-exists&program=${encodeURIComponent(program)}`
+      )
       return answer.present
     },
 

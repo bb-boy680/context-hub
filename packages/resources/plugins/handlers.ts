@@ -22,6 +22,7 @@ import { createFsWorkspaceStore } from "@context-hub/core/host/workspaces"
 import {
   contentTypeOf,
   readBody,
+  sendError,
   sendJson,
   type HubMiddleware,
 } from "@context-hub/core/host/http"
@@ -199,6 +200,21 @@ export function createPluginHandler(
         return
       }
 
+      /* Where the library is, for an installer that has to register it. */
+      if (method === "GET" && action === "root") {
+        sendJson(response, 200, { root: library.root })
+        return
+      }
+
+      /* Whether a program is on this machine. A question, so it travels in the
+         query: it changes nothing and it reads nothing. */
+      if (method === "GET" && action === "program-exists") {
+        sendJson(response, 200, {
+          present: await hasProgram(requiredString(url.searchParams.get("program"), "program")),
+        })
+        return
+      }
+
       /* What a pack carries inside it: the skills, the commands and the
          MCP servers its own directory holds. A pack the hub collected and
          one an agent keeps in place are read the same way, as its files
@@ -218,7 +234,7 @@ export function createPluginHandler(
       }
 
       if (method !== "POST") {
-        response.writeHead(405).end()
+        sendError(response, new Error(`unsupported method ${method}`), 405)
         return
       }
 
@@ -289,10 +305,6 @@ export function createPluginHandler(
         case "update":
           sendJson(response, 200, await updater.update(requiredString(body.name, "name")))
           return
-        /* Where the library is, for an installer that has to register it. */
-        case "root":
-          sendJson(response, 200, { root: library.root })
-          return
         /* The indexes a client reads, written from the library as it stands. */
         case "sync-marketplace":
           await writeMarketplaceIndex(library.root, await library.list())
@@ -317,11 +329,6 @@ export function createPluginHandler(
           sendJson(response, 200, { output: result.output })
           return
         }
-        case "program-exists":
-          sendJson(response, 200, {
-            present: await hasProgram(requiredString(body.program, "program")),
-          })
-          return
         /* What a pack says about itself, at a directory an agent named.
            Its picture is kept in the hub's asset library, so the answer
            carries a reference there rather than a copy of the bytes. */
