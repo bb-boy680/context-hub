@@ -141,7 +141,22 @@ mcp 的 `records` 改 `entries`；plugins 的 `path` 改 `directory`；core 的 
 
 ## 阶段 B：统一 RPC 约定
 
-### 目标，七行
+**状态：完成。** 五条桥全部转成同一套约定，`pnpm test` **877 个用例全绿**，
+typecheck 11/11、lint 11/11、build 通过，四个资产页面在**构建后的形态**里真开过一遍。
+
+| 模块 | 提交 |
+|---|---|
+| prompts | `36d887e` |
+| mcp | `04f3331` |
+| plugins | `8a13762` |
+| skills | `22dc48a` |
+| core（含 `apps/web` 的两个客户端） | `7ad8dd8` |
+
+**六份桥检查网里只有 core 那份改过**（net 那两行原本自己手写请求体，改成走
+`createRemoteNet`），其余五份**一个字都没动**——它们描述的是「页面会发哪些调用」，
+不是线形。这正是先做阶段 A 的回报：转换没有一处是靠"跑一遍看看"，每一处都有网兜着。
+
+### 目标，七行（已落成）
 
 ```
 读（参数都是标量）   GET  <route>?action=<name>&<params>      裸 GET = 该模块默认读
@@ -153,8 +168,52 @@ mcp 的 `records` 改 `entries`；plugins 的 `path` 改 `directory`；core 的 
 失败                  4xx + { error: string }                  （不再有空 body）
 ```
 
-**第 2 行不是糖**：`net` 的 `headers`、`mcp` 的 `declaration`、`place-files` 的 `ref`
-三个对象没有合理的 query 表示法，写成 GET 只会逼出「URL 里塞 JSON」。
+**只剩两处身份读**：`GET /hub/skills/<id>` 与 `GET /hub/extensions/<id>`（后者吐裸
+`plugin.json`）。skills 那条是唯一「一个东西一个地址」的地方，其余全部落进信封。
+
+### 顺手修掉的既存缺陷
+
+1. **`GET /hub/skills/<id>/files/<path>` 传不了带 `#` 的文件名。**
+   `#` 起 fragment，服务器根本看不到后半段；路径里带 `/` 时「先切再拼」也丢信息。
+   折成 `?action=file&id&path` 后 `a b#c.md` 能写能读（curl 实测）。
+   `extensions/src/remote.ts:35` 早就用了正确的逐段编码，skills 这里漏了。
+2. **`GET /<id>/update` 是唯一「读会写盘」的动作**：答案记在行上，浏览器或代理重试一次
+   就多起一次子进程、多一次网络。改成 `POST { action: "check-update" }`，
+   与同模块的复数版 `check-updates` 一致。
+3. **失败体收成一处**：core 有 12 处手写 `sendJson(400,{error})`，plugins 3 处，
+   九个 404/405 是空 body。现在写响应只有 `sendJson` / `sendError` / `sendFile` / `sendBytes`。
+   **416 原样保留**——它带 `Content-Range`，是协议应答不是失败。
+4. **mcp 客户端把 `{ error }` 整份丢掉**（六个 `call` 里唯一一个），只报状态码；
+   现在读理由。
+
+### 阶段 B 的端到端验收（构建后的形态）
+
+`node apps/web/server.ts --port 0 --static apps/web/dist --home <tmp> --folder <tmp>`，
+浏览器（`browser-automation` + `--bridge`）里逐个开：
+
+- **Skills / Prompts / MCP 三页都读到 seed 进去的真实行**（文件树、tag 过滤、
+  卡片封面=提示词正文，这些都是从磁盘读回来的）；
+- **写路径也真走过**：在 Skills 页点 Install 到 Claude Code 位置，
+  `.tmp-verify/ws/.claude/skills/a-skill` 作为指向库的 junction 落地，
+  详情弹窗随即显示 `Places: 2 installed`；
+- 走 `--static` 而不是 `pnpm dev`：**5270/5271 已被另一个 session 的 dev server 占着**
+  （PID 25496 / 23640，00:29 起），而 `strictPort: true` 会因此报错。
+  构建形态是单进程、`--port 0`，不碰任何人的端口，也不需要 turbo 传环境变量。
+
+### 没验到的两处（如实记）
+
+- **Plugins 页面本身没开**：我对它的改动只在 installer 的 `root` / `program-exists`
+  两个动作上，页面读的 `list`/`files`/`content`/`raw` 一个都没动；那两个动作由
+  `bridge.test.ts`（走真客户端）与 curl 覆盖。
+- **有一条测试在某一轮里失败过一次，没能复现**（随后连续五次全绿），
+  当轮输出被 `tail -5` 截掉了，没抓到是哪一个。疑似与两个起真实 git 子进程的文件
+  （`skills/updates`、`plugins/library`）的时序有关，但**这是猜测**，不是结论。
+
+### 命名决策与路径形态（转换时照此执行，保留备查）
+
+**读但有结构化参数不是糖**：`net` 的 `headers`、`mcp` 的 `declaration`、
+`place-files` 的 `ref` 三个对象没有合理的 query 表示法，
+写成 GET 只会逼出「URL 里塞 JSON」。
 
 ### 三条命名决策（先说清，因为跨模块）
 
@@ -551,7 +610,7 @@ return kernel                              // .then 立刻渲染，加载在后�
 |---|---|---|---|
 | P0 | plugins 的 project 补进根 vitest 配置 | `pnpm test` 收满 | ✅ `2e66267` |
 | A | 6 份 `bridge.test.ts`；五个客户端加 `base` | 全绿；种错参数名变红 | ✅ `c051262`…`b254d22` |
-| B | 逐模块统一（prompts → mcp → plugins → skills → core） | 该模块 `bridge.test.ts` 绿 + curl 读写各一条 | |
+| B | 逐模块统一（prompts → mcp → plugins → skills → core） | 该模块 `bridge.test.ts` 绿 + curl 读写各一条 | ✅ `36d887e`…`7ad8dd8` |
 | C-一 | `extensions/src/catalog.ts` + `useCatalog` + 三个依赖 + `catalog.test.ts` | 该包 typecheck / lint / 测试绿 | |
 | C-二 | Prompts（最简，先做） | 进页面不产生第二个请求 | |
 | C-三 | Skills | 切 workspace 重读；打字仍只重读一次 | |
