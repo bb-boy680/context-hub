@@ -12,6 +12,7 @@
  * what the page matches is not what the library is, and folding a keystroke into
  * this read would re-read every place on every keystroke for every watcher.
  */
+import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope } from "@context-hub/core/place-files"
@@ -43,13 +44,20 @@ export interface SkillLibraryValue {
 /** Nothing read yet, and the answer for a form that has no library to read. */
 export const NOTHING_READ: SkillLibraryValue = { page: null, held: {}, tags: [] }
 
-/** The shared read of the skill library. */
-export class SkillLibrary {
-  private readonly ctx: Context
+/**
+ * The shared read of the skill library.
+ *
+ * It is a service rather than a plain value so a form's startup can find it by
+ * name and start it, the way it starts the services it provides itself — and the
+ * base class is what puts it there: constructing one registers it under
+ * {@link SKILL_LIBRARY_SERVICE} for as long as the module stays loaded. Nothing
+ * is read on the way in; the first `load()` is what asks.
+ */
+export class SkillLibrary extends Service {
   private readonly catalog: Catalog<SkillLibraryValue>
 
   constructor(ctx: Context) {
-    this.ctx = ctx
+    super(ctx, SKILL_LIBRARY_SERVICE)
     this.catalog = createCatalog<SkillLibraryValue>({
       initial: NOTHING_READ,
       read: () => this.read(),
@@ -70,13 +78,25 @@ export class SkillLibrary {
     return this.catalog.subscribe(listener)
   }
 
+  /**
+   * Whether anyone has asked this to be read.
+   *
+   * Before that there is nothing to read *again*, and the noise of the kernel
+   * still starting up — every extension activating emits a change — is not a
+   * reason to read: a read then would be of half the agents, and would be
+   * thrown away and read again the moment the last one finished.
+   */
+  private started = false
+
   /** Read if nothing has been read. A page that opens first does this itself. */
   load(): Promise<void> {
+    this.started = true
     return this.catalog.load()
   }
 
   /** Read again: what a page calls once it has written something. */
   reload(): Promise<void> {
+    this.started = true
     return this.catalog.reload()
   }
 
@@ -140,16 +160,19 @@ export class SkillLibrary {
    * page that drew this library; watching them here means watching them once.
    */
   private watch(): void {
-    this.ctx.on("extensions/changed", () => void this.reload())
+    const again = () => {
+      if (this.started) void this.reload()
+    }
+    this.ctx.on("extensions/changed", again)
 
     this.ctx.effect(() => {
       const stops: (() => void)[] = []
       const workspaces = this.ctx.get("hub.workspaces")
-      if (workspaces !== undefined) stops.push(workspaces.subscribe(() => void this.reload()))
+      if (workspaces !== undefined) stops.push(workspaces.subscribe(again))
       const store = this.store()
       /* A form whose store reports its own changes gets read again; the browser's
          reports none, and is read after each write instead. */
-      if (store !== null) stops.push(store.subscribe(() => void this.reload()))
+      if (store !== null) stops.push(store.subscribe(again))
       return () => {
         for (const stop of stops) stop()
       }

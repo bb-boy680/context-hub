@@ -13,6 +13,7 @@
  * no transport of its own: the library it reads is the one the form provided,
  * looked up each time so a form that gains one is picked up.
  */
+import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import { createCatalog, type Catalog, type CatalogState } from "@context-hub/extensions"
@@ -39,13 +40,20 @@ export interface PromptLibraryValue {
   root: string
 }
 
-/** The shared read of the prompt library. */
-export class PromptLibrary {
+/**
+ * The shared read of the prompt library.
+ *
+ * It is a service rather than a plain value so a form's startup can find it by
+ * name and start it, the way it starts the services it provides itself — and the
+ * base class is what puts it there: constructing one registers it under
+ * {@link PROMPT_LIBRARY_SERVICE} for as long as the module stays loaded. Nothing
+ * is read on the way in; the first `load()` is what asks.
+ */
+export class PromptLibrary extends Service {
   private readonly catalog: Catalog<PromptLibraryValue>
-  private readonly ctx: Context
 
   constructor(ctx: Context) {
-    this.ctx = ctx
+    super(ctx, PROMPT_LIBRARY_SERVICE)
     this.catalog = createCatalog<PromptLibraryValue>({
       /* Empty until something has been read: a page that has not been answered
          yet draws its own emptiness rather than an invented library. */
