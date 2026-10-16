@@ -4,7 +4,7 @@
  * this for one that calls its main process. Nothing else in the plugin knows
  * the difference.
  */
-import { assetUrl, isLink } from "@workspace/core"
+import { assetRef } from "@workspace/core"
 
 import type {
   ImportedSkill,
@@ -178,9 +178,7 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       })
     },
 
-    assetUrl(ref: string): string {
-      return isLink(ref) ? ref : assetUrl(ref, base)
-    },
+    assetUrl: (ref) => assetRef(ref, base),
 
     placeSkills(ref: SkillPlaceRef): Promise<PlaceSkills | null> {
       return call<PlaceSkills | null>(base, `/hub/skills?action=place${placeQuery(ref)}`)

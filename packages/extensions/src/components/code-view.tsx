@@ -5,14 +5,15 @@
  * * {@link CodeCard} is the same view with the header a file reads under, so a
  * screen that shows a whole file uses that one and a screen that shows code
  * inside its own frame uses this one.
- * * The highlighter is built once per session and carries only the languages
- * these screens show — loading it is asynchronous, so the text shows at once
- * and the colours arrive after.
+ * * The highlighter is the shared one, built once per session and carrying only
+ * the languages these screens show — the same one a document's fenced blocks are
+ * coloured with. Loading it is asynchronous, so the text shows at once and the
+ * colours arrive after.
  */
-import { createHighlighterCore, type HighlighterCore } from "shiki/core"
-import { createJavaScriptRegexEngine } from "shiki/engine/javascript"
 import { CheckIcon, CopyIcon, FileTextIcon } from "lucide-react"
 import * as React from "react"
+
+import { paint } from "@workspace/ui/lib/highlight"
 
 /** Extensions a shown file uses, and the grammar that colours each one. */
 const GRAMMARS: Record<string, string> = {
@@ -57,34 +58,6 @@ export interface CodeCardWords {
   copied: string
 }
 
-/** Built on first use and kept: these files repeat their languages. */
-let highlighter: Promise<HighlighterCore> | null = null
-
-function loadHighlighter(): Promise<HighlighterCore> {
-  highlighter ??= createHighlighterCore({
-    /* Both themes are compiled once; which one paints is CSS (see `.file-code`). */
-    themes: [
-      import("shiki/themes/github-light.mjs"),
-      import("shiki/themes/github-dark.mjs"),
-    ],
-    langs: [
-      import("shiki/langs/markdown.mjs"),
-      import("shiki/langs/yaml.mjs"),
-      import("shiki/langs/json.mjs"),
-      import("shiki/langs/python.mjs"),
-      import("shiki/langs/typescript.mjs"),
-      import("shiki/langs/javascript.mjs"),
-      import("shiki/langs/bash.mjs"),
-      import("shiki/langs/html.mjs"),
-      import("shiki/langs/css.mjs"),
-      import("shiki/langs/toml.mjs"),
-    ],
-    /* The JavaScript engine keeps wasm out of the bundle. */
-    engine: createJavaScriptRegexEngine(),
-  })
-  return highlighter
-}
-
 /**
  * Draw one file's text with syntax colours.
  *
@@ -102,22 +75,9 @@ export function CodeView({ text, path }: { text: string; path: string }) {
 
   React.useEffect(() => {
     let live = true
-    void loadHighlighter()
-      .then((instance) =>
-        instance.codeToHtml(text, {
-          lang: grammarOf(path),
-          themes: { light: "github-light", dark: "github-dark" },
-          /* The colours come from CSS variables, so the theme follows the
-             app's own switch instead of a colour baked into the markup. */
-          defaultColor: false,
-        })
-      )
-      .then((html) => {
-        if (live) setRendered({ path, text, html })
-      })
-      .catch(() => {
-        /* A grammar that will not load leaves the text plain; it still shows. */
-      })
+    void paint(text, grammarOf(path), "classic").then((html) => {
+      if (live && html !== null) setRendered({ path, text, html })
+    })
     return () => {
       live = false
     }

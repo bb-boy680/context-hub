@@ -16,8 +16,7 @@
     "@workspace/extensions": "workspace:*",
     "@workspace/ui": "workspace:*",
     "lucide-react": "^1.48.0",
-    "react": "^19.2.8",
-    "swiper": "^14.3.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10",

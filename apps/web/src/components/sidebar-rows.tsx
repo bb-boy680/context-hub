@@ -73,7 +73,11 @@ export function SidebarRow({
         {icon}
       </span>
       <span className="min-w-0 flex-1 truncate">{label}</span>
-      {trailing === undefined ? null : (
+      {/* `ReactNode` holds `null` as well as `undefined`, and the row that
+          switches its trailing element off passes exactly that — so testing
+          only for `undefined` leaves an empty box that still takes a `gap-2.5`
+          beside the label. */}
+      {trailing === undefined || trailing === null ? null : (
         /* Whatever the row carries answers its own presses: choosing a row and
            opening its menu are two different intentions. */
         <span

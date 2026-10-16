@@ -13,6 +13,8 @@
     "@lobehub/ui": "^5.57.1",
     "@workspace/extensions": "workspace:*",
     "@workspace/plugin-mcp": "workspace:*",
+    "@workspace/plugin-plugins": "workspace:*",
+    "@workspace/plugin-prompts": "workspace:*",
     "@workspace/plugin-skills": "workspace:*",
     "@workspace/ui": "workspace:*",
     "antd": "^6.1.1",

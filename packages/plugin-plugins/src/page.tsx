@@ -2,63 +2,112 @@
  * Plugins as a screen: one catalog, read either as a masonry grid of covers or
  * as a ledger, with a toolbar that narrows and pages the same set for both.
  *
- * This file holds the interface only. The rows come from `./sample.ts`, and the
- * one state the screen keeps is which packs read as installed; reading a pack's
- * own directory, installing it, and the detail view are the module's next step,
- * so nothing here opens a card.
+ * This file holds the interface only: the rows come from `./library.ts`, which
+ * folds the library's records and the clients' own answers in `./rows.ts`. Every
+ * row opens the detail lightbox — a pack no library record holds yet is read
+ * there too, and taking it in is what that lightbox offers.
  */
 import {
+  CircleArrowUpIcon,
+  ContainerIcon,
   DownloadIcon,
+  FileArchiveIcon,
+  FolderGit2Icon,
+  GitBranchIcon,
+  GlobeIcon,
   HardDriveIcon,
+  InboxIcon,
   LayoutGridIcon,
+  LibraryIcon,
   ListIcon,
-  PackageIcon,
+  PackagePlusIcon,
   PlugIcon,
   PlusIcon,
   RefreshCwIcon,
   SearchXIcon,
-  StoreIcon,
-  Trash2Icon,
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
 
 import { AddPluginDialog, type AddPluginTab } from "./add-plugin-dialog.tsx"
 import { PluginDetailDialog } from "./detail-dialog.tsx"
-import { sampleInstalled, samplePlugins } from "./sample.ts"
-import type { PluginRow, PluginSource } from "./types.ts"
-
-import type { ExtensionIcon } from "@workspace/extensions"
+import { PluginActions } from "./install-actions.tsx"
 import {
+  packImageBase,
+  reasonOf,
+  usePackReadme,
+  usePluginLibrary,
+  type PackUploadFile,
+  type PluginClient,
+  type PluginCollected,
+} from "./library.ts"
+import { rowsForTab, SCOPE_LABELS, type PluginTab } from "./rows.ts"
+import { PluginTile } from "./parts.tsx"
+import type { PluginRow, PluginSource } from "./types.ts"
+import type { PluginInstallScope } from "./contract.ts"
+
+import type { AssetScope, ExtensionIcon } from "@workspace/extensions"
+import {
+  ActionTab,
+  AutoplayVideo,
+  AvatarStack,
   FilterBar,
   Ledger,
   PageBody,
+  PlaceScopePicker,
   TablePagination,
+  knownAspect,
+  mediaKind,
+  rememberAspect,
   type LedgerColumn,
+  type PlaceOption,
+  type PlaceWords,
 } from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
+import { Markdown } from "@workspace/ui/components/markdown"
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
+import { toast } from "@workspace/ui/components/toast"
 
-/** Which rows a tab shows: everything, what is installed, or what is not. */
-type PluginTab = "all" | "installed" | "available"
-
+/* The tab row carries two dimensions. Four entries are the hub's own view of the
+   catalog — everything, what it holds the files of, what only an agent holds,
+   and what a source has moved past. The last of the four stands for what is
+   missing rather than for where anything is, so it carries the one batch action
+   its set is for and the toolbar stays about the page as a whole. The last two
+   group the agents by the kind of place they hold a pack in: one inside the
+   repository in use, and one machine-wide. */
 const SHELL_TABS: { value: PluginTab; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "plugins.tab.all", icon: LayoutGridIcon },
-  { value: "installed", labelKey: "plugins.tab.installed", icon: HardDriveIcon },
-  { value: "available", labelKey: "plugins.tab.available", icon: StoreIcon },
+  { value: "library", labelKey: "plugins.tab.library", icon: LibraryIcon },
+  { value: "unstored", labelKey: "plugins.tab.unstored", icon: InboxIcon },
+  { value: "updates", labelKey: "plugins.tab.updates", icon: CircleArrowUpIcon },
+  { value: "workspace", labelKey: "plugins.tab.workspace", icon: ContainerIcon },
+  { value: "global", labelKey: "plugins.tab.global", icon: GlobeIcon },
 ]
+
+/** The tabs that group the agents by where they hold a pack, which open a menu. */
+const SCOPE_TABS: PluginTab[] = ["workspace", "global"]
 
 /** The mark for where a pack came from. */
 const SOURCE_ICONS: Record<PluginSource, LucideIcon> = {
-  marketplace: StoreIcon,
+  repo: GitBranchIcon,
+  subdir: FolderGit2Icon,
+  archive: FileArchiveIcon,
   local: HardDriveIcon,
-  builtin: PackageIcon,
 }
 
 /** The categories on offer, read from the rows so the chips cannot drift. */
@@ -69,25 +118,6 @@ function tagsOf(rows: readonly PluginRow[]): string[] {
 /** The value the "every tag" chip carries. */
 const ALL_TAGS = "All tags"
 
-/**
- * Which rows a tab holds, before the tag filter and the query.
- *
- * @param rows — the catalog, already narrowed by the filters.
- * @param value — the tab on screen.
- * @param installed — the ids that read as installed.
- * @returns the rows the tab shows.
- */
-function rowsForTab(
-  rows: PluginRow[],
-  value: PluginTab,
-  installed: readonly string[]
-): PluginRow[] {
-  if (value === "all") return rows
-  return rows.filter((row) =>
-    value === "installed" ? installed.includes(row.id) : !installed.includes(row.id)
-  )
-}
-
 /** The three fields the query box reads. */
 function matchesQuery(row: PluginRow, text: string) {
   return (
@@ -95,6 +125,22 @@ function matchesQuery(row: PluginRow, text: string) {
     row.description.toLowerCase().includes(text) ||
     row.tags.some((item) => item.toLowerCase().includes(text))
   )
+}
+
+/**
+ * The words every place list on this page draws, resolved in the active locale.
+ * The list itself knows no keys: a module hands it the strings it owns.
+ *
+ * @param t — the active locale's lookup.
+ * @returns the strings a place menu draws.
+ */
+function placeWords(t: (key: string) => string): PlaceWords {
+  return {
+    search: t("plugins.place.search"),
+    searchClear: t("plugins.place.searchClear"),
+    searchEmpty: t("plugins.place.searchEmpty"),
+    count: (total) => t("plugins.location.count").replace("{count}", String(total)),
+  }
 }
 
 const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
@@ -123,7 +169,12 @@ function TagPill({ tag }: { tag: string }) {
   return <span className={pillSurface}>{tag}</span>
 }
 
-/** Where a pack came from, as one quiet line under the card's body. */
+/**
+ * What a row's own line says about where the pack is: the hub's own word for the
+ * kind of source it collected the pack from. A pack the hub does not hold is
+ * worded as what it is — a directory on this machine — because that is where the
+ * agents holding it read it from.
+ */
 function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
   const { t } = useI18n()
   const Icon = SOURCE_ICONS[plugin.source]
@@ -142,69 +193,57 @@ function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
 }
 
 /**
- * The one action a row carries. Installing is the row's own action, so it reads
- * as a soft fill; undoing it reads as an outline. Both are the interface's own
- * state until the module writes anything.
+ * The agents holding a pack, as their own marks.
+ *
+ * It answers "which agents have this" without the row being opened, which is the
+ * question a pack's source word cannot: a pack collected from a repository can
+ * still be sitting in three agents, and one only an agent holds is worded as a
+ * local directory like every other pack on this machine.
  */
-function InstallButton({
-  plugin,
-  installed,
-  onToggle,
-}: {
-  plugin: PluginRow
-  installed: boolean
-  onToggle: () => void
-}) {
-  const { t } = useI18n()
-  const shell =
-    "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-ring"
+function HolderStack({ plugin }: { plugin: PluginRow }) {
+  if (plugin.held.length === 0) return null
 
-  return installed ? (
-    <Button
-      type="button"
-      variant="outline"
-      aria-label={`${t("plugins.action.uninstall")} ${plugin.name}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onToggle()
-      }}
-      className={`${shell} border-border bg-transparent text-secondary-foreground hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
-    >
-      <Trash2Icon className="size-3.5" />
-      {t("plugins.action.uninstall")}
-    </Button>
-  ) : (
-    <Button
-      type="button"
-      aria-label={`${t("plugins.action.install")} ${plugin.name}`}
-      onClick={(event) => {
-        event.stopPropagation()
-        onToggle()
-      }}
-      className={`${shell} bg-secondary text-foreground hover:bg-accent`}
-    >
-      <DownloadIcon className="size-3.5" />
-      {t("plugins.action.install")}
-    </Button>
+  return (
+    <AvatarStack
+      marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
+      seam="ring-card"
+      label={plugin.held.map((hold) => hold.label).join(" · ")}
+    />
+  )
+}
+
+/** What every row's action cluster needs, gathered so it travels as one prop. */
+interface RowActions {
+  /** The clients this hub can deliver to, with what each one already holds. */
+  clients: readonly PluginClient[]
+  /** True while a call is in flight, which disables the actions. */
+  busy: boolean
+  onUpdate: (plugin: PluginRow) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  /** Switch an agent's own use of a pack on or off, where it already sits. */
+  onSetEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, on: boolean) => void
+  /** Take a pack an agent holds into the library. */
+  onAdopt: (plugin: PluginRow) => void
+}
+
+/** The one action a row carries: the pack's own actions, over the install places. */
+function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowActions }) {
+  return (
+    <PluginActions
+      plugin={plugin}
+      clients={actions.clients}
+      busy={actions.busy}
+      onUpdate={() => actions.onUpdate(plugin)}
+      onInstall={(client, scope) => actions.onInstall(plugin, client, scope)}
+      onUninstall={(client, scope) => actions.onUninstall(plugin, client, scope)}
+      onSetEnabled={(client, scope, on) => actions.onSetEnabled(plugin, client, scope, on)}
+    />
   )
 }
 
 /** Ratio a card falls back to before its own cover reports one. */
 const FALLBACK_RATIO = 16 / 9
-
-/** Natural ratios already measured, so a re-mounted card lays out without a jump. */
-const aspects = new Map<string, number>()
-
-/** The ratio measured for a source earlier in this session, if any. */
-function knownAspect(src: string): number | undefined {
-  return aspects.get(src)
-}
-
-/** Remember an asset's measured ratio for later mounts. */
-function rememberAspect(src: string, ratio: number): void {
-  if (!Number.isFinite(ratio) || ratio <= 0) return
-  aspects.set(src, ratio)
-}
 
 /** Cover image that reports its own aspect ratio, for a card sized to the asset. */
 function PhotoCover({ src, onRatio }: { src: string; onRatio: (ratio: number) => void }) {
@@ -233,65 +272,129 @@ function PhotoCover({ src, onRatio }: { src: string; onRatio: (ratio: number) =>
 }
 
 /**
- * The cover of a pack that ships no picture: its mark, and how much it carries.
- * The card body already states the name and the description, so what is left to
- * say is what installing it would bring.
+ * The cover of a pack that ships no picture: its mark, and the version the pack
+ * itself declares. The card body already states the name and the description, so
+ * what is left to say is which revision of it this is.
  */
 function BundleCover({ plugin }: { plugin: PluginRow }) {
-  const { t } = useI18n()
-
   return (
     <div className="flex size-full flex-col items-center justify-center gap-2 bg-surface-raised">
       <span className="flex size-11 items-center justify-center rounded-full bg-secondary">
         <PlugIcon className="size-5 text-muted-foreground" aria-hidden />
       </span>
-      <span className="font-mono text-[12px] leading-[18px] text-muted-foreground">
-        {t("plugins.cover.bundle")
-          .replace("{skills}", String(plugin.bundle.skills))
-          .replace("{commands}", String(plugin.bundle.commands))}
-      </span>
+      {plugin.version === "" ? null : (
+        <span className="font-mono text-[12px] leading-[18px] text-muted-foreground">
+          {plugin.version}
+        </span>
+      )}
     </div>
+  )
+}
+
+/**
+ * The cover of a pack with no picture: what the pack says about itself, rendered
+ * as the document it is. A cover is a thumbnail, so the document is clipped
+ * rather than scrolled — a card reads as one, not as a reading surface.
+ */
+function ReadmeCover({ plugin }: { plugin: PluginRow }) {
+  const readme = usePackReadme(plugin)
+  if (readme === undefined || readme === null) return <BundleCover plugin={plugin} />
+
+  return (
+    <div
+      className={`size-full overflow-hidden bg-surface-raised px-[18px] text-[12px] leading-[18px] text-secondary-foreground ${
+        /* Room for the tag pills, which sit over this corner; nothing to clear without them. */
+        plugin.tags.length > 0 ? "pt-10" : "py-3.5"
+      }`}
+    >
+      <Markdown imageBase={packImageBase(plugin)}>{readme}</Markdown>
+    </div>
+  )
+}
+
+/**
+ * What fills a card's cover box: the first picture a person added, drawn or
+ * played by whatever kind it is, and the pack's own document when there is none.
+ * A pack with a picture reads no document at all, which is why the README is read
+ * inside the branch that needs it.
+ */
+function CoverFace({
+  plugin,
+  source,
+  onRatio,
+}: {
+  plugin: PluginRow
+  /** The picture being drawn, as a URL. */
+  source: string | undefined
+  onRatio: (ratio: number) => void
+}) {
+  if (source === undefined) return <ReadmeCover plugin={plugin} />
+  return mediaKind(source) === "video" ? (
+    <AutoplayVideo src={source} onAspect={onRatio} className="size-full object-cover" />
+  ) : (
+    <PhotoCover src={source} onRatio={onRatio} />
+  )
+}
+
+/**
+ * The mark a pack carries when its source moved past the copy here. It is the
+ * only place the answer to a check is visible without opening the pack, so it
+ * says the one word and nothing else.
+ */
+function UpdateBadge({ plugin }: { plugin: PluginRow }) {
+  const { t } = useI18n()
+  if (plugin.outdated !== true) return null
+  return (
+    <span
+      className="shrink-0 rounded-full bg-amber-600/12 px-[7px] py-[2px] text-[11px] leading-[14px] font-semibold text-amber-600 dark:bg-amber-400/15 dark:text-amber-400"
+      title={plugin.modified === true ? t("plugins.update.modified") : t("plugins.update.available")}
+    >
+      {t("plugins.update.badge")}
+    </span>
   )
 }
 
 function PluginCard({
   plugin,
-  installed,
-  onToggle,
+  actions,
   onOpen,
 }: {
   plugin: PluginRow
-  installed: boolean
-  onToggle: () => void
+  actions: RowActions
   onOpen: () => void
 }) {
   const { t } = useI18n()
   const shownTags = plugin.tags.slice(0, 2)
   const extraTags = plugin.tags.length - shownTags.length
   /* The media box takes the cover's own ratio, so covers are never cropped and
-     the columns keep differing heights, which is what the grid reads as. */
+     the columns keep differing heights, which is what the grid reads as. Which
+     picture is the cover is the row's answer, already resolved to a URL. */
+  const cover = plugin.cover
   const [ratio, setRatio] = React.useState<number | undefined>(() =>
-    plugin.cover === undefined ? undefined : knownAspect(plugin.cover)
+    cover === undefined ? undefined : knownAspect(cover)
   )
 
   const measure = React.useCallback(
     (next: number) => {
-      if (plugin.cover === undefined) return
-      rememberAspect(plugin.cover, next)
+      if (cover === undefined) return
+      rememberAspect(cover, next)
       setRatio(next)
     },
-    [plugin.cover]
+    [cover]
   )
 
   return (
     <div
+      /* A pack's own card opens the pack whether or not the library holds it: a
+         pack only an agent holds is still one a person wants to look at, and the
+         lightbox is where taking it in is offered. The card holds its own action
+         button, so it cannot be a real button; the two keys a button answers to
+         are handled here instead. */
       role="button"
       tabIndex={0}
       aria-label={plugin.name}
       onClick={onOpen}
       onKeyDown={(event) => {
-        /* The card holds its own action button, so it cannot be a real button;
-           the two keys a button answers to are handled here instead. */
         if (event.key !== "Enter" && event.key !== " ") return
         if (event.target !== event.currentTarget) return
         event.preventDefault()
@@ -303,11 +406,9 @@ function PluginCard({
         className="relative w-full overflow-hidden bg-surface-raised"
         style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
       >
-        {plugin.cover === undefined ? (
-          <BundleCover plugin={plugin} />
-        ) : (
-          <PhotoCover src={plugin.cover} onRatio={measure} />
-        )}
+        {/* Keyed by the picture, so a card whose cover changed measures the new
+            one rather than keeping the ratio the old one reported. */}
+        <CoverFace key={cover} plugin={plugin} source={cover} onRatio={measure} />
         <div className="absolute top-3 left-3 flex items-center gap-1.5">
           {shownTags.map((tag) => (
             <TagPill key={tag} tag={tag} />
@@ -318,23 +419,49 @@ function PluginCard({
         </div>
       </div>
       <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
-        <div className="flex h-[19px] items-center justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate font-mono text-[14px] leading-[19px] font-semibold">
-              {plugin.name}
-            </span>
-            <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
-              {t("plugins.version").replace("{version}", plugin.version)}
-            </span>
-          </span>
-          <span className="shrink-0 text-[12px] leading-[15px] text-muted-soft">
+        {/* The title block reads as the MCP cards do: the pack's own mark on a
+            tile, then its name, with where it came from and its version beneath. */}
+        <div className="flex min-w-0 items-center gap-3">
+          <PluginTile plugin={plugin} />
+          <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+            <div className="flex min-w-0 items-center gap-1.5">
+              <span className="truncate font-mono text-[13.5px] leading-[1.3] font-semibold">
+                {plugin.name}
+              </span>
+              <UpdateBadge plugin={plugin} />
+            </div>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <PluginSourceLine plugin={plugin} />
+              {plugin.version === "" ? null : (
+                <>
+                  <span className="size-[3px] shrink-0 rounded-full bg-muted-soft" />
+                  <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
+                    {t("plugins.version").replace("{version}", plugin.version)}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+          <span className="shrink-0 self-start text-[12px] leading-[15px] text-muted-soft">
             {plugin.updated}
           </span>
         </div>
-        <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">{plugin.description}</p>
-        <div className="flex items-center justify-between gap-2">
-          <PluginSourceLine plugin={plugin} />
-          <InstallButton plugin={plugin} installed={installed} onToggle={onToggle} />
+        {plugin.description === "" ? null : (
+          <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">
+            {plugin.description}
+          </p>
+        )}
+        <div className="flex items-center gap-2">
+          {/* The marks take the left of the row and the action keeps the right,
+              whether or not any agent holds this pack. */}
+          <span className="mr-auto flex min-w-0 items-center">
+            <HolderStack plugin={plugin} />
+          </span>
+          {/* The two menus stand here whether or not the hub holds the files:
+              what an agent makes of a pack, and where else to put it, are the
+              row's own questions. Taking a pack in is the panel's, which is
+              where a person has just read what it carries. */}
+          <InstallButton plugin={plugin} actions={actions} />
         </div>
       </div>
     </div>
@@ -365,20 +492,23 @@ function EmptyState({
       <span className="max-w-[420px] text-[13px] leading-[18px] text-muted-foreground">
         {hint}
       </span>
-      {action === undefined ? null : <div className="mt-1 flex items-center gap-2">{action}</div>}
+      {/* An empty state may carry no action at all, and a caller that switches
+          one off passes `null` rather than `undefined` — both have to read as
+          nothing, or the row keeps an empty box it never fills. */}
+      {action === undefined || action === null ? null : (
+        <div className="mt-1 flex items-center gap-2">{action}</div>
+      )}
     </div>
   )
 }
 
 function PluginGrid({
   plugins,
-  installed,
-  onToggle,
+  actions,
   onOpen,
 }: {
   plugins: PluginRow[]
-  installed: readonly string[]
-  onToggle: (plugin: PluginRow) => void
+  actions: RowActions
   onOpen: (plugin: PluginRow) => void
 }) {
   /*
@@ -394,28 +524,12 @@ function PluginGrid({
           <PluginCard
             key={plugin.id}
             plugin={plugin}
-            installed={installed.includes(plugin.id)}
-            onToggle={() => onToggle(plugin)}
+            actions={actions}
             onOpen={() => onOpen(plugin)}
           />
         ))}
       </div>
     </div>
-  )
-}
-
-/** The mark a row shows when it has no picture: the pack itself. */
-function PluginThumb({ plugin }: { plugin: PluginRow }) {
-  if (plugin.cover !== undefined) {
-    return (
-      <img src={plugin.cover} alt="" className="size-9 shrink-0 rounded-[12px] object-cover" />
-    )
-  }
-
-  return (
-    <span className="flex size-9 shrink-0 items-center justify-center rounded-[12px] bg-surface-raised">
-      <PlugIcon className="size-4 text-foreground" aria-hidden />
-    </span>
   )
 }
 
@@ -444,8 +558,7 @@ function PluginTable({
   needle,
   checked,
   onCheck,
-  installed,
-  onToggle,
+  actions,
   onOpen,
 }: {
   plugins: PluginRow[]
@@ -454,8 +567,7 @@ function PluginTable({
   /** Keys of the rows ticked for a batch action. */
   checked: readonly string[]
   onCheck: (keys: string[]) => void
-  installed: readonly string[]
-  onToggle: (plugin: PluginRow) => void
+  actions: RowActions
   onOpen: (plugin: PluginRow) => void
 }) {
   const { t } = useI18n()
@@ -468,10 +580,10 @@ function PluginTable({
     {
       key: "plugin",
       label: t("plugins.column.plugin"),
-      width: "43.1%",
+      width: "35.7%",
       cell: (plugin) => (
-        <div className="flex items-center gap-3">
-          <PluginThumb plugin={plugin} />
+        <div className="flex min-w-0 items-center gap-4">
+          <PluginTile plugin={plugin} size={36} />
           <div className="flex min-w-0 flex-col gap-1.5">
             <span className="flex min-w-0 items-center gap-1.5">
               <span className="truncate font-mono text-[14px] leading-[18px] font-semibold">
@@ -480,6 +592,7 @@ function PluginTable({
               <span className="shrink-0 font-mono text-[11px] leading-[14px] text-muted-soft">
                 {t("plugins.version").replace("{version}", plugin.version)}
               </span>
+              <UpdateBadge plugin={plugin} />
             </span>
             <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
               <Highlighted text={plugin.description} needle={needle} />
@@ -491,7 +604,7 @@ function PluginTable({
     {
       key: "tags",
       label: t("plugins.column.tags"),
-      width: "19.3%",
+      width: "16.0%",
       cell: (plugin) => (
         <div className="flex flex-wrap items-center gap-1.5">
           {plugin.tags.map((tag) => (
@@ -503,13 +616,18 @@ function PluginTable({
     {
       key: "source",
       label: t("plugins.column.source"),
-      width: "16.1%",
-      cell: (plugin) => <PluginSourceLine plugin={plugin} />,
+      width: "13.3%",
+      cell: (plugin) => (
+        <div className="flex min-w-0 items-center gap-2">
+          <PluginSourceLine plugin={plugin} />
+          <HolderStack plugin={plugin} />
+        </div>
+      ),
     },
     {
       key: "updated",
       label: t("plugins.column.updated"),
-      width: "10.1%",
+      width: "8.4%",
       cell: (plugin) => (
         <span className="text-[13px] text-muted-foreground">{plugin.updated}</span>
       ),
@@ -517,14 +635,8 @@ function PluginTable({
     {
       key: "action",
       label: t("plugins.column.action"),
-      width: "8.5%",
-      cell: (plugin) => (
-        <InstallButton
-          plugin={plugin}
-          installed={installed.includes(plugin.id)}
-          onToggle={() => onToggle(plugin)}
-        />
-      ),
+      width: "23.7%",
+      cell: (plugin) => <InstallButton plugin={plugin} actions={actions} />,
     },
   ]
 
@@ -542,20 +654,55 @@ function PluginTable({
         clearLabel: t("plugins.batch.clear"),
         onClear: () => onCheck([]),
         action: (
-          <Button
-            type="button"
-            disabled={checked.length === 0}
-            onClick={() => {
-              for (const plugin of plugins) {
-                if (checked.includes(plugin.id)) onToggle(plugin)
+          /* One target, chosen once, applied to every ticked row: a batch that
+             asked per row would be the row's own menu again. */
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  type="button"
+                  disabled={checked.length === 0 || actions.busy}
+                  className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
+                />
               }
-              onCheck([])
-            }}
-            className="h-[34px] gap-1.5 rounded-full px-4 text-[13px] font-semibold"
-          >
-            <DownloadIcon className="size-3.5" />
-            {t("plugins.action.install")}
-          </Button>
+            >
+              <DownloadIcon className="size-3.5" />
+              {t("plugins.action.installTo")}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" sideOffset={6} className="w-[272px] p-1">
+              {actions.clients.map((client) => (
+                <div key={client.id}>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="flex items-center gap-1.5 px-1.5 py-1 text-[11.5px] font-semibold text-muted-soft">
+                      <client.icon className="size-3.5 shrink-0" aria-hidden />
+                      {client.label}
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
+                  {client.places.map((place) => (
+                    <DropdownMenuItem
+                      key={`${client.id}:${place.scopeWord}`}
+                      closeOnClick={false}
+                      disabled={actions.busy || !client.available}
+                      onClick={() => {
+                        for (const plugin of plugins) {
+                          if (checked.includes(plugin.id)) {
+                            actions.onInstall(plugin, client.id, place.scopeWord)
+                          }
+                        }
+                        onCheck([])
+                      }}
+                      className="gap-2.5 px-1.5 py-2 pl-4"
+                    >
+                      <span className="text-[13px] leading-[18px] font-semibold">
+                        {t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord)}
+                      </span>
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </div>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         ),
       }}
       onOpen={onOpen}
@@ -620,6 +767,9 @@ function ViewButton({
 export function PluginsPage() {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<PluginTab>("all")
+  /* One agent inside the scope tab on screen, once a person picked one from its
+     menu; `null` leaves the scope whole. */
+  const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const [view, setView] = React.useState<"grid" | "list">("grid")
   /* Which segment the Add dialog opens on; `null` while it is closed. */
   const [addTab, setAddTab] = React.useState<AddPluginTab | null>(null)
@@ -634,12 +784,57 @@ export function PluginsPage() {
   const [checked, setChecked] = React.useState<readonly string[]>([])
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
-  /* Which packs read as installed. Until the module reads a real catalog this
-     is the screen's own state, seeded from the sample. */
-  const [installed, setInstalled] = React.useState<readonly string[]>(sampleInstalled)
-  /* The rows on offer. Reading real packs replaces this list outright; until
-     then an edit in the lightbox is a change to this state. */
-  const [catalog, setCatalog] = React.useState<PluginRow[]>(samplePlugins)
+  /* A batch a tab's menu started, which holds the menu's item disabled until the
+     run it stands for has finished. */
+  const [batch, setBatch] = React.useState<"adopt" | "update" | null>(null)
+  /* The library the rows come from, and the one place a write reaches it. */
+  const library = usePluginLibrary()
+  const catalog = library.rows
+
+  /* A pack whose folder was deleted is fetched again as the page loads: the
+     record is what says it was here, and the address it carries is what puts the
+     files back. One notice names every pack that is gone, and they are fetched at
+     once — each address is that pack's own, so nothing here has to wait for
+     another to finish before it starts. */
+  const missing = library.missing
+  const repairing = React.useRef(new Set<string>())
+  React.useEffect(() => {
+    const gone = missing.filter((name) => !repairing.current.has(name))
+    /* A pack that failed once is not tried again on every re-read: a source that
+       has gone away answers the same way each time, and a reload is the retry. */
+    if (gone.length === 0) return
+    for (const name of gone) repairing.current.add(name)
+    const id = "plugins.restore"
+    toast.add({
+      id,
+      type: "loading",
+      title: t("plugins.notice.restoring").replace("{names}", gone.join(t("plugins.notice.separator"))),
+    })
+    void Promise.allSettled(gone.map((name) => library.restore(name)))
+      .then(async (results) => {
+        const failed = results.flatMap((result, at) =>
+          result.status === "rejected"
+            ? [{ name: gone[at] as string, reason: reasonOf(result.reason) }]
+            : []
+        )
+        await library.refresh()
+        if (failed.length === 0) {
+          toast.close(id)
+          return
+        }
+        toast.update(id, {
+          type: "error",
+          title: t("plugins.notice.restoreFailed").replace(
+            "{names}",
+            failed.map((one) => one.name).join(t("plugins.notice.separator"))
+          ),
+          description: failed.map((one) => one.reason).join("\n"),
+        })
+      })
+      .catch((error: unknown) => {
+        toast.update(id, { type: "error", title: reasonOf(error) })
+      })
+  }, [missing, library, t])
 
   const offered = React.useMemo(() => {
     if (needle === "") return catalog
@@ -652,20 +847,63 @@ export function PluginsPage() {
     [offered, tag]
   )
 
-  /* A number belongs to every tab: this screen's tabs are states of one set
-     rather than places, so each one can say its size. */
+  /* A number belongs to the tabs that hold packs; a scope tab shows which agents
+     it spans instead, so its size is not printed twice. Every count is read
+     before any narrowing: a tab says how big its set is, not how big the slice of
+     it a person happens to be looking at is. */
   const counts = React.useMemo(
     () => ({
-      all: rowsForTab(filtered, "all", installed).length,
-      installed: rowsForTab(filtered, "installed", installed).length,
-      available: rowsForTab(filtered, "available", installed).length,
+      all: rowsForTab(filtered, "all").length,
+      library: rowsForTab(filtered, "library").length,
+      unstored: rowsForTab(filtered, "unstored").length,
+      updates: rowsForTab(filtered, "updates").length,
     }),
-    [filtered, installed]
+    [filtered]
   )
 
+  /* A tab whose set is empty leaves the row rather than sitting there saying
+     nothing, and the screen follows it off: a person who emptied the set by
+     acting on it lands back on the whole catalog rather than on a blank page. */
+  const screenTab: PluginTab =
+    (tab === "unstored" && counts.unstored === 0) || (tab === "updates" && counts.updates === 0)
+      ? "all"
+      : tab
+
+  /* The agents each scope tab spans, as the tab's own stack and menu draw them.
+     Which of them is a place of which tab is the same reading the rows go
+     through, so a client no tab can show is not offered by one either. */
+  const scopePlaces = React.useMemo(() => {
+    const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
+    for (const scope of SCOPE_TABS as AssetScope[]) {
+      byScope[scope] = library.clients
+        .filter((client) => client.places.some((one) => one.scope === scope))
+        .map((client) => ({
+          id: client.id,
+          icon: client.icon,
+          label: client.label,
+          count: catalog.filter((row) =>
+            row.held.some(
+              (hold) =>
+                hold.client === client.id && hold.places.some((one) => one.group === scope)
+            )
+          ).length,
+        }))
+    }
+    return byScope
+  }, [library.clients, catalog])
+
+  /* A choice from a scope tab's menu only means something while it is a place of
+     the scope on screen; anywhere else the scope is whole. */
+  const chosen =
+    narrowed !== null &&
+    SCOPE_TABS.includes(screenTab) &&
+    scopePlaces[screenTab as AssetScope].some((place) => place.id === narrowed)
+      ? narrowed
+      : null
+
   const matching = React.useMemo(
-    () => rowsForTab(filtered, tab, installed),
-    [filtered, tab, installed]
+    () => rowsForTab(filtered, screenTab, chosen),
+    [filtered, screenTab, chosen]
   )
 
   /* A filter can leave the page past the end; the page shown is clamped rather
@@ -678,28 +916,156 @@ export function PluginsPage() {
     [matching, shownPage, pageSize]
   )
 
-  /* The one write this screen makes: a pack moves between the two tabs. */
-  const toggle = (plugin: PluginRow) =>
-    setInstalled((held) =>
-      held.includes(plugin.id)
-        ? held.filter((id) => id !== plugin.id)
-        : [...held, plugin.id]
+  /* Every row's own write: a pack is delivered to one client at one scope, or
+     taken back out of that same place. Each place is its own, so the row's menu
+     acts on them one at a time. */
+  const actions: RowActions = {
+    clients: library.clients,
+    busy: library.busy,
+    onUpdate: (plugin) => {
+      void library
+        .update(plugin.id)
+        .then((outcome) => {
+          toast.add({
+            type: "success",
+            title: outcome.changed
+              ? t("plugins.update.done").replace("{name}", plugin.name)
+              : t("plugins.update.unchanged").replace("{name}", plugin.name),
+          })
+          if (outcome.overwroteEdits) {
+            toast.add({ type: "warning", title: t("plugins.update.overwritten") })
+          }
+        })
+        .catch((error: unknown) => {
+          toast.add({
+            type: "error",
+            title: error instanceof Error ? error.message : String(error),
+          })
+        })
+    },
+    onInstall: (plugin, client, scope) => {
+      void library.install(plugin.name, client, scope).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onUninstall: (plugin, client, scope) => {
+      void library.uninstall(plugin.name, client, scope).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onSetEnabled: (plugin, client, scope, on) => {
+      void library.setEnabled(plugin.name, client, scope, on).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onAdopt: (plugin) => {
+      void library.adopt(plugin.name).then(
+        (collected) => {
+          toast.add({
+            type: collected.already ? "info" : "success",
+            title: t(
+              collected.already ? "plugins.notice.already" : "plugins.notice.added"
+            ).replace("{name}", collected.record.name),
+          })
+        },
+        (error: unknown) => {
+          toast.add({
+            type: "error",
+            title: error instanceof Error ? error.message : String(error),
+          })
+        }
+      )
+    },
+  }
+
+  /**
+   * Collect one pack and say what became of it.
+   *
+   * The dialog closes on a pack that is new, so the notice is what says what
+   * landed; a pack that was already here, or a failure, leaves the dialog open
+   * for the address to be corrected, so the notice is the only thing that reports
+   * it. A failure is a notice rather than a state the dialog draws, because it is
+   * about this one attempt rather than about the address that produced it.
+   */
+  const collect = (run: () => Promise<PluginCollected>) =>
+    run().then(
+      (collected) => {
+        toast.add({
+          type: collected.already ? "info" : "success",
+          title: t(
+            collected.already ? "plugins.notice.already" : "plugins.notice.added"
+          ).replace("{name}", collected.record.name),
+        })
+        return collected
+      },
+      (error: unknown) => {
+        toast.add({
+          type: "error",
+          title: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
     )
 
-  /* A pack the Add dialog named. Until the module reads a real catalog there is
-     nothing to install into, so the name is what the tabs then read. */
-  const take = (name: string) =>
-    setInstalled((held) => (held.includes(name) ? held : [...held, name]))
+  const take = (source: string) => collect(() => library.add(source))
+
+  /* The same for a folder a page read, whose pack the host names from the same
+     manifest — so it too only knows what landed by being told. */
+  const addFromFolder = (name: string, files: readonly PackUploadFile[]) =>
+    collect(() => library.addFolder(name, files))
 
   /* The pack the lightbox is open on, read from the catalog rather than the
      page: a filter can take its row away while the lightbox is up. */
   const detail = catalog.find((plugin) => plugin.id === detailId) ?? null
 
+  /* Every row opens: the lightbox says what a pack is either way, and for one the
+     hub does not hold yet it carries taking that pack in where the rest carry
+     the pack's own files. */
+  const openDetail = (plugin: PluginRow) => setDetailId(plugin.id)
+
   /* A category edited in the lightbox is that row's own from then on. */
-  const setTags = (plugin: PluginRow, tags: string[]) =>
-    setCatalog((rows) =>
-      rows.map((row) => (row.id === plugin.id ? { ...row, tags } : row))
-    )
+  const setTags = (plugin: PluginRow, tags: string[]) => library.setTags(plugin.name, tags)
+
+  /* The two batches act on the whole catalog rather than on what the filters and
+     the current tab happen to leave on screen: one of them is offered by the tab
+     that stands for the set, and that set is what it runs on. */
+  const unstoredRows = React.useMemo(() => catalog.filter((row) => !row.stored), [catalog])
+  const outdatedRows = React.useMemo(() => catalog.filter((row) => row.outdated === true), [catalog])
+
+  /**
+   * Take in every pack a client wrote, one at a time: each is a write of its own,
+   * and the first refusal names the pack it was about, so a run that stops says
+   * which one stopped it.
+   */
+  const adoptAll = async () => {
+    setBatch("adopt")
+    try {
+      for (const plugin of unstoredRows) await library.adopt(plugin.name)
+    } catch (error: unknown) {
+      toast.add({ type: "error", title: reasonOf(error) })
+    } finally {
+      setBatch(null)
+    }
+  }
+
+  /** Take every pack that fell behind to the revision its source holds. */
+  const updateAll = async () => {
+    setBatch("update")
+    try {
+      let replaced = false
+      for (const plugin of outdatedRows) {
+        const outcome = await library.update(plugin.id)
+        replaced = replaced || outcome.overwroteEdits
+      }
+      /* An update replaces the files it lands on, and a batch answers for all of
+         them at once: one line says that some of what was here is now gone. */
+      if (replaced) toast.add({ type: "warning", title: t("plugins.update.overwritten") })
+    } catch (error: unknown) {
+      toast.add({ type: "error", title: reasonOf(error) })
+    } finally {
+      setBatch(null)
+    }
+  }
 
   const pagination = (
     <TablePagination
@@ -733,21 +1099,76 @@ export function PluginsPage() {
       </div>
     )
 
+  /* Taking a tab is one thing whichever element carried it — a tab primitive, an
+     action's pill, or a scope's — so the reset that goes with it lives here. */
+  const pickTab = (value: PluginTab) => {
+    setTab(value)
+    setPage(0)
+    setChecked([])
+  }
+
   return (
     <div className="flex flex-1 flex-col gap-8">
       <PageHeading />
       <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
-          setPage(0)
-          setChecked([])
-        }}
+        value={screenTab}
+        onValueChange={(value) =>
+          pickTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
+        }
         className="flex-1 gap-8"
       >
         <div className="flex items-center justify-between gap-6">
           <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
-            {SHELL_TABS.map((item) => {
+            {SHELL_TABS.filter(
+              (item) =>
+                (item.value !== "unstored" || counts.unstored > 0) &&
+                (item.value !== "updates" || counts.updates > 0)
+            ).map((item) => {
+              const active = screenTab === item.value
+              /* A set of what is missing opens through the one action it is for:
+                 the whole pill is the trigger, and the count it carries is the
+                 size of the set that action runs on. */
+              if (item.value === "unstored" || item.value === "updates") {
+                const own = item.value === "unstored" ? "adopt" : "update"
+                return (
+                  <ActionTab
+                    key={item.value}
+                    icon={item.icon}
+                    label={t(item.labelKey)}
+                    count={counts[item.value]}
+                    action={t(
+                      own === "adopt" ? "plugins.action.adoptAll" : "plugins.action.updateAll"
+                    )}
+                    actionIcon={own === "adopt" ? PackagePlusIcon : DownloadIcon}
+                    /* The run is this tab's to show; the other one only holds it up. */
+                    state={batch === null ? "idle" : batch === own ? "running" : "blocked"}
+                    active={active}
+                    onTab={() => pickTab(item.value)}
+                    onAction={() => void (own === "adopt" ? adoptAll() : updateAll())}
+                  />
+                )
+              }
+              /* A scope opens through the agents it spans, so a person never lands
+                 on it without having said which agent they meant. */
+              if (item.value === "workspace" || item.value === "global") {
+                return (
+                  <PlaceScopePicker
+                    key={item.value}
+                    scopeIcon={item.icon}
+                    scopeLabel={t(item.labelKey)}
+                    places={scopePlaces[item.value]}
+                    chosen={active ? chosen : null}
+                    active={active}
+                    allLabel={t("plugins.place.all")}
+                    title={t("plugins.place.which")}
+                    words={placeWords(t)}
+                    onChoose={(id) => {
+                      pickTab(item.value)
+                      setNarrowed(id)
+                    }}
+                  />
+                )
+              }
               const count = counts[item.value]
               return (
                 <TabsTrigger
@@ -781,12 +1202,41 @@ export function PluginsPage() {
             </div>
             <Button
               variant="outline"
+              disabled={library.busy}
               className="h-9 gap-2 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
+              onClick={() => {
+                void library
+                  .checkUpdates()
+                  .then((summary) => {
+                    toast.add({
+                      type: summary.modified > 0 ? "warning" : "success",
+                      title: t("plugins.notice.checked")
+                        .replace("{count}", String(summary.checked))
+                        .replace("{outdated}", String(summary.outdated))
+                        .replace("{modified}", String(summary.modified)),
+                    })
+                    if (summary.failed.length > 0) {
+                      toast.add({
+                        type: "error",
+                        title: t("plugins.notice.checkFailed").replace(
+                          "{count}",
+                          String(summary.failed.length)
+                        ),
+                      })
+                    }
+                  })
+                  .catch((error: unknown) => {
+                    toast.add({
+                      type: "error",
+                      title: error instanceof Error ? error.message : String(error),
+                    })
+                  })
+              }}
             >
-              <RefreshCwIcon />
+              <RefreshCwIcon className={library.busy ? "animate-spin" : undefined} />
               {t("plugins.action.checkUpdates")}
             </Button>
-            <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddTab("marketplace")}>
+            <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddTab("address")}>
               <PlusIcon />
               {t("plugins.action.add")}
             </Button>
@@ -811,7 +1261,7 @@ export function PluginsPage() {
             all: t("plugins.allTags"),
           }}
         />
-        <TabsContent value={tab} className="flex flex-col">
+        <TabsContent value={screenTab} className="flex flex-col">
           <PageBody footer={footer}>
             {plugins.length === 0 ? (
               needle !== "" ? (
@@ -835,32 +1285,26 @@ export function PluginsPage() {
                 />
               ) : (
                 <EmptyState
-                  icon={SHELL_TABS.find((item) => item.value === tab)?.icon ?? PlugIcon}
+                  icon={SHELL_TABS.find((item) => item.value === screenTab)?.icon ?? PlugIcon}
                   title={t("plugins.empty.tab")}
                   hint={t("plugins.empty.tabHint")}
                   action={
-                    <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
+                    <Button className="h-10 rounded-full px-4" onClick={() => pickTab("all")}>
                       {t("plugins.tab.all")}
                     </Button>
                   }
                 />
               )
             ) : view === "grid" ? (
-              <PluginGrid
-                plugins={plugins}
-                installed={installed}
-                onToggle={toggle}
-                onOpen={(plugin) => setDetailId(plugin.id)}
-              />
+              <PluginGrid plugins={plugins} actions={actions} onOpen={openDetail} />
             ) : (
               <PluginTable
                 plugins={plugins}
                 needle={needle}
                 checked={checked}
                 onCheck={setChecked}
-                installed={installed}
-                onToggle={toggle}
-                onOpen={(plugin) => setDetailId(plugin.id)}
+                actions={actions}
+                onOpen={openDetail}
               />
             )}
           </PageBody>
@@ -868,22 +1312,31 @@ export function PluginsPage() {
       </Tabs>
       <AddPluginDialog
         open={addTab !== null}
-        tab={addTab ?? "marketplace"}
-        installed={installed}
+        tab={addTab ?? "address"}
         onTabChange={setAddTab}
         onOpenChange={(next) => {
           if (!next) setAddTab(null)
         }}
-        onInstall={take}
+        onAdd={take}
+        onAddFolder={addFromFolder}
       />
       <PluginDetailDialog
         plugin={detail}
-        installed={detail !== null && installed.includes(detail.id)}
+        clients={library.clients}
+        root={library.root}
+        busy={library.busy}
         tagSuggestions={tagsOf(catalog)}
-        onToggleInstall={toggle}
+        onUpdate={(plugin) => actions.onUpdate(plugin)}
+        onInstall={(plugin, client, scope) => actions.onInstall(plugin, client, scope)}
+        onUninstall={(plugin, client, scope) => actions.onUninstall(plugin, client, scope)}
+        onAdopt={(plugin) => actions.onAdopt(plugin)}
+        onCheckUpdate={(plugin) => library.checkUpdate(plugin.name).then(() => undefined)}
+        onDelete={(plugin) => library.remove(plugin.name)}
         onTagsChange={(tags) => {
           if (detail !== null) setTags(detail, tags)
         }}
+        onAddAssets={(plugin, sources) => library.addAssets(plugin.name, sources)}
+        onRemoveAsset={(plugin, ref) => library.removeAsset(plugin.name, ref)}
         onOpenChange={(next) => {
           if (!next) setDetailId(null)
         }}

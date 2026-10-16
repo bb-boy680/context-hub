@@ -1,22 +1,46 @@
 /**
- * Plugins as a plugin: the catalog screen, its navigation entry, and the English
- * defaults for the `plugins.*` namespace — contributed through the kernel's
- * extension points, so the shell ships no plugin-specific code.
+ * Plugins as a plugin: the library screen, its navigation entry, the service
+ * every agent extension registers its installer into, and the English defaults
+ * for the `plugins.*` namespace — all through the kernel's extension points, so
+ * the shell ships no plugin-specific code.
  *
- * The screen is the whole of it for now: it reads `./sample.ts` rather than a
- * catalog, installs nothing, and opens nothing. Reading a pack's own directory
- * and installing it into an agent come next, and they arrive as this module's
- * own service and host half rather than as shell code.
+ * The library itself lives behind this package: `./vite` is the bridge that puts
+ * the disk-backed library behind the dev server, and `./provider` is the service
+ * an agent plugin registers how it installs a plugin into. Nothing here names an
+ * agent — adding one is a plugin, not a case in this module.
  */
 import { PlugIcon } from "lucide-react"
 
+import type { WorkspaceService } from "@workspace/core/workspace"
 import type { ExtensionDefinition } from "@workspace/extensions"
 
 import { pluginsMessages } from "./messages.ts"
 import { PluginsPage } from "./page.tsx"
+import {
+  createPluginInstallerRegistry,
+  PLUGIN_SERVICE,
+  type PluginService,
+} from "./provider.ts"
+import { createRemotePluginTools } from "./tools.ts"
+
+declare module "@deepseek-ai/cordis" {
+  interface Context {
+    /**
+     * The form-owned workspace list; a client resolves its own project files
+     * against the folder this names, so the page rereads when it changes.
+     */
+    "hub.workspaces"?: WorkspaceService
+  }
+}
 
 export { PluginsPage }
-export { samplePlugins, sampleInstalled } from "./sample.ts"
+export * from "./contract.ts"
+export * from "./revision.ts"
+export * from "./records.ts"
+export * from "./inspect.ts"
+export * from "./provider.ts"
+export { createRemotePluginTools } from "./tools.ts"
+export { usePluginLibrary, packFile, packFiles, type PluginLibrary } from "./library.ts"
 export * from "./types.ts"
 
 export const pluginsExtension: ExtensionDefinition = {
@@ -31,8 +55,18 @@ export const pluginsExtension: ExtensionDefinition = {
     icon: PlugIcon,
     defaultEnabled: true,
     permissions: ["assets.read", "assets.write"],
+    provides: [PLUGIN_SERVICE],
   },
   activate(scope) {
+    /* The service carries the registry agent plugins register into and the tools
+       an installer is handed. It is published before anything else, so an agent
+       plugin enabled in the same pass can register as soon as it activates. */
+    const service: PluginService = {
+      registry: createPluginInstallerRegistry(),
+      tools: createRemotePluginTools(),
+    }
+    scope.provide(PLUGIN_SERVICE, service)
+
     scope.contribute("nav", {
       path: "/plugins",
       labelKey: "nav.plugins",

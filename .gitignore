@@ -40,3 +40,7 @@ designs/**/*.webp
 
 .agents
 midscene_run
+
+# AOCI agent host integration (machine-bound; do not commit)
+.mcp.json
+.mcp.json.backup.*

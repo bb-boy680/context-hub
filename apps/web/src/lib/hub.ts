@@ -33,6 +33,7 @@ import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
 import { claudeCodeExtension } from "@workspace/plugin-claude-code"
 import { mcpExtension } from "@workspace/plugin-mcp"
 import { pluginsExtension } from "@workspace/plugin-plugins"
+import { createRemotePromptStore, promptsExtension } from "@workspace/plugin-prompts"
 import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
 import { skillsShExtension } from "@workspace/plugin-skills-sh"
 import * as ui from "./ui-kit.ts"
@@ -41,6 +42,9 @@ import { createRemoteWorkspaceService } from "./workspaces.ts"
 
 /** Path the active form serves the skill library on, when it serves one at all. */
 const SKILLS_ENDPOINT = "/hub/skills"
+
+/** The same for the prompt library: it has a route, and no query to narrow it. */
+const PROMPTS_ENDPOINT = "/hub/prompts"
 
 /**
  * Where the build before the host-backed state kept each document, and how it
@@ -116,9 +120,20 @@ async function skillStoreAvailable(): Promise<boolean> {
   }
 }
 
+/** The same question for the prompt library, asked at its own route. */
+async function promptStoreAvailable(): Promise<boolean> {
+  try {
+    const response = await fetch(PROMPTS_ENDPOINT, { method: "GET" })
+    return response.ok
+  } catch {
+    /* No host behind this origin: the page says it has no library. */
+    return false
+  }
+}
+
 /**
- * Every plugin installed under `<home>/plugins`. One that cannot be loaded is
- * reported to the console and left out, so a broken download never keeps the
+ * Every extension installed under `<home>/extensions`. One that cannot be loaded
+ * is reported to the console and left out, so a broken download never keeps the
  * hub from starting.
  */
 async function installedPlugins() {
@@ -164,6 +179,9 @@ export async function startHub(): Promise<HubKernel> {
     },
   }
   const services: Record<string, unknown> = { "hub.ui": ui }
+  if (await promptStoreAvailable()) {
+    services["hub.prompts"] = createRemotePromptStore(PROMPTS_ENDPOINT)
+  }
   if (await skillStoreAvailable()) {
     services["hub.skills"] = createRemoteSkillStore()
   }
@@ -176,6 +194,7 @@ export async function startHub(): Promise<HubKernel> {
     extensions: [
       ...builtinExtensions,
       skillsExtension,
+      promptsExtension,
       mcpExtension,
       pluginsExtension,
       claudeCodeExtension,

@@ -10,7 +10,11 @@
  */
 import type { IncomingMessage, ServerResponse } from "node:http"
 
+import { createAssetStore } from "@workspace/core"
+import type { AssetSink, AssetStore } from "@workspace/core"
+import { createFsAssetLibrary } from "@workspace/core/host"
 import { hostFolder } from "@workspace/core/host/fs-browse"
+import { resolveHubHome } from "@workspace/core/host/home"
 
 import { createFsSkillStore } from "./src/host/skills-fs.ts"
 import type { SkillOrigin, SkillPlaceRef, SkillStore } from "./src/store.ts"
@@ -59,15 +63,35 @@ function sendError(response: ServerResponse, error: unknown) {
   sendJson(response, 400, { error: message })
 }
 
-/** Vite plugin that exposes the skill library over the dev server. */
-export function skillLibrary(options: { home?: string; folder?: string } = {}) {
+/**
+ * Vite plugin that exposes the skill library over the dev server.
+ *
+ * @param options.home — the hub home; skills live in `<home>/skills` and their files in `<home>/assets`.
+ * @param options.folder — the folder this host works in, when it is not the one the process is started from.
+ * @param options.sinks — places this form keeps assets besides the hub's own directory, such as a bucket a plugin uploads to.
+ * @param options.assets — a store to use instead of one over `<home>/assets`, for a form that keeps assets its own way.
+ */
+export function skillLibrary(
+  options: {
+    home?: string
+    folder?: string
+    sinks?: readonly AssetSink[]
+    assets?: AssetStore
+  } = {}
+) {
   let ready: Promise<SkillStore> | null = null
 
   const getStore = async (): Promise<SkillStore> => {
     ready ??= (async () => {
       /* This host's own folder is a workspace by default, with no picking. */
       const folder = options.folder ?? (await hostFolder())
-      return createFsSkillStore({ home: options.home, folder })
+      const assets =
+        options.assets ??
+        createAssetStore(
+          createFsAssetLibrary(resolveHubHome(options.home)),
+          options.sinks ?? []
+        )
+      return createFsSkillStore({ home: options.home, folder, assets })
     })()
     return ready
   }
