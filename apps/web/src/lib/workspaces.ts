@@ -32,8 +32,12 @@ async function call<T>(url: string, method: "GET" | "POST", body?: unknown): Pro
   return payload as T
 }
 
-/** Create the service the browser form provides on the kernel. */
-export function createRemoteWorkspaceService(): WorkspaceService {
+/**
+ * Create the service the browser form provides on the kernel.
+ *
+ * @param base — origin the route is served on; empty for the current one.
+ */
+export function createRemoteWorkspaceService(base = ""): WorkspaceService {
   let page: WorkspacePage | null = null
   let failure: string | null = null
   const listeners = new Set<() => void>()
@@ -68,7 +72,7 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async refresh() {
       try {
-        page = await call<WorkspacePage>(WORKSPACE_ROUTE, "GET")
+        page = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "GET")
         failure = null
       } catch (error) {
         failure = reasonOf(error)
@@ -78,7 +82,7 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async select(id) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/select`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/select`, "POST", { id }))
       } catch (error) {
         return refuse(error)
       }
@@ -86,7 +90,7 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async add(path) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/add`, "POST", { path }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/add`, "POST", { path }))
       } catch (error) {
         return refuse(error)
       }
@@ -94,7 +98,9 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async setAgent(id, on) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/agent`, "POST", { id, on }))
+        return settle(
+          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/agent`, "POST", { id, on })
+        )
       } catch (error) {
         return refuse(error)
       }
@@ -102,7 +108,9 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async rename(id, name) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/rename`, "POST", { id, name }))
+        return settle(
+          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/rename`, "POST", { id, name })
+        )
       } catch (error) {
         return refuse(error)
       }
@@ -110,7 +118,7 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async remove(id) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/remove`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/remove`, "POST", { id }))
       } catch (error) {
         return refuse(error)
       }

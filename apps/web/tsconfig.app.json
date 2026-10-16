@@ -26,5 +26,5 @@
       "@context-hub/shadcn-ui/*": ["../../packages/shadcn-ui/src/*"]
     }
   },
-  "include": ["src", "__test__"]
+  "include": ["src"]
 }
