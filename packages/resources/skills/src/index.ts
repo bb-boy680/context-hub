@@ -10,7 +10,7 @@
  */
 import type { WorkspaceService } from "@context-hub/core/workspace"
 
-import { skillsExtensionWith } from "./extension.ts"
+import { skillsModuleWith } from "./extension.ts"
 import { SkillsPage } from "./page.tsx"
 
 export { SkillsPage }
@@ -19,7 +19,7 @@ export * from "./registry.ts"
 export * from "./provider.ts"
 export { useSkillAgents } from "./library.ts"
 export { createRemoteSkillStore } from "./remote-store.ts"
-export { SKILLS_ID, skillsExtensionWith } from "./extension.ts"
+export { SKILLS_ID, skillsModuleWith } from "./extension.ts"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -30,4 +30,4 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
-export const skillsExtension = skillsExtensionWith(SkillsPage)
+export const skillsExtension = skillsModuleWith(SkillsPage)

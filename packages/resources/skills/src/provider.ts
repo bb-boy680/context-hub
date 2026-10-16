@@ -123,8 +123,11 @@ export function readablePlaces(
  * requiring `skills` reads `plugins.skills` with this type, and a name no
  * module declared is a name no plugin can inject.
  */
-declare module "@context-hub/extensions" {
-  interface ExtensionServices {
+/* A plugin reads this as a property of the context it is handed, so it is
+   declared on `Context` — the same place `host` and `i18n` are declared, and
+   what makes `ctx.skills` resolve rather than only `ctx.get("skills")`. */
+declare module "@deepseek-ai/cordis" {
+  interface Context {
     /** This module's registry of agent places; see {@link SkillService}. */
     skills: SkillService
   }

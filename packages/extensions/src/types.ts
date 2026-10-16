@@ -6,8 +6,6 @@
 import type { Context } from "@deepseek-ai/cordis"
 import type { ComponentType } from "react"
 
-import type { PlatformHost } from "./host.ts"
-import type { I18nService } from "./i18n.ts"
 import type { SkillRegistry } from "./skill-registry.ts"
 
 /** Extension API this kernel implements; manifests declare the range they were built for. */
@@ -132,49 +130,6 @@ export type DeclarativeContributions = {
   [P in ExtensionPointId]?: ContributionMap[P][]
 }
 
-/** What the kernel hands an extension's `activate`. */
-export interface ExtensionScope {
-  /** The extension's own Cordis context; its services and effects unwind on disable. */
-  readonly ctx: Context
-  /** Form capabilities and persistence; extensions never touch platform APIs directly. */
-  readonly host: PlatformHost
-  /**
-   * The kernel's translation service. A component rendered later cannot read it
-   * off {@link ctx}: a fiber's injected services resolve while `activate` runs,
-   * so take what you need to render with now.
-   */
-  readonly i18n?: I18nService
-  /** Register one contribution; removed automatically when the extension is disabled. */
-  contribute<P extends ExtensionPointId>(point: P, value: ContributionMap[P]): void
-  /**
-   * Publish an API under a service name, for other extensions to require.
-   *
-   * The name must be declared in {@link ExtensionManifest.provides}, so a
-   * dependency a person could satisfy is discoverable from the catalog rather
-   * than only from a throw. What is published lives as long as this extension
-   * is enabled, and an extension that required it unloads when this one is
-   * disabled.
-   *
-   * @throws when another enabled extension already provides that name.
-   */
-  provide(name: string, api: unknown): void
-  /**
-   * Run `setup` once the named services are all provided, with a context that
-   * has them and a map of the services themselves; unwind it again when one of
-   * them goes away.
-   *
-   * This is how one plugin uses another's API without knowing which extension
-   * supplies it, and without either being loaded first: the callback is simply
-   * not called until the dependency exists. `services` is keyed by the names
-   * asked for, so a plugin reads `services.mcp` rather than reaching for a
-   * property of the context — see {@link ExtensionServices}.
-   */
-  inject<N extends keyof ExtensionServices & string>(
-    names: readonly N[],
-    setup: (ctx: Context, services: Pick<ExtensionServices, N>) => void
-  ): void
-}
-
 /**
  * The services a plugin may require, by name.
  *
@@ -185,10 +140,8 @@ export interface ExtensionScope {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the kernel ships no service of its own; every entry is merged in by the module that publishes one.
 export interface ExtensionServices {}
 
-/** Identity and presentation of one extension package. */
+/** Identity and presentation of one extension package, apart from its id. */
 export interface ExtensionManifest {
-  /** Reverse-DNS style id, unique across the catalog, e.g. "hub.locale.zh-CN". */
-  id: string
   /** Catalog name, authored in the language the package chooses. */
   name: string
   version: string
@@ -203,22 +156,40 @@ export interface ExtensionManifest {
   /** The kernel never disables this extension, so the UI offers no switch. */
   locked?: boolean
   permissions?: ExtensionPermission[]
-  /** Cordis service names this extension provides; other extensions may require them. */
+  /** Service names this package publishes; a plugin may require them by name. */
   provides?: string[]
-  /**
-   * Cordis service names this extension requires. It stays `waiting` until
-   * every one is provided, and unloads again when one is disabled.
-   */
-  inject?: string[]
 }
 
-/** One package in the catalog. */
-export interface ExtensionDefinition {
+/**
+ * One package in the catalog, as its own module declares it.
+ *
+ * The module is the unit of a plugin: `name` is its id, `manifest` is what the
+ * catalog shows, `inject` names the services it needs, and `apply` registers
+ * what it contributes. Reading the module is not running it, so the catalog can
+ * list a package that is switched off.
+ *
+ * A plugin reads its services as properties of the context it is handed —
+ * `ctx.skills.register(...)` — which is why `inject` is a declaration and not a
+ * callback: every name it lists is on the context before `apply` runs.
+ */
+export interface ExtensionModule {
+  /** Reverse-DNS style id, unique across the catalog, e.g. "hub.skill.catalog". */
+  name: string
+  /** Everything the catalog shows, apart from the id. */
   manifest: ExtensionManifest
-  /** Data contributions loaded on every form; no extension code runs for these. */
+  /** Service names this package requires; it stays waiting until each is there. */
+  inject?: string[]
+  /** Data contributions, loaded on every form; no code runs for these. */
   declarative?: DeclarativeContributions
-  /** Code activation for forms that run extension code; registrations unwind on disable. */
-  activate?: (scope: ExtensionScope) => void
+  /** Register what this package contributes, for as long as it is enabled. */
+  apply?: (ctx: Context) => void
+}
+
+/** One package as the kernel holds it: the module, with its id resolved. */
+export interface ExtensionDefinition {
+  module: ExtensionModule
+  /** The module's manifest with its `name` filled in from the module's id. */
+  manifest: ExtensionManifest & { id: string }
 }
 
 /** Whether this kernel can load a manifest, by API range equality. */

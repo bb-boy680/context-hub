@@ -16,7 +16,7 @@
  * it does not get — and disabling it takes every one of them away, including
  * its MCP files, in the same step.
  */
-import type { ExtensionDefinition, ExtensionIcon } from "@context-hub/extensions"
+import type { ExtensionIcon, ExtensionModule } from "@context-hub/extensions"
 import type { PromptPlace } from "@context-hub/prompts/contract"
 import type { SkillPlace } from "@context-hub/skills/contract"
 
@@ -114,13 +114,13 @@ function promptPlaces(icon: ExtensionIcon): PromptPlace[] {
  *
  * @param icon — the mark every row, tab and menu draws for this agent.
  */
-export function claudeCodeExtensionWith(icon: ExtensionIcon): ExtensionDefinition {
+export function claudeCodeModuleWith(icon: ExtensionIcon): ExtensionModule {
   const places = skillPlaces(icon)
   const promptPlacesHere = promptPlaces(icon)
 
   return {
+    name: CLAUDE_CODE_ID,
     manifest: {
-      id: CLAUDE_CODE_ID,
       name: "Claude Code",
       version: "0.1.0",
       apiVersion: "^0.1",
@@ -131,42 +131,33 @@ export function claudeCodeExtensionWith(icon: ExtensionIcon): ExtensionDefinitio
       defaultEnabled: true,
       permissions: ["assets.read", "assets.write", "filesystem"],
     },
-    activate(scope) {
-      /* The MCP module publishes its service; this runs once it exists, and is
-         unwound when it goes away. With that module disabled the rest of this
-         extension still works: skills do not depend on MCP.
+    /* Every service this integration registers into, declared once. They are all
+       properties of the context by the time `apply` runs, and until they are all
+       there this extension waits rather than half-registering: an agent whose
+       half its places are listed is harder to understand than one that says what
+       it is waiting for. */
+    inject: ["skills", "prompts", "mcp", "plugins", "targets", "locales"],
 
-         Nothing here imports the MCP module: the registry to register into and
-         the toolkit to write a file with both arrive as `plugins.mcp`, which is
-         the same way a plugin installed as a folder gets them. */
-      scope.inject(["mcp"], (_ctx, plugins) => {
-        plugins.mcp.register(createClaudeCodeMcp(plugins.mcp.tools))
-      })
-
-      /* How Claude Code installs a plugin is this extension's knowledge, not the
-         plugins module's: that module owns the page and the library, and this
-         registers the installer it drives, through the same service. */
-      scope.inject(["plugins"], (_ctx, plugins) => {
-        plugins.plugins.register(claudeCodeInstaller)
-      })
-
-      /* The places register into the skills module, which is what makes this
-         agent one the sidebar lists and the skills page reads.
-
-         No effect around it: the registration belongs to whoever called it, so
-         this extension's places leave with this extension. */
-      scope.inject(["skills"], (_ctx, plugins) => {
-        plugins.skills.register({ id: CLAUDE_CODE_ID, places })
-      })
+    apply(ctx) {
+      /* Where this agent keeps skills is what makes it one the sidebar lists and
+         the skills page reads. */
+      ctx.skills.register({ id: CLAUDE_CODE_ID, places })
 
       /* The same places, told to the prompts module, which is what puts this
-         agent in a prompt's install menu. A separate inject because the two
-         modules are separate: with one of them disabled the other still works. */
-      scope.inject(["prompts"], (_ctx, plugins) => {
-        plugins.prompts.register({ id: CLAUDE_CODE_ID, places: promptPlacesHere })
-      })
+         agent in a prompt's install menu. */
+      ctx.prompts.register({ id: CLAUDE_CODE_ID, places: promptPlacesHere })
 
-      scope.contribute("target", {
+      /* How this client's file is read and written. The toolkit comes off the
+         same service, which is how it reaches a plugin installed as a folder:
+         such a directory imports nothing, so nothing else can hand it over. */
+      ctx.mcp.register(createClaudeCodeMcp(ctx.mcp.tools))
+
+      /* How Claude Code installs a plugin is this integration's knowledge, not
+         the plugins module's: that module owns the page and the library, and
+         this registers the installer it drives. */
+      ctx.plugins.register(claudeCodeInstaller)
+
+      ctx.targets.register({
         id: CLAUDE_CODE_ID,
         displayName: "Claude Code",
         icon,
@@ -177,7 +168,8 @@ export function claudeCodeExtensionWith(icon: ExtensionIcon): ExtensionDefinitio
         })),
         format: "Markdown with YAML frontmatter; JSON for MCP servers and hooks",
       })
-      scope.contribute("locale", {
+
+      ctx.locales.register({
         id: "en",
         label: "English",
         messages: claudeCodeMessages,

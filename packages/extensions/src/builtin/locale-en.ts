@@ -4,7 +4,7 @@
  */
 import { LanguagesIcon } from "lucide-react"
 
-import type { ExtensionDefinition } from "../types.ts"
+import type { ExtensionModule } from "../types.ts"
 
 /** Keys every pack resolves; the UI reads them through `ctx.i18n.t`. */
 const en: Record<string, string> = {
@@ -86,9 +86,9 @@ const en: Record<string, string> = {
 }
 
 /** Fallback pack: locked, always enabled, and the table every other pack falls back to. */
-export const englishLocale: ExtensionDefinition = {
+export const englishLocale: ExtensionModule = {
+  name: "hub.locale.en",
   manifest: {
-    id: "hub.locale.en",
     name: "English",
     version: "0.1.0",
     apiVersion: "^0.1",

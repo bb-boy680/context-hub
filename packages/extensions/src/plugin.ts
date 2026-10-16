@@ -16,9 +16,8 @@ import type { LucideIcon } from "lucide-react"
 import { PLUGIN_ICONS, resolvePluginIcon } from "./icons.ts"
 import {
   isCompatible,
-  type ExtensionDefinition,
+  type ExtensionModule,
   type ExtensionPermission,
-  type ExtensionScope,
 } from "./types.ts"
 
 /** Manifest fields accepted from `plugin.json`, before the kernel resolves them. */
@@ -32,7 +31,7 @@ export interface PluginManifestFile {
   description?: string
   /** Kebab-case icon name, e.g. "sparkles"; see `PLUGIN_ICONS`. */
   icon?: string
-  /** Module file inside the plugin directory that exports `activate`; defaults to index.js. */
+  /** Module file inside the plugin directory that exports `apply`; defaults to index.js. */
   entry?: string
   category?: "agent" | "asset" | "integration" | "language" | "appearance" | "source" | "storage"
   permissions?: ExtensionPermission[]
@@ -47,18 +46,18 @@ export interface PluginManifestFile {
 /** One plugin found on disk, and whether the kernel can load it. */
 export interface DiscoveredPlugin {
   id: string
-  definition?: ExtensionDefinition
-  /** Why this plugin is not loadable; present instead of `definition`. */
+  module?: ExtensionModule
+  /** Why this plugin is not loadable; present instead of `module`. */
   problem?: string
 }
 
 /** What a plugin's entry module must export. */
 export interface PluginModule {
-  activate(scope: PluginScope): void
+  apply(scope: PluginScope): void
 }
 
 /**
- * The scope a disk plugin's `activate` receives: the kernel's own scope plus
+ * The scope a disk plugin's `apply` receives: the kernel's own scope plus
  * what a module that imports nothing still needs — React, the icon table (a
  * contribution carries a component, not a name), and the form's UI kit.
  *
@@ -67,7 +66,7 @@ export interface PluginModule {
  * requires anyway. Installing a plugin is copying a directory; there is no
  * package resolution to lean on.
  */
-export interface PluginScope extends ExtensionScope {
+export interface PluginScope {
   react: typeof React
   /** Icons a manifest may name, by kebab-case name. */
   icons: typeof PLUGIN_ICONS
@@ -178,16 +177,16 @@ export async function discoverPlugins(options: {
       const entry = manifest.entry ?? "index.js"
       const module = (await options.importModule(
         `${route}/${encodeURIComponent(id)}/${entry}`
-      )) as { activate?: unknown; default?: { activate?: unknown } }
-      const activate = module.activate ?? module.default?.activate
-      if (typeof activate !== "function") {
-        throw new Error("plugin entry module must export an activate function")
+      )) as { apply?: unknown; default?: { apply?: unknown } }
+      const apply = module.apply ?? module.default?.apply
+      if (typeof apply !== "function") {
+        throw new Error("plugin entry module must export an apply function")
       }
       found.push({
         id,
-        definition: {
+        module: {
+          name: manifest.id,
           manifest: {
-            id: manifest.id,
             name: manifest.name,
             version: manifest.version,
             apiVersion: manifest.apiVersion,
@@ -197,18 +196,29 @@ export async function discoverPlugins(options: {
             icon: resolvePluginIcon(manifest.icon),
             defaultEnabled: manifest.defaultEnabled,
             permissions: manifest.permissions,
-            inject: manifest.inject,
             provides: manifest.provides,
           },
-          activate: (scope: ExtensionScope) => {
-            /* React, icons, and the UI kit travel on the scope: a plugin module imports nothing. */
-            ;(activate as (value: unknown) => void)({
-              ...scope,
+          inject: manifest.inject,
+          apply: (ctx) => {
+            /* React, icons, and the UI kit travel with the context: a plugin
+               module imports nothing.
+
+               Built first, then hung behind the context, rather than spread from
+               it. A Cordis context is a proxy: spreading one copies its own
+               properties only — `root`, `fiber`, `reflect` and the like — and the
+               services it resolves are not among them, so a plugin reading
+               `ctx.mcp` would find nothing. Assigning onto something that already
+               has the context behind it does not work either, because the write
+               reaches the proxy's own guard. Own properties first, prototype
+               second, keeps every name the fiber declared. */
+            const scope: Record<string, unknown> = {
               react: React,
               icons: PLUGIN_ICONS,
               icon: resolvePluginIcon,
-              ui: scope.ctx.get("hub.ui"),
-            })
+              ui: ctx.get("hub.ui"),
+            }
+            Object.setPrototypeOf(scope, ctx)
+            ;(apply as (value: unknown) => void)(scope)
           },
         },
       })

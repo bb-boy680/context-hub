@@ -5,16 +5,16 @@
  */
 import { LanguagesIcon } from "lucide-react"
 
-import type { ExtensionDefinition } from "@context-hub/extensions"
+import type { ExtensionModule } from "@context-hub/extensions"
 
 import { messages } from "./messages.ts"
 
 export { messages as zhCNMessages } from "./messages.ts"
 
 /** Installable language pack; enabling it adds Simplified Chinese to the picker. */
-export const simplifiedChineseLocale: ExtensionDefinition = {
+export const simplifiedChineseLocale: ExtensionModule = {
+  name: "hub.locale.zh-CN",
   manifest: {
-    id: "hub.locale.zh-CN",
     name: "简体中文",
     version: "0.1.0",
     apiVersion: "^0.1",

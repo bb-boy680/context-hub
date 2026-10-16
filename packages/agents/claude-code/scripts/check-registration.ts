@@ -17,9 +17,9 @@
  */
 import { createHubKernel } from "@context-hub/extensions"
 import type { PlatformHost } from "@context-hub/extensions"
-import { skillsExtensionWith, SKILLS_ID } from "@context-hub/skills/extension"
+import { skillsModuleWith, SKILLS_ID } from "@context-hub/skills/extension"
 
-import { claudeCodeExtensionWith } from "../src/extension.ts"
+import { claudeCodeModuleWith } from "../src/extension.ts"
 import { CLAUDE_CODE_ID } from "../src/locations.ts"
 
 let failures = 0
@@ -48,10 +48,18 @@ function testHost(): PlatformHost {
 }
 
 /* The page is left out: nothing here renders, and the skills module takes its
-   page as an argument for exactly this reason. */
+   page as an argument for exactly this reason.
+
+   The other three modules are stood in for, because this check is about the one
+   seam it names. Claude Code declares every service it registers into, so
+   without them it waits rather than running — which is the point of declaring
+   them, and is asserted on its own below. */
+const stubbed = () => ({ register: () => () => undefined, tools: {} })
+
 const kernel = await createHubKernel({
   host: testHost(),
-  extensions: [skillsExtensionWith(() => null), claudeCodeExtensionWith(() => null)],
+  services: { prompts: stubbed(), mcp: stubbed(), plugins: stubbed() },
+  extensions: [skillsModuleWith(() => null), claudeCodeModuleWith(() => null)],
 })
 await kernel.start()
 
@@ -96,6 +104,29 @@ check(
   placesOf().filter((id) => id === CLAUDE_CODE_ID).length === 1,
   placesOf()
 )
+
+console.log("\nwith one of the modules it declares taken away")
+{
+  /* The other half of declaring dependencies: an agent that cannot reach every
+     module it registers into waits rather than registering into some of them.
+     Half an agent — its skill places listed but its MCP file never read — is
+     harder to understand than one that says what it is waiting for. */
+  const partial = await createHubKernel({
+    host: testHost(),
+    services: { prompts: stubbed(), plugins: stubbed() },
+    extensions: [skillsModuleWith(() => null), claudeCodeModuleWith(() => null)],
+  })
+  await partial.start()
+  const entry = partial.ctx.extensions
+    .snapshot()
+    .entries.find((one) => one.manifest.id === CLAUDE_CODE_ID)
+  check("Claude Code waits instead of half-registering", entry?.status === "waiting", entry?.status)
+  check(
+    "and the module it could not reach registered nothing for it",
+    (partial.ctx.get("skills")?.providers() ?? []).every((one) => one.id !== CLAUDE_CODE_ID),
+    (partial.ctx.get("skills")?.providers() ?? []).map((one) => one.id)
+  )
+}
 
 console.log(`\n${checked - failures}/${checked} checks passed`)
 process.exitCode = failures === 0 ? 0 : 1

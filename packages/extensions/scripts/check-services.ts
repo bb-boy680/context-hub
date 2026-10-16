@@ -1,18 +1,21 @@
 /**
  * Behaviour check for the two tracks an extension registers through: the
- * contribution points, which carry data for the screen, and Cordis services,
- * which carry an API one extension calls from another.
+ * contribution points, which carry data for the screen, and services, which
+ * carry an API one extension calls from another.
  *
- * Everything here runs a real kernel over a throwaway host, so what it proves
- * is what the product does: a provider's names are visible in the catalog, a
- * service published by one extension reaches another that required it, and both
- * come apart again when either side is disabled.
+ * Everything here runs a real kernel over a throwaway host, so what it proves is
+ * what the product does: a service published by one extension reaches another
+ * that declared it, both come apart again when either side is disabled, and a
+ * contribution lives exactly as long as the plugin that made it.
  *
  * Run from the package: `node scripts/check-services.ts`
  */
+import { Service } from "@deepseek-ai/cordis"
+import type { Context } from "@deepseek-ai/cordis"
+
 import { createHubKernel } from "../src/kernel.ts"
 import type { PlatformHost } from "../src/host.ts"
-import type { ExtensionDefinition } from "../src/types.ts"
+import type { ExtensionModule } from "../src/types.ts"
 
 let failures = 0
 let checked = 0
@@ -39,94 +42,106 @@ function testHost(): PlatformHost {
   }
 }
 
-/* The two plugins below are the smallest pair that shows the mechanism: one
-   publishes a value under a name, the other uses whatever publishes it. A real
-   module adds its name to `ExtensionServices` so the map is typed; this check
-   declares its own, the way the MCP module does. */
+/* The three plugins below are the smallest set that shows the mechanism: one
+   publishes a service as a class, one declares it and reads it off its context,
+   and one contributes only data. A real module declares its service on `Context`
+   so the property is typed; this check does the same, the way MCP does. */
 
-declare module "../src/types.ts" {
-  interface ExtensionServices {
-    counter: { bump(): number }
+declare module "@deepseek-ai/cordis" {
+  interface Context {
+    counter: CounterService
+  }
+}
+
+class CounterService extends Service {
+  private count = 0
+
+  constructor(ctx: Context) {
+    super(ctx, "counter")
+  }
+
+  bump(): number {
+    this.count += 1
+    return this.count
   }
 }
 
 const log: string[] = []
 
-const provider: ExtensionDefinition = {
+const provider: ExtensionModule = {
+  name: "test.provider",
   manifest: {
-    id: "test.provider",
     name: "Provider",
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
     category: "integration",
-    description: "Publishes a value.",
+    description: "Publishes a service.",
     icon: () => null,
     defaultEnabled: true,
     provides: ["counter"],
   },
-  activate(scope) {
-    let count = 0
-    scope.provide("counter", { bump: () => (count += 1) })
+  apply(ctx) {
+    new CounterService(ctx)
     log.push("provider active")
   },
 }
 
-const consumer: ExtensionDefinition = {
+const consumer: ExtensionModule = {
+  name: "test.consumer",
   manifest: {
-    id: "test.consumer",
     name: "Consumer",
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
     category: "integration",
-    description: "Uses that value.",
+    description: "Uses that service.",
     icon: () => null,
     defaultEnabled: true,
   },
-  activate(scope) {
+  /* Declared, not asked for inside `apply`: the kernel holds this extension back
+     until the service is published, so every name here is a property of the
+     context by the time `apply` runs. */
+  inject: ["counter"],
+
+  apply(ctx) {
     log.push("consumer active")
-    scope.inject(["counter"], (ctx, services) => {
-      log.push("consumer connected")
-      /* The services asked for arrive as a map, keyed by name: that is what a
-         plugin reads. The context is there too, for effects and events. */
-      log.push(`services carried: ${typeof services.counter?.bump === "function"}`)
-      log.push(`bumped: ${services.counter.bump()}`)
-      /* And the same service is a property of that context, because the callback
-         runs on a fiber that declares it. This used to be asserted the other way
-         round: the kernel mounted extensions through `this.ctx`, which a Service
-         reads through the tracker, so a plugin ended up on a context that was
-         not this one's child and property access threw. That was the deviation,
-         not the contract — Cordis resolves an injected name as a property, and
-         the dsh-shaped plugin writes `ctx.skills.register(...)`. */
-      log.push(`property access: ${typeof (ctx as unknown as Record<string, unknown>).counter}`)
-      log.push(`get resolved: ${String(ctx.get("counter") !== undefined)}`)
-      ctx.effect(() => () => log.push("consumer disconnected"))
-    })
+    log.push(`property access: ${typeof ctx.counter}`)
+    log.push(`bumped: ${ctx.counter.bump()}`)
+    log.push(`get resolved: ${String(ctx.get("counter") !== undefined)}`)
   },
 }
 
-const undeclared: ExtensionDefinition = {
+const contributor: ExtensionModule = {
+  name: "test.contributor",
   manifest: {
-    id: "test.undeclared",
-    name: "Undeclared",
+    name: "Contributor",
     version: "0.1.0",
     apiVersion: "^0.1",
     kind: "code",
     category: "integration",
-    description: "Publishes a name its manifest omits.",
+    description: "Adds one navigation entry.",
     icon: () => null,
-    defaultEnabled: false,
+    defaultEnabled: true,
   },
-  activate(scope) {
-    scope.provide("hidden", {})
+  inject: ["nav"],
+
+  apply(ctx) {
+    ctx.nav.register({
+      path: "/test",
+      labelKey: "test.nav",
+      icon: () => null,
+      group: "assets",
+      order: 99,
+    })
+    log.push("contributor applied")
   },
 }
 
 async function main(): Promise<void> {
   const kernel = await createHubKernel({
     host: testHost(),
-    extensions: [provider, consumer, undeclared],
+    extensions: [provider, consumer, contributor],
   })
   await kernel.start()
 
@@ -134,56 +149,75 @@ async function main(): Promise<void> {
 
   check("the provider activated", log.includes("provider active"))
   check("the consumer activated without the provider loaded first", log.includes("consumer active"))
-  check("the consumer connected to it", log.includes("consumer connected"))
-  check("the services map carries it", log.includes("services carried: true"), log)
-  check("and it is the live service", log.includes("bumped: 1"), log)
-  check("the callback can reach the service by name", log.includes("get resolved: true"), log)
+  check("the service is a property of the consumer's context", log.includes("property access: object"), log)
+  check("and calling it works", log.includes("bumped: 1"), log)
+  check("the context can also reach it by name", log.includes("get resolved: true"), log)
   check(
-    "the same service is a property of the callback's context",
-    log.includes("property access: object"),
-    log
-  )
-  check(
-    "the catalog says what the provider publishes",
-    JSON.stringify(kernel.ctx.extensions.snapshot().entries.find((e) => e.manifest.id === "test.provider")?.provides) === '["counter"]',
-    kernel.ctx.extensions.snapshot().entries.find((e) => e.manifest.id === "test.provider")?.provides
-  )
-  check(
-    "nothing is published while the provider is disabled",
-    kernel.ctx.extensions.snapshot().entries.find((e) => e.manifest.id === "test.provider")?.enabled === true
+    "the catalog reports what the provider declares it publishes",
+    kernel.ctx.extensions
+      .snapshot()
+      .entries.find((entry) => entry.manifest.id === "test.provider")
+      ?.provides.join(",") === "counter"
   )
 
   console.log("withdrawal")
 
   log.length = 0
   await kernel.ctx.extensions.disable("test.provider")
-  check("disabling the provider disconnects the consumer", log.includes("consumer disconnected"), log)
-  check("the consumer itself stays loaded", !log.includes("consumer active"))
+  check("disabling the provider unloads the consumer that required it", !log.includes("consumer active"), log)
+  check("its service is out of the context", kernel.ctx.get("counter") === undefined)
 
   log.length = 0
   await kernel.ctx.extensions.enable("test.provider")
-  check("enabling it again reconnects the consumer", log.includes("consumer connected"), log)
+  check("enabling it again brings the consumer back", log.includes("consumer active"), log)
+  check("and the consumer reconnects to the service", log.includes("bumped: 1"), log)
 
-  console.log("declarations")
+  console.log("contributions")
 
-  await kernel.ctx.extensions.enable("test.undeclared")
-  const refused = kernel.ctx.extensions.snapshot().entries.find((entry) => entry.manifest.id === "test.undeclared")
-  check("publishing an undeclared name fails the activation", refused?.status === "error", refused?.status)
-  check("the failure names the name and the manifest", (refused?.error ?? "").includes("hidden") && (refused?.error ?? "").includes("manifest does not declare"), refused?.error)
-  check("it publishes nothing", refused?.provides.length === 0)
-
-  await kernel.ctx.extensions.disable("test.provider")
-  await kernel.ctx.extensions.disable("test.consumer")
-  /* What a row says it provides comes from its manifest, so it does not change
-     when the extension is switched off — that is the declaration, and it stays
-     true. What does change is whether the service is there to reach. */
-  check("disabling the provider takes its service out of the context", kernel.ctx.get("counter") === undefined)
+  const nav = () => kernel.ctx.extensions.contributions("nav")
+  check("the contributor's entry is there", nav().some((one) => one.path === "/test"), nav())
   check(
-    "the declaration is still reported, because it is a declaration",
+    "and belongs to it in the catalog",
     kernel.ctx.extensions
       .snapshot()
-      .entries.find((entry) => entry.manifest.id === "test.provider")?.provides.join(",") === "counter"
+      .entries.find((entry) => entry.manifest.id === "test.contributor")
+      ?.points.includes("nav") === true
   )
+
+  await kernel.ctx.extensions.disable("test.contributor")
+  check("disabling it takes its entry out with it", !nav().some((one) => one.path === "/test"), nav())
+
+  await kernel.ctx.extensions.enable("test.contributor")
+  check("and enabling it puts the entry back", nav().some((one) => one.path === "/test"), nav())
+
+  console.log("a plugin that declares a service nothing publishes")
+
+  const waiting: ExtensionModule = {
+    name: "test.waiting",
+    manifest: {
+      name: "Waiting",
+      version: "0.1.0",
+      apiVersion: "^0.1",
+      kind: "code",
+      category: "integration",
+      description: "Requires a service no one provides.",
+      icon: () => null,
+      defaultEnabled: true,
+    },
+    inject: ["never-provided"],
+    apply() {
+      log.push("waiting applied")
+    },
+  }
+  kernel.ctx.extensions.snapshot()
+  const withWaiting = await createHubKernel({
+    host: testHost(),
+    extensions: [waiting],
+  })
+  await withWaiting.start()
+  const entry = withWaiting.ctx.extensions.snapshot().entries[0]
+  check("it stays waiting rather than running half-registered", entry?.status === "waiting", entry?.status)
+  check("and its apply never ran", !log.includes("waiting applied"))
 
   console.log(`\n${checked - failures}/${checked} checks passed`)
   if (failures > 0) process.exitCode = 1

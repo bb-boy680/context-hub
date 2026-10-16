@@ -11,7 +11,7 @@
  */
 import { FileTextIcon, FolderIcon } from "lucide-react"
 
-import type { ExtensionDefinition } from "@context-hub/extensions"
+import type { ExtensionModule } from "@context-hub/extensions"
 
 import { promptsMessages } from "./messages.ts"
 import { PromptsPage } from "./page.tsx"
@@ -66,9 +66,9 @@ const WORKSPACE_PLACE: PromptPlace = {
   order: 0,
 }
 
-export const promptsExtension: ExtensionDefinition = {
+export const promptsExtension: ExtensionModule = {
+  name: PROMPTS_ID,
   manifest: {
-    id: PROMPTS_ID,
     name: "Prompts",
     version: "0.1.0",
     apiVersion: "^0.1",
@@ -81,28 +81,30 @@ export const promptsExtension: ExtensionDefinition = {
     permissions: ["assets.read", "filesystem"],
     provides: [PROMPT_SERVICE],
   },
-  activate(scope) {
+  inject: ["nav", "routes", "locales"],
+
+  apply(ctx) {
     /* The delivery targets travel through the registry rather than a
        contribution point, so an agent integration registers into this module
        the same way whether it was built here or installed as a folder. The
        workspace place is the module's own: `.agents/` is the one directory the
        agents in this hub share, and what lands there is what this hub wrote,
        not what an agent reads a prompt out of. */
-    const service = new PromptService(scope.ctx)
+    const service = new PromptService(ctx)
     service.register({ id: PROMPTS_ID, places: [WORKSPACE_PLACE] })
 
-    scope.contribute("nav", {
+    ctx.nav.register({
       path: "/prompts",
       labelKey: "nav.prompts",
       icon: FileTextIcon,
       group: "assets",
       order: 35,
     })
-    scope.contribute("route", {
+    ctx.routes.register({
       path: "/prompts",
       Component: PromptsPage,
     })
-    scope.contribute("locale", {
+    ctx.locales.register({
       id: "en",
       label: "English",
       messages: promptsMessages,

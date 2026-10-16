@@ -12,13 +12,13 @@
  * The definition itself lives in `./extension.ts`, which carries no JSX, and
  * the contract a client extension implements is `./contract.ts`.
  */
-import type { ExtensionDefinition } from "@context-hub/extensions"
+import type { ExtensionModule } from "@context-hub/extensions"
 
-import { mcpExtensionWith } from "./extension.ts"
+import { mcpModuleWith } from "./extension.ts"
 import { McpServersPage } from "./page.tsx"
 
 export * from "./contract.ts"
-export { mcpExtensionWith } from "./extension.ts"
+export { mcpModuleWith } from "./extension.ts"
 export { McpServersPage }
 export { McpService } from "./provider.ts"
 export { failureText, useMcpLibrary } from "./library.ts"
@@ -43,4 +43,4 @@ export {
   type McpRecordsPort,
 } from "./records.ts"
 
-export const mcpExtension: ExtensionDefinition = mcpExtensionWith(McpServersPage)
+export const mcpExtension: ExtensionModule = mcpModuleWith(McpServersPage)

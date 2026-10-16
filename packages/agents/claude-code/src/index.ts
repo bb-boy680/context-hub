@@ -11,7 +11,7 @@ import ClaudeCode from "@lobehub/icons/es/ClaudeCode"
 
 import type { ExtensionIcon } from "@context-hub/extensions"
 
-import { claudeCodeExtensionWith } from "./extension.ts"
+import { claudeCodeModuleWith } from "./extension.ts"
 
 /**
  * The brand mark in its own colours. It takes a `size` of its own as well, but
@@ -28,6 +28,6 @@ const ClaudeCodeIcon: ExtensionIcon = ClaudeCode.Color
 export { createClaudeCodeMcp } from "./provider.ts"
 export { claudeCodeInstaller } from "./installer.ts"
 export { CLAUDE_CODE_ID } from "./locations.ts"
-export { claudeCodeExtensionWith } from "./extension.ts"
+export { claudeCodeModuleWith } from "./extension.ts"
 
-export const claudeCodeExtension = claudeCodeExtensionWith(ClaudeCodeIcon)
+export const claudeCodeExtension = claudeCodeModuleWith(ClaudeCodeIcon)

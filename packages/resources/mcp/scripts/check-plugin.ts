@@ -25,10 +25,10 @@ import type { ExtensionIcon, HubKernel } from "@context-hub/extensions"
 import { readJsonObject, type McpIo } from "../src/contract.ts"
 
 import { placesOf } from "../src/catalog.ts"
-import { mcpExtensionWith } from "../src/extension.ts"
+import { mcpModuleWith } from "../src/extension.ts"
 
 /** The module's own definition; the page is a stub, since nothing renders here. */
-const mcpModule = mcpExtensionWith(() => null)
+const mcpModule = mcpModuleWith(() => null)
 
 let failures = 0
 let checked = 0
@@ -98,7 +98,7 @@ async function main(): Promise<void> {
         ).href
       ) as Promise<unknown>,
   })
-  const definition = found[0]?.definition
+  const definition = found[0]?.module
 
   console.log("the downloaded folder")
 

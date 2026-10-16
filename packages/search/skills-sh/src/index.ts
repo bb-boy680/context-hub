@@ -21,7 +21,7 @@
  */
 import { StoreIcon } from "lucide-react"
 
-import type { ExtensionDefinition, RemoteSkill, SkillRegistry } from "@context-hub/extensions"
+import type { ExtensionModule, RemoteSkill, SkillRegistry } from "@context-hub/extensions"
 
 /** The public search route. */
 const ENDPOINT = "https://skills.sh/api/search"
@@ -94,9 +94,9 @@ function descriptionOf(html: string): string | null {
     .replace(/&amp;/g, "&")
 }
 
-export const skillsShExtension: ExtensionDefinition = {
+export const skillsShExtension: ExtensionModule = {
+  name: "hub.skill.registry.skills-sh",
   manifest: {
-    id: "hub.skill.registry.skills-sh",
     name: "skills.sh",
     version: "0.1.0",
     apiVersion: "^0.1",
@@ -109,11 +109,13 @@ export const skillsShExtension: ExtensionDefinition = {
     permissions: ["network"],
   },
 
-  activate(scope) {
-    const net = scope.host.net
+  inject: ["skillRegistries"],
+
+  apply(ctx) {
+    const net = ctx.host.net
     if (net === null) {
       /* Without a network the dialog keeps its own preview rather than failing a search. */
-      scope.host.log(
+      ctx.host.log(
         "warn",
         "skills.sh: this form cannot reach the network, so the registry stays out"
       )
@@ -161,6 +163,6 @@ export const skillsShExtension: ExtensionDefinition = {
       },
     }
 
-    scope.contribute("skillRegistry", registry)
+    ctx.skillRegistries.register(registry)
   },
 }

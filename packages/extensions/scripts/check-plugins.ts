@@ -54,7 +54,7 @@ await writePlugin(
   legacy,
   "acme.legacy",
   JSON.stringify({ id: "acme.legacy", name: "Legacy", version: "0.9.0", apiVersion: "^0.1" }),
-  "export function activate() {}\n"
+  "export function apply() {}\n"
 )
 await writePlugin(legacy, "acme.pack", JSON.stringify({ name: "acme.pack", version: "1.0.0" }))
 await fs.writeFile(
@@ -77,16 +77,16 @@ await writePlugin(
     icon: "sparkles",
     permissions: ["storage.self"],
   }),
-  `export function activate(scope) {
-     globalThis.__scope = { react: typeof scope.react?.createElement === "function", icons: typeof scope.icons?.sparkles, icon: typeof scope.icon("server"), ui: scope.ui !== undefined }
-     scope.contribute("nav", { path: "/hello", labelKey: "nav.hello", icon: scope.icon("sparkles"), group: "assets", order: 25 })
+  `export function apply(ctx) {
+     globalThis.__scope = { react: typeof ctx.react?.createElement === "function", icons: typeof ctx.icons?.sparkles, icon: typeof ctx.icon("server"), ui: ctx.ui !== undefined }
+     ctx.nav.register({ path: "/hello", labelKey: "nav.hello", icon: ctx.icon("sparkles"), group: "assets", order: 25 })
    }\n`
 )
 await writePlugin(
   extensions,
   "acme.mismatch",
   JSON.stringify({ id: "acme.other", name: "Mismatch", version: "1.0.0", apiVersion: "^0.1" }),
-  "export function activate() {}\n"
+  "export function apply() {}\n"
 )
 await writePlugin(
   extensions,
@@ -142,21 +142,21 @@ const found = await discoverPlugins({
 const byId = new Map(found.map((plugin) => [plugin.id, plugin]))
 
 check("every plugin is reported", found.length === 5, found.length)
-check("a valid plugin loads", byId.get("acme.hello")?.definition !== undefined, byId.get("acme.hello"))
+check("a valid plugin loads", byId.get("acme.hello")?.module !== undefined, byId.get("acme.hello"))
 check(
   "the migrated extension loads too",
-  byId.get("acme.legacy")?.definition !== undefined,
+  byId.get("acme.legacy")?.module !== undefined,
   byId.get("acme.legacy")
 )
 check(
   "the manifest reaches the kernel definition",
-  byId.get("acme.hello")?.definition?.manifest.name === "Hello" &&
-    byId.get("acme.hello")?.definition?.manifest.version === "1.0.0",
-  byId.get("acme.hello")?.definition?.manifest
+  byId.get("acme.hello")?.module?.manifest.name === "Hello" &&
+    byId.get("acme.hello")?.module?.manifest.version === "1.0.0",
+  byId.get("acme.hello")?.module?.manifest
 )
 check(
   "the icon name resolves to a component",
-  byId.get("acme.hello")?.definition?.manifest.icon != null
+  byId.get("acme.hello")?.module?.manifest.icon != null
 )
 check(
   "an id that disagrees with its directory is refused",
@@ -169,22 +169,29 @@ check(
   byId.get("acme.future")?.problem
 )
 check(
-  "an entry module without activate is refused",
-  (byId.get("acme.empty")?.problem ?? "").includes("activate"),
+  "an entry module without apply is refused",
+  (byId.get("acme.empty")?.problem ?? "").includes("apply"),
   byId.get("acme.empty")?.problem
 )
 
-/* Activating the loaded plugin is what the kernel does when it is enabled. */
+/* Applying the loaded plugin is what the kernel does when it is enabled: a
+   plugin's own context, plus what a directory that imports nothing still needs.
+   The points and `hub.ui` are stand-ins here, because this check is about what
+   `discoverPlugins` hands over, not about a kernel. */
 const contributions: [string, unknown][] = []
-byId.get("acme.hello")?.definition?.activate?.({
-  ctx: { get: () => ({ Button: "kit" }) },
-  host: { form: "Test" },
-  contribute: (point, value) => contributions.push([point, value]),
+const nav = { register: (value: unknown) => contributions.push(["nav", value]) }
+byId.get("acme.hello")?.module?.apply?.({
+  get: (name: string) => (name === "hub.ui" ? { Button: "kit" } : undefined),
+  nav,
+  react: { createElement: () => null },
+  icons: { sparkles: () => null },
+  icon: () => () => null,
+  ui: { Button: "kit" },
 } as never)
 const scope = (globalThis as { __scope?: Record<string, unknown> }).__scope
 check("the entry module receives React", scope?.react === true, scope)
 check("the entry module receives the icon table", scope?.icons === "object", scope)
-check("icon names resolve on the scope", scope?.icon === "object", scope)
+check("icon names resolve on the context", scope?.icon === "object", scope)
 check("the form's UI kit arrives as hub.ui", scope?.ui === true, scope)
 check(
   "its contribution arrives with a real icon component",

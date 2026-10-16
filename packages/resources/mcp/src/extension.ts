@@ -8,7 +8,7 @@ import type { ComponentType } from "react"
 import { ServerIcon } from "lucide-react"
 
 import type { WorkspaceService } from "@context-hub/core/workspace"
-import type { ExtensionDefinition } from "@context-hub/extensions"
+import type { ExtensionModule } from "@context-hub/extensions"
 import { MCP_SERVICE } from "./contract.ts"
 
 import { mcpMessages } from "./messages.ts"
@@ -29,10 +29,10 @@ declare module "@deepseek-ai/cordis" {
  *
  * @param page — the page a UI shell renders at `/mcp-servers`.
  */
-export function mcpExtensionWith(page: ComponentType): ExtensionDefinition {
+export function mcpModuleWith(page: ComponentType): ExtensionModule {
   return {
+    name: "hub.mcp.servers",
     manifest: {
-      id: "hub.mcp.servers",
       name: "MCP servers",
       version: "0.1.0",
       apiVersion: "^0.1",
@@ -44,18 +44,20 @@ export function mcpExtensionWith(page: ComponentType): ExtensionDefinition {
       permissions: ["storage.self", "filesystem"],
       provides: [MCP_SERVICE],
     },
-    activate(scope) {
-      new McpService(scope.ctx)
+    inject: ["nav", "routes", "locales"],
 
-      scope.contribute("nav", {
+    apply(ctx) {
+      new McpService(ctx)
+
+      ctx.nav.register({
         path: "/mcp-servers",
         labelKey: "nav.mcpServers",
         icon: ServerIcon,
         group: "assets",
         order: 20,
       })
-      scope.contribute("route", { path: "/mcp-servers", Component: page })
-      scope.contribute("locale", { id: "en", label: "English", messages: mcpMessages })
+      ctx.routes.register({ path: "/mcp-servers", Component: page })
+      ctx.locales.register({ id: "en", label: "English", messages: mcpMessages })
     },
   }
 }

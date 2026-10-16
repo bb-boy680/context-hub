@@ -9,7 +9,7 @@
 import type { ComponentType } from "react"
 import { FolderIcon, SparklesIcon } from "lucide-react"
 
-import type { ExtensionDefinition } from "@context-hub/extensions"
+import type { ExtensionModule } from "@context-hub/extensions"
 
 import { skillsMessages } from "./messages.ts"
 import { SKILL_SERVICE, SkillService, type SkillPlace } from "./provider.ts"
@@ -32,10 +32,10 @@ const SHARED_PLACE: SkillPlace = {
  *
  * @param page — the page a UI shell renders at `/skills`.
  */
-export function skillsExtensionWith(page: ComponentType): ExtensionDefinition {
+export function skillsModuleWith(page: ComponentType): ExtensionModule {
   return {
+    name: SKILLS_ID,
     manifest: {
-      id: SKILLS_ID,
       name: "Skills",
       version: "0.1.0",
       apiVersion: "^0.1",
@@ -47,7 +47,9 @@ export function skillsExtensionWith(page: ComponentType): ExtensionDefinition {
       permissions: ["assets.read", "assets.write"],
       provides: [SKILL_SERVICE],
     },
-    activate(scope) {
+    inject: ["nav", "routes", "locales"],
+
+    apply(ctx) {
       /* The places travel through the registry rather than a contribution point,
          so an agent integration registers into this module the same way whether
          it was built here or installed as a folder. This module's own place is
@@ -56,21 +58,21 @@ export function skillsExtensionWith(page: ComponentType): ExtensionDefinition {
 
          Constructing the service publishes it, and it belongs to this plugin —
          so the places it holds, including this module's own, go away with it. */
-      const service = new SkillService(scope.ctx)
+      const service = new SkillService(ctx)
       service.register({ id: SKILLS_ID, places: [SHARED_PLACE] })
 
-      scope.contribute("nav", {
+      ctx.nav.register({
         path: "/skills",
         labelKey: "nav.skills",
         icon: SparklesIcon,
         group: "assets",
         order: 15,
       })
-      scope.contribute("route", {
+      ctx.routes.register({
         path: "/skills",
         Component: page,
       })
-      scope.contribute("locale", {
+      ctx.locales.register({
         id: "en",
         label: "English",
         messages: skillsMessages,

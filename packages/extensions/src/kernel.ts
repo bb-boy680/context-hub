@@ -10,13 +10,13 @@ import { Context } from "./cordis.ts"
 import { I18nService } from "./i18n.ts"
 import { ExtensionService } from "./service.ts"
 import type { PlatformHost } from "./host.ts"
-import type { ExtensionDefinition } from "./types.ts"
+import type { ExtensionModule } from "./types.ts"
 
 /** Composition inputs for one running kernel. */
 export interface KernelOptions {
   host: PlatformHost
   /** Packages this build ships; runtime-installed extensions join the catalog later. */
-  extensions: ExtensionDefinition[]
+  extensions: ExtensionModule[]
   /**
    * Values the product provides as services before extensions activate, e.g. a
    * form-owned implementation an extension reads with `ctx.get(name)`. Omitted

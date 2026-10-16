@@ -160,8 +160,11 @@ export class McpService extends Service {
  * requiring `mcp` reads `plugins.mcp` with this type, and a name no module
  * declared is a name no plugin can inject.
  */
-declare module "@context-hub/extensions" {
-  interface ExtensionServices {
+/* A plugin reads this as a property of the context it is handed, so it is
+   declared on `Context` — the same place `host` and `i18n` are declared, and
+   what makes `ctx.mcp` resolve rather than only `ctx.get("mcp")`. */
+declare module "@deepseek-ai/cordis" {
+  interface Context {
     /** This module's registry and toolkit; see {@link McpService}. */
     mcp: McpService
   }

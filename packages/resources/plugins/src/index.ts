@@ -12,7 +12,7 @@
 import { PlugIcon } from "lucide-react"
 
 import type { WorkspaceService } from "@context-hub/core/workspace"
-import type { ExtensionDefinition } from "@context-hub/extensions"
+import type { ExtensionModule } from "@context-hub/extensions"
 
 import { pluginsMessages } from "./messages.ts"
 import { PluginsPage } from "./page.tsx"
@@ -39,9 +39,9 @@ export { createRemotePluginTools } from "./tools.ts"
 export { usePluginLibrary, packFile, packFiles, type PluginLibrary } from "./library.ts"
 export * from "./types.ts"
 
-export const pluginsExtension: ExtensionDefinition = {
+export const pluginsExtension: ExtensionModule = {
+  name: "hub.plugin.catalog",
   manifest: {
-    id: "hub.plugin.catalog",
     name: "Plugins",
     version: "0.1.0",
     apiVersion: "^0.1",
@@ -53,26 +53,28 @@ export const pluginsExtension: ExtensionDefinition = {
     permissions: ["assets.read", "assets.write"],
     provides: [PLUGIN_SERVICE],
   },
-  activate(scope) {
+  inject: ["nav", "routes", "locales"],
+
+  apply(ctx) {
     /* The service carries the registry agent plugins register into and the tools
        an installer is handed. The tools are this form's, so they are passed in;
        constructing the service publishes it, before anything else runs, so an
        agent plugin enabled in the same pass can register as soon as it
        activates. */
-    new PluginService(scope.ctx, createRemotePluginTools())
+    new PluginService(ctx, createRemotePluginTools())
 
-    scope.contribute("nav", {
+    ctx.nav.register({
       path: "/plugins",
       labelKey: "nav.plugins",
       icon: PlugIcon,
       group: "assets",
       order: 30,
     })
-    scope.contribute("route", {
+    ctx.routes.register({
       path: "/plugins",
       Component: PluginsPage,
     })
-    scope.contribute("locale", {
+    ctx.locales.register({
       id: "en",
       label: "English",
       messages: pluginsMessages,
