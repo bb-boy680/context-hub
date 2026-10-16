@@ -95,10 +95,14 @@ export class PluginLibrary extends Service {
   /**
    * The context this was constructed in.
    *
-   * Not `this.ctx`: a `Service`'s context is read through the tracker, which
-   * rebinds it to whoever is calling. Everything this read touches — the
-   * installers, the workspace list, the client files — belongs to the form that
-   * built it, so it has to be read from the context it was built in.
+   * Not `this.ctx`, which is a traced view of it: that one comes back rebound to
+   * whoever is reading — measured, it is never the object the constructor was
+   * handed — and what a context is bound to is whose fiber an `effect` or an
+   * `on` registers against. Lookups survive that rebinding, so this is not
+   * holding up a `get`; it is what keeps "the form that built this read" spelled
+   * out rather than depending on where a method happens to be called from.
+   * Everything here — the installers, the workspace list, the client files —
+   * belongs to that form.
    */
   private readonly owner: Context
   private readonly catalog: Catalog<PluginLibraryValue>
@@ -274,7 +278,14 @@ export class PluginLibrary extends Service {
       /* The folder in use is the only thing about the workspace list this read
          goes through — it decides which of a client's own files each answer is
          read from — so it, and not the list, is what is watched. A rename, or
-         choosing one more agent to deliver to, is not this library's business. */
+         choosing one more agent to deliver to, is not this library's business.
+
+         Read off the folder rather than taken from the announcement, because
+         this read makes a workspace read of its own and would otherwise be woken
+         by its own asking: that is a loop, and it ran hot enough to be measured
+         before the folder was compared. A form's workspace service is the form's
+         — `hub.workspaces` is answered by whichever one a build provides — so
+         this does not lean on that service choosing to stay quiet. */
       let seen = workspaces.current()?.current ?? null
       return workspaces.subscribe(() => {
         const now = workspaces.current()?.current ?? null
