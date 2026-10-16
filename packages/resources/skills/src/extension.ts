@@ -11,6 +11,7 @@ import { FolderIcon, SparklesIcon } from "lucide-react"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
+import { SKILL_LIBRARY_SERVICE, SkillLibrary } from "./library-store.ts"
 import { skillsMessages } from "./messages.ts"
 import { SKILL_SERVICE, SkillService, type SkillPlace } from "./provider.ts"
 
@@ -45,7 +46,7 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
       icon: SparklesIcon,
       defaultEnabled: true,
       permissions: ["assets.read", "assets.write"],
-      provides: [SKILL_SERVICE],
+      provides: [SKILL_SERVICE, SKILL_LIBRARY_SERVICE],
     },
     inject: ["nav", "routes", "locales"],
 
@@ -60,6 +61,11 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
          so the places it holds, including this module's own, go away with it. */
       const service = new SkillService(ctx)
       service.register({ id: SKILLS_ID, places: [SHARED_PLACE] })
+
+      /* The shared read of the library. Constructed here and read by name from
+         the form's own startup, so the rows are already there when a page opens
+         rather than being read again on the way in. */
+      new SkillLibrary(ctx)
 
       ctx.nav.register({
         path: "/skills",

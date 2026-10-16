@@ -6,10 +6,12 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
+import { useCatalog, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
+import { createCatalog, type Catalog } from "@context-hub/extensions"
+import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
 import type {
   PlaceSkill,
@@ -33,6 +35,16 @@ import type {
 
 /** Nothing chosen, as a stable value: a reload key must not change identity. */
 const NO_AGENTS: string[] = []
+
+/**
+ * What a page watches when this module is not loaded: always empty, never
+ * reading. It exists so that watching a library is one code path rather than a
+ * hook called inside a condition.
+ */
+const NOTHING: Catalog<SkillLibraryValue> = createCatalog({
+  initial: NOTHING_READ,
+  read: async () => NOTHING_READ,
+})
 
 /** One place an agent keeps skills in, with what it holds right now. */
 export interface SkillPlaceView {
@@ -439,67 +451,60 @@ export function useSkillLibrary(
   /* The workspace in use decides which skills are in reach, so it is a reload key. */
   const workspaceId = React.useSyncExternalStore(subscribeWorkspaces, readWorkspaceId)
 
-  const [page, setPage] = React.useState<SkillPage | null>(null)
-  /* What each place holds, keyed by its id; a place that could not be read is absent. */
-  const [held, setHeld] = React.useState<Record<string, PlaceSkillsView | null>>({})
-  const [loading, setLoading] = React.useState(store !== null)
-  const [error, setError] = React.useState<string | null>(null)
-  const [tags, setTags] = React.useState<string[]>([])
-  const generation = React.useRef(0)
   /* The store owns what a query matches, so the page hands it over untouched. */
   const needle = query.trim()
 
+  /* The read is not made here. It is the library's own shared read, so a form
+     can start it before this page is ever opened and the rows are already there
+     when it is — what is left here is a query, which is not part of the library:
+     the filter row spans all of it, and folding a keystroke into that read would
+     re-read every place on every keystroke, for everyone watching. */
+  const shared = React.useMemo(() => ctx.get("catalog.skills") ?? null, [ctx])
+  const catalog = shared ?? NOTHING
+
+  React.useEffect(() => {
+    /* Somebody has to be the first to ask. A form's startup does this before
+       anything is drawn; until it does, the page is what asks. */
+    void shared?.load()
+  }, [shared])
+
+  const value = useCatalog(catalog, (snapshot) => snapshot.value ?? NOTHING_READ)
+  const failure = useCatalog(catalog, (snapshot) => snapshot.failure)
+  const status = useCatalog(catalog, (snapshot) => snapshot.status)
+  const held = value.held
+  const tags = value.tags
+
+  const [matched, setMatched] = React.useState<SkillPage | null>(null)
+  const [matchFailure, setMatchFailure] = React.useState<string | null>(null)
+
+  React.useEffect(() => {
+    if (store === null || needle === "") return
+    let live = true
+    void store.list({ sort: "updated", q: needle }).then(
+      (answer) => {
+        if (!live) return
+        setMatched(answer)
+        setMatchFailure(null)
+      },
+      (reason: unknown) => {
+        if (!live) return
+        setMatchFailure(reason instanceof Error ? reason.message : String(reason))
+      }
+    )
+    return () => {
+      live = false
+    }
+  }, [store, needle, value.page])
+
+  /* Unfiltered is what the library read; a query is what the page asked for on
+     top of it, and keeps the previous answer on screen until the next lands. */
+  const page = needle === "" ? value.page : matched
+  const loading = store !== null && (status === "idle" || status === "loading")
+  const error = needle === "" ? failure : matchFailure
+
   const reload = React.useCallback(async () => {
-    if (store === null) return
-    /* The workspace in use is a reload key: it decides what the rows mean. */
-    void workspaceId
-    const current = ++generation.current
-    try {
-      const [catalog, ...views] = await Promise.all([
-        store.list(needle === "" ? { sort: "updated" } : { sort: "updated", q: needle }),
-        ...targets.map(([, scope, dir]) => store.placeSkills({ scope, dir })),
-      ])
-      /* A slower earlier request must not overwrite a newer one. */
-      if (current !== generation.current) return
-      setPage(catalog)
-      setHeld(
-        Object.fromEntries(targets.map(([id], at) => [id, views[at] ?? null]))
-      )
-      setError(null)
-    } catch (failure) {
-      if (current !== generation.current) return
-      setError(failure instanceof Error ? failure.message : String(failure))
-    } finally {
-      if (current === generation.current) setLoading(false)
-    }
-  }, [store, workspaceId, targets, needle])
-
-  /* The filter row spans the whole library, not the rows on screen. */
-  const loadTags = React.useCallback(async () => {
-    if (store === null) return
-    try {
-      setTags(await store.tags())
-    } catch {
-      /* The rows carry a failure worth showing; the filter row keeps its list. */
-    }
-  }, [store])
-
-  React.useEffect(() => {
-    /* Deferred a microtask: the load's state change belongs to the read that
-       follows, and the linter only sees the call itself. */
-    queueMicrotask(() => {
-      void reload()
-      void loadTags()
-    })
-  }, [reload, loadTags])
-
-  React.useEffect(() => {
-    if (store === null) return
-    return store.subscribe(() => {
-      void reload()
-      void loadTags()
-    })
-  }, [store, reload, loadTags])
+    await shared?.reload()
+  }, [shared])
 
   /** Each place with what it holds right now, for the tabs and the rows. */
   const placeViews = React.useMemo(
