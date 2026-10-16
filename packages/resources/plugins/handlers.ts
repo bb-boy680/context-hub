@@ -68,6 +68,20 @@ function requiredString(value: unknown, field: string): string {
 }
 
 /**
+ * The path under one route, or null when this handler does not own the request.
+ *
+ * `""` is the route itself. Requiring the separator is what keeps a path that
+ * merely starts with the same letters — `/hub/pluginsX` — from being answered
+ * as this route; the action travels in the query here, so a stray path would
+ * otherwise read as the default one and answer the whole library.
+ */
+function under(route: string, pathname: string): string | null {
+  if (pathname === route) return ""
+  if (!pathname.startsWith(`${route}/`)) return null
+  return pathname.slice(route.length + 1)
+}
+
+/**
  * Exposes the plugin library.
  *
  * Every action here serves the library itself: what it holds, what is in it, and
@@ -111,7 +125,9 @@ export function createPluginHandler(
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(PLUGIN_ROUTE)) {
+    /* This bridge is flat: every action is the one route, and nothing is
+       addressed by a path. Anything else belongs to whoever is next. */
+    if (under(PLUGIN_ROUTE, url.pathname) !== "") {
       next()
       return
     }

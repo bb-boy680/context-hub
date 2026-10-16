@@ -17,8 +17,8 @@ interface ErrorBody {
   error?: string
 }
 
-async function call<T>(body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(ENDPOINT, {
+async function call<T>(base: string, body: Record<string, unknown>): Promise<T> {
+  const response = await fetch(`${base}${ENDPOINT}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -30,20 +30,24 @@ async function call<T>(body: Record<string, unknown>): Promise<T> {
   return (await response.json()) as T
 }
 
-/** Build the tools that reach the host, which owns the library and the programs. */
-export function createRemotePluginTools(): PluginBridgeTools {
+/**
+ * Build the tools that reach the host, which owns the library and the programs.
+ *
+ * @param base — the origin the route is reached on; empty means this one.
+ */
+export function createRemotePluginTools(base = ""): PluginBridgeTools {
   return {
     async root() {
-      const answer = await call<{ root: string }>({ action: "root" })
+      const answer = await call<{ root: string }>(base, { action: "root" })
       return answer.root
     },
 
     async syncMarketplace() {
-      await call({ action: "sync-marketplace" })
+      await call(base, { action: "sync-marketplace" })
     },
 
     async run(program, args) {
-      const answer = await call<{ output: string }>({
+      const answer = await call<{ output: string }>(base, {
         action: "program",
         program,
         args: [...args],
@@ -52,12 +56,12 @@ export function createRemotePluginTools(): PluginBridgeTools {
     },
 
     async has(program) {
-      const answer = await call<{ present: boolean }>({ action: "program-exists", program })
+      const answer = await call<{ present: boolean }>(base, { action: "program-exists", program })
       return answer.present
     },
 
     async describe(directory, name) {
-      return call<PackDescription>({ action: "describe", path: directory, name })
+      return call<PackDescription>(base, { action: "describe", path: directory, name })
     },
   }
 }
