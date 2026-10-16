@@ -24,6 +24,7 @@ import { createFsSkillStore } from "./src/host/skills-fs.ts"
 import {
   SKILL_ROUTE,
   type SkillOrigin,
+  type SkillPatch,
   type SkillPlaceRef,
   type SkillStore,
 } from "./src/store.ts"
@@ -101,368 +102,284 @@ export function createSkillHandler(
       next()
       return
     }
-    /* Decoded inside the try: a malformed escape is a bad request, not a
-       failure of this carrier. */
-    const [id, section, ...tail] = rest.split("/").map(decodeURIComponent)
+    const method = request.method ?? "GET"
     /* A read names the place in its query; a write names it in its body,
        because the id it acts on travels there too. */
     const queryRef = () =>
       placeRef(url.searchParams.get("scope"), url.searchParams.get("dir"))
     const bodyRef = (body: { scope?: unknown; dir?: unknown }) =>
       placeRef(body.scope, body.dir)
+    const asked = url.searchParams.get("action")
+
     try {
       const api = await getStore()
-      const method = request.method ?? "GET"
 
-      /* GET /hub/skills?action=place&scope=&dir= — what one place holds */
-      if (
-        rest === "" &&
-        method === "GET" &&
-        url.searchParams.get("action") === "place"
-      ) {
-        sendJson(response, 200, await api.placeSkills(queryRef()))
-        return
-      }
+      /* Two addresses, and only two: the route itself, and one skill by id. A
+         path is where a thing is, not what to do with it, so everything else
+         names its action — in the query for a read, in the body for a write. */
+      if (rest.includes("/")) throw new Error(`unknown route ${url.pathname}`)
+      const id = rest === "" ? "" : decodeURIComponent(rest)
 
-      /* GET /hub/skills?action=place-skill&id=… — one, read in place */
-      if (
-        rest === "" &&
-        method === "GET" &&
-        url.searchParams.get("action") === "place-skill"
-      ) {
-        const skill = url.searchParams.get("id")
-        if (skill === null || skill === "") {
-          sendError(response, new Error("missing skill id"))
+      if (method === "GET") {
+        if (id !== "") {
+          sendJson(response, 200, await api.get(id))
           return
         }
-        sendJson(response, 200, await api.placeSkill(skill, queryRef()))
-        return
-      }
 
-      /* GET /hub/skills?action=place-file&id=…&path=… — one file, read in place */
-      if (
-        rest === "" &&
-        method === "GET" &&
-        url.searchParams.get("action") === "place-file"
-      ) {
-        const skill = url.searchParams.get("id")
-        const file = url.searchParams.get("path")
-        if (skill === null || skill === "" || file === null || file === "") {
-          sendError(response, new Error("missing place file"))
-          return
-        }
-        sendJson(response, 200, {
-          text: await api.placeFile(skill, file, queryRef()),
-        })
-        return
-      }
-
-      /* POST /hub/skills?action=install-place — link one skill into it */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "install-place"
-      ) {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          id?: unknown
-          scope?: unknown
-          dir?: unknown
-        }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendError(response, new Error("missing skill id"))
-          return
-        }
-        sendJson(response, 200, {
-          mode: await api.installInto(body.id, bodyRef(body)),
-        })
-        return
-      }
-
-      /* POST /hub/skills?action=adopt-place — link one into the library */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "adopt-place"
-      ) {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          id?: unknown
-          scope?: unknown
-          dir?: unknown
-        }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendError(response, new Error("missing skill id"))
-          return
-        }
-        sendJson(response, 200, {
-          mode: await api.adoptFrom(body.id, bodyRef(body)),
-        })
-        return
-      }
-
-      /* POST /hub/skills?action=delete-place — delete its directory */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "delete-place"
-      ) {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          id?: unknown
-          scope?: unknown
-          dir?: unknown
-        }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendError(response, new Error("missing skill id"))
-          return
-        }
-        await api.deleteInPlace(body.id, bodyRef(body))
-        sendJson(response, 200, { ok: true })
-        return
-      }
-
-      /* POST /hub/skills?action=remove-place — take one back out */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "remove-place"
-      ) {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          id?: unknown
-          scope?: unknown
-          dir?: unknown
-        }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendError(response, new Error("missing skill id"))
-          return
-        }
-        await api.removeFrom(body.id, bodyRef(body))
-        sendJson(response, 200, { ok: true })
-        return
-      }
-
-      /* GET /hub/skills?action=tags — every category in use */
-      if (
-        rest === "" &&
-        method === "GET" &&
-        url.searchParams.get("action") === "tags"
-      ) {
-        sendJson(response, 200, await api.tags())
-        return
-      }
-
-      /* GET /hub/skills?action=package&source=… — what a package offers */
-      if (
-        rest === "" &&
-        method === "GET" &&
-        url.searchParams.get("action") === "package"
-      ) {
-        const source = url.searchParams.get("source")
-        if (source === null || source.trim() === "") {
-          sendError(response, new Error("missing package source"))
-          return
-        }
-        sendJson(response, 200, await api.listPackage(source))
-        return
-      }
-
-      /* GET /hub/skills — the catalog page */
-      if (rest === "" && method === "GET") {
-        const enabled = url.searchParams.get("enabled")
-        const wanted = url.searchParams.get("source")
-        const page = await api.list({
-          offset: Number(url.searchParams.get("offset") ?? 0),
-          limit:
-            url.searchParams.get("limit") === null
-              ? undefined
-              : Number(url.searchParams.get("limit")),
-          q: url.searchParams.get("q") ?? undefined,
-          tag: url.searchParams.get("tag") ?? undefined,
-          enabled: enabled === null ? undefined : enabled === "true",
-          source: ORIGINS.find((origin) => origin === wanted),
-          sort:
-            url.searchParams.get("sort") === "name" ? "name" : "updated",
-        })
-        sendJson(response, 200, page)
-        return
-      }
-
-      /* POST /hub/skills?action=refresh — rebuild the catalog from disk */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "refresh"
-      ) {
-        await api.refresh()
-        sendJson(response, 200, { ok: true })
-        return
-      }
-
-      /* POST /hub/skills?action=check-updates — ask every recorded source */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "check-updates"
-      ) {
-        sendJson(response, 200, await api.checkUpdates())
-        return
-      }
-
-      /* POST /hub/skills?action=install — download from a package */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "install"
-      ) {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          source?: unknown
-          skills?: unknown
-        }
-        if (typeof body.source !== "string" || body.source.trim() === "") {
-          sendError(response, new Error("missing package source"))
-          return
-        }
-        const skills = Array.isArray(body.skills)
-          ? body.skills.filter((item): item is string => typeof item === "string")
-          : []
-        sendJson(response, 200, await api.installPackage(body.source, skills))
-        return
-      }
-
-      /* POST /hub/skills?action=import — take over the skills a folder read */
-      if (
-        rest === "" &&
-        method === "POST" &&
-        url.searchParams.get("action") === "import"
-      ) {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          skills?: unknown
-        }
-        if (!Array.isArray(body.skills)) {
-          sendError(response, new Error("missing folder skills"))
-          return
-        }
-        const skills = body.skills.filter(
-          (item): item is { name: string; files: { path: string; base64: string }[] } =>
-            typeof item === "object" &&
-            item !== null &&
-            typeof (item as { name?: unknown }).name === "string" &&
-            Array.isArray((item as { files?: unknown }).files) &&
-            ((item as { files: unknown[] }).files as unknown[]).every(
-              (file) =>
-                typeof file === "object" &&
-                file !== null &&
-                typeof (file as { path?: unknown }).path === "string" &&
-                typeof (file as { base64?: unknown }).base64 === "string"
+        switch (asked) {
+          /* No action at all is the catalog page, which is what a page draws
+             when it opens. */
+          case null: {
+            const enabled = url.searchParams.get("enabled")
+            const wanted = url.searchParams.get("source")
+            sendJson(
+              response,
+              200,
+              await api.list({
+                offset: Number(url.searchParams.get("offset") ?? 0),
+                limit:
+                  url.searchParams.get("limit") === null
+                    ? undefined
+                    : Number(url.searchParams.get("limit")),
+                q: url.searchParams.get("q") ?? undefined,
+                tag: url.searchParams.get("tag") ?? undefined,
+                enabled: enabled === null ? undefined : enabled === "true",
+                source: ORIGINS.find((origin) => origin === wanted),
+                sort: url.searchParams.get("sort") === "name" ? "name" : "updated",
+              })
             )
-        )
-        sendJson(response, 200, await api.importFolder(skills))
-        return
-      }
+            return
+          }
 
-      /* POST /hub/skills — create */
-      if (rest === "" && method === "POST") {
-        const body = JSON.parse(
-          (await readBody(request)).toString("utf8")
-        )
-        sendJson(response, 200, await api.create(body))
-        return
-      }
+          /* What one place holds. */
+          case "place":
+            sendJson(response, 200, await api.placeSkills(queryRef()))
+            return
 
-      if (id === undefined || id === "") {
-        sendError(response, new Error("missing skill id"))
-        return
-      }
+          /* One skill, read in place rather than out of the library. */
+          case "place-skill":
+            sendJson(
+              response,
+              200,
+              await api.placeSkill(requiredText(url.searchParams.get("id"), "skill id"), queryRef())
+            )
+            return
 
-      /* /hub/skills/<id> */
-      if (section === undefined) {
-        if (method === "GET") sendJson(response, 200, await api.get(id))
-        else if (method === "PATCH") {
-          const body = JSON.parse(
-            (await readBody(request)).toString("utf8")
-          )
-          sendJson(response, 200, await api.update(id, body))
-        } else if (method === "DELETE") {
-          await api.remove(id)
-          sendJson(response, 200, { ok: true })
-        } else
-          sendError(response, new Error(`unsupported method ${method}`))
-        return
-      }
+          case "place-file": {
+            const skill = requiredText(url.searchParams.get("id"), "place file")
+            const file = requiredText(url.searchParams.get("path"), "place file")
+            sendJson(response, 200, { text: await api.placeFile(skill, file, queryRef()) })
+            return
+          }
 
-      /* /hub/skills/<id>/update — read the upstream, or install it over this copy */
-      if (section === "update") {
-        if (method === "GET") {
-          sendJson(response, 200, await api.checkUpdate(id))
-        } else if (method === "POST") {
-          await api.updateFromUpstream(id)
-          sendJson(response, 200, { ok: true })
-        } else {
-          sendError(response, new Error(`unsupported method ${method}`))
+          /* One file of a skill the library holds. Which skill and which file
+             are named rather than addressed, so a name with a slash in it — or
+             a space, or a `#` — is simply encoded. */
+          case "file": {
+            const skill = requiredText(url.searchParams.get("id"), "skill id")
+            const file = requiredText(url.searchParams.get("path"), "skill file")
+            sendJson(response, 200, { text: await api.readFile(skill, file) })
+            return
+          }
+
+          /* Every category in use, for the filter row. */
+          case "tags":
+            sendJson(response, 200, await api.tags())
+            return
+
+          /* What a package offers, before anything is written to disk. */
+          case "package":
+            sendJson(
+              response,
+              200,
+              await api.listPackage(requiredText(url.searchParams.get("source"), "package source"))
+            )
+            return
+
+          default:
+            throw new Error(`unknown action: ${asked}`)
         }
+      }
+
+      if (method !== "POST") {
+        sendError(response, new Error(`unsupported method ${method}`), 405)
         return
       }
 
-      /* POST /hub/skills/<id>/source — record a pasted source */
-      if (section === "source" && method === "POST") {
-        const body = JSON.parse(
-          (await readBody(request)).toString("utf8")
-        ) as { source?: string }
-        if (typeof body.source !== "string") {
-          sendError(response, new Error("missing source"))
-          return
-        }
-        sendJson(response, 200, await api.addAssetSource(id, body.source))
-        return
-      }
-
-      /* /hub/skills/<id>/assets?ref=… — drop a reference */
-      if (section === "assets" && method === "DELETE") {
-        const ref = url.searchParams.get("ref")
-        if (ref === null) {
-          sendError(response, new Error("missing asset reference"))
-          return
-        }
-        await api.deleteAsset(id, ref)
-        sendJson(response, 200, { ok: true })
-        return
-      }
-
-      /* POST /hub/skills/<id>/assets?name=… — take over uploaded bytes */
-      if (section === "assets" && method === "POST") {
-        const name = url.searchParams.get("name")
-        if (name === null) {
-          sendError(response, new Error("missing asset name"))
-          return
-        }
+      /* Uploaded bytes are the body itself rather than base64 in JSON, so this
+         is the one call that cannot name its action in the body. */
+      if (asked === "put-asset") {
+        const skill = requiredText(url.searchParams.get("id"), "skill id")
+        const name = requiredText(url.searchParams.get("name"), "asset name")
         const bytes = await readBody(request)
         const part = new Uint8Array(bytes.byteLength)
         part.set(bytes)
-        const file = new File([part], name, {
-          type: request.headers["content-type"] ?? "",
-        })
-        sendJson(response, 200, await api.putAsset(id, file))
+        const file = new File([part], name, { type: request.headers["content-type"] ?? "" })
+        sendJson(response, 200, await api.putAsset(skill, file))
         return
       }
 
-      /* /hub/skills/<id>/files/<path> */
-      if (section === "files" && tail.length > 0) {
-        const file = tail.join("/")
-        if (method === "GET") {
-          sendJson(response, 200, { text: await api.readFile(id, file) })
-        } else if (method === "PUT") {
-          await api.writeFile(
-            id,
-            file,
-            (await readBody(request)).toString("utf8")
+      const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<string, unknown>
+
+      switch (body.action) {
+        /* Rebuild the catalog from disk, which is the one read that has to be
+           asked for again rather than served from what is held. */
+        case "refresh":
+          await api.refresh()
+          sendJson(response, 200, { ok: true })
+          return
+
+        /* Ask every recorded source. */
+        case "check-updates":
+          sendJson(response, 200, await api.checkUpdates())
+          return
+
+        /* One skill's source, asked on its own. This one writes: the answer is
+           recorded on the row, so asking changes what the next page reads. */
+        case "check-update":
+          sendJson(response, 200, await api.checkUpdate(requiredText(body.id, "skill id")))
+          return
+
+        /* Download from a package, and take over the skills a folder read. */
+        case "install":
+          sendJson(
+            response,
+            200,
+            await api.installPackage(
+              requiredText(body.source, "package source"),
+              stringsOf(body.skills)
+            )
+          )
+          return
+
+        case "import":
+          sendJson(response, 200, await api.importFolder(folderSkills(body.skills)))
+          return
+
+        case "create":
+          sendJson(
+            response,
+            200,
+            await api.create({
+              name: requiredText(body.name, "skill name"),
+              description: requiredText(body.description, "skill description"),
+              tags: stringsOf(body.tags),
+            })
+          )
+          return
+
+        /* A field the body omits is left as it is. */
+        case "update": {
+          const patch: SkillPatch = {}
+          if (body.description !== undefined) {
+            patch.description = requiredText(body.description, "skill description")
+          }
+          if (body.tags !== undefined) patch.tags = stringsOf(body.tags)
+          if (typeof body.enabled === "boolean") patch.enabled = body.enabled
+          sendJson(response, 200, await api.update(requiredText(body.id, "skill id"), patch))
+          return
+        }
+
+        case "remove":
+          await api.remove(requiredText(body.id, "skill id"))
+          sendJson(response, 200, { ok: true })
+          return
+
+        /* Install what the source holds now over the copy here. */
+        case "update-from-upstream":
+          await api.updateFromUpstream(requiredText(body.id, "skill id"))
+          sendJson(response, 200, { ok: true })
+          return
+
+        /* Record a pasted address, as opposed to uploaded bytes. */
+        case "add-asset-source":
+          sendJson(
+            response,
+            200,
+            await api.addAssetSource(
+              requiredText(body.id, "skill id"),
+              requiredText(body.source, "source")
+            )
+          )
+          return
+
+        case "delete-asset":
+          await api.deleteAsset(
+            requiredText(body.id, "skill id"),
+            requiredText(body.ref, "asset reference")
           )
           sendJson(response, 200, { ok: true })
-        } else
-          sendError(response, new Error(`unsupported method ${method}`))
-        return
-      }
+          return
 
-      sendError(response, new Error(`unknown route ${url.pathname}`))
+        /* Write one file inside a skill. */
+        case "write-file":
+          await api.writeFile(
+            requiredText(body.id, "skill id"),
+            requiredText(body.path, "skill file"),
+            typeof body.text === "string" ? body.text : ""
+          )
+          sendJson(response, 200, { ok: true })
+          return
+
+        /* Link one library skill into a place, or adopt one out of it. */
+        case "install-place":
+          sendJson(response, 200, {
+            mode: await api.installInto(requiredText(body.id, "skill id"), bodyRef(body)),
+          })
+          return
+
+        case "adopt-place":
+          sendJson(response, 200, {
+            mode: await api.adoptFrom(requiredText(body.id, "skill id"), bodyRef(body)),
+          })
+          return
+
+        case "delete-place":
+          await api.deleteInPlace(requiredText(body.id, "skill id"), bodyRef(body))
+          sendJson(response, 200, { ok: true })
+          return
+
+        case "remove-place":
+          await api.removeFrom(requiredText(body.id, "skill id"), bodyRef(body))
+          sendJson(response, 200, { ok: true })
+          return
+
+        default:
+          throw new Error(`unknown action: ${String(body.action)}`)
+      }
     } catch (error) {
       sendError(response, error)
     }
   }
+}
+
+/** A field a body carries, refused when it is missing or not a string. */
+function requiredText(value: unknown, what: string): string {
+  if (typeof value !== "string" || value === "") throw new Error(`missing ${what}`)
+  return value
+}
+
+/** The strings a body carries, with anything that is not one dropped. */
+function stringsOf(value: unknown): string[] {
+  if (!Array.isArray(value)) return []
+  return value.filter((item): item is string => typeof item === "string")
+}
+
+/** The skills a folder read produced; a list this route cannot read is refused. */
+function folderSkills(value: unknown): { name: string; files: { path: string; base64: string }[] }[] {
+  if (!Array.isArray(value)) throw new Error("missing folder skills")
+  return value.filter(
+    (item): item is { name: string; files: { path: string; base64: string }[] } =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as { name?: unknown }).name === "string" &&
+      Array.isArray((item as { files?: unknown }).files) &&
+      ((item as { files: unknown[] }).files as unknown[]).every(
+        (file) =>
+          typeof file === "object" &&
+          file !== null &&
+          typeof (file as { path?: unknown }).path === "string" &&
+          typeof (file as { base64?: unknown }).base64 === "string"
+      )
+  )
 }

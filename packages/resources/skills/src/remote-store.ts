@@ -52,6 +52,30 @@ async function call<T>(
   return (await response.json()) as T
 }
 
+/** One read, named by its action in the query. */
+function read<T>(base: string, query: string): Promise<T> {
+  return call<T>(base, `${SKILL_ROUTE}${query === "" ? "" : `?${query}`}`)
+}
+
+/** One write, named by its action in the body. */
+function write<T>(base: string, action: string, args: Record<string, unknown> = {}): Promise<T> {
+  return call<T>(base, SKILL_ROUTE, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action, ...args }),
+  })
+}
+
+/** One uploaded file, whose bytes are the body and whose action rides in the query. */
+function upload<T>(base: string, action: string, args: Record<string, string>, body: BodyInit, type: string): Promise<T> {
+  const params = new URLSearchParams({ action, ...args })
+  return call<T>(base, `${SKILL_ROUTE}?${params.toString()}`, {
+    method: "POST",
+    headers: { "Content-Type": type },
+    body,
+  })
+}
+
 /** Build a store that reaches the library over the given base path. */
 export function createRemoteSkillStore(base = ""): SkillStore {
   const query = (input: SkillQuery = {}) => {
@@ -71,15 +95,16 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     root: "host",
 
     async refresh(): Promise<void> {
-      await call(base, `${SKILL_ROUTE}?action=refresh`, { method: "POST" })
+      await write(base, "refresh")
     },
 
     tags(): Promise<string[]> {
-      return call<string[]>(base, `${SKILL_ROUTE}?action=tags`)
+      return read<string[]>(base, "action=tags")
     },
 
     list(input?: SkillQuery): Promise<SkillPage> {
-      return call<SkillPage>(base, `${SKILL_ROUTE}${query(input)}`)
+      const search = query(input)
+      return read<SkillPage>(base, search.startsWith("?") ? search.slice(1) : search)
     },
 
     get(id: string): Promise<SkillDetail> {
@@ -87,178 +112,115 @@ export function createRemoteSkillStore(base = ""): SkillStore {
     },
 
     create(draft: SkillDraft): Promise<SkillDetail> {
-      return call<SkillDetail>(base, `${SKILL_ROUTE}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
-      })
+      return write<SkillDetail>(base, "create", { ...draft })
     },
 
     update(id: string, patch: SkillPatch): Promise<SkillDetail> {
-      return call<SkillDetail>(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(patch),
-      })
+      return write<SkillDetail>(base, "update", { id, ...patch })
     },
 
     async remove(id: string): Promise<void> {
-      await call(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-      })
+      await write(base, "remove", { id })
     },
 
     async readFile(id: string, file: string): Promise<string> {
-      const body = await call<{ text: string }>(
-        base,
-        `${SKILL_ROUTE}/${encodeURIComponent(id)}/files/${file}`
-      )
+      const params = new URLSearchParams({ action: "file", id, path: file })
+      const body = await read<{ text: string }>(base, params.toString())
       return body.text
     },
 
     async writeFile(id: string, file: string, text: string): Promise<void> {
-      await call(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}/files/${file}`, {
-        method: "PUT",
-        body: text,
-      })
+      await write(base, "write-file", { id, path: file, text })
     },
 
     putAsset(id: string, file: File): Promise<SkillAsset> {
-      /* Raw bytes: the file object is the body, so no multipart encoder is needed. */
-      return call<SkillAsset>(
+      /* Raw bytes: the file object is the body, so the id and the name it is
+         stored under ride in the query instead. */
+      return upload<SkillAsset>(
         base,
-        `${SKILL_ROUTE}/${encodeURIComponent(id)}/assets?name=${encodeURIComponent(file.name)}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": file.type || "application/octet-stream" },
-          body: file,
-        }
+        "put-asset",
+        { id, name: file.name },
+        file,
+        file.type || "application/octet-stream"
       )
     },
 
     addAssetSource(id: string, source: string): Promise<SkillAsset> {
-      return call<SkillAsset>(
-        base,
-        `${SKILL_ROUTE}/${encodeURIComponent(id)}/source`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ source }),
-        }
-      )
+      return write<SkillAsset>(base, "add-asset-source", { id, source })
     },
 
     async deleteAsset(id: string, ref: string): Promise<void> {
-      await call(
-        base,
-        `${SKILL_ROUTE}/${encodeURIComponent(id)}/assets?ref=${encodeURIComponent(ref)}`,
-        { method: "DELETE" }
-      )
+      await write(base, "delete-asset", { id, ref })
     },
 
     listPackage(source: string): Promise<PackageSkill[]> {
-      return call<PackageSkill[]>(
-        base,
-        `${SKILL_ROUTE}?action=package&source=${encodeURIComponent(source)}`
-      )
+      return read<PackageSkill[]>(base, `action=package&source=${encodeURIComponent(source)}`)
     },
 
     installPackage(source: string, skills: string[]): Promise<SkillImport> {
-      return call<SkillImport>(base, `${SKILL_ROUTE}?action=install`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source, skills }),
-      })
+      return write<SkillImport>(base, "install", { source, skills })
     },
 
     importFolder(skills: ImportedSkill[]): Promise<SkillImport> {
-      return call<SkillImport>(base, `${SKILL_ROUTE}?action=import`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ skills }),
-      })
+      return write<SkillImport>(base, "import", { skills })
     },
 
     assetUrl: (ref) => assetRef(ref, base),
 
     placeSkills(ref: SkillPlaceRef): Promise<PlaceSkills | null> {
-      return call<PlaceSkills | null>(base, `${SKILL_ROUTE}?action=place${placeQuery(ref)}`)
+      return read<PlaceSkills | null>(base, `action=place${placeQuery(ref)}`)
     },
 
     placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
-      return call<PlaceSkillRecord | null>(
+      return read<PlaceSkillRecord | null>(
         base,
-        `${SKILL_ROUTE}?action=place-skill&id=${encodeURIComponent(id)}${placeQuery(ref)}`
+        `action=place-skill&id=${encodeURIComponent(id)}${placeQuery(ref)}`
       )
     },
 
     async placeFile(id: string, file: string, ref: SkillPlaceRef): Promise<string> {
-      const body = await call<{ text: string }>(
+      const body = await read<{ text: string }>(
         base,
-        `${SKILL_ROUTE}?action=place-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
+        `action=place-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
       )
       return body.text
     },
 
     async installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
-      const body = await call<{ mode: SkillInstall }>(
-        base,
-        `${SKILL_ROUTE}?action=install-place`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, ...placeBody(ref) }),
-        }
-      )
+      const body = await write<{ mode: SkillInstall }>(base, "install-place", {
+        id,
+        ...placeBody(ref),
+      })
       return body.mode
     },
 
     async adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
-      const body = await call<{ mode: SkillInstall }>(
-        base,
-        `${SKILL_ROUTE}?action=adopt-place`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, ...placeBody(ref) }),
-        }
-      )
+      const body = await write<{ mode: SkillInstall }>(base, "adopt-place", {
+        id,
+        ...placeBody(ref),
+      })
       return body.mode
     },
 
     async deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void> {
-      await call(base, `${SKILL_ROUTE}?action=delete-place`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...placeBody(ref) }),
-      })
+      await write(base, "delete-place", { id, ...placeBody(ref) })
     },
 
     async removeFrom(id: string, ref: SkillPlaceRef): Promise<void> {
-      await call(base, `${SKILL_ROUTE}?action=remove-place`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...placeBody(ref) }),
-      })
+      await write(base, "remove-place", { id, ...placeBody(ref) })
     },
 
+    /* A write, not a read: the answer is recorded on the row. */
     checkUpdate(id: string): Promise<SkillUpdateCheck> {
-      return call<SkillUpdateCheck>(
-        base,
-        `${SKILL_ROUTE}/${encodeURIComponent(id)}/update`
-      )
+      return write<SkillUpdateCheck>(base, "check-update", { id })
     },
 
     checkUpdates(): Promise<SkillUpdateSummary> {
-      return call<SkillUpdateSummary>(base, `${SKILL_ROUTE}?action=check-updates`, {
-        method: "POST",
-      })
+      return write<SkillUpdateSummary>(base, "check-updates")
     },
 
     async updateFromUpstream(id: string): Promise<void> {
-      await call(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}/update`, {
-        method: "POST",
-      })
+      await write(base, "update-from-upstream", { id })
     },
 
     subscribe(): () => void {
