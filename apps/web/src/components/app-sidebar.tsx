@@ -7,9 +7,9 @@ import { CheckIcon, ChevronDownIcon, WaypointsIcon } from "lucide-react"
 import * as React from "react"
 import { useLocation } from "react-router"
 
-import { useContributions, useI18n } from "@workspace/extensions/react"
-import { useSkillAgents } from "@workspace/plugin-skills"
-import { Sidebar, SidebarContent, SidebarHeader } from "@workspace/ui/components/sidebar"
+import { useContributions, useI18n } from "@context-hub/extensions/react"
+import { useSkillAgents } from "@context-hub/skills"
+import { Sidebar, SidebarContent, SidebarHeader } from "@context-hub/shadcn-ui/components/sidebar"
 
 import { SidebarGroup, SidebarRow } from "@/components/sidebar-rows"
 import { WorkspaceGroup } from "@/components/workspace-group"

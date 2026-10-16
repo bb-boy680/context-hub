@@ -8,22 +8,22 @@ import * as React from "react"
 
 import { ExtensionDetailDialog } from "@/components/extension-detail-dialog"
 import { categoryOrder, categoryTile } from "@/lib/extensions"
-import type { ExtensionView } from "@workspace/extensions"
+import type { ExtensionView } from "@context-hub/extensions"
 import {
   useExtensionSnapshot,
   useHub,
   useI18n,
-} from "@workspace/extensions/react"
-import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
+} from "@context-hub/extensions/react"
+import { Badge } from "@context-hub/shadcn-ui/components/badge"
+import { Button } from "@context-hub/shadcn-ui/components/button"
+import { Input } from "@context-hub/shadcn-ui/components/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@workspace/ui/components/select"
+} from "@context-hub/shadcn-ui/components/select"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
 

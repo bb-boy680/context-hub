@@ -10,24 +10,24 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import { TablePagination } from "@workspace/extensions/components"
-import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
+import { TablePagination } from "@context-hub/extensions/components"
+import { Badge } from "@context-hub/shadcn-ui/components/badge"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@workspace/ui/components/card"
-import { Checkbox } from "@workspace/ui/components/checkbox"
+} from "@context-hub/shadcn-ui/components/card"
+import { Checkbox } from "@context-hub/shadcn-ui/components/checkbox"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@workspace/ui/components/select"
-import { Switch } from "@workspace/ui/components/switch"
+} from "@context-hub/shadcn-ui/components/select"
+import { Switch } from "@context-hub/shadcn-ui/components/switch"
 import {
   Table,
   TableBody,
@@ -35,7 +35,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@workspace/ui/components/table"
+} from "@context-hub/shadcn-ui/components/table"
 
 const cardSurface =
   "[--card-spacing:1.5rem] rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"

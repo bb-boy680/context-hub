@@ -9,7 +9,7 @@
 import { SearchIcon, XIcon } from "lucide-react"
 import * as React from "react"
 
-import { Kbd } from "@workspace/ui/components/kbd"
+import { Kbd } from "@context-hub/shadcn-ui/components/kbd"
 
 /** How many chips show before the rest fold into one `+N` chip. */
 const VISIBLE_TAGS = 4

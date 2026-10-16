@@ -14,9 +14,9 @@
  */
 import * as React from "react"
 
-import { Button } from "@workspace/ui/components/button"
-import { Card } from "@workspace/ui/components/card"
-import { Checkbox } from "@workspace/ui/components/checkbox"
+import { Button } from "@context-hub/shadcn-ui/components/button"
+import { Card } from "@context-hub/shadcn-ui/components/card"
+import { Checkbox } from "@context-hub/shadcn-ui/components/checkbox"
 import {
   Table,
   TableBody,
@@ -24,7 +24,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@workspace/ui/components/table"
+} from "@context-hub/shadcn-ui/components/table"
 
 /** One column of a ledger: its head, its share of the table, and its cells. */
 export interface LedgerColumn<T> {

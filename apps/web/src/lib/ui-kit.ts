@@ -4,17 +4,17 @@
  * the same React instance as the app — so whatever it renders with comes from
  * here.
  */
-import { Badge } from "@workspace/ui/components/badge"
+import { Badge } from "@context-hub/shadcn-ui/components/badge"
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@workspace/ui/components/card"
-import { Input } from "@workspace/ui/components/input"
-import { Spinner } from "@workspace/ui/components/spinner"
-import { Button } from "@workspace/ui/components/button"
+} from "@context-hub/shadcn-ui/components/card"
+import { Input } from "@context-hub/shadcn-ui/components/input"
+import { Spinner } from "@context-hub/shadcn-ui/components/spinner"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 
 export {
   Badge,

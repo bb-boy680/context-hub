@@ -11,12 +11,12 @@
 import { PlusIcon, XIcon } from "lucide-react"
 import * as React from "react"
 
-import { Input } from "@workspace/ui/components/input"
+import { Input } from "@context-hub/shadcn-ui/components/input"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@workspace/ui/components/popover"
+} from "@context-hub/shadcn-ui/components/popover"
 
 /** The words the row draws; each is the caller's, so a locale can replace it. */
 export interface TagEditorWords {

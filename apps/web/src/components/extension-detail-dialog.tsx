@@ -6,21 +6,21 @@ import { DownloadIcon, Trash2Icon, XIcon } from "lucide-react"
 import * as React from "react"
 
 import { categoryTile } from "@/lib/extensions"
-import type { ExtensionView } from "@workspace/extensions"
+import type { ExtensionView } from "@context-hub/extensions"
 import {
   useExtensionContributions,
   useHub,
   useI18n,
-} from "@workspace/extensions/react"
-import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
+} from "@context-hub/extensions/react"
+import { Badge } from "@context-hub/shadcn-ui/components/badge"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@workspace/ui/components/dialog"
+} from "@context-hub/shadcn-ui/components/dialog"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
 

@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/core",
+  "name": "@context-hub/core",
   "version": "0.0.0",
   "type": "module",
   "private": true,

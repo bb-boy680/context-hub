@@ -1,7 +1,7 @@
 import { useLocation } from "react-router"
 
 import { useNavItem } from "@/lib/navigation"
-import { useI18n } from "@workspace/extensions/react"
+import { useI18n } from "@context-hub/extensions/react"
 
 /** Route target for sections that are not designed yet. */
 export function PlaceholderPage() {

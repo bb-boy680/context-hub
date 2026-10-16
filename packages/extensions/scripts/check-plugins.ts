@@ -12,8 +12,8 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { assertPluginId, EXTENSION_DIR, EXTENSION_RECORDS, EXTENSION_ROUTE, LEGACY_EXTENSION_DIR } from "@workspace/core/plugins"
-import { createFsPluginStore } from "@workspace/core/host/plugins"
+import { assertPluginId, EXTENSION_DIR, EXTENSION_RECORDS, EXTENSION_ROUTE, LEGACY_EXTENSION_DIR } from "@context-hub/core/plugins"
+import { createFsPluginStore } from "@context-hub/core/host/plugins"
 import { discoverPlugins } from "../src/plugin.ts"
 
 let failures = 0

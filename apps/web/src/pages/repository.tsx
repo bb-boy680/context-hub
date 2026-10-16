@@ -11,23 +11,23 @@
 } from "lucide-react"
 import type { ReactNode } from "react"
 
-import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
+import { Badge } from "@context-hub/shadcn-ui/components/badge"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@workspace/ui/components/card"
-import { Input } from "@workspace/ui/components/input"
+} from "@context-hub/shadcn-ui/components/card"
+import { Input } from "@context-hub/shadcn-ui/components/input"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@workspace/ui/components/select"
-import { Switch } from "@workspace/ui/components/switch"
+} from "@context-hub/shadcn-ui/components/select"
+import { Switch } from "@context-hub/shadcn-ui/components/switch"
 
 const cardSurface =
   "[--card-spacing:1.25rem] gap-4 rounded-lg ring-glass-border shadow-glass backdrop-blur-glass"

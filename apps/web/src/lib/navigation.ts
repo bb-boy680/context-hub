@@ -6,8 +6,8 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import type { ExtensionIcon, NavGroupId } from "@workspace/extensions"
-import { useContributions } from "@workspace/extensions/react"
+import type { ExtensionIcon, NavGroupId } from "@context-hub/extensions"
+import { useContributions } from "@context-hub/extensions/react"
 
 export type NavItem = {
   /** Message key resolved through `ctx.i18n` where the item renders. */

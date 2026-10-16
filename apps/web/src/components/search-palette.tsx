@@ -9,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 
-import { cn } from "@workspace/ui/lib/utils"
+import { cn } from "@context-hub/shadcn-ui/lib/utils"
 
 type SearchResult = {
   name: string

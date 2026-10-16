@@ -8,14 +8,14 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from "@workspace/ui/components/breadcrumb"
-import { Button } from "@workspace/ui/components/button"
-import { Kbd } from "@workspace/ui/components/kbd"
-import { SidebarTrigger } from "@workspace/ui/components/sidebar"
+} from "@context-hub/shadcn-ui/components/breadcrumb"
+import { Button } from "@context-hub/shadcn-ui/components/button"
+import { Kbd } from "@context-hub/shadcn-ui/components/kbd"
+import { SidebarTrigger } from "@context-hub/shadcn-ui/components/sidebar"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useNavItem } from "@/lib/navigation"
-import { useI18n } from "@workspace/extensions/react"
+import { useI18n } from "@context-hub/extensions/react"
 
 /** Changes waiting to leave the workspace; mirrored on the Repository page. */
 const pendingChanges = 3

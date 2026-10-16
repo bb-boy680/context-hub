@@ -14,14 +14,14 @@ import {
   ChevronsRightIcon,
 } from "lucide-react"
 
-import { Button } from "@workspace/ui/components/button"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@workspace/ui/components/select"
+} from "@context-hub/shadcn-ui/components/select"
 
 const outline = "border-input bg-transparent dark:bg-transparent"
 

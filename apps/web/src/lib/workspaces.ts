@@ -7,9 +7,9 @@
  */
 import * as React from "react"
 
-import { WORKSPACE_ROUTE } from "@workspace/core/workspace"
-import type { WorkspacePage, WorkspaceService } from "@workspace/core/workspace"
-import { useHub } from "@workspace/extensions/react"
+import { WORKSPACE_ROUTE } from "@context-hub/core/workspace"
+import type { WorkspacePage, WorkspaceService } from "@context-hub/core/workspace"
+import { useHub } from "@context-hub/extensions/react"
 
 /** A failure explained for the menu. */
 function reasonOf(error: unknown): string {

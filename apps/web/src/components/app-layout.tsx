@@ -1,7 +1,7 @@
 import * as React from "react"
 import { Outlet } from "react-router"
 
-import { SidebarInset, SidebarProvider } from "@workspace/ui/components/sidebar"
+import { SidebarInset, SidebarProvider } from "@context-hub/shadcn-ui/components/sidebar"
 
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"

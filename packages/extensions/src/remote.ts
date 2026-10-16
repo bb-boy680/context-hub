@@ -4,8 +4,8 @@
  * without touching the disk. This is the read side only — installing an
  * extension writes files, which is the host's job.
  */
-import { EXTENSION_ROUTE } from "@workspace/core/plugins"
-import type { PluginSource } from "@workspace/core/plugins"
+import { EXTENSION_ROUTE } from "@context-hub/core/plugins"
+import type { PluginSource } from "@context-hub/core/plugins"
 
 /** Host answer for the extension list. */
 interface PluginListBody {

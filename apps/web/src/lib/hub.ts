@@ -6,9 +6,9 @@
  * itself, so `startHub` offers those only when a host answers for them; without
  * a host the skills page has no catalog and says so.
  */
-import { claudeCodeExtension } from "@workspace/plugin-claude-code"
-import { STATE_ROUTE } from "@workspace/core/state"
-import { createRemoteNet } from "@workspace/core/net"
+import { claudeCodeExtension } from "@context-hub/claude-code"
+import { STATE_ROUTE } from "@context-hub/core/state"
+import { createRemoteNet } from "@context-hub/core/net"
 import {
   builtinExtensions,
   createHubKernel,
@@ -17,13 +17,13 @@ import {
   type HubKernel,
   type PlatformHost,
   type StoragePort,
-} from "@workspace/extensions"
-import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
-import { mcpExtension } from "@workspace/plugin-mcp"
-import { pluginsExtension } from "@workspace/plugin-plugins"
-import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@workspace/plugin-prompts"
-import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
-import { skillsShExtension } from "@workspace/plugin-skills-sh"
+} from "@context-hub/extensions"
+import { simplifiedChineseLocale } from "@context-hub/zh-cn"
+import { mcpExtension } from "@context-hub/mcp"
+import { pluginsExtension } from "@context-hub/plugins"
+import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
+import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-hub/skills"
+import { skillsShExtension } from "@context-hub/skills-sh"
 import * as ui from "./ui-kit.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"

@@ -1,5 +1,5 @@
 /** Presentation helpers shared by the Extensions page and its detail dialog. */
-import type { ExtensionCategoryId } from "@workspace/extensions"
+import type { ExtensionCategoryId } from "@context-hub/extensions"
 
 /** Catalog order of the sections; a category with no entries is skipped. */
 export const categoryOrder: ExtensionCategoryId[] = [

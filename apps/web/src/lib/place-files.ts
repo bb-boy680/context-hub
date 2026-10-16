@@ -6,7 +6,7 @@
  * A page gets no answer at all when that process is not there: every call
  * throws, and the caller reports the failure instead of inventing a file.
  */
-import { PLACE_FILES_ROUTE, type PlaceCall, type PlaceFiles, type PlaceRef } from "@workspace/core/place-files"
+import { PLACE_FILES_ROUTE, type PlaceCall, type PlaceFiles, type PlaceRef } from "@context-hub/core/place-files"
 
 /** Whether the host answers for these files; without one every call fails. */
 export async function placeFilesAvailable(): Promise<boolean> {

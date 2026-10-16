@@ -1,5 +1,5 @@
 {
-  "name": "@workspace/extensions",
+  "name": "@context-hub/extensions",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -10,8 +10,8 @@
   },
   "dependencies": {
     "@deepseek-ai/cordis": "^4.0.4",
-    "@workspace/core": "workspace:*",
-    "@workspace/ui": "workspace:*",
+    "@context-hub/core": "workspace:*",
+    "@context-hub/shadcn-ui": "workspace:*",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8",
     "swiper": "^14.3.0"

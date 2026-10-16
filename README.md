@@ -37,7 +37,7 @@ with it.
    by hand — a route is a string, so no type check sees the two ends disagree.
    Answers are JSON, and a failure is a 4xx carrying `{ error }`. The pipeline
    (`readBody`, `sendJson`, `sendError`) is shared from
-   `@workspace/core/host/http` — do not write another one.
+   `@context-hub/core/host/http` — do not write another one.
 
 ## Adding components
 
@@ -47,12 +47,12 @@ To add components to your app, run the following command at the root of your `we
 pnpm dlx shadcn@latest add button -c apps/web
 ```
 
-This will place the ui components in the `packages/ui/src/components` directory.
+This will place the ui components in the `packages/shadcn-ui/src/components` directory.
 
 ## Using components
 
 To use the components in your app, import them from the `ui` package.
 
 ```tsx
-import { Button } from "@workspace/ui/components/button";
+import { Button } from "@context-hub/shadcn-ui/components/button";
 ```

@@ -23,72 +23,72 @@ importers:
 
   apps/web:
     dependencies:
-      '@workspace/agent-cline':
+      '@context-hub/claude-code':
         specifier: workspace:*
-        version: link:../../packages/agents-extensions/cline
-      '@workspace/agent-codex':
+        version: link:../../packages/agents/claude-code
+      '@context-hub/cline':
         specifier: workspace:*
-        version: link:../../packages/agents-extensions/codex
-      '@workspace/agent-command-code':
+        version: link:../../packages/agents/cline
+      '@context-hub/codex':
         specifier: workspace:*
-        version: link:../../packages/agents-extensions/command-code
-      '@workspace/agent-copilot':
+        version: link:../../packages/agents/codex
+      '@context-hub/command-code':
         specifier: workspace:*
-        version: link:../../packages/agents-extensions/copilot
-      '@workspace/agent-cursor':
+        version: link:../../packages/agents/command-code
+      '@context-hub/copilot':
         specifier: workspace:*
-        version: link:../../packages/agents-extensions/cursor
-      '@workspace/agent-gemini-cli':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/gemini-cli
-      '@workspace/agent-kiro-cli':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/kiro-cli
-      '@workspace/agent-minimax-code':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/minimax-code
-      '@workspace/agent-qoder':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/qoder
-      '@workspace/agent-qwen-code':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/qwen-code
-      '@workspace/agent-trae':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/trae
-      '@workspace/agent-windsurf':
-        specifier: workspace:*
-        version: link:../../packages/agents-extensions/windsurf
-      '@workspace/core':
+        version: link:../../packages/agents/copilot
+      '@context-hub/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@workspace/extensions':
+      '@context-hub/cursor':
+        specifier: workspace:*
+        version: link:../../packages/agents/cursor
+      '@context-hub/extensions':
         specifier: workspace:*
         version: link:../../packages/extensions
-      '@workspace/locale-zh-cn':
+      '@context-hub/gemini-cli':
         specifier: workspace:*
-        version: link:../../packages/locale-zh-cn
-      '@workspace/plugin-claude-code':
+        version: link:../../packages/agents/gemini-cli
+      '@context-hub/kiro-cli':
         specifier: workspace:*
-        version: link:../../packages/plugin-claude-code
-      '@workspace/plugin-mcp':
+        version: link:../../packages/agents/kiro-cli
+      '@context-hub/mcp':
         specifier: workspace:*
-        version: link:../../packages/plugin-mcp
-      '@workspace/plugin-plugins':
+        version: link:../../packages/resources/mcp
+      '@context-hub/minimax-code':
         specifier: workspace:*
-        version: link:../../packages/plugin-plugins
-      '@workspace/plugin-prompts':
+        version: link:../../packages/agents/minimax-code
+      '@context-hub/plugins':
         specifier: workspace:*
-        version: link:../../packages/plugin-prompts
-      '@workspace/plugin-skills':
+        version: link:../../packages/resources/plugins
+      '@context-hub/prompts':
         specifier: workspace:*
-        version: link:../../packages/plugin-skills
-      '@workspace/plugin-skills-sh':
+        version: link:../../packages/resources/prompts
+      '@context-hub/qoder':
         specifier: workspace:*
-        version: link:../../packages/plugin-skills-sh
-      '@workspace/ui':
+        version: link:../../packages/agents/qoder
+      '@context-hub/qwen-code':
         specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../packages/agents/qwen-code
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../../packages/shadcn-ui
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../packages/resources/skills
+      '@context-hub/skills-sh':
+        specifier: workspace:*
+        version: link:../../packages/search/skills-sh
+      '@context-hub/trae':
+        specifier: workspace:*
+        version: link:../../packages/agents/trae
+      '@context-hub/windsurf':
+        specifier: workspace:*
+        version: link:../../packages/agents/windsurf
+      '@context-hub/zh-cn':
+        specifier: workspace:*
+        version: link:../../packages/i18n/zh-cn
       cn:
         specifier: ^0.4.0
         version: 0.4.0
@@ -145,39 +145,60 @@ importers:
         specifier: ^8
         version: 8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0)
 
-  packages/agents-extensions/cline:
+  packages/agents/claude-code:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/mcp':
+        specifier: workspace:*
+        version: link:../../resources/mcp
+      '@context-hub/plugins':
+        specifier: workspace:*
+        version: link:../../resources/plugins
+      '@context-hub/prompts':
+        specifier: workspace:*
+        version: link:../../resources/prompts
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../../shadcn-ui
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-mcp':
-        specifier: workspace:*
-        version: link:../../plugin-mcp
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
+      '@lobehub/ui':
+        specifier: ^5.57.1
+        version: 5.57.1(@date-fns/tz@1.5.0)(@lobehub/fluent-emoji@4.1.1(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@lobehub/icons@5.23.0)(@shikijs/themes@4.5.0)(@types/mdast@4.0.4)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(date-fns@4.4.0)(micromark-util-types@2.0.3)(micromark@4.0.3)(motion@12.43.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      antd:
+        specifier: ^6.1.1
+        version: 6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      lucide-react:
+        specifier: ^1.48.0
+        version: 1.48.0(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
     devDependencies:
-      '@eslint/js':
-        specifier: ^10
-        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
-      '@types/node':
-        specifier: ^24
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19
-        version: 19.2.18
-      '@workspace/core':
+      '@context-hub/core':
         specifier: workspace:*
         version: link:../../core
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
       eslint:
         specifier: ^10
         version: 10.10.0(jiti@2.7.0)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.10.0(jiti@2.7.0))
       globals:
         specifier: ^17
         version: 17.12.0
@@ -188,36 +209,36 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/codex:
+  packages/agents/cline:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/mcp':
+        specifier: workspace:*
+        version: link:../../resources/mcp
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-mcp':
-        specifier: workspace:*
-        version: link:../../plugin-mcp
-      '@workspace/plugin-plugins':
-        specifier: workspace:*
-        version: link:../../plugin-plugins
       react:
         specifier: ^19.2.8
         version: 19.2.8
     devDependencies:
-      '@eslint/js':
-        specifier: ^10
-        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
-      '@types/node':
-        specifier: ^24
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19
-        version: 19.2.18
-      '@workspace/core':
+      '@context-hub/core':
         specifier: workspace:*
         version: link:../../core
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
       eslint:
         specifier: ^10
         version: 10.10.0(jiti@2.7.0)
@@ -231,17 +252,60 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/command-code:
+  packages/agents/codex:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/mcp':
+        specifier: workspace:*
+        version: link:../../resources/mcp
+      '@context-hub/plugins':
+        specifier: workspace:*
+        version: link:../../resources/plugins
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
+    devDependencies:
+      '@context-hub/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+
+  packages/agents/command-code:
+    dependencies:
+      '@context-hub/extensions':
         specifier: workspace:*
         version: link:../../extensions
-      '@workspace/plugin-skills':
+      '@context-hub/skills':
         specifier: workspace:*
-        version: link:../../plugin-skills
+        version: link:../../resources/skills
+      '@lobehub/icons':
+        specifier: ^5.23.0
+        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -268,14 +332,14 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/copilot:
+  packages/agents/copilot:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -302,17 +366,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/cursor:
+  packages/agents/cursor:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -339,17 +403,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/gemini-cli:
+  packages/agents/gemini-cli:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -376,17 +440,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/kiro-cli:
+  packages/agents/kiro-cli:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -413,17 +477,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/minimax-code:
+  packages/agents/minimax-code:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -450,17 +514,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/qoder:
+  packages/agents/qoder:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -487,17 +551,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/qwen-code:
+  packages/agents/qwen-code:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -524,17 +588,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/trae:
+  packages/agents/trae:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -561,17 +625,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/agents-extensions/windsurf:
+  packages/agents/windsurf:
     dependencies:
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/skills':
+        specifier: workspace:*
+        version: link:../../resources/skills
       '@lobehub/icons':
         specifier: ^5.23.0
         version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../../extensions
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../../plugin-skills
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -621,15 +685,15 @@ importers:
 
   packages/extensions:
     dependencies:
+      '@context-hub/core':
+        specifier: workspace:*
+        version: link:../core
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../shadcn-ui
       '@deepseek-ai/cordis':
         specifier: ^4.0.4
         version: 4.0.4
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      '@workspace/ui':
-        specifier: workspace:*
-        version: link:../ui
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -668,11 +732,11 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/locale-zh-cn:
+  packages/i18n/zh-cn:
     dependencies:
-      '@workspace/extensions':
+      '@context-hub/extensions':
         specifier: workspace:*
-        version: link:../extensions
+        version: link:../../extensions
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -702,87 +766,23 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/plugin-claude-code:
+  packages/resources/mcp:
     dependencies:
-      '@lobehub/icons':
-        specifier: ^5.23.0
-        version: 5.23.0(@lobehub/ui@5.57.1)(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@lobehub/ui':
-        specifier: ^5.57.1
-        version: 5.57.1(@date-fns/tz@1.5.0)(@lobehub/fluent-emoji@4.1.1(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(@lobehub/icons@5.23.0)(@shikijs/themes@4.5.0)(@types/mdast@4.0.4)(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(antd@6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(date-fns@4.4.0)(micromark-util-types@2.0.3)(micromark@4.0.3)(motion@12.43.0(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/extensions':
+      '@context-hub/core':
         specifier: workspace:*
-        version: link:../extensions
-      '@workspace/plugin-mcp':
+        version: link:../../core
+      '@context-hub/extensions':
         specifier: workspace:*
-        version: link:../plugin-mcp
-      '@workspace/plugin-plugins':
+        version: link:../../extensions
+      '@context-hub/shadcn-ui':
         specifier: workspace:*
-        version: link:../plugin-plugins
-      '@workspace/plugin-prompts':
-        specifier: workspace:*
-        version: link:../plugin-prompts
-      '@workspace/plugin-skills':
-        specifier: workspace:*
-        version: link:../plugin-skills
-      '@workspace/ui':
-        specifier: workspace:*
-        version: link:../ui
-      antd:
-        specifier: ^6.1.1
-        version: 6.6.5(date-fns@4.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      lucide-react:
-        specifier: ^1.48.0
-        version: 1.48.0(react@19.2.8)
-      react:
-        specifier: ^19.2.8
-        version: 19.2.8
-    devDependencies:
-      '@eslint/js':
-        specifier: ^10
-        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
-      '@types/node':
-        specifier: ^24
-        version: 24.13.3
-      '@types/react':
-        specifier: ^19
-        version: 19.2.18
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      eslint:
-        specifier: ^10
-        version: 10.10.0(jiti@2.7.0)
-      eslint-plugin-react-hooks:
-        specifier: ^7.1.1
-        version: 7.1.1(eslint@10.10.0(jiti@2.7.0))
-      globals:
-        specifier: ^17
-        version: 17.12.0
-      typescript:
-        specifier: ~6
-        version: 6.0.3
-      typescript-eslint:
-        specifier: ^8
-        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
-
-  packages/plugin-mcp:
-    dependencies:
+        version: link:../../shadcn-ui
       '@deepseek-ai/cordis':
         specifier: ^4.0.4
         version: 4.0.4
       '@modelcontextprotocol/sdk':
         specifier: ^1.32.1
         version: 1.32.1(zod@4.5.4)
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../extensions
-      '@workspace/ui':
-        specifier: workspace:*
-        version: link:../ui
       cn:
         specifier: ^0.4.0
         version: 0.4.0
@@ -827,8 +827,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/plugin-plugins:
+  packages/resources/plugins:
     dependencies:
+      '@context-hub/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../../shadcn-ui
       '@deepseek-ai/cordis':
         specifier: ^4.0.4
         version: 4.0.4
@@ -838,15 +847,6 @@ importers:
       '@headless-tree/react':
         specifier: ^1.7.0
         version: 1.7.0(@headless-tree/core@1.7.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../extensions
-      '@workspace/ui':
-        specifier: workspace:*
-        version: link:../ui
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -879,20 +879,20 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/plugin-prompts:
+  packages/resources/prompts:
     dependencies:
+      '@context-hub/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../../shadcn-ui
       '@deepseek-ai/cordis':
         specifier: ^4.0.4
         version: 4.0.4
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../extensions
-      '@workspace/ui':
-        specifier: workspace:*
-        version: link:../ui
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -925,8 +925,17 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/plugin-skills:
+  packages/resources/skills:
     dependencies:
+      '@context-hub/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../../shadcn-ui
       '@deepseek-ai/cordis':
         specifier: ^4.0.4
         version: 4.0.4
@@ -936,15 +945,6 @@ importers:
       '@headless-tree/react':
         specifier: ^1.7.0
         version: 1.7.0(@headless-tree/core@1.7.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@workspace/core':
-        specifier: workspace:*
-        version: link:../core
-      '@workspace/extensions':
-        specifier: workspace:*
-        version: link:../extensions
-      '@workspace/ui':
-        specifier: workspace:*
-        version: link:../ui
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -977,11 +977,11 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/plugin-skills-sh:
+  packages/search/skills-sh:
     dependencies:
-      '@workspace/extensions':
+      '@context-hub/extensions':
         specifier: workspace:*
-        version: link:../extensions
+        version: link:../../extensions
       lucide-react:
         specifier: ^1.48.0
         version: 1.48.0(react@19.2.8)
@@ -1011,7 +1011,7 @@ importers:
         specifier: ^8
         version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
 
-  packages/ui:
+  packages/shadcn-ui:
     dependencies:
       '@base-ui/react':
         specifier: ^1.8.0
@@ -1919,16 +1919,6 @@ packages:
     peerDependencies:
       '@types/react': '>=16'
       react: '>=16'
-
-  '@modelcontextprotocol/sdk@1.30.1':
-    resolution: {integrity: sha512-H2HxLvC3HDNybePJaLdSrU1hhUK5iQw+WvV1b01myFyI7sdVGe1u/IPTE5D9fGCiJDVtgMV/lmFkQXLmQyIFYA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      '@cfworker/json-schema': ^4.1.1
-      zod: ^3.25 || ^4.0
-    peerDependenciesMeta:
-      '@cfworker/json-schema':
-        optional: true
 
   '@modelcontextprotocol/sdk@1.32.1':
     resolution: {integrity: sha512-2DdE+SJDtzLEEWzY1ZjY7Q+VcPhcV1KisD3zI4u0XZyktsjHum1mwbMI+JaulUBi2OZk+KJAi2uPXzxichPkdw==}
@@ -6870,7 +6860,7 @@ snapshots:
       '@mdx-js/mdx': 3.1.1
       '@mdx-js/react': 3.1.1(@types/react@19.2.18)(react@19.2.8)
       '@pierre/diffs': 1.2.12(@shikijs/themes@4.5.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      '@radix-ui/react-slot': 1.3.3(@types/react@19.2.18)(react@19.2.8)
+      '@radix-ui/react-slot': 1.4.0(@types/react@19.2.18)(react@19.2.8)
       '@shikijs/core': 4.5.0
       '@shikijs/stream': 4.5.0(react@19.2.8)
       '@shikijs/transformers': 4.5.0
@@ -6990,7 +6980,7 @@ snapshots:
       '@types/react': 19.2.18
       react: 19.2.8
 
-  '@modelcontextprotocol/sdk@1.30.1(zod@3.25.76)':
+  '@modelcontextprotocol/sdk@1.32.1(zod@3.25.76)':
     dependencies:
       '@hono/node-server': 2.1.1(hono@4.13.9)
       ajv: 8.20.0
@@ -8407,7 +8397,7 @@ snapshots:
       '@radix-ui/react-compose-refs': 1.1.5(@types/react@19.2.18)(react@19.2.8)
       '@radix-ui/react-dialog': 1.1.23(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-id': 1.1.4(@types/react@19.2.18)(react@19.2.8)
-      '@radix-ui/react-primitive': 2.1.10(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-primitive': 2.1.11(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       react: 19.2.8
       react-dom: 19.2.8(react@19.2.8)
     transitivePeerDependencies:
@@ -9438,7 +9428,7 @@ snapshots:
 
   leva@0.10.1(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8):
     dependencies:
-      '@radix-ui/react-portal': 1.1.17(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@radix-ui/react-portal': 1.1.18(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@radix-ui/react-tooltip': 1.3.0(@types/react-dom@19.2.7(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       '@stitches/react': 1.2.8(react@19.2.8)
       '@use-gesture/react': 10.3.1(react@19.2.8)
@@ -10963,7 +10953,7 @@ snapshots:
       '@babel/plugin-transform-typescript': 7.29.9(@babel/core@7.29.7)
       '@babel/preset-typescript': 7.29.7(@babel/core@7.29.7)
       '@dotenvx/dotenvx': 1.75.1
-      '@modelcontextprotocol/sdk': 1.30.1(zod@3.25.76)
+      '@modelcontextprotocol/sdk': 1.32.1(zod@3.25.76)
       '@types/validate-npm-package-name': 4.0.2
       browserslist: 4.28.2
       cn: 0.2.6

@@ -6,8 +6,8 @@ import { ExtensionsPage } from "@/pages/extensions"
 import { OverviewPage } from "@/pages/overview"
 import { PlaceholderPage } from "@/pages/placeholder"
 import { RepositoryPage } from "@/pages/repository"
-import { useContributions } from "@workspace/extensions/react"
-import { Toaster } from "@workspace/ui/components/toast"
+import { useContributions } from "@context-hub/extensions/react"
+import { Toaster } from "@context-hub/shadcn-ui/components/toast"
 
 /** Pages the shell owns; every other route comes from an extension. */
 const designedPaths = ["/", "/extensions", "/repository"]

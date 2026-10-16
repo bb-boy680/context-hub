@@ -7,7 +7,7 @@
 import * as React from "react"
 import { Link } from "react-router"
 
-import { cn } from "@workspace/ui/lib/utils"
+import { cn } from "@context-hub/shadcn-ui/lib/utils"
 
 /** A group of rows under the label that names it. */
 export function SidebarGroup({

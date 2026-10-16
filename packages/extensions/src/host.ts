@@ -3,7 +3,7 @@
  * extension read capabilities from here, so no extension asks which form it
  * runs in.
  */
-import type { PlaceFiles } from "@workspace/core/place-files"
+import type { PlaceFiles } from "@context-hub/core/place-files"
 
 /**
  * What the kernel and its extensions remember about this hub: one JSON value
@@ -69,7 +69,7 @@ export interface PlatformHost {
   log(level: "info" | "warn" | "error", message: string): void
 }
 
-export type { AssetScope, PlaceFiles, PlaceRef } from "@workspace/core/place-files"
+export type { AssetScope, PlaceFiles, PlaceRef } from "@context-hub/core/place-files"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {

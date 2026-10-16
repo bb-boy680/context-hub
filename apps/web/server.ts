@@ -23,12 +23,12 @@ import {
   createPlaceFileHandler,
   createStateHandler,
   createWorkspaceHandler,
-} from "@workspace/core/handlers"
-import { createHubServer, type HubServerOptions } from "@workspace/core/host/server"
-import { createMcpHandler } from "@workspace/plugin-mcp/handlers"
-import { createPluginHandler } from "@workspace/plugin-plugins/handlers"
-import { createPromptHandler } from "@workspace/plugin-prompts/handlers"
-import { createSkillHandler } from "@workspace/plugin-skills/handlers"
+} from "@context-hub/core/handlers"
+import { createHubServer, type HubServerOptions } from "@context-hub/core/host/server"
+import { createMcpHandler } from "@context-hub/mcp/handlers"
+import { createPluginHandler } from "@context-hub/plugins/handlers"
+import { createPromptHandler } from "@context-hub/prompts/handlers"
+import { createSkillHandler } from "@context-hub/skills/handlers"
 
 /** One flag and the value it takes, or `true` when it takes none. */
 function flags(argv: readonly string[]): Map<string, string | true> {
