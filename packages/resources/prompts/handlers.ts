@@ -35,6 +35,19 @@ function tagsOf(value: unknown): string[] {
 }
 
 /**
+ * The path under one route, or null when this handler does not own the request.
+ *
+ * `""` is the route itself. Requiring the separator is what keeps a path that
+ * merely starts with the same letters — `/hub/promptsX` — from being read as
+ * this route carrying a row id of `X`.
+ */
+function under(route: string, pathname: string): string | null {
+  if (pathname === route) return ""
+  if (!pathname.startsWith(`${route}/`)) return null
+  return pathname.slice(route.length + 1)
+}
+
+/**
  * Exposes the prompt library.
  *
  * @param options.home — the hub home; the library is the `prompts/prompts.json` inside it.
@@ -49,18 +62,22 @@ export function createPromptHandler(options: { home?: string } = {}): HubMiddlew
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(PROMPT_ROUTE)) {
+    const rest = under(PROMPT_ROUTE, url.pathname)
+    if (rest === null) {
       next()
       return
     }
-    const rest = url.pathname.slice(PROMPT_ROUTE.length).replace(/^\//, "")
     const method = request.method ?? "GET"
-    /* `<id>`, then the part of the row the request is about. */
-    const [rawId = "", section = ""] = rest.split("/")
-    const id = decodeURIComponent(rawId)
+    /* `<id>`, then the part of the row the request is about. Nothing deeper is
+       a route here, so a third segment is refused rather than dropped. */
+    const [rawId = "", section = "", ...deeper] = rest.split("/")
 
     try {
       const store = await getStore()
+      /* Decoded here rather than before the try: a malformed escape is a bad
+         request, not a failure of this carrier. */
+      const id = decodeURIComponent(rawId)
+      if (deeper.length > 0) throw new Error(`unknown route ${url.pathname}`)
 
       /* GET /hub/prompts — the whole library, which is what a page draws. */
       if (rest === "" && method === "GET") {
