@@ -10,16 +10,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deepseek-ai/cordis": "^4.0.4",
-    "@modelcontextprotocol/sdk": "^1.32.1",
     "@context-hub/core": "workspace:*",
     "@context-hub/extensions": "workspace:*",
     "@context-hub/shadcn-ui": "workspace:*",
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "cn": "^0.4.0",
     "jsonc-parser": "^3.3.1",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8",
-    "smol-toml": "^1.9.1"
+    "smol-toml": "^1.9.1",
+    "use-immer": "^0.11.0"
   },
   "devDependencies": {
     "@eslint/js": "^10",

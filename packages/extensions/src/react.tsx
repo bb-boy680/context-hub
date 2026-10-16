@@ -3,9 +3,11 @@
  * a separate entry so the kernel itself carries no UI framework.
  */
 import * as React from "react"
+import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector"
 
 import type { Context } from "./cordis.ts"
 
+import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
 import type { ContributionMap, ExtensionPointId } from "./types.ts"
@@ -80,4 +82,31 @@ export function useI18n(): I18n {
     }),
     [ctx, state]
   )
+}
+
+/**
+ * One slice of a catalog, re-rendering when that slice changes and not when the
+ * rest of it does.
+ *
+ * A library of servers is drawn a row at a time, and every row is reading the
+ * same catalog: one probe's answer landing must not redraw all of them. So the
+ * caller says what it reads, and `isEqual` decides whether what it read is a new
+ * value — `Object.is` unless the selector builds a fresh object every time.
+ *
+ * @param catalog — the library to watch.
+ * @param select — the slice, read out of the whole snapshot.
+ * @param isEqual — whether two slices are the same; `Object.is` by default.
+ * @returns the selected slice, recomputed only when it changes.
+ */
+export function useCatalog<S, T>(
+  catalog: Catalog<S>,
+  select: (state: CatalogState<S>) => T,
+  isEqual?: (a: T, b: T) => boolean
+): T {
+  const subscribe = React.useCallback(
+    (onChange: () => void) => catalog.subscribe(onChange),
+    [catalog]
+  )
+  const snapshot = React.useCallback(() => catalog.state(), [catalog])
+  return useSyncExternalStoreWithSelector(subscribe, snapshot, undefined, select, isEqual)
 }
