@@ -8,10 +8,11 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
+    "types": ["node"],
     "paths": {
       "@context-hub/shadcn-ui/*": ["./src/*"]
     }
   },
-  "include": ["src"],
+  "include": ["src", "__test__"],
   "exclude": ["node_modules", "dist"]
 }

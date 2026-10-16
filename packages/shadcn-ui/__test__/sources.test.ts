@@ -5,21 +5,21 @@
  * This exists because losing that coverage is silent. Tailwind generates only
  * the classes it finds, so a package outside every glob produces no error, no
  * warning and no missing file — the page it belongs to simply renders without
- * its layout. That happened when packages moved a level deeper into groups,
- * and the only signal was a person noticing a broken screen.
+ * its layout. That happened when packages moved a level deeper into groups, and
+ * the only signal was a person noticing a broken screen.
  *
- * The check carries its own proof: it asserts that the glob set as it stood
- * before the move would be reported as insufficient, so a passing run means the
- * matcher can tell the two apart rather than agreeing with whatever it is
+ * The matcher is proved before it is used: a case below asserts that the glob set
+ * as it stood before the move is reported as insufficient, so a passing run means
+ * the matcher can tell the two apart rather than agreeing with whatever it is
  * given.
- *
- * Run from the package: `node scripts/check-sources.ts`
  */
 import { readFileSync, readdirSync, statSync } from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
+import { describe, expect, it } from "vitest"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
+/* Two levels up from `__test__`, which is where `scripts` sat: the repo root. */
 const repo = path.resolve(here, "../../..")
 const stylesheet = path.join(repo, "packages/shadcn-ui/src/styles/globals.css")
 
@@ -31,17 +31,6 @@ const stylesheet = path.join(repo, "packages/shadcn-ui/src/styles/globals.css")
  * marker to be replaced again before the expression is used.
  */
 const SENTINEL = "\uE000"
-
-let failures = 0
-
-function check(what: string, ok: boolean, detail?: unknown) {
-  if (ok) {
-    console.log(`  ok   ${what}`)
-    return
-  }
-  failures += 1
-  console.log(`  FAIL ${what}${detail === undefined ? "" : ` — ${JSON.stringify(detail)}`}`)
-}
 
 /** Every `@source "<glob>"` the stylesheet declares, in order. */
 function sourceGlobs(text: string): string[] {
@@ -82,32 +71,6 @@ function covered(globs: readonly string[], target: string): boolean {
   return globs.some((glob) => matches(glob, posix))
 }
 
-const text = readFileSync(stylesheet, "utf8")
-const globs = sourceGlobs(text)
-console.log(`stylesheet: ${path.relative(repo, stylesheet)}`)
-console.log(`globs: ${globs.join("  ")}\n`)
-
-/* Proof first: the matcher must tell a reached path from an unreached one, and
-   must agree with the glob set as it stood before packages were grouped. */
-const oneLevel = "../../../*/src/**/*.{ts,tsx}"
-const twoLevel = "../../../*/*/src/**/*.{ts,tsx}"
-check(
-  "a one-level glob reaches a package directly under packages/",
-  matches(oneLevel, "../../../core/src/page.tsx")
-)
-check(
-  "and does not reach one inside a group",
-  !matches(oneLevel, "../../../resources/skills/src/page.tsx")
-)
-check(
-  "a two-level glob reaches it",
-  matches(twoLevel, "../../../resources/skills/src/page.tsx")
-)
-check(
-  "the glob set as it stood before the move is reported as insufficient",
-  !covered([oneLevel, "../../../apps/*/src/**/*.{ts,tsx}"], "../../../resources/skills/src/page.tsx")
-)
-
 /** Every package directory, one level down inside a group or directly under packages/. */
 function packageDirs(): string[] {
   const packages = path.join(repo, "packages")
@@ -130,24 +93,55 @@ function packageDirs(): string[] {
   return found
 }
 
+const globs = sourceGlobs(readFileSync(stylesheet, "utf8"))
 const stylesDir = path.dirname(stylesheet)
-const uncovered: string[] = []
-for (const dir of packageDirs()) {
-  const source = path.join(dir, "src")
-  if (statSync(source, { throwIfNoEntry: false }) === undefined) continue
-  /* The package that owns the stylesheet needs no `@source`: Tailwind detects
-     sources from the CSS file outward, so only the rest has to be declared. */
-  if (stylesheet.startsWith(source + path.sep)) continue
-  /* One representative file: the globs are directory scopes, not file lists. */
-  const sample = path.join(path.relative(stylesDir, source), "index.ts")
-  if (!covered(globs, sample)) uncovered.push(path.relative(repo, source))
+
+/** Every `src` directory no glob reaches, relative to the repo. */
+function uncoveredSources(): string[] {
+  const uncovered: string[] = []
+  for (const dir of packageDirs()) {
+    const source = path.join(dir, "src")
+    if (statSync(source, { throwIfNoEntry: false }) === undefined) continue
+    /* The package that owns the stylesheet needs no `@source`: Tailwind detects
+       sources from the CSS file outward, so only the rest has to be declared. */
+    if (stylesheet.startsWith(source + path.sep)) continue
+    /* One representative file: the globs are directory scopes, not file lists. */
+    const sample = path.join(path.relative(stylesDir, source), "index.ts")
+    if (!covered(globs, sample)) uncovered.push(path.relative(repo, source))
+  }
+  return uncovered
 }
 
-check(
-  `every package's src is reached by a glob (${packageDirs().length} packages)`,
-  uncovered.length === 0,
-  uncovered
-)
+/* The glob set as it stood before packages were grouped, which is what the
+   matcher has to be able to call insufficient. */
+const ONE_LEVEL = "../../../*/src/**/*.{ts,tsx}"
+const TWO_LEVEL = "../../../*/*/src/**/*.{ts,tsx}"
 
-console.log(failures === 0 ? "\nall checks passed" : `\n${failures} check(s) failed`)
-process.exitCode = failures === 0 ? 0 : 1
+describe("the glob matcher", () => {
+  it("tells a one-level glob from a two-level one, and calls the old set insufficient", () => {
+    expect(
+      matches(ONE_LEVEL, "../../../core/src/page.tsx"),
+      "a one-level glob reaches a package directly under packages/"
+    ).toBe(true)
+    expect(
+      matches(ONE_LEVEL, "../../../resources/skills/src/page.tsx"),
+      "and does not reach one inside a group"
+    ).toBe(false)
+    expect(matches(TWO_LEVEL, "../../../resources/skills/src/page.tsx")).toBe(true)
+    expect(
+      covered(
+        [ONE_LEVEL, "../../../apps/*/src/**/*.{ts,tsx}"],
+        "../../../resources/skills/src/page.tsx"
+      ),
+      "the glob set as it stood before the move"
+    ).toBe(false)
+  })
+})
+
+describe("the stylesheet's coverage", () => {
+  it("reaches every package's src", () => {
+    const uncovered = uncoveredSources()
+    expect(uncovered, `no @source reaches ${uncovered.join(", ")}`).toEqual([])
+    expect(packageDirs().length, "packages walked").toBeGreaterThan(0)
+  })
+})
