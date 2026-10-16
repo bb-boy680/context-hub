@@ -92,37 +92,50 @@ handler 读 `searchParams.get("name")`，每次 400 而面板 `catch` 掉后渲�
 
 ## 阶段 A：桥的检查网（安全网，必须最先）
 
-**每个有桥的包一份 `__test__/bridge.test.ts`，共 6 份**：
+**状态：完成。** 六份 `__test__/bridge.test.ts` 全部落地，`pnpm test`
+**35 个文件 / 874 个用例**（15.3 秒 → 19.6 秒），typecheck 11/11、lint 11/11、build 通过。
 
-| 文件 | 覆盖 |
-|---|---|
-| `packages/resources/skills/__test__/bridge.test.ts` | `/hub/skills` 全部动作 + `/<id>` 身份读 |
-| `packages/resources/plugins/__test__/bridge.test.ts` | `/hub/plugins` 全部动作 |
-| `packages/resources/prompts/__test__/bridge.test.ts` | `/hub/prompts` 全部动作 |
-| `packages/resources/mcp/__test__/bridge.test.ts` | `/hub/mcp` 全部动作 |
-| `packages/core/__test__/bridge.test.ts` | `/hub/net` + 三条路径路由（`files`/`extensions`/`state`）当回归网 |
-| `apps/web/__test__/bridge.test.ts` | `/hub/place-files` 与 `/hub/workspaces`——这两条**唯一的两端就是** `apps/web/src/lib/place-files.ts` / `workspaces.ts` 与 core 的 handler，包内那份测不到 |
+| 文件 | 覆盖 | 提交 |
+|---|---|---|
+| `packages/resources/prompts/__test__/bridge.test.ts` | 7 条调用 | `c051262` |
+| `packages/resources/mcp/__test__/bridge.test.ts` | 探活 + 记录 + 缓存 + 探测 | `0a16867` |
+| `packages/resources/plugins/__test__/bridge.test.ts` | 12 条调用 + 安装器工具集 | `0927395` |
+| `packages/core/__test__/bridge.test.ts` | state / files / extensions / net | `f971da5` |
+| `apps/web/__test__/bridge.test.ts` | place-files / workspaces | `4b79c22` |
+| `packages/resources/skills/__test__/bridge.test.ts` | 22 条调用 | `b254d22` |
 
-放包内而不是集中一份，因为要检查的是**这个包自己的两端**（handler 与它自己的客户端）。
-模块之间的编排（挂载顺序）由 `packages/core/__test__/server.test.ts` 那一层覆盖。
+**自证（五份各做一次，都变红并指名了原因）**：prompts 的 `?ref=` 改 `?reference=`；
+mcp 的 `records` 改 `entries`；plugins 的 `path` 改 `directory`；core 的 `asked.url`
+改 `asked.target`；web 的 `/rename` 改 `/renamed`；skills 的 `path` 改 `file`。
 
-做法：真 `createHubServer`（`packages/core/src/host/server.ts`，`port: 0`）挂
-`createXHandler({ home, folder })`，`home` 是 `mkdtemp` 出来的临时 hub home；
-然后用**这个包自己的客户端**打每一条 action——`createRemoteSkillStore(listener.url)`、
-`createRemotePromptStore(listener.url + PROMPT_ROUTE)`。mcp / plugins 的客户端今天没有
-`base` 参数，各加一个（三个工厂，一行一个），理由与 skills 那条现成的 `base = ""` 相同：
-不同源也要能驱动同一份客户端。
+### 这张网第一次跑就抓到的四件事（都是既存缺陷，都已修）
 
-断言表是文件顶部一个字面量：`{ action, params, expectKeys }`，每条三条断言：
+1. **`startsWith` 派发在九条路由上都漏**：`/hub/skillsXYZ` 被读成 id=`XYZ`、
+   `/hub/stateX` 被读成文档名 `X`、`/hub/workspacesX` 被读成工作区 `X`，
+   而 **plugins 那条更重：`/hub/pluginsX` 直接答 200 整个库**（action 在 query 里，
+   游荡路径读成了默认动作）。九处守卫统一换成 `under()`（要求分隔符），
+   解码移进 `try`（畸形百分号从载体的 500 变成 400）。实测九条都落到 404。
 
-- 不是 404 / 405 —— 路由挂上了；
-- 不是 `400 missing …` / 未知 action —— **两端参数名一致**（漂移的名字正好落在这里）；
-- 响应是 JSON 且含 `expectKeys`。
+2. **`check-update` 对本地收来的包是正当拒绝**（"this source cannot be asked about"）——
+   它没有可问的来源。检查里如实断言成"拒绝"，而不是当成失败。
 
-**自证**（`docs/memory.md:65`："扫描 / 审查类脚本必须先自证"）：先把某条的参数名故意改错，
-确认变红，再改回。否则"全绿"和"这个检查根本不会失败"长得一样。
+3. **place 的 `dir` 是相对 scope 根的目录，不是绝对路径**（`host/place-skills.ts`）。
+   这条对**测试安全**是硬的：工作区 place 会解析进宿主自己的文件夹，
+   把宿主留在默认值（进程 cwd → 仓库根）就会**往被测的仓库里写链接**。
+   skills 的夹具因此显式 `folder` 指向临时目录。
 
-**验收**：`pnpm test` 全绿（含新的 6 个文件），**且种入错误参数名时确实变红**。
+4. **客户端的 `base` 参数现在六个客户端一致**：新增 `createRemoteProbe` /
+   `createRemoteRecords` / `createRemotePluginTools` / `createRemotePlaceFiles` /
+   `createRemoteWorkspaceService` 的 `base = ""`（`createRemoteSkillStore` 与
+   `createRemotePromptStore` 本来就有）。理由与那条现成的一样：不同源也要能驱动同一份客户端。
+
+### 顺带的结构改动
+
+- `apps/web` 的测试拿到**自己的 tsconfig 程序**（`tsconfig.test.json`，
+  `types: ["node", "vite/client"]`），`tsconfig.app.json` 的 `include` 缩回 `["src"]`。
+  测试要同时够到应用的浏览器代码与 hub 的 Node 侧模块，而应用那份程序是**故意只给浏览器**的
+  ——为了让它编译过去而加 `types: ["node"]`，等于让 `process` / `Buffer` 在 Vite 不 polyfill
+  的浏览器源码里通过类型检查。
 
 ---
 
@@ -537,7 +550,7 @@ return kernel                              // .then 立刻渲染，加载在后�
 | 步子 | 内容 | 完成判据 | 状态 |
 |---|---|---|---|
 | P0 | plugins 的 project 补进根 vitest 配置 | `pnpm test` 收满 | ✅ `2e66267` |
-| A | 6 份 `bridge.test.ts`；mcp / plugins 客户端加 `base` | 全绿；种错参数名变红 | |
+| A | 6 份 `bridge.test.ts`；五个客户端加 `base` | 全绿；种错参数名变红 | ✅ `c051262`…`b254d22` |
 | B | 逐模块统一（prompts → mcp → plugins → skills → core） | 该模块 `bridge.test.ts` 绿 + curl 读写各一条 | |
 | C-一 | `extensions/src/catalog.ts` + `useCatalog` + 三个依赖 + `catalog.test.ts` | 该包 typecheck / lint / 测试绿 | |
 | C-二 | Prompts（最简，先做） | 进页面不产生第二个请求 | |
@@ -554,15 +567,20 @@ return kernel                              // .then 立刻渲染，加载在后�
 
 ```bash
 pnpm install                      # 必须 dangerouslyDisableSandbox: true
-pnpm test                         # 全部 project 全绿，含新增的 7 个文件
+pnpm test                         # 全部 project 全绿
 pnpm typecheck && pnpm lint       # 11/11 + 11/11
 pnpm build
 ```
 
-端到端（阶段 A 与阶段 C 各一次）：
-起隔离 hub home（`CONTEXT_HUB_HOME=<temp>`，**必须绕过 turbo**——turbo 2 默认
-`envMode: "strict"` 会过滤掉未声明的环境变量），浏览器里核对：预加载发出的请求数、
-进页面不产生第二个请求、切 workspace 后重读。
-按 `AGENTS.md`，浏览器自动化一律走 `browser-automation` skill 的 `--bridge` 模式。
+**跨载体的冒烟**（改了派发就要做，不必开浏览器）：
+`node apps/web/server.ts --port 0 --home <tmp> --folder <tmp>`，然后 curl 打十一个路由
+（state / extensions / workspaces / skills / prompts / mcp / plugins / place-files / net 与
+九条游荡路径）。`--port 0` 是关键：**永远不要占一个固定的开发端口**，
+收尾只按自己拿到的那个 URL 对应的 PID 杀。
+
+端到端（阶段 C 需要，浏览器）：起隔离 hub home
+（`CONTEXT_HUB_HOME=<temp>`，**必须绕过 turbo**——turbo 2 默认 `envMode: "strict"`
+会过滤掉未声明的环境变量），核对预加载发出的请求数、进页面不产生第二个请求、
+切 workspace 后重读。按 `AGENTS.md`，浏览器自动化走 `browser-automation` skill 的 `--bridge` 模式。
 
 收尾：树静下来之后跑一次 `aoci_maintain`（先查有没有别人的文件在动，见风险 7）。
