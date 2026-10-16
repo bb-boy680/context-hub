@@ -6,6 +6,7 @@
   "scripts": {
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -14,7 +15,8 @@
     "eslint": "^10",
     "globals": "^17",
     "typescript": "~6",
-    "typescript-eslint": "^8"
+    "typescript-eslint": "^8",
+    "vitest": "^5.0.5"
   },
   "exports": {
     ".": "./src/assets.ts",
