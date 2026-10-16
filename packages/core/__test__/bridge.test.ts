@@ -31,7 +31,7 @@ import {
 } from "../handlers.ts"
 import { ASSET_ROUTE } from "../src/assets.ts"
 import { EXTENSION_ROUTE } from "../src/plugins.ts"
-import { NET_ROUTE } from "../src/net.ts"
+import { NET_ROUTE, createRemoteNet } from "../src/net.ts"
 import { STATE_ROUTE } from "../src/state.ts"
 
 const PACK_ID = "check.plugin"
@@ -129,24 +129,27 @@ describe("the installed extensions", () => {
 
 describe("the network proxy", () => {
   it("reads the url it was sent, and refuses this one", async () => {
-    const response = await fetch(at(NET_ROUTE), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      /* `https` so the refusal is the host policy rather than the scheme check. */
-      body: JSON.stringify({ url: "https://127.0.0.1/", headers: {} }),
-    })
-    expect(response.status).toBe(400)
-    const body = (await response.json()) as { error?: string }
-    /* The refusal names the host, which is the proof that `url` arrived under
-       the name the route reads. A field that drifted would have been refused
-       for needing a url instead. */
-    expect(body.error).toContain("127.0.0.1")
+    /* Through the client the hub's own extensions use, so the body it builds is
+       what is under test rather than one written out here. `https` so the
+       refusal is the host policy rather than the scheme check. */
+    await expect(createRemoteNet(base).request("https://127.0.0.1/")).rejects.toThrow(/127\.0\.0\.1/)
   })
 
   it("refuses a body that is not JSON", async () => {
+    /* No client can send this one, so it is written out. */
     const response = await fetch(at(NET_ROUTE), { method: "POST", body: "not json" })
     expect(response.status).toBe(400)
     expect(((await response.json()) as { error?: string }).error).toContain("not JSON")
+  })
+
+  it("refuses an action it does not have", async () => {
+    const response = await fetch(at(NET_ROUTE), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "post", url: "https://example.invalid/" }),
+    })
+    expect(response.status).toBe(400)
+    expect(((await response.json()) as { error?: string }).error).toContain("unknown action")
   })
 })
 

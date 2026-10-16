@@ -27,6 +27,7 @@ import { resolveHubHome } from "./src/host/home.ts"
 import {
   contentTypeOf,
   readBody,
+  sendError,
   sendJson,
   type HubMiddleware,
 } from "./src/host/http.ts"
@@ -51,6 +52,12 @@ function under(route: string, pathname: string): string | null {
   return pathname.slice(route.length + 1)
 }
 
+/** A field a body carries, refused when it is missing or not a string. */
+function required(value: unknown, said: string): string {
+  if (typeof value !== "string" || value === "") throw new Error(said)
+  return value
+}
+
 /** Serve one file, honouring `Range` so media players can seek. */
 async function sendFile(
   home: string,
@@ -61,7 +68,7 @@ async function sendFile(
   const target = resolveStoredFile(home, relative)
   const stat = await fs.stat(target).catch(() => null)
   if (stat === null || !stat.isFile()) {
-    response.writeHead(404).end()
+    sendError(response, new Error("no such file"), 404)
     return
   }
   const type = contentTypeOf(target)
@@ -102,7 +109,7 @@ export function createAssetHandler(options: { home?: string } = {}): HubMiddlewa
       return
     }
     if ((request.method ?? "GET") !== "GET") {
-      response.writeHead(405).end()
+      sendError(response, new Error(`unsupported method ${request.method ?? "GET"}`), 405)
       return
     }
     const relative = decodeURIComponent(
@@ -111,7 +118,7 @@ export function createAssetHandler(options: { home?: string } = {}): HubMiddlewa
     try {
       await sendFile(home, relative, request.headers.range, response)
     } catch {
-      response.writeHead(404).end()
+      sendError(response, new Error("no such file"), 404)
     }
   }
 }
@@ -160,10 +167,9 @@ export function createStateHandler(
         sendJson(response, 200, { ok: true })
         return
       }
-      response.writeHead(405).end()
+      sendError(response, new Error(`unsupported method ${method}`), 405)
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      sendJson(response, 400, { error: message })
+      sendError(response, error)
     }
   }
 }
@@ -189,7 +195,7 @@ export function createPlaceFileHandler(options: { home?: string; folder?: string
       return
     }
     if ((request.method ?? "GET") !== "POST") {
-      response.writeHead(405).end()
+      sendError(response, new Error(`unsupported method ${request.method ?? "GET"}`), 405)
       return
     }
     try {
@@ -232,7 +238,7 @@ async function sendExtensionFile(
   const target = resolveStoredFile(root, `${id}/${file}`)
   const stat = await fs.stat(target).catch(() => null)
   if (stat === null || !stat.isFile()) {
-    response.writeHead(404).end()
+    sendError(response, new Error("no such file"), 404)
     return
   }
   response.writeHead(200, {
@@ -259,7 +265,7 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
       return
     }
     if ((request.method ?? "GET") !== "GET") {
-      response.writeHead(405).end()
+      sendError(response, new Error(`unsupported method ${request.method ?? "GET"}`), 405)
       return
     }
     try {
@@ -275,7 +281,7 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
       }
       await sendExtensionFile(store.root, id, rest.slice(slash + 1), response)
     } catch {
-      response.writeHead(404).end()
+      sendError(response, new Error("no such file"), 404)
     }
   }
 }
@@ -299,21 +305,25 @@ export function createNetHandler(): HubMiddleware {
       return
     }
     if ((request.method ?? "GET") !== "POST") {
-      response.writeHead(405).end()
-      return
-    }
-    let asked: NetRequest
-    try {
-      asked = JSON.parse((await readBody(request)).toString("utf8")) as NetRequest
-    } catch {
-      sendJson(response, 400, { error: "net: the request body is not JSON" })
+      sendError(response, new Error(`unsupported method ${request.method ?? "GET"}`), 405)
       return
     }
     try {
+      let asked: NetRequest
+      try {
+        asked = JSON.parse((await readBody(request)).toString("utf8")) as NetRequest
+      } catch {
+        /* The parser's own message names a character offset, which says nothing
+           to whoever sent the body. */
+        throw new Error("net: the request body is not JSON")
+      }
+      /* The one action this route has, named like every other call in the hub. */
+      if ((asked as { action?: unknown }).action !== "fetch") {
+        throw new Error(`net: unknown action: ${String((asked as { action?: unknown }).action)}`)
+      }
       sendJson(response, 200, await fetchThroughProxy(asked))
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      sendJson(response, 400, { error: message })
+      sendError(response, error)
     }
   }
 }
@@ -397,83 +407,62 @@ export function createWorkspaceHandler(options: { home?: string; folder?: string
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    const action = under(WORKSPACE_ROUTE, url.pathname)
-    if (action === null) {
+    /* One route, and the call names its own action in the body. */
+    if (under(WORKSPACE_ROUTE, url.pathname) !== "") {
       next()
       return
     }
     const method = request.method ?? "GET"
     try {
       const store = await getStore()
-      if (action === "" && method === "GET") {
+
+      if (method === "GET") {
         sendJson(response, 200, await store.page())
         return
       }
-      if (action === "add" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as { path?: unknown }
-        if (typeof body.path !== "string" || body.path === "") {
-          sendJson(response, 400, { error: "add needs the folder's path" })
-          return
-        }
-        sendJson(response, 200, await store.add(body.path))
+      if (method !== "POST") {
+        sendError(response, new Error(`unsupported method ${method}`), 405)
         return
       }
-      if (action === "select" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as { id?: unknown }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendJson(response, 400, { error: "select needs a workspace id" })
+
+      const body = JSON.parse((await readBody(request)).toString("utf8")) as Record<string, unknown>
+
+      switch (body.action) {
+        case "add": {
+          const path = required(body.path, "add needs the folder's path")
+          sendJson(response, 200, await store.add(path))
           return
         }
-        sendJson(response, 200, await store.select(body.id))
-        return
+
+        case "select":
+          sendJson(response, 200, await store.select(required(body.id, "select needs a workspace id")))
+          return
+
+        /* Both halves are required: an agent is chosen or given up, and a call
+           naming only one of them would have to guess the other. */
+        case "agent": {
+          const id = required(body.id, "agent needs an id")
+          if (typeof body.on !== "boolean") throw new Error("agent needs whether it is chosen")
+          sendJson(response, 200, await store.setAgent(id, body.on))
+          return
+        }
+
+        case "rename": {
+          const id = required(body.id, "rename needs a workspace id")
+          const name = required(body.name, "rename needs the name to give it")
+          sendJson(response, 200, await store.rename(id, name))
+          return
+        }
+
+        case "remove":
+          sendJson(response, 200, await store.remove(required(body.id, "remove needs a workspace id")))
+          return
+
+        default:
+          throw new Error(`unknown action: ${String(body.action)}`)
       }
-      if (action === "agent" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          id?: unknown
-          on?: unknown
-        }
-        /* Both halves are required: an agent is chosen or given up, and a
-           call naming only one of them would have to guess the other. */
-        if (typeof body.id !== "string" || body.id === "") {
-          sendJson(response, 400, { error: "agent needs an id" })
-          return
-        }
-        if (typeof body.on !== "boolean") {
-          sendJson(response, 400, { error: "agent needs whether it is chosen" })
-          return
-        }
-        sendJson(response, 200, await store.setAgent(body.id, body.on))
-        return
-      }
-      if (action === "rename" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as {
-          id?: unknown
-          name?: unknown
-        }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendJson(response, 400, { error: "rename needs a workspace id" })
-          return
-        }
-        if (typeof body.name !== "string") {
-          sendJson(response, 400, { error: "rename needs the name to give it" })
-          return
-        }
-        sendJson(response, 200, await store.rename(body.id, body.name))
-        return
-      }
-      if (action === "remove" && method === "POST") {
-        const body = JSON.parse((await readBody(request)).toString("utf8")) as { id?: unknown }
-        if (typeof body.id !== "string" || body.id === "") {
-          sendJson(response, 400, { error: "remove needs a workspace id" })
-          return
-        }
-        sendJson(response, 200, await store.remove(body.id))
-        return
-      }
-      response.writeHead(405).end()
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      sendJson(response, 400, { error: message })
+      sendError(response, error)
     }
   }
 }

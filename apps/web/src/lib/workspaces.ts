@@ -82,7 +82,7 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
 
     async select(id) {
       try {
-        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/select`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "select", id }))
       } catch (error) {
         return refuse(error)
       }
@@ -90,7 +90,7 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
 
     async add(path) {
       try {
-        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/add`, "POST", { path }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "add", path }))
       } catch (error) {
         return refuse(error)
       }
@@ -99,7 +99,7 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
     async setAgent(id, on) {
       try {
         return settle(
-          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/agent`, "POST", { id, on })
+          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "agent", id, on })
         )
       } catch (error) {
         return refuse(error)
@@ -109,7 +109,7 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
     async rename(id, name) {
       try {
         return settle(
-          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/rename`, "POST", { id, name })
+          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "rename", id, name })
         )
       } catch (error) {
         return refuse(error)
@@ -118,7 +118,7 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
 
     async remove(id) {
       try {
-        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}/remove`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "remove", id }))
       } catch (error) {
         return refuse(error)
       }
