@@ -13,16 +13,17 @@ pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不
 pnpm-workspace.yaml[FV7T]: F:工作区与构建白名单 | R:- | A:- | S:packages 列出 apps/*、packages/* 与 packages/agents-extensions/*（agent 扩展多一层）；allowBuilds 是安装脚本白名单，msw 为 false 表示不跑它的构建脚本
 tsconfig.json[FV5T]: F:仓库级编译基线 | R:- | A:- | S:只给 target/module/strict 等公共项，各包自己的 tsconfig 在此基础上加 include 与 jsx
 turbo.json[FV7T]: F:任务图与缓存 | R:- | A:- | S:dev 不缓存且 persistent；build 依赖 ^build 且输出 dist/**；lint/format/typecheck 都先跑依赖包的同名任务
+prompts.json[SD7T]: F:提示词库形状的手写样例 | R:code:packages/plugin-prompts/src/store.ts | A:- | S:这是形状样例，运行时读的是 <hub-home>/prompts.json；两者只共享字段形状，改这份不会影响页面
 
 ===D:/work-space/dsh-context-hub/apps/web/===
 components.json[FU5T]: F:shadcn 生成配置 | R:code:packages/ui/src/styles/globals.css | A:- | S:aliases.utils 与 aliases.ui 必须指向 @workspace/ui，否则生成的组件会把 utils 重复内联进应用
 eslint.config.js[FQ3T]: F:web 应用 lint 规则 | R:- | A:- | S:忽略必须用 globalIgnores 而非 ignorePatterns
 index.html[EU5T]: F:页面宿主骨架 | R:code:apps/web/src/main.tsx | A:- | S:挂载点是 #root；标题仍是模板名 vite-monorepo，尚未改成产品名
-package.json[FV7T]: F:web 应用依赖与脚本 | R:- | A:- | S:build 先跑 tsc -b 再 vite build；所有 @workspace/* 用 workspace:* 协议，新增 agent 集成包必须在此登记才能被 web 引用
+package.json[FV7T]: F:web 应用依赖与脚本 | R:- | A:- | S:build 先跑 tsc -b 再 vite build；所有 @workspace/* 用 workspace:* 协议，新增模块（含 plugin-prompts）必须在此登记才能被 web 引用
 tsconfig.app.json[FV7T]: F:应用编译选项 | R:- | A:- | S:paths 必须同时映射 @/* 与 @workspace/ui/*，并与 vite alias 和 tsconfig.json 三处保持一致
 tsconfig.json[FV5T]: F:引用式工程根 | R:code:apps/web/tsconfig.app.json,code:apps/web/tsconfig.node.json | A:- | S:files 为空靠 references 组合；paths 需与子配置重复声明，三处必须同步
 tsconfig.node.json[FV3T]: F:构建脚本编译选项 | R:- | A:- | S:只包含 vite.config.ts；types 为 node 而非 vite/client
-vite.config.ts[FV9T]: F:开发与构建装配 | R:- | A:- | S:每个模块的 vite 插件就是它的宿主侧实现（资产库、状态、工作区、网络代理、技能库、place files、MCP 探测、插件库），新增模块必须在此挂上插件
+vite.config.ts[FV9T]: F:开发与构建装配 | R:- | A:- | S:每个模块的 vite 插件就是它的宿主侧实现（资产库、状态、工作区、网络代理、技能库、提示词库、place files、MCP 探测、插件库），新增模块必须在此挂上插件
 
 ===D:/work-space/dsh-context-hub/apps/web/src/===
 App.tsx[AU8T]: F:路由表与外壳装配 | R:code:apps/web/src/components/app-layout.tsx,code:apps/web/src/lib/navigation.ts | A:App | S:未设计路径落到 PlaceholderPage；designedPaths 与贡献路由必须先并入 designed，否则占位页会盖掉扩展页
@@ -42,7 +43,7 @@ workspace-group.tsx[DU8M]: F:侧栏工作区列表与增删改 | R:code:apps/web
 ===D:/work-space/dsh-context-hub/apps/web/src/lib/===
 extensions.ts[CU5T]: F:扩展展示辅助表 | R:- | A:categoryOrder,categoryTile | S:categoryOrder 决定页面分区顺序且空分类会被跳过；categoryTile 借用 skill 标签配色，以保持同一套视觉
 folder-picker.ts[IU5T]: F:浏览器目录选择封装 | R:- | A:pickFolder | S:只在用户手势中可调用；页面只能拿到目录名拿不到路径，host 侧按名字自行定位；无此能力的浏览器返回 unsupported
-hub.ts[AE9M]: F:web 形态内核装配 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts | A:startHub | S:无 host 时 files 为 null 且不注册 hub.skills；旧浏览器 state 写入 host 后即删除本地副本
+hub.ts[AE9M]: F:web 形态内核装配 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts | A:startHub | S:无 host 时 files 为 null 且不注册 hub.skills/hub.prompts；两个库各探自己的路由，一个不可用不影响另一个
 navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:- | A:navGroups,useNavGroups,useNavItem | S:内置项 order 留 10/20/30 间隔供扩展插值；useNavItem 取最长匹配路径，嵌套页才不丢标题
 place-files.ts[ID7T]: F:客户端配置文件远端读写 | R:- | A:placeFilesAvailable,createRemotePlaceFiles | S:无 host 时每个调用都抛错，调用方要如实报失败而不是凭空造出一个文件
 ui-kit.ts[CE7T]: F:插件可用的 UI 组件集 | R:- | A:Badge,Button,Card,CardContent,Input,Spinner | S:插件模块不能解析包且必须复用同一 React 实例，UI 只能从此处取；新增组件要在此显式导出
@@ -262,11 +263,11 @@ check-messages.ts[TL7T]: F:中文包键覆盖检查 | R:code:packages/locale-zh-
 
 ===D:/work-space/dsh-context-hub/packages/locale-zh-cn/src/===
 index.ts[CL7T]: F:简体中文语言包声明 | R:code:packages/locale-zh-cn/src/messages.ts | A:simplifiedChineseLocale,zhCNMessages | S:kind 为 declarative（内核不为它跑代码）、defaultEnabled 为 false；id 用 hub.locale.zh-CN
-messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键与 extensions 的英文基础表一一对应，缺键回退英文；各插件的 mcp.*/plugins.*/skills.* 键都收在这一个文件里；新增英文键必须同步这里，否则 check-messages 报缺
+messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键与 extensions 的英文基础表一一对应，缺键回退英文；各插件的 mcp.*/plugins.*/skills.*/prompts.* 键都收在这一个文件里；新增英文键必须同步这里，否则 check-messages 报缺
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/===
 eslint.config.js[FQ3T]: F:Claude Code 包 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh
-package.json[FV5T]: F:Claude Code 集成包清单 | R:- | A:- | S:exports 的 . 指向 src/index.ts；依赖 plugin-mcp、plugin-plugins、plugin-skills
+package.json[FV5T]: F:Claude Code 集成包清单 | R:- | A:- | S:exports 的 . 指向 src/index.ts；依赖 plugin-mcp、plugin-plugins、plugin-prompts、plugin-skills；prompts 那条只用于类型导入，但类型导入也要连上才能编译
 tsconfig.json[FV3T]: F:Claude Code 包编译选项 | R:- | A:- | S:与 cline 包同构，目标 ES2022、jsx react-jsx
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/scripts/===
@@ -274,9 +275,9 @@ check-installer.ts[TQ7L]: F:Claude Code 插件列表解析检查 | R:code:packag
 check-provider.ts[TQ8M]: F:Claude Code MCP 提供者检查 | R:code:packages/plugin-claude-code/src/provider.ts | A:- | S:夹具带注释、不同拼法的项目键与无关项目，用以证明每次写入只动一个节点；断言 machineScope 与 noProject 两种拒绝，以及卸载后两个文件回到逐字节原样
 
 ===D:/work-space/dsh-context-hub/packages/plugin-claude-code/src/===
-index.ts[IE9S]: F:Claude Code 集成注册 | R:code:packages/plugin-claude-code/src/installer.ts,code:packages/plugin-claude-code/src/locations.ts,code:packages/plugin-claude-code/src/provider.ts | A:claudeCodeExtension,createClaudeCodeMcp,claudeCodeInstaller | S:三个 inject（mcp/plugins/skills）各自独立，任一模块禁用其余仍可用；注册两个 skills place（项目 .claude/skills 与全局 ~/.claude/skills）
+index.ts[IE9S]: F:Claude Code 集成注册 | R:code:packages/plugin-claude-code/src/installer.ts,code:packages/plugin-claude-code/src/locations.ts,code:packages/plugin-claude-code/src/provider.ts | A:claudeCodeExtension,createClaudeCodeMcp,claudeCodeInstaller | S:四个 inject（mcp/plugins/skills/prompts）各自独立，任一模块禁用其余仍可用；工作区与全局各注册一个 skills place 与一个提示词 place
 installer.ts[IE8M]: F:Claude Code 插件交付 | R:code:packages/plugin-claude-code/src/locations.ts | A:claudeCodeInstaller,readHeld | S:先 marketplace add 注册库根再 claude plugin install --scope；不写 installed_plugins.json 与缓存；readHeld 取 readFromFolder 优先于 installPath，并把 projectPath 与在用文件夹不符的记录整条剔除（客户端列的是它记得的所有仓库，不是这一处的）；remove 收客户端自己报的 id（带它自己的市场名），不再拼本 hub 的市场名
-locations.ts[CE7T]: F:Claude Code 路径与键名事实 | R:- | A:CLAUDE_CODE_SKILL_DIR,CLAUDE_CODE_MCP_FILE,CLAUDE_CODE_GLOBAL_MCP_FILE,CLAUDE_CODE_DISABLED_KEY,SUPPORTS,normalizeProjectPath | S:项目技能目录是 .claude/skills；.mcp.json 属项目、.claude.json 是全局文档；插件开关记在 settings.json 的 enabledPlugins；服务器停用按项目路径记在全局文档；文件夹比对用 normalizeProjectPath
+locations.ts[CE7T]: F:Claude Code 路径与键名事实 | R:- | A:CLAUDE_CODE_SKILL_DIR,CLAUDE_CODE_MCP_FILE,CLAUDE_CODE_GLOBAL_MCP_FILE,CLAUDE_CODE_DISABLED_KEY,CLAUDE_CODE_COMMAND_DIR,CLAUDE_CODE_RULE_DIR | S:项目技能目录是 .claude/skills；提示词目录 .claude/commands 与规则目录 .claude/rules 是机器可读的落点，全局指令文件是 .claude/CLAUDE.md（项目侧 CLAUDE.md 是共享文件，不由交付动作写）
 messages.ts[CL3T]: F:Claude Code 英文文案 | R:- | A:claudeCodeMessages | S:命名空间 claudeCode.*，含 machineScope 与 noProject 两条拒绝
 provider.ts[IN9M]: F:Claude Code MCP 文件读写 | R:code:packages/plugin-claude-code/src/locations.ts | A:createClaudeCodeMcp | S:两个 place（.mcp.json 项目、.claude.json 全局）都是 JSONC，逐节点改写不得重排既有内容；停用列表属项目而非文件，故只有 workspace place 可开关、全局 place 的 switchable 为 false；项目键经 normalizeProjectPath 归一匹配，客户端没记录过该目录时拒绝写入而不新建记录
 
@@ -511,3 +512,34 @@ highlight.ts[CU5T]: F:共享语法高亮器 | R:- | A:paint,loadHighlighter,THEM
 ===D:/work-space/dsh-context-hub/packages/ui/src/styles/===
 globals.css[CU9M]: F:全局样式入口 | R:code:packages/ui/src/styles/theme.css | A:- | S:@source 指到本包之外（apps/*/src 与 */src），故 Tailwind 会扫包外源码；静态设计尺度在 @theme 里定义；主题变量在 theme.css；file-code 带行号与固定 11.5px，文档里的代码块两样都不该有，故另立 doc-code，只读 --shiki-light/dark
 theme.css[CU9M]: F:主题颜色 token | R:- | A:- | S:颜色 token 都是 var() 引用，故 <html> 上一个 class 就能整体换主题；dark 变体经 @custom-variant dark (&:is(.dark *)) 定义；与 globals.css 里的 :root/.dark 定义成对
+
+===D:/work-space/dsh-context-hub/packages/plugin-prompts/===
+eslint.config.js[FQ3T]: F:提示词模块 lint 规则 | R:- | A:- | S:与其他插件包同源且不含 react-refresh；改规则时要同步全部插件包
+package.json[FV8T]: F:提示词模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./host、./vite；依赖里不含 plugin-skills——PromptPlace 在本包自己声明，少一条跨包边
+tsconfig.json[FV3T]: F:提示词模块编译选项 | R:- | A:- | S:include 必须同时含 src 与 vite.ts，否则开发桥整份不进类型检查
+vite.ts[IV8S]: F:提示词库开发期桥接 | R:code:packages/plugin-prompts/src/host/prompts-fs.ts,code:packages/plugin-prompts/src/store.ts | A:promptLibrary | S:只管库的读写；投递到 Agent 目录走 place-files 桥，两个根由它一处裁决
+
+===D:/work-space/dsh-context-hub/packages/plugin-prompts/scripts/===
+check-prompt-store.ts[TQ7S]: F:提示词库行为检查 | R:code:packages/plugin-prompts/src/host/prompts-fs.ts | A:- | S:跑在临时 hub home 上；钉住的是拒绘而不是恢复——库只有一个文件，旁边没有可重建的东西，所以解析失败必须原样留着、不能覆写
+check-prompt-text.ts[TQ7M]: F:文件名、命令文件与分节的行为检查 | R:code:packages/plugin-prompts/src/slug.ts,code:packages/plugin-prompts/src/command-file.ts,code:packages/plugin-prompts/src/instruction.ts | A:- | S:危险名字与近似合法名字成对断言，因为下游校验按 / 切分、拦不住反斜杠与盘符
+
+===D:/work-space/dsh-context-hub/packages/plugin-prompts/src/===
+add-prompt-dialog.tsx[DU6S]: F:添加提示词弹窗 | R:code:packages/plugin-prompts/src/store.ts | A:AddPromptDialog | S:描述与提示词都是必填，先缺哪个报哪个并留在对话框里；提交失败也开着，草稿不因一次失败被丢掉
+command-file.ts[DG7T]: F:提示词落成文件时的文本 | R:code:packages/plugin-prompts/src/slug.ts | A:commandFile,describeBody | S:frontmatter 的 description 含冒号、井号或前导符号时必须加引号，否则 agent 读到的是坏 YAML
+contract.ts[CE5T]: F:给 agent 扩展的提示词契约面 | R:code:packages/plugin-prompts/src/provider.ts | A:- | S:不带渲染，故检查可在纯 Node 下跑；agent 包必须 import 它一次，否则 ExtensionServices 的合并不进编译程序
+deliver.ts[DG8S]: F:四种交付动作 | R:code:packages/plugin-prompts/src/command-file.ts,code:packages/plugin-prompts/src/instruction.ts,code:packages/plugin-prompts/src/slug.ts,code:packages/plugin-prompts/src/provider.ts | A:Delivery,targetOf,delivered,deliver,undeliver | S:安装与生成 Commands 写同一个文件，差别只在 frontmatter；文件名由 description 现算，所以改描述就是换一个投递地址
+index.ts[EE8T]: F:提示词模块定义与导出 | R:code:packages/plugin-prompts/src/provider.ts,code:packages/plugin-prompts/src/service.ts | A:promptsExtension,PromptsPage | S:不注册自己的 place——提示词没有每个 agent 共享的目录，只存在于它被投递的地方
+install-menu.tsx[DU8M]: F:交付菜单与每行的二级菜单 | R:code:packages/plugin-prompts/src/provider.ts,code:packages/plugin-prompts/src/deliver.ts | A:PromptActions,BatchActions | S:PlaceMenu 传了自定义 trailing 就不再画勾，勾要自己补；⋯ 压在行上必须 stopPropagation，否则连带触发安装
+instruction.ts[DG7T]: F:往指令文件里加一节 | R:- | A:withSection | S:幂等靠自带的两行注释标记——同名分节替换而不是再追加一份；文件换行与其余字节逐字保留
+library.ts[AG8S]: F:提示词页面的数据钩子 | R:code:packages/plugin-prompts/src/store.ts,code:packages/plugin-prompts/src/deliver.ts,code:packages/plugin-prompts/src/provider.ts | A:usePromptLibrary,usePromptPlaces,usePlaceFiles,useInstalled,formatAge,tokenLabel | S:位置列表跟随扩展快照的 revision，agent 启停要能当场长出来；已投递状态每次从文件重读，不另记一份
+messages.ts[CL5T]: F:提示词模块英文文案 | R:- | A:promptsMessages | S:命名空间 prompts.* 随包一起走；无包覆盖的键保留这里的英文，新增键必须同步 zh-CN 否则 check-messages 报缺
+page.tsx[AU8L]: F:提示词页 | R:code:packages/plugin-prompts/src/library.ts,code:packages/plugin-prompts/src/install-menu.tsx,code:packages/plugin-prompts/src/add-prompt-dialog.tsx,code:packages/plugin-prompts/src/prompt-detail-dialog.tsx | A:PromptsPage | S:只有一个页签——提示词没有可筛的作用域或来源；卡片照 skills 版式：封面恒 16:9 且从正文第一行开始，description 用同一个 line-clamp-2 + text-copy 段落
+prompt-detail-dialog.tsx[DU6S]: F:提示词详情弹窗 | R:code:packages/plugin-prompts/src/install-menu.tsx,code:packages/plugin-prompts/src/library.ts | A:PromptDetailDialog | S:不持有副本，读的就是打开它的那一行；删除只清库里的记录，已投递出去的副本保持原样
+provider.ts[CE9S]: F:提示词交付目标契约 | R:- | A:PROMPT_SERVICE,PromptPlace,PromptProvider,PromptProviderRegistry,PromptService,promptPlaces | S:commandDir/ruleDir/instructionFile 是机器可读的落点，与给人看的 target.locations 不是一回事；没声明 instructionFile 的行就不出那一项
+remote-store.ts[IG7T]: F:提示词库的远端实现 | R:code:packages/plugin-prompts/src/store.ts | A:createRemotePromptStore | S:方法名与接口一一对应，换成桌面形态只换这一处；行名进路径前先编码，避免名字里的字符被当成路由
+service.ts[CE5T]: F:提示词目标注册表服务 | R:code:packages/plugin-prompts/src/provider.ts | A:createPromptService | S:register 返回 disposer，插件禁用时它的位置随之摘除，页面不会留下已卸载 agent 的行
+slug.ts[DG7T]: F:名称到文件名的唯一转换点 | R:- | A:slugOf | S:信任边界在此：下游按 / 切分查 ..，反斜杠能绕过，故这里就限定到字母数字并拒 Windows 保留设备名
+store.ts[CG7T]: F:提示词库接缝与形状 | R:- | A:Prompt,StoredPrompt,PromptPage,PromptDraft,PromptStore | S:没有存储的 id——行名由 description 现算，改描述等于换身份；正文随行一起返回，因为卡片拿它当封面、投递也写它
+
+===D:/work-space/dsh-context-hub/packages/plugin-prompts/src/host/===
+prompts-fs.ts[PD8M]: F:磁盘提示词库 | R:code:packages/plugin-prompts/src/store.ts,code:packages/plugin-prompts/src/slug.ts | A:createFsPromptStore,promptsFile | S:库是 <home>/prompts/prompts.json 一个 JSON 数组，解析失败一律拒绝而不重建；未知字段随行走，因为文件是人手写的
