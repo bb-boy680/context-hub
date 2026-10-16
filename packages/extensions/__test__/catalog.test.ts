@@ -118,6 +118,29 @@ describe("a catalog nothing has read", () => {
     await catalog.reload()
     expect(reads).toBe(2)
   })
+
+  it("does not read again for a load that lands on a read already out", async () => {
+    /* The whole point of a form starting its own reads: the page that opens a
+       moment later asks for the same thing and must be told to wait, not to
+       read it a second time. */
+    let reads = 0
+    const held = gate<{ n: number }>()
+    const catalog = createCatalog({
+      initial: null,
+      read: async () => {
+        reads += 1
+        return held.promise
+      },
+    })
+
+    const form = catalog.load()
+    await settle()
+    const page = catalog.load()
+    held.open({ n: 1 })
+    await Promise.all([form, page])
+
+    expect(reads, "the page opening caused a second read").toBe(1)
+  })
 })
 
 describe("a read that fails", () => {

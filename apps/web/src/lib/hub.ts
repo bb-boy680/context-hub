@@ -26,6 +26,7 @@ import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-h
 import { skillsShExtension } from "@context-hub/skills-sh"
 import * as ui from "./ui-kit.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
+import { preloadCatalogs } from "./preload.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
 
 /**
@@ -190,5 +191,9 @@ export async function startHub(): Promise<HubKernel> {
     ],
   })
   await kernel.start()
+  /* Every shared read, started now rather than when a page that needs it is
+     opened. Not awaited: rendering waits for the kernel, not for the libraries
+     — a page draws what it has until an answer lands. */
+  void preloadCatalogs(kernel)
   return kernel
 }

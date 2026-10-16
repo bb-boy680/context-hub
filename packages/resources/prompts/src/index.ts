@@ -15,6 +15,7 @@ import type { ExtensionModule } from "@context-hub/extensions"
 
 import { promptsMessages } from "./messages.ts"
 import { PromptsPage } from "./page.tsx"
+import { PROMPT_LIBRARY_SERVICE, PromptLibrary } from "./library-store.ts"
 import { PROMPT_SERVICE, PromptService, type PromptPlace } from "./provider.ts"
 import type { PromptStore } from "./store.ts"
 
@@ -22,6 +23,7 @@ export { PromptsPage }
 export * from "./store.ts"
 export * from "./provider.ts"
 export { PromptService } from "./provider.ts"
+export { PromptLibrary, PROMPT_LIBRARY_SERVICE } from "./library-store.ts"
 export { createRemotePromptStore } from "./remote-store.ts"
 export { deliver, delivered, targetOf, undeliver, type Delivery } from "./deliver.ts"
 
@@ -79,11 +81,16 @@ export const promptsExtension: ExtensionModule = {
     icon: FileTextIcon,
     defaultEnabled: true,
     permissions: ["assets.read", "filesystem"],
-    provides: [PROMPT_SERVICE],
+    provides: [PROMPT_SERVICE, PROMPT_LIBRARY_SERVICE],
   },
   inject: ["nav", "routes", "locales"],
 
   apply(ctx) {
+    /* The shared read of the library. Constructed here and read by name from
+       the form's own startup, so the rows are already there when a page opens
+       rather than being read again on the way in. */
+    new PromptLibrary(ctx)
+
     /* The delivery targets travel through the registry rather than a
        contribution point, so an agent integration registers into this module
        the same way whether it was built here or installed as a folder. The

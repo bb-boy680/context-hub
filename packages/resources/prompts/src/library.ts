@@ -12,11 +12,25 @@
 import * as React from "react"
 
 import type { PlaceFiles } from "@context-hub/core/place-files"
-import { useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
+import { createCatalog, type Catalog } from "@context-hub/extensions"
+import { useCatalog, useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
 
 import { delivered } from "./deliver.ts"
+import type { PromptLibraryValue } from "./library-store.ts"
 import { promptPlaces, type PromptPlace } from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
+
+/**
+ * What a page watches when this module is not loaded: always empty, never
+ * reading. It exists so that watching a library is one code path rather than a
+ * hook called inside a condition.
+ */
+const EMPTY: PromptLibraryValue = { rows: [], tags: [], root: "" }
+
+const NO_LIBRARY: Catalog<PromptLibraryValue> = createCatalog({
+  initial: EMPTY,
+  read: async () => EMPTY,
+})
 
 /** What the page draws and can do. */
 export interface PromptLibrary {
@@ -70,43 +84,31 @@ export function usePromptStore(): PromptStore | null {
  * A read is the whole library in one call: a row carries its own text, and the
  * page draws that text as the card's cover, so fetching bodies separately would
  * be paying for the same read twice.
+ *
+ * The read itself is not made here. It is the library's own shared read, so a
+ * form can start it before this page is ever opened and the rows are already
+ * there when it is; what lives here is the wiring between that read and React —
+ * and a fallback start, for a page opened in a form that never asked.
  */
 export function usePromptLibrary(): PromptLibrary {
+  const ctx = useHub()
   const store = usePromptStore()
-
-  const [rows, setRows] = React.useState<StoredPrompt[]>([])
-  const [tags, setTags] = React.useState<string[]>([])
-  const [root, setRoot] = React.useState("")
-  const [loading, setLoading] = React.useState(store !== null)
-  const [error, setError] = React.useState<string | null>(null)
-  const generation = React.useRef(0)
-
-  const reload = React.useCallback(async () => {
-    if (store === null) return
-    const current = ++generation.current
-    try {
-      const page = await store.list()
-      /* A slower earlier read must not overwrite a newer one. */
-      if (current !== generation.current) return
-      setRows(page.items)
-      setTags(page.tags)
-      setRoot(page.root)
-      setError(null)
-    } catch (failure) {
-      if (current !== generation.current) return
-      setError(failure instanceof Error ? failure.message : String(failure))
-    } finally {
-      if (current === generation.current) setLoading(false)
-    }
-  }, [store])
+  const shared = React.useMemo(() => ctx.get("catalog.prompts") ?? null, [ctx])
+  const catalog = shared ?? NO_LIBRARY
 
   React.useEffect(() => {
-    /* Deferred a microtask: the load's state change belongs to the read that
-       follows, and the linter only sees the call itself. */
-    queueMicrotask(() => {
-      void reload()
-    })
-  }, [reload])
+    /* Somebody has to be the first to ask. A form's startup does this before
+       anything is drawn; until it does, the page is what asks. */
+    void shared?.load()
+  }, [shared])
+
+  const value = useCatalog(catalog, (snapshot) => snapshot.value ?? EMPTY)
+  const failure = useCatalog(catalog, (snapshot) => snapshot.failure)
+  const status = useCatalog(catalog, (snapshot) => snapshot.status)
+
+  const reload = React.useCallback(async () => {
+    await shared?.reload()
+  }, [shared])
 
   const add = React.useCallback(
     async (draft: PromptDraft) => {
@@ -135,7 +137,20 @@ export function usePromptLibrary(): PromptLibrary {
     [store, reload]
   )
 
-  return { store, root, rows, tags, loading, error, reload, add, update, remove }
+  return {
+    store,
+    root: value.root,
+    rows: value.rows,
+    tags: value.tags,
+    /* A form with no library is not loading one, and a read that has answered
+       is not still going: what is left is a page waiting to be told. */
+    loading: store !== null && (status === "idle" || status === "loading"),
+    error: failure,
+    reload,
+    add,
+    update,
+    remove,
+  }
 }
 
 /** A past timestamp as an age the list can print, localized to the active locale. */

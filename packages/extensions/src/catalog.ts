@@ -159,9 +159,12 @@ export function createCatalog<S>(options: CatalogOptions<S>): Catalog<S> {
     } while (rerun)
   }
 
-  const start = (): Promise<void> => {
+  const start = (again: boolean): Promise<void> => {
     if (inFlight !== null) {
-      rerun = true
+      /* A read already out answers "read it" — waiting for it is waiting for a
+         fresh answer. Only a reload means "and replace what is held", which the
+         read under way cannot know it should do. */
+      if (again) rerun = true
       return inFlight
     }
     /* The slot is claimed before anything can synchronously reenter `load`: the
@@ -186,16 +189,12 @@ export function createCatalog<S>(options: CatalogOptions<S>): Catalog<S> {
     },
 
     load() {
-      if (inFlight !== null) {
-        rerun = true
-        return inFlight
-      }
       /* Already answered: a page opening is not a reason to read again. */
-      if (held.status === "ready") return Promise.resolve()
-      return start()
+      if (inFlight === null && held.status === "ready") return Promise.resolve()
+      return start(false)
     },
 
-    reload: start,
+    reload: () => start(true),
 
     update(recipe) {
       if (held.value !== null) commit(recipe)

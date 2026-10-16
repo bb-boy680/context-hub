@@ -41,6 +41,10 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
   let page: WorkspacePage | null = null
   let failure: string | null = null
   const listeners = new Set<() => void>()
+  /* The read in flight, if there is one. Startup asks for this and so does every
+     library that needs to know which folder it is reading in, and those are the
+     same question: one request answers all of them. */
+  let refreshing: Promise<void> | null = null
 
   const announce = () => {
     for (const listener of [...listeners]) listener()
@@ -70,14 +74,19 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
       }
     },
 
-    async refresh() {
-      try {
-        page = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "GET")
-        failure = null
-      } catch (error) {
-        failure = reasonOf(error)
-      }
-      announce()
+    refresh() {
+      refreshing ??= (async () => {
+        try {
+          page = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "GET")
+          failure = null
+        } catch (error) {
+          failure = reasonOf(error)
+        } finally {
+          refreshing = null
+        }
+        announce()
+      })()
+      return refreshing
     },
 
     async select(id) {
