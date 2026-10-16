@@ -14,11 +14,15 @@
 import ClaudeCode from "@lobehub/icons/es/ClaudeCode"
 
 import type { ExtensionDefinition, ExtensionIcon } from "@workspace/extensions"
+import type { PromptPlace } from "@workspace/plugin-prompts/contract"
 import type { SkillPlace } from "@workspace/plugin-skills/contract"
 
 import { claudeCodeInstaller } from "./installer.ts"
 import {
+  CLAUDE_CODE_COMMAND_DIR,
+  CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE,
   CLAUDE_CODE_ID,
+  CLAUDE_CODE_RULE_DIR,
   CLAUDE_CODE_SKILL_DIR,
   GLOBAL_LOCATIONS,
   PROJECT_LOCATIONS,
@@ -62,6 +66,43 @@ const CLAUDE_CODE_PLACES: SkillPlace[] = [
 export { createClaudeCodeMcp } from "./provider.ts"
 export { claudeCodeInstaller } from "./installer.ts"
 
+/**
+ * Where this agent takes a prompt, under both roots it reads: commands as one
+ * file each, rules as one file each.
+ *
+ * The two roots differ in more than their path, and that shows up here. Inside
+ * a project the memory file is the repository's own `CLAUDE.md` — a file other
+ * people commit and read — while outside one it is the machine's memory file,
+ * which is only ever the person's own. Only the second is offered as something
+ * a prompt can be added to, because an action that silently edits a shared
+ * project file, under the same words as one that edits a private file, is the
+ * kind of difference a row has to make visible rather than hide. A project rule
+ * goes in as its own file instead, where nothing of anyone else's is touched.
+ */
+const CLAUDE_CODE_PROMPT_PLACES: PromptPlace[] = [
+  {
+    id: "claude-code",
+    agent: CLAUDE_CODE_ID,
+    labelKey: "claudeCode.tab",
+    icon: ClaudeCodeIcon,
+    scope: "workspace",
+    commandDir: CLAUDE_CODE_COMMAND_DIR,
+    ruleDir: CLAUDE_CODE_RULE_DIR,
+    order: 20,
+  },
+  {
+    id: "claude-code-global",
+    agent: CLAUDE_CODE_ID,
+    labelKey: "claudeCode.tab",
+    icon: ClaudeCodeIcon,
+    scope: "global",
+    commandDir: CLAUDE_CODE_COMMAND_DIR,
+    ruleDir: CLAUDE_CODE_RULE_DIR,
+    instructionFile: CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE,
+    order: 20,
+  },
+]
+
 export const claudeCodeExtension: ExtensionDefinition = {
   manifest: {
     id: CLAUDE_CODE_ID,
@@ -102,6 +143,16 @@ export const claudeCodeExtension: ExtensionDefinition = {
       const { registry } = plugins.skills
       ctx.effect(() =>
         registry.register({ id: CLAUDE_CODE_ID, places: CLAUDE_CODE_PLACES })
+      )
+    })
+
+    /* The same places, told to the prompts module, which is what puts this
+       agent in a prompt's install menu. A separate inject because the two
+       modules are separate: with one of them disabled the other still works. */
+    scope.inject(["prompts"], (ctx, plugins) => {
+      const { registry } = plugins.prompts
+      ctx.effect(() =>
+        registry.register({ id: CLAUDE_CODE_ID, places: CLAUDE_CODE_PROMPT_PLACES })
       )
     })
 

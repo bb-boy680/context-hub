@@ -55,6 +55,30 @@ export const CLAUDE_CODE_SETTINGS_FILE = ".claude/settings.json"
 /** The node that file keeps the switches under, keyed by plugin id. */
 export const CLAUDE_CODE_ENABLED_KEY = "enabledPlugins"
 
+/**
+ * Where Claude Code reads slash commands, relative to the workspace and to the
+ * home directory alike: `.claude/commands` under a project, `~/.claude/commands`
+ * outside one. Each command is its own Markdown file, and the file's name is
+ * the command's name — which is why a prompt delivered here becomes a file
+ * named after the prompt.
+ */
+export const CLAUDE_CODE_COMMAND_DIR = ".claude/commands"
+
+/**
+ * Where Claude Code reads standing rules, under the same two roots. A rule is
+ * its own file rather than a line in a larger one, so writing one here adds a
+ * document instead of editing somebody's.
+ */
+export const CLAUDE_CODE_RULE_DIR = ".claude/rules"
+
+/**
+ * The instruction file Claude Code reads outside every project — its own memory
+ * file, which is only ever the person's. It is named here as where a prompt is
+ * added when it is added to a memory file; the project-side `CLAUDE.md` is a
+ * shared file and is not written by that action.
+ */
+export const CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE = ".claude/CLAUDE.md"
+
 /** One place either scope reads assets from. */
 export interface ClaudeCodeLocation {
   /** What the path holds, e.g. "Skills". */
@@ -66,6 +90,8 @@ export interface ClaudeCodeLocation {
 /** What Claude Code reads outside any project. */
 export const GLOBAL_LOCATIONS: ClaudeCodeLocation[] = [
   { label: "Skills", path: "~/.claude/skills/<name>/SKILL.md" },
+  { label: "Commands", path: "~/.claude/commands/<name>.md" },
+  { label: "Rules", path: "~/.claude/rules/<name>.md" },
   { label: "Memory", path: "~/.claude/CLAUDE.md" },
   { label: "MCP servers", path: "~/.claude.json" },
   { label: "Hooks", path: "~/.claude/settings.json" },
@@ -74,6 +100,9 @@ export const GLOBAL_LOCATIONS: ClaudeCodeLocation[] = [
 /** What Claude Code reads inside a project folder, where this hub installs. */
 export const PROJECT_LOCATIONS: ClaudeCodeLocation[] = [
   { label: "Skills", path: ".claude/skills/<name>/SKILL.md" },
+  { label: "Commands", path: ".claude/commands/<name>.md" },
+  { label: "Rules", path: ".claude/rules/<name>.md" },
+  { label: "Memory", path: "CLAUDE.md" },
 ]
 
 /** The asset kinds Claude Code accepts, in the order a panel lists them. */

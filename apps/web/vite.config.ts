@@ -12,6 +12,7 @@ import {
 import { skillLibrary } from "@workspace/plugin-skills/vite"
 import { mcpProbe } from "@workspace/plugin-mcp/vite"
 import { pluginLibrary } from "@workspace/plugin-plugins/vite"
+import { promptLibrary } from "@workspace/plugin-prompts/vite"
 import { defineConfig } from "vite"
 
 // https://vite.dev/config/
@@ -30,6 +31,7 @@ export default defineConfig({
     placeFiles(),
     mcpProbe(),
     pluginLibrary(),
+    promptLibrary(),
   ],
   resolve: {
     alias: {
