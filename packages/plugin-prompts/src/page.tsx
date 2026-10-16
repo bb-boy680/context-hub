@@ -24,9 +24,20 @@ import {
 import * as React from "react"
 
 import type { PlaceFiles } from "@workspace/core/place-files"
-import { FilterBar, Ledger, PageBody, TablePagination, type LedgerColumn } from "@workspace/extensions/components"
+import {
+  AutoplayVideo,
+  FilterBar,
+  Ledger,
+  PageBody,
+  TablePagination,
+  knownAspect,
+  mediaKind,
+  rememberAspect,
+  type LedgerColumn,
+} from "@workspace/extensions/components"
 import { useI18n } from "@workspace/extensions/react"
 import { Button } from "@workspace/ui/components/button"
+import { Markdown } from "@workspace/ui/components/markdown"
 import { toast } from "@workspace/ui/components/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 
@@ -36,7 +47,7 @@ import { BatchActions, cardActionShell, PromptActions } from "./install-menu.tsx
 import { formatAge, tokenLabel, useInstalled, usePlaceFiles, usePromptLibrary, usePromptPlaces } from "./library.ts"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
-import type { PromptDraft, PromptPatch, StoredPrompt } from "./store.ts"
+import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
 
 /* The canvas spends its one accent on actions, so a category chip is neutral
    and the chip's own geometry carries what it means. */
@@ -46,10 +57,7 @@ const pillSurface =
 
 const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
 
-/** The opening of a prompt shown on a card that has no picture. */
-const COVER_LINES = 6
-
-/** The ratio every card's cover takes; a prompt has no picture to measure. */
+/** The ratio a card's cover takes before its own picture reports one. */
 const FALLBACK_RATIO = 16 / 9
 
 /** How long the copy button wears its confirmation before it offers again. */
@@ -64,46 +72,86 @@ function firstLine(prompt: string): string {
 }
 
 /**
- * What a prompt card shows instead of a screenshot: the prompt's own text.
+ * What fills a card's cover box: the first picture a person added to the
+ * prompt, drawn or played by whatever kind it is — and, when there is none, the
+ * prompt itself rendered as the document it is. A card is a thumbnail, so the
+ * document is clipped rather than scrolled.
  *
- * A prompt is its text, so a card that drew anything else would be showing a
- * picture of a thing nobody has. This is the counterpart of the skill card's
- * document cover — that one lists the files a skill ships and how much they
- * weigh, and this one shows the lines and the size, because a prompt has no
- * files to list. What the card says in words is the description, so the cover
- * starts at the prompt's own first line and the two never repeat each other.
+ * The text is the fallback rather than the only answer because a picture says
+ * what a prompt is *for* faster than its first three lines do. Which of the two
+ * this is comes off the row's own `assets`, so the card and the lightbox never
+ * disagree about what the prompt has.
  */
-function PromptCover({ prompt }: { prompt: StoredPrompt }) {
+function PromptCover({ prompt, store }: { prompt: StoredPrompt; store: PromptStore | null }) {
   const { t } = useI18n()
-  const lines = prompt.prompt.split("\n").slice(0, COVER_LINES)
-  const more = prompt.prompt.split("\n").length - lines.length
-  const size = t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))
+  const source = prompt.assets[0]
+  const [broken, setBroken] = React.useState(false)
+  const [ratio, setRatio] = React.useState<number | undefined>(() =>
+    source === undefined ? undefined : knownAspect(source)
+  )
+
+  const measure = React.useCallback(
+    (next: number) => {
+      if (source === undefined) return
+      rememberAspect(source, next)
+      setRatio(next)
+    },
+    [source]
+  )
+
+  /* A reference the hub cannot resolve — a form with no library, or a link that
+     no longer answers — leaves the card showing the prompt, which is always
+     there. */
+  const src = store === null || source === undefined ? null : store.assetUrl(source)
+  const drawn = src === null || broken ? null : src
 
   return (
     <div
-      className={`flex size-full flex-col gap-1 overflow-hidden bg-surface-raised px-[18px] pb-3 ${
-        prompt.tags.length > 0 ? "pt-10" : "pt-3.5"
-      }`}
+      className="relative w-full overflow-hidden bg-surface-raised"
+      style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
     >
-      {lines.length === 0 ? (
-        /* An empty prompt is refused by the form, so this is the moment before
-           a row arrives rather than a state a stored one is in. */
-        <span className="flex min-h-0 flex-1 items-center justify-center text-muted-foreground">
-          <FileTextIcon className="size-[22px]" aria-hidden />
-        </span>
+      {drawn !== null && mediaKind(source ?? "") === "video" ? (
+        <AutoplayVideo src={drawn} onAspect={measure} className="size-full object-cover" />
+      ) : drawn !== null ? (
+        <img
+          src={drawn}
+          alt=""
+          onLoad={(event) => {
+            const image = event.currentTarget
+            if (image.naturalWidth > 0) measure(image.naturalWidth / image.naturalHeight)
+          }}
+          onError={() => setBroken(true)}
+          className="size-full object-cover"
+        />
       ) : (
-        /* `whitespace-pre` so a prompt's own line breaks and indentation read
-           the way they were written. */
-        <span className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden font-mono text-[12px] leading-[18px] whitespace-pre text-muted-foreground">
-          {lines.map((line, at) => (
-            <span key={at} className="truncate">
-              {line === "" ? " " : line}
+        <div
+          className={`size-full overflow-hidden px-[18px] pb-3 text-[12px] leading-[18px] text-secondary-foreground ${
+            /* Room for the tag pills, which sit over this corner. */
+            prompt.tags.length > 0 ? "pt-10" : "pt-3.5"
+          }`}
+        >
+          <Markdown>{prompt.prompt}</Markdown>
+        </div>
+      )}
+      {prompt.tags.length === 0 ? null : (
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          {prompt.tags.slice(0, 2).map((tag) => (
+            <span key={tag} className={pillSurface}>
+              {tag}
             </span>
           ))}
-        </span>
+          {prompt.tags.length > 2 ? (
+            <span className={`${pillSurface} text-muted-foreground`}>
+              +{prompt.tags.length - 2}
+            </span>
+          ) : null}
+        </div>
       )}
-      <span className="shrink-0 border-t border-border pt-1.5 font-mono text-[12px] leading-[18px] text-muted-foreground">
-        {more > 0 ? `${size} · +${more}` : size}
+      {/* How big the prompt is stays on the cover it sits under, whatever that
+          cover turned out to be: it is the one number a card can give about the
+          text without printing the text. */}
+      <span className="absolute right-3 bottom-3 rounded-full bg-card/95 px-[9px] py-[3px] font-mono text-[11px] leading-none text-muted-foreground ring-1 ring-border">
+        {t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))}
       </span>
     </div>
   )
@@ -226,18 +274,18 @@ interface CardProps {
   prompt: StoredPrompt
   updated: string
   busy: boolean
+  /** The form's library, which is what turns a recorded reference into a URL. */
+  store: PromptStore | null
   places: readonly PromptPlace[]
   onOpen: () => void
   onToggle: (place: PromptPlace) => void
   onGenerate: (place: PromptPlace, action: Delivery) => void
 }
 
-function PromptCard({ prompt, updated, busy, places, onOpen, onToggle, onGenerate }: CardProps) {
+function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, onGenerate }: CardProps) {
   const files = usePlaceFiles()
   const [stamp, setStamp] = React.useState(0)
   const installed = useInstalled(prompt, places, files, stamp)
-  const shown = prompt.tags.slice(0, 2)
-  const extra = prompt.tags.length - shown.length
 
   return (
     <div
@@ -255,25 +303,12 @@ function PromptCard({ prompt, updated, busy, places, onOpen, onToggle, onGenerat
       }}
       className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {/* One ratio for every prompt card, the same 16:9 the asset pages use:
-          a prompt has no picture to measure, and a cover that grew with its
-          text would make the grid a different shape on every screen. */}
-      <div
-        className="relative w-full overflow-hidden bg-surface-raised"
-        style={{ aspectRatio: FALLBACK_RATIO }}
-      >
-        <PromptCover prompt={prompt} />
-        {shown.length === 0 ? null : (
-          <div className="absolute top-3 left-3 flex items-center gap-1.5">
-            {shown.map((tag) => (
-              <span key={tag} className={pillSurface}>
-                {tag}
-              </span>
-            ))}
-            {extra > 0 ? <span className={`${pillSurface} text-muted-foreground`}>+{extra}</span> : null}
-          </div>
-        )}
-      </div>
+      {/* The cover box takes the picture's own ratio when there is one, so a
+          portrait screenshot is not cropped and the columns keep the differing
+          heights a masonry grid reads as; with no picture it is the 16:9 the
+          asset pages fall back to, since there is nothing to measure. The tag
+          pills sit inside the cover, on whichever of the two it is. */}
+      <PromptCover key={prompt.assets[0]} prompt={prompt} store={store} />
       <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
         {/* The description is what the row is read by, and it takes the very
             paragraph a skill card gives its own description: same size, same
@@ -496,6 +531,7 @@ export function PromptsPage() {
     prompt,
     updated: formatAge(prompt.updatedAt, state.active),
     busy,
+    store: library.store,
     places,
     onOpen: () => setDetailId(prompt.id),
     onToggle: (place: PromptPlace) => void toggle(prompt, place),
