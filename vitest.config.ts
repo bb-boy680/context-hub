@@ -22,6 +22,7 @@ export default defineConfig({
       "packages/resources/mcp/vitest.config.ts",
       "packages/resources/skills/vitest.config.ts",
       "packages/resources/prompts/vitest.config.ts",
+      "apps/web/vitest.config.ts",
     ],
   },
 })

@@ -127,11 +127,11 @@ async function installedPlugins() {
     })
     const extensions = []
     for (const plugin of found) {
-      if (plugin.definition === undefined) {
+      if (plugin.module === undefined) {
         console.warn(`context hub: plugin "${plugin.id}" was not loaded: ${plugin.problem}`)
         continue
       }
-      extensions.push(plugin.definition)
+      extensions.push(plugin.module)
     }
     return extensions
   } catch {
