@@ -49,6 +49,19 @@ function placeRef(scope: unknown, dir: unknown): SkillPlaceRef {
 }
 
 /**
+ * The path under one route, or null when this handler does not own the request.
+ *
+ * `""` is the route itself. Requiring the separator is what keeps a path that
+ * merely starts with the same letters — `/hub/skillsXYZ` — from being read as
+ * this route carrying a skill id of `XYZ`.
+ */
+function under(route: string, pathname: string): string | null {
+  if (pathname === route) return ""
+  if (!pathname.startsWith(`${route}/`)) return null
+  return pathname.slice(route.length + 1)
+}
+
+/**
  * Exposes the skill library.
  *
  * @param options.home — the hub home; skills live in `<home>/skills` and their files in `<home>/assets`.
@@ -83,11 +96,13 @@ export function createSkillHandler(
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
-    if (!url.pathname.startsWith(SKILL_ROUTE)) {
+    const rest = under(SKILL_ROUTE, url.pathname)
+    if (rest === null) {
       next()
       return
     }
-    const rest = url.pathname.slice(SKILL_ROUTE.length).replace(/^\//, "")
+    /* Decoded inside the try: a malformed escape is a bad request, not a
+       failure of this carrier. */
     const [id, section, ...tail] = rest.split("/").map(decodeURIComponent)
     /* A read names the place in its query; a write names it in its body,
        because the id it acts on travels there too. */
