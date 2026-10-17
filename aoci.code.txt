@@ -5,7 +5,7 @@
 .gitignore[FV7T]: F:声明 Git 忽略范围 | R:- | A:- | S:.mcp.json 与 .mcp.json.backup.* 由 aoci init 追加，属机器绑定配置不得提交；认知资产 aoci*.txt 与 AGENTS.md 绝不可加入忽略，否则 scan 会静默跳过
 .prettierignore[FV3T]: F:声明 Prettier 忽略清单 | R:- | A:- | S:pnpm-lock.yaml 必须保持忽略，否则格式化会改动锁文件产生噪声提交
 .prettierrc[FV5T]: F:统一格式化规则 | R:code:.gitattributes | A:- | S:endOfLine=lf 与 .gitattributes 保持一致；tailwindStylesheet 指向 packages/shadcn-ui/src/styles/globals.css，组件迁包后这里不同步会让 Tailwind 类名排序失效
-AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:指令优先级里最新明确请求高于仓库级说明；涉及安全、数据丢失、凭证、部署或重大架构决策时必须停下询问；浏览器自动化指定用 ego-browser skill；末尾 AOCI 受管区块由工具维护不可手改
+AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:执行任务前用 create-plan 子智能体写计划并自审，用户明确批准前不动源码，获批后用 TaskCreate/TaskUpdate 逐阶段推进；指令优先级中最新明确请求高于仓库级说明；涉及安全、数据丢失、凭证、部署或重大架构决策必须停下询问；浏览器自动化用 ego-browser skill；末尾 AOCI 受管区块由工具维护不可手改
 DESIGN.md[SU7M]: F:设计 token 与组件规范 | R:- | A:- | S:唯一强调色 Coinbase Blue #0052ff 且克制使用；display 字重固定 400 不得加粗；圆角只有 pill 100px、xl 24px、full 9999px；交易绿红 #05b169 与 #cf202f 只作文本色不作背景
 README.md[SG8S]: F:运行方式、测试布局与 API 扩展约定 | R:code:apps/web/hub-port.ts,code:apps/web/server.ts,code:apps/web/src/lib/preload.ts | A:- | S:开发是两个进程（server.ts 5270 + Vite 5271），停止 hub 即带停 Vite；测试必须在 __test__/ 下，各包 vitest.config.ts 写死该 glob；资产库在启动时由 preload 读一次，页面只订阅不自己读；新增路由必须挂进 apps/web/server.ts 且另一端手工验，类型检查看不到字符串两端不一致
 package.json[FV8T]: F:monorepo 根脚本与工具链 | R:- | A:- | S:包管理器锁定 pnpm@10.33.4 且要求 node>=20；test 直接跑根 vitest 汇总各包，不经 turbo（否则会起多个 worker 池）；其余脚本经 turbo 转发
@@ -260,7 +260,7 @@ update.ts[PE7S]: F:把包更新到源当前状态 | R:code:packages/resources/pl
 
 ===D:/work-space/dsh-context-hub/packages/resources/prompts/===
 eslint.config.js[FQ3T]: F:提示词模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh；globals 只有 browser
-handlers.ts[IN9S]: F:提示词库的宿主侧 HTTP 处理器 | R:code:packages/resources/prompts/src/store.ts,code:packages/core/src/host/http.ts | A:createPromptHandler | S:一条路由，什么都不按路径寻址；调用在 query 里命名 action，上传的字节直接作 body；媒体文件由资产桥提供，这里只记录与清除引用；失败一律 4xx 带 { error }
+handlers.ts[IN9S]: F:提示词库的宿主侧 HTTP 处理器 | R:code:packages/resources/prompts/src/store.ts,code:packages/core/src/host/http.ts | A:createPromptHandler | S:一条路由，什么都不按路径寻址；调用在 query 里命名 action，上传的字节直接作 body；库是 <home>/prompts 目录，prompts.json 索引 + 每条一个 md；媒体文件由资产桥提供，这里只记录与清除引用；失败一律 4xx 带 { error }
 package.json[FV8T]: F:提示词模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./host、./handlers；依赖里不含 skills——PromptPlace 在本包自己声明，少一条跨包边
 tsconfig.json[FV3T]: F:提示词模块编译选项 | R:- | A:- | S:include 含 src、handlers.ts 与 __test__；types 用 node
 vitest.config.ts[FQ3T]: F:提示词模块的 vitest 项目 | R:code:packages/resources/prompts/tsconfig.json | A:- | S:include 写死 __test__/**/*.test.ts，测试放在别处不会收集
@@ -282,10 +282,10 @@ prompt-detail-dialog.tsx[DU6S]: F:提示词详情弹窗 | R:code:packages/resour
 provider.ts[CE9S]: F:提示词交付目标契约 | R:code:packages/extensions/src/agents.ts | A:PROMPT_SERVICE,PromptPlace,PromptDocument,PromptProvider,PromptService,promptPlaces | S:commandDir/ruleDir 是机器可读的落点，与给人看的 target.locations 不是一回事；documents 是能追加成段落的文件清单；generatedOnly 表示只收写出来的成品；register 必须是原型方法；promptPlaces 只收被选中的 provider，shared 恒收——未选的 agent 不只是不可见，而是不可写
 remote-store.ts[IG7T]: F:提示词库的远端实现 | R:code:packages/resources/prompts/src/store.ts | A:createRemotePromptStore | S:方法名与接口一一对应，换形态只换这一处；送出的字段必须与 handlers.ts 那侧逐个对齐，漏一个就是静默丢字段；所有动作都在同一路由上按 action 命名；上传的字节直接作 body
 slug.ts[DG7T]: F:名称到文件名的唯一转换点 | R:- | A:slugOf | S:信任边界在此：下游按 / 切分查 ..，反斜杠能绕过，故这里就限定到字母数字并拒 Windows 保留设备名
-store.ts[CG7T]: F:提示词库接缝与形状 | R:- | A:Prompt,PromptDraft,PromptAsset,StoredPrompt,PromptPage,PromptStore | S:id 不透明、永不改写；名称按 slug 唯一（投递文件名由它现算），描述不要求唯一；正文随行返回，卡片当封面、投递也写；assets 是这行的图，删行连带删掉
+store.ts[CG7T]: F:提示词库接缝与形状 | R:- | A:Prompt,PromptDraft,PromptAsset,StoredPrompt,PromptPage,PromptStore | S:id 不透明永不改写；name 按 slug 唯一（投递文件名由它现算），description 可重复；prompt 是从 md 合并回来的完整正文；assets 属本行，删行连带删掉
 
 ===D:/work-space/dsh-context-hub/packages/resources/prompts/src/host/===
-prompts-fs.ts[PD8M]: F:磁盘提示词库 | R:code:packages/resources/prompts/src/store.ts,code:packages/resources/prompts/src/slug.ts | A:createFsPromptStore,promptsFile | S:<home>/prompts/prompts.json 是唯一文件，解析失败一律拒绝而不重建；未知字段随行走，因为文件是人手写的；id 创建时生成、永不改写；无 name 的老行以 description 为标题；唯一性判据是 slugOf(name)；上传文件重包成 <id>-<原名>，删行连带删图
+prompts-fs.ts[PD8L]: F:磁盘提示词库 | R:code:packages/resources/prompts/src/store.ts,code:packages/resources/prompts/src/slug.ts | A:createFsPromptStore,promptsDir,promptsFile | S:索引 prompts.json 存元数据，正文在每行 file 指名的同目录 md；旧库首次读取把 prompt 写成 md 再删去，先正文后索引故重试幂等；坏 JSON、坏 file、两行同 file 一律拒绝不重建；未被引用的 md 不收录，create 不覆盖；未知字段随行走；id 不改；无 name 用 description；唯一性按 slugOf(name)；上传重包 <id>-<原名>，删行连带删图
 
 ===D:/work-space/dsh-context-hub/packages/resources/skills/===
 eslint.config.js[FQ3T]: F:技能模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh；globals 只有 browser
