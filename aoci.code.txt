@@ -13,7 +13,6 @@ pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不
 pnpm-workspace.yaml[FV7T]: F:工作区与构建白名单 | R:- | A:- | S:packages 列出 apps/*、packages/* 与 packages/*/*（分组包多一层）；allowBuilds 是安装脚本白名单，msw 为 false 表示不跑它的构建脚本
 tsconfig.json[FV5T]: F:仓库级编译基线 | R:- | A:- | S:只给 target/module/strict 等公共项，各包自己的 tsconfig 在此基础上加 include 与 jsx
 turbo.json[FV7T]: F:任务图与缓存 | R:- | A:- | S:dev 不缓存且 persistent；build 依赖 ^build 且输出 dist/**；lint/format/typecheck 都先跑依赖包的同名任务
-1.txt[XZ2T]: F:重构后包目录的临时草稿清单 | R:- | A:- | S:非构建输入，无脚本读取；内容可能与实际目录不同步
 vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob——packages/* 会匹到各包的 eslint.config.js，vitest 拒绝；新增包必须在此登记才进整轮；各包自己的 vitest.config.ts 管 include
 
 ===D:/work-space/dsh-context-hub/apps/web/===
