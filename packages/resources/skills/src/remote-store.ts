@@ -107,50 +107,50 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       return read<SkillPage>(base, search.startsWith("?") ? search.slice(1) : search)
     },
 
-    get(id: string): Promise<SkillDetail> {
-      return call<SkillDetail>(base, `${SKILL_ROUTE}/${encodeURIComponent(id)}`)
+    get(name: string): Promise<SkillDetail> {
+      return call<SkillDetail>(base, `${SKILL_ROUTE}/${encodeURIComponent(name)}`)
     },
 
     create(draft: SkillDraft): Promise<SkillDetail> {
       return write<SkillDetail>(base, "create", { ...draft })
     },
 
-    update(id: string, patch: SkillPatch): Promise<SkillDetail> {
-      return write<SkillDetail>(base, "update", { id, ...patch })
+    update(name: string, patch: SkillPatch): Promise<SkillDetail> {
+      return write<SkillDetail>(base, "update", { name, ...patch })
     },
 
-    async remove(id: string): Promise<void> {
-      await write(base, "remove", { id })
+    async remove(name: string): Promise<void> {
+      await write(base, "remove", { name })
     },
 
-    async readFile(id: string, file: string): Promise<string> {
-      const params = new URLSearchParams({ action: "file", id, path: file })
+    async readFile(name: string, file: string): Promise<string> {
+      const params = new URLSearchParams({ action: "file", name, path: file })
       const body = await read<{ text: string }>(base, params.toString())
       return body.text
     },
 
-    async writeFile(id: string, file: string, text: string): Promise<void> {
-      await write(base, "write-file", { id, path: file, text })
+    async writeFile(name: string, file: string, text: string): Promise<void> {
+      await write(base, "write-file", { name, path: file, text })
     },
 
-    putAsset(id: string, file: File): Promise<SkillAsset> {
-      /* Raw bytes: the file object is the body, so the id and the name it is
-         stored under ride in the query instead. */
+    putAsset(name: string, file: File): Promise<SkillAsset> {
+      /* Raw bytes: the file object is the body, so the skill's name and the
+         name the file is stored under ride in the query instead. */
       return upload<SkillAsset>(
         base,
         "put-asset",
-        { id, name: file.name },
+        { name, file: file.name },
         file,
         file.type || "application/octet-stream"
       )
     },
 
-    addAssetSource(id: string, source: string): Promise<SkillAsset> {
-      return write<SkillAsset>(base, "add-asset-source", { id, source })
+    addAssetSource(name: string, source: string): Promise<SkillAsset> {
+      return write<SkillAsset>(base, "add-asset-source", { name, source })
     },
 
-    async deleteAsset(id: string, ref: string): Promise<void> {
-      await write(base, "delete-asset", { id, ref })
+    async deleteAsset(name: string, ref: string): Promise<void> {
+      await write(base, "delete-asset", { name, ref })
     },
 
     listPackage(source: string): Promise<PackageSkill[]> {
@@ -171,56 +171,56 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       return read<PlaceSkills | null>(base, `action=place${placeQuery(ref)}`)
     },
 
-    placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
+    placeSkill(name: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
       return read<PlaceSkillRecord | null>(
         base,
-        `action=place-skill&id=${encodeURIComponent(id)}${placeQuery(ref)}`
+        `action=place-skill&name=${encodeURIComponent(name)}${placeQuery(ref)}`
       )
     },
 
-    async placeFile(id: string, file: string, ref: SkillPlaceRef): Promise<string> {
+    async placeFile(name: string, file: string, ref: SkillPlaceRef): Promise<string> {
       const body = await read<{ text: string }>(
         base,
-        `action=place-file&id=${encodeURIComponent(id)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
+        `action=place-file&name=${encodeURIComponent(name)}&path=${encodeURIComponent(file)}${placeQuery(ref)}`
       )
       return body.text
     },
 
-    async installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async installInto(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const body = await write<{ mode: SkillInstall }>(base, "install-place", {
-        id,
+        name,
         ...placeBody(ref),
       })
       return body.mode
     },
 
-    async adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const body = await write<{ mode: SkillInstall }>(base, "adopt-place", {
-        id,
+        name,
         ...placeBody(ref),
       })
       return body.mode
     },
 
-    async deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void> {
-      await write(base, "delete-place", { id, ...placeBody(ref) })
+    async deleteInPlace(name: string, ref: SkillPlaceRef): Promise<void> {
+      await write(base, "delete-place", { name, ...placeBody(ref) })
     },
 
-    async removeFrom(id: string, ref: SkillPlaceRef): Promise<void> {
-      await write(base, "remove-place", { id, ...placeBody(ref) })
+    async removeFrom(name: string, ref: SkillPlaceRef): Promise<void> {
+      await write(base, "remove-place", { name, ...placeBody(ref) })
     },
 
     /* A write, not a read: the answer is recorded on the row. */
-    checkUpdate(id: string): Promise<SkillUpdateCheck> {
-      return write<SkillUpdateCheck>(base, "check-update", { id })
+    checkUpdate(name: string): Promise<SkillUpdateCheck> {
+      return write<SkillUpdateCheck>(base, "check-update", { name })
     },
 
     checkUpdates(): Promise<SkillUpdateSummary> {
       return write<SkillUpdateSummary>(base, "check-updates")
     },
 
-    async updateFromUpstream(id: string): Promise<void> {
-      await write(base, "update-from-upstream", { id })
+    async updateFromUpstream(name: string): Promise<void> {
+      await write(base, "update-from-upstream", { name })
     },
 
     subscribe(): () => void {

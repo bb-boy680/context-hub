@@ -1,9 +1,9 @@
 /**
  * Behaviour of the disk-backed skill library, run against a temporary hub home:
- * the list is served from `index.json`, writes keep it in step with the
- * manifests, an external manifest edit reaches the list through a refresh, and
- * a media reference is either a link the hub leaves alone or a file it stores
- * and deletes together with the reference.
+ * the list is served from `skills.json`, an edit made in the hub never rewrites
+ * the manifest, a directory added outside the hub reaches the list through a
+ * refresh, and a media reference is either a link the hub leaves alone or a
+ * file it stores and deletes together with the reference.
  *
  * Nothing here reaches the machine's own home: the hub home is a temporary
  * directory, and both the skills root and the asset directory sit under it.
@@ -17,7 +17,7 @@ import path from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
-import type { SkillPage, SkillStore } from "../src/store.ts"
+import type { SkillStore } from "../src/store.ts"
 
 /** The stat of a path, or `null` when nothing is there. */
 const statOrNull = (target: string) => fs.stat(target).catch(() => null)
@@ -31,8 +31,6 @@ let root: string
 let files: string
 let store: SkillStore
 let reopened: SkillStore | undefined
-/* The list read after the create, so a later revision can be compared against it. */
-let listed: SkillPage
 
 beforeAll(async () => {
   home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-"))
@@ -53,20 +51,20 @@ describe("an empty root", () => {
   it("lists nothing, and writes the catalog file the read came from", async () => {
     const empty = await store.list()
     expect(empty.total, "empty root lists nothing").toBe(0)
-    const catalog = await statOrNull(path.join(root, "index.json"))
+    const catalog = await statOrNull(path.join(root, "skills.json"))
     expect(catalog, "catalog file exists after first read").not.toBeNull()
   })
 })
 
 /* Create writes the manifest, the conventional folders, and the catalog row. */
 describe("creating a skill", () => {
-  it("takes a slugged id, a starter manifest, and the conventional folders", async () => {
+  it("takes the name it was given, a starter manifest, and the conventional folders", async () => {
     const created = await store.create({
-      name: "PDF Extract",
+      name: "pdf-extract",
       description: "Extract tables from PDFs and scans",
       tags: ["Documents"],
     })
-    expect(created.id, "create uses a slugged id").toBe("pdf-extract")
+    expect(created.name, "the directory names the row").toBe("pdf-extract")
     expect(created.body.length, "create writes SKILL.md").toBeGreaterThan(0)
     const conventional = await Promise.all(
       ["assets", "references", "scripts"].map(async (dir) => {
@@ -78,47 +76,43 @@ describe("creating a skill", () => {
   })
 })
 
-/* The list comes from the catalog file: the manifest alone does not feed it. */
+/* The list comes from the record: the manifest alone does not feed it. */
 describe("the list", () => {
   it("carries the created skill and its frontmatter", async () => {
-    listed = await store.list()
+    const listed = await store.list()
     expect(listed.total, "list returns the created skill").toBe(1)
     expect(listed.items[0]?.tags[0], "list carries frontmatter fields").toBe("Documents")
   })
 })
 
-/* Update rewrites the owned frontmatter and keeps hand-written keys. */
+/* Update writes the record and leaves the manifest exactly as it was. */
 describe("updating a skill", () => {
-  it("rewrites what it owns, and keeps the keys it does not", async () => {
+  it("writes the record instead of the manifest", async () => {
     const manifest = path.join(root, "pdf-extract", "SKILL.md")
-    await fs.writeFile(
-      manifest,
-      `---\nname: pdf-extract\ndescription: Extract tables from PDFs and scans\ntags: [Documents]\nwhenToUse: spreadsheets\n---\n\n# PDF Extract\n\nBody text.\n`,
-      "utf8"
-    )
+    const text = `---\nname: pdf-extract\ndescription: Extract tables from PDFs and scans\ntags: [Documents]\nwhenToUse: spreadsheets\n---\n\n# PDF Extract\n\nBody text.\n`
+    await fs.writeFile(manifest, text, "utf8")
     await store.update("pdf-extract", { tags: ["Documents", "Data"] })
-    const rewritten = await fs.readFile(manifest, "utf8")
-    expect(rewritten, "update keeps unknown frontmatter keys").toContain(
-      "whenToUse: spreadsheets"
-    )
-    expect(rewritten, "update writes the new tags").toContain("tags: [Documents, Data]")
-    expect(rewritten, "update keeps the body").toContain("Body text.")
+    expect(
+      await fs.readFile(manifest, "utf8"),
+      "editing in the hub never rewrites SKILL.md"
+    ).toBe(text)
+    expect((await store.get("pdf-extract")).tags, "the record carries the new tags").toEqual([
+      "Documents",
+      "Data",
+    ])
   })
 })
 
-/* The catalog reports the change without a scan. */
-describe("the catalog after a write", () => {
-  it("carries the new tags, and a later revision", async () => {
+/* The record reports the change without a scan. */
+describe("the record after a write", () => {
+  it("carries the new tags", async () => {
     const afterUpdate = await store.list()
     expect(afterUpdate.items[0]?.tags, "list reflects the new tags").toHaveLength(2)
-    expect(afterUpdate.revision, "revision advances on every change").toBeGreaterThan(
-      listed.revision
-    )
   })
 })
 
-/* An external edit is invisible until a refresh indexes it. */
-describe("an external manifest edit", () => {
+/* A directory added outside the hub is invisible until a refresh indexes it. */
+describe("a directory added outside the hub", () => {
   it("is invisible until a refresh indexes it", async () => {
     const external = path.join(root, "hand-made")
     await fs.mkdir(external, { recursive: true })
@@ -132,8 +126,23 @@ describe("an external manifest edit", () => {
     await store.refresh()
     const afterRefresh = await store.list()
     expect(afterRefresh.total, "refresh indexes the external skill").toBe(2)
-    const handmade = afterRefresh.items.find((item) => item.id === "hand-made")
-    expect(handmade?.name, "refresh reads its frontmatter").toBe("Hand Made")
+    const handmade = afterRefresh.items.find((item) => item.name === "hand-made")
+    expect(handmade?.name, "the directory names the row").toBe("hand-made")
+    expect(handmade?.description, "a new row is seeded from its manifest").toBe(
+      "Added outside the app"
+    )
+  })
+
+  it("does not overwrite a recorded row when its manifest is edited by hand", async () => {
+    await fs.writeFile(
+      path.join(root, "hand-made", "SKILL.md"),
+      `---\nname: Hand Made\ndescription: Edited by hand\ntags: [Other]\n---\n\n# Hand Made\n`,
+      "utf8"
+    )
+    await store.refresh()
+    const handmade = (await store.list()).items.find((item) => item.name === "hand-made")
+    expect(handmade?.description, "skills.json stays the truth").toBe("Added outside the app")
+    expect(handmade?.tags, "and so do its tags").toEqual(["Docs"])
   })
 })
 
@@ -143,7 +152,7 @@ describe("paging", () => {
     const page = await store.list({ offset: 1, limit: 1, sort: "name" })
     expect(page.items, "paging slices the rows").toHaveLength(1)
     expect(page.total).toBe(2)
-    expect(page.items[0]?.id, "sort by name orders the first page").toBe("pdf-extract")
+    expect(page.items[0]?.name, "sort by name orders the first page").toBe("pdf-extract")
     expect(page.root, "a page reports the root it read").toContain("skills")
   })
 
@@ -163,7 +172,7 @@ describe("filtering", () => {
   it("selects by tag, and leaves the other rows out", async () => {
     const tagged = await store.list({ tag: "Docs" })
     expect(tagged.total, "tag filter selects the right row").toBe(1)
-    expect(tagged.items[0]?.id).toBe("hand-made")
+    expect(tagged.items[0]?.name).toBe("hand-made")
     expect((await store.list({ tag: "Data" })).total, "tag filter excludes other rows").toBe(1)
   })
 
@@ -172,10 +181,10 @@ describe("filtering", () => {
     expect(off.enabled, "update reports the new enabled state").toBe(false)
     const enabledOnly = await store.list({ enabled: true })
     expect(enabledOnly.total, "enabled filter keeps the other rows").toBe(1)
-    expect(enabledOnly.items[0]?.id).toBe("pdf-extract")
+    expect(enabledOnly.items[0]?.name).toBe("pdf-extract")
     const disabledOnly = await store.list({ enabled: false })
     expect(disabledOnly.total, "enabled filter selects the switched-off row").toBe(1)
-    expect(disabledOnly.items[0]?.id).toBe("hand-made")
+    expect(disabledOnly.items[0]?.name).toBe("hand-made")
     await store.update("hand-made", { enabled: true })
   })
 })
@@ -209,16 +218,19 @@ describe("the counts the tab row labels", () => {
 /* A reopened store reads the origin the catalog recorded and filters on it. */
 describe("a reopened store", () => {
   it("reads the recorded origin, and filters on it", async () => {
-    const catalogPath = path.join(root, "index.json")
+    const catalogPath = path.join(root, "skills.json")
     const recorded = JSON.parse(await fs.readFile(catalogPath, "utf8")) as {
-      skills: Record<string, { source: string }>
-    }
-    recorded.skills["hand-made"].source = "registry"
+      name: string
+      source: string
+    }[]
+    const handmade = recorded.find((row) => row.name === "hand-made")
+    if (handmade === undefined) throw new Error("the record has no hand-made row")
+    handmade.source = "registry"
     await fs.writeFile(catalogPath, `${JSON.stringify(recorded, null, 2)}\n`, "utf8")
     reopened = await createFsSkillStore({ home, userHome: home })
     const registryOnly = await reopened.list({ source: "registry" })
     expect(registryOnly.total, "a recorded origin survives a reopen").toBe(1)
-    expect(registryOnly.items[0]?.id).toBe("hand-made")
+    expect(registryOnly.items[0]?.name).toBe("hand-made")
     expect(registryOnly.counts.registry, "reopened counts follow the recorded origins").toBe(1)
     expect(registryOnly.counts.local).toBe(1)
     expect(
@@ -228,17 +240,13 @@ describe("a reopened store", () => {
   })
 })
 
-/* A partial patch rewrites only its own line, so the rest of the file survives. */
+/* A partial patch touches the record only: the manifest is not the hub's file. */
 describe("a tags-only patch", () => {
-  it("rewrites the tags line and leaves the rest of the file alone", async () => {
+  it("updates the record and leaves the manifest byte for byte", async () => {
     const before = await store.readFile("hand-made", "SKILL.md")
     await store.update("hand-made", { tags: ["Docs", "Safety"] })
-    const patched = await store.readFile("hand-made", "SKILL.md")
-    expect(patched, "a tags-only write keeps the name line").toMatch(/^name: Hand Made$/m)
-    expect(patched, "a tags-only write keeps the description line").toMatch(/^description: /m)
-    expect(patched, "a tags-only write replaces the tags line").toMatch(/^tags: \[Docs, Safety\]$/m)
-    expect(patched, "a tags-only write keeps the body").toContain("# Hand Made")
-    expect(patched, "the write changes the file").not.toBe(before)
+    expect(await store.readFile("hand-made", "SKILL.md"), "SKILL.md is untouched").toBe(before)
+    expect((await store.list({ tag: "Safety" })).total, "the record carries the new tag").toBe(1)
   })
 })
 
@@ -410,7 +418,7 @@ describe("removing a skill", () => {
     const directory = await statOrNull(path.join(root, "pdf-extract"))
     expect(directory, "removing a skill deletes its directory").toBeNull()
     expect(
-      (await store.list()).items.map((item) => item.id),
+      (await store.list()).items.map((item) => item.name),
       "removing a skill drops the row"
     ).not.toContain("pdf-extract")
   })
@@ -459,5 +467,149 @@ describe("directory watching", () => {
     )
     expect(await notified, "directory watching notifies the caller").toBe(true)
     expect((await store.list()).total, "watched skill reaches the list").toBe(1)
+  })
+})
+
+/* An older build wrote `index.json`; its rows move into `skills.json` whole. */
+describe("the record an older build left behind", () => {
+  /** A hub home holding one manifest and the old catalog, plus whatever `extra` adds. */
+  const legacyHome = async (extra?: (root: string) => Promise<void>) => {
+    const home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-legacy-"))
+    const root = path.join(home, "skills")
+    await fs.mkdir(path.join(root, "browser-automation"), { recursive: true })
+    await fs.writeFile(
+      path.join(root, "browser-automation", "SKILL.md"),
+      `---\nname: browser-automation\ndescription: |\n  Runs headless.\n\n  - Browse pages\n---\n\n# Browser\n`,
+      "utf8"
+    )
+    await fs.writeFile(
+      path.join(root, "index.json"),
+      JSON.stringify({
+        version: 1,
+        revision: 7,
+        skills: {
+          "browser-automation": {
+            name: "browser-automation",
+            description: "|",
+            tags: ["Old"],
+            enabled: false,
+            source: "registry",
+            assets: ["assets/picture.png"],
+            mtimeMs: 1,
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            upstream: {
+              source: "owner/repo",
+              sourceType: "github",
+              skillPath: "SKILL.md",
+              hash: "installed",
+            },
+            checked: {
+              at: "2026-01-02T00:00:00.000Z",
+              latest: "newer",
+              currentHash: "installed",
+            },
+          },
+        },
+      }),
+      "utf8"
+    )
+    await extra?.(root)
+    return { home, root }
+  }
+
+  it("keeps every recorded field and re-reads the description", async () => {
+    const legacy = await legacyHome()
+    const moved = await createFsSkillStore({ home: legacy.home, userHome: legacy.home })
+    const row = (await moved.list()).items[0]
+    expect(row?.name, "the directory names the row").toBe("browser-automation")
+    expect(row?.description, "the block scalar is read again").toContain("- Browse pages")
+    expect(row?.enabled, "enablement survives").toBe(false)
+    expect(row?.source, "the origin survives").toBe("registry")
+    expect(row?.assets, "the media survives").toEqual(["assets/picture.png"])
+    expect(row?.upstream?.hash, "the recorded upstream survives").toBe("installed")
+    expect(row?.checked?.latest, "the last check survives").toBe("newer")
+    const written = JSON.parse(
+      await fs.readFile(path.join(legacy.root, "skills.json"), "utf8")
+    ) as unknown
+    expect(Array.isArray(written), "the record is an array").toBe(true)
+    expect(
+      await statOrNull(path.join(legacy.root, "index.json")),
+      "the old file is gone once the new one is written"
+    ).toBeNull()
+    moved.dispose()
+    await fs.rm(legacy.home, { recursive: true, force: true })
+  })
+
+  it("lets a hand-written skills.json win, and fills in the rest", async () => {
+    const legacy = await legacyHome(async (root) => {
+      await fs.writeFile(
+        path.join(root, "skills.json"),
+        JSON.stringify([
+          {
+            name: "browser-automation",
+            description: "Written by hand",
+            tags: [],
+            enabled: true,
+            source: "local",
+            assets: [],
+            mtimeMs: 0,
+            updatedAt: "",
+          },
+        ]),
+        "utf8"
+      )
+    })
+    const moved = await createFsSkillStore({ home: legacy.home, userHome: legacy.home })
+    const row = (await moved.list()).items.find((item) => item.name === "browser-automation")
+    expect(row?.description, "the hand-written row wins").toBe("Written by hand")
+    expect(row?.source, "and keeps its own origin").toBe("local")
+    moved.dispose()
+    await fs.rm(legacy.home, { recursive: true, force: true })
+  })
+
+  it("leaves an unreadable index.json alone", async () => {
+    const legacy = await legacyHome(async (root) => {
+      await fs.writeFile(path.join(root, "index.json"), "{ not json", "utf8")
+    })
+    const moved = await createFsSkillStore({ home: legacy.home, userHome: legacy.home })
+    expect((await moved.list()).total, "the manifest still lists the skill").toBe(1)
+    expect(
+      await statOrNull(path.join(legacy.root, "index.json")),
+      "an unreadable file is not deleted"
+    ).not.toBeNull()
+    moved.dispose()
+    await fs.rm(legacy.home, { recursive: true, force: true })
+  })
+})
+
+/* Create takes the name it is given as the directory, and refuses what a
+   filesystem cannot hold. */
+describe("creating with a name of your own", () => {
+  const freshHome = () => fs.mkdtemp(path.join(tmpdir(), "context-hub-name-"))
+
+  it("keeps a name with spaces, as the directory it lives in", async () => {
+    const nameHome = await freshHome()
+    const named = await createFsSkillStore({ home: nameHome, userHome: nameHome })
+    const created = await named.create({ name: "PDF Extract", description: "Tables" })
+    expect(created.name, "the name is kept as written").toBe("PDF Extract")
+    expect(
+      await statOrNull(path.join(nameHome, "skills", "PDF Extract", "SKILL.md")),
+      "the directory carries the same name"
+    ).not.toBeNull()
+    named.dispose()
+    await fs.rm(nameHome, { recursive: true, force: true })
+  })
+
+  it("refuses a separator, a device name, and a name already in the library", async () => {
+    const nameHome = await freshHome()
+    const named = await createFsSkillStore({ home: nameHome, userHome: nameHome })
+    await expect(named.create({ name: "a/b", description: "x" })).rejects.toThrow(/unusable/)
+    await expect(named.create({ name: "con", description: "x" })).rejects.toThrow(/unusable/)
+    await named.create({ name: "taken", description: "x" })
+    await expect(named.create({ name: "taken", description: "x" })).rejects.toThrow(
+      /already in the library/
+    )
+    named.dispose()
+    await fs.rm(nameHome, { recursive: true, force: true })
   })
 })

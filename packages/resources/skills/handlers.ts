@@ -54,7 +54,7 @@ function placeRef(scope: unknown, dir: unknown): SkillPlaceRef {
  *
  * `""` is the route itself. Requiring the separator is what keeps a path that
  * merely starts with the same letters — `/hub/skillsXYZ` — from being read as
- * this route carrying a skill id of `XYZ`.
+ * this route carrying a skill name of `XYZ`.
  */
 function under(route: string, pathname: string): string | null {
   if (pathname === route) return ""
@@ -104,7 +104,7 @@ export function createSkillHandler(
     }
     const method = request.method ?? "GET"
     /* A read names the place in its query; a write names it in its body,
-       because the id it acts on travels there too. */
+       because the name it acts on travels there too. */
     const queryRef = () =>
       placeRef(url.searchParams.get("scope"), url.searchParams.get("dir"))
     const bodyRef = (body: { scope?: unknown; dir?: unknown }) =>
@@ -114,15 +114,15 @@ export function createSkillHandler(
     try {
       const api = await getStore()
 
-      /* Two addresses, and only two: the route itself, and one skill by id. A
+      /* Two addresses, and only two: the route itself, and one skill by name. A
          path is where a thing is, not what to do with it, so everything else
          names its action — in the query for a read, in the body for a write. */
       if (rest.includes("/")) throw new Error(`unknown route ${url.pathname}`)
-      const id = rest === "" ? "" : decodeURIComponent(rest)
+      const name = rest === "" ? "" : decodeURIComponent(rest)
 
       if (method === "GET") {
-        if (id !== "") {
-          sendJson(response, 200, await api.get(id))
+        if (name !== "") {
+          sendJson(response, 200, await api.get(name))
           return
         }
 
@@ -161,12 +161,12 @@ export function createSkillHandler(
             sendJson(
               response,
               200,
-              await api.placeSkill(requiredText(url.searchParams.get("id"), "skill id"), queryRef())
+              await api.placeSkill(requiredText(url.searchParams.get("name"), "skill name"), queryRef())
             )
             return
 
           case "place-file": {
-            const skill = requiredText(url.searchParams.get("id"), "place file")
+            const skill = requiredText(url.searchParams.get("name"), "place file")
             const file = requiredText(url.searchParams.get("path"), "place file")
             sendJson(response, 200, { text: await api.placeFile(skill, file, queryRef()) })
             return
@@ -176,7 +176,7 @@ export function createSkillHandler(
              are named rather than addressed, so a name with a slash in it — or
              a space, or a `#` — is simply encoded. */
           case "file": {
-            const skill = requiredText(url.searchParams.get("id"), "skill id")
+            const skill = requiredText(url.searchParams.get("name"), "skill name")
             const file = requiredText(url.searchParams.get("path"), "skill file")
             sendJson(response, 200, { text: await api.readFile(skill, file) })
             return
@@ -209,12 +209,14 @@ export function createSkillHandler(
       /* Uploaded bytes are the body itself rather than base64 in JSON, so this
          is the one call that cannot name its action in the body. */
       if (asked === "put-asset") {
-        const skill = requiredText(url.searchParams.get("id"), "skill id")
-        const name = requiredText(url.searchParams.get("name"), "asset name")
+        const skill = requiredText(url.searchParams.get("name"), "skill name")
+        /* The uploaded file's own name rides under its own key: `name` already
+           means the skill the bytes belong to. */
+        const fileName = requiredText(url.searchParams.get("file"), "asset file name")
         const bytes = await readBody(request)
         const part = new Uint8Array(bytes.byteLength)
         part.set(bytes)
-        const file = new File([part], name, { type: request.headers["content-type"] ?? "" })
+        const file = new File([part], fileName, { type: request.headers["content-type"] ?? "" })
         sendJson(response, 200, await api.putAsset(skill, file))
         return
       }
@@ -237,7 +239,7 @@ export function createSkillHandler(
         /* One skill's source, asked on its own. This one writes: the answer is
            recorded on the row, so asking changes what the next page reads. */
         case "check-update":
-          sendJson(response, 200, await api.checkUpdate(requiredText(body.id, "skill id")))
+          sendJson(response, 200, await api.checkUpdate(requiredText(body.name, "skill name")))
           return
 
         /* Download from a package, and take over the skills a folder read. */
@@ -276,18 +278,18 @@ export function createSkillHandler(
           }
           if (body.tags !== undefined) patch.tags = stringsOf(body.tags)
           if (typeof body.enabled === "boolean") patch.enabled = body.enabled
-          sendJson(response, 200, await api.update(requiredText(body.id, "skill id"), patch))
+          sendJson(response, 200, await api.update(requiredText(body.name, "skill name"), patch))
           return
         }
 
         case "remove":
-          await api.remove(requiredText(body.id, "skill id"))
+          await api.remove(requiredText(body.name, "skill name"))
           sendJson(response, 200, { ok: true })
           return
 
         /* Install what the source holds now over the copy here. */
         case "update-from-upstream":
-          await api.updateFromUpstream(requiredText(body.id, "skill id"))
+          await api.updateFromUpstream(requiredText(body.name, "skill name"))
           sendJson(response, 200, { ok: true })
           return
 
@@ -297,7 +299,7 @@ export function createSkillHandler(
             response,
             200,
             await api.addAssetSource(
-              requiredText(body.id, "skill id"),
+              requiredText(body.name, "skill name"),
               requiredText(body.source, "source")
             )
           )
@@ -305,7 +307,7 @@ export function createSkillHandler(
 
         case "delete-asset":
           await api.deleteAsset(
-            requiredText(body.id, "skill id"),
+            requiredText(body.name, "skill name"),
             requiredText(body.ref, "asset reference")
           )
           sendJson(response, 200, { ok: true })
@@ -314,7 +316,7 @@ export function createSkillHandler(
         /* Write one file inside a skill. */
         case "write-file":
           await api.writeFile(
-            requiredText(body.id, "skill id"),
+            requiredText(body.name, "skill name"),
             requiredText(body.path, "skill file"),
             typeof body.text === "string" ? body.text : ""
           )
@@ -324,23 +326,23 @@ export function createSkillHandler(
         /* Link one library skill into a place, or adopt one out of it. */
         case "install-place":
           sendJson(response, 200, {
-            mode: await api.installInto(requiredText(body.id, "skill id"), bodyRef(body)),
+            mode: await api.installInto(requiredText(body.name, "skill name"), bodyRef(body)),
           })
           return
 
         case "adopt-place":
           sendJson(response, 200, {
-            mode: await api.adoptFrom(requiredText(body.id, "skill id"), bodyRef(body)),
+            mode: await api.adoptFrom(requiredText(body.name, "skill name"), bodyRef(body)),
           })
           return
 
         case "delete-place":
-          await api.deleteInPlace(requiredText(body.id, "skill id"), bodyRef(body))
+          await api.deleteInPlace(requiredText(body.name, "skill name"), bodyRef(body))
           sendJson(response, 200, { ok: true })
           return
 
         case "remove-place":
-          await api.removeFrom(requiredText(body.id, "skill id"), bodyRef(body))
+          await api.removeFrom(requiredText(body.name, "skill name"), bodyRef(body))
           sendJson(response, 200, { ok: true })
           return
 

@@ -1148,7 +1148,7 @@ export function SkillsPage() {
 
   const install = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
-      await library.install(skill.id, ref)
+      await library.install(skill.name, ref)
     } catch (failure) {
       refuse(failure)
     }
@@ -1185,10 +1185,10 @@ export function SkillsPage() {
     try {
       if (skill.linkAt === "library") {
         /* The library linked the skill in; removing its entry takes the link. */
-        await (library.store?.remove(skill.id) ?? Promise.resolve())
+        await (library.store?.remove(skill.name) ?? Promise.resolve())
         await library.reload()
       } else {
-        await library.remove(skill.id, ref)
+        await library.remove(skill.name, ref)
       }
     } catch (failure) {
       refuse(failure)
@@ -1198,7 +1198,7 @@ export function SkillsPage() {
   /** Link a skill a place wrote into the library. */
   const adopt = async (skill: Skill, ref: SkillPlaceRef) => {
     try {
-      await library.adopt(skill.id, ref)
+      await library.adopt(skill.name, ref)
     } catch (failure) {
       refuse(failure)
     }
@@ -1220,7 +1220,7 @@ export function SkillsPage() {
       for (const skill of unstoredRows) {
         const hold = holdsOf(skill)[0]
         if (hold === undefined) continue
-        await library.adopt(skill.id, { scope: hold.scope, dir: hold.dir })
+        await library.adopt(skill.name, { scope: hold.scope, dir: hold.dir })
       }
     } catch (failure) {
       refuse(failure)
@@ -1233,7 +1233,7 @@ export function SkillsPage() {
   const updateAll = async () => {
     setBatch("update")
     try {
-      for (const skill of outdatedRows) await library.update(skill.id)
+      for (const skill of outdatedRows) await library.update(skill.name)
     } catch (failure) {
       refuse(failure)
     } finally {
@@ -1242,18 +1242,18 @@ export function SkillsPage() {
   }
 
   const setTags = (skill: Skill, tags: string[]) =>
-    void applyTo(() => library.store?.update(skill.id, { tags }) ?? Promise.resolve())
+    void applyTo(() => library.store?.update(skill.name, { tags }) ?? Promise.resolve())
 
   /** Delete the skill, then close the lightbox it was open in. */
   const removeSkill = async (skill: Skill) => {
-    await (library.store?.remove(skill.id) ?? Promise.resolve())
+    await (library.store?.remove(skill.name) ?? Promise.resolve())
     await library.reload()
     setDetailKey(null)
   }
 
   /** Delete a skill from the place that holds it, then close the lightbox. */
   const removePlaceSkill = async (skill: Skill, ref: SkillPlaceRef) => {
-    await library.deleteInPlace(skill.id, ref)
+    await library.deleteInPlace(skill.name, ref)
     setDetailKey(null)
   }
   const openDetail = (skill: Skill) => setDetailKey(skillKey(skill))
@@ -1599,8 +1599,8 @@ export function SkillsPage() {
         onAdopt={(skill, ref) => void adopt(skill, ref)}
         onDelete={removeSkill}
         onDeletePlace={removePlaceSkill}
-        onCheckUpdate={(skill) => library.checkUpdate(skill.id)}
-        onUpdate={(skill) => library.update(skill.id)}
+        onCheckUpdate={(skill) => library.checkUpdate(skill.name)}
+        onUpdate={(skill) => library.update(skill.name)}
         onTagsChange={(tags) => {
           if (detail) setTags(detail, tags)
         }}

@@ -31,8 +31,11 @@ export type { SkillUpstream, SkillCheck } from "./store.ts"
 
 /** One skill row, shared by the catalog page and the detail lightbox. */
 export type Skill = {
-  /** Stable id from the library; the row key and the target of every action. */
-  id: string
+  /**
+   * The directory name in the library, which is also the row key and the
+   * target of every action. A skill a place holds alone is named by the
+   * directory it has there.
+   */
   name: string
   /** Short line the grid card shows. */
   summary: string
@@ -55,8 +58,8 @@ export type Skill = {
    */
   linkAt?: "library" | SkillPlaceId
   /**
-   * The places holding a skill of their own under this id, so the name is taken
-   * there: installing the library's copy into one of them is not possible.
+   * The places holding a skill of their own under this name, so the name is
+   * taken there: installing the library's copy into one of them is not possible.
    */
   takenAt?: SkillPlaceId[]
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
@@ -69,8 +72,8 @@ export type Skill = {
   /** The last check of that source: what it held, and the files here then. */
   checked?: SkillCheck
   /**
-   * A skill the workspace holds that the library also holds under this id; the
-   * library's copy is the one to manage, so this row offers nothing to do.
+   * A skill the workspace holds that the library also holds under this name;
+   * the library's copy is the one to manage, so this row offers nothing to do.
    */
   inLibrary?: boolean
   /** Token estimate, present once the body has been read. */

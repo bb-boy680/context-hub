@@ -174,7 +174,7 @@ function useMediaItems(
       if (store !== null && detail !== null) {
         setBusy(true)
         try {
-          for (const file of list) await store.putAsset(detail.id, file)
+          for (const file of list) await store.putAsset(detail.name, file)
           onChanged()
         } finally {
           setBusy(false)
@@ -209,7 +209,7 @@ function useMediaItems(
       }
       setBusy(true)
       try {
-        await store.addAssetSource(detail.id, src)
+        await store.addAssetSource(detail.name, src)
         onChanged()
       } finally {
         setBusy(false)
@@ -223,7 +223,7 @@ function useMediaItems(
       if (store !== null && detail !== null) {
         setBusy(true)
         try {
-          await store.deleteAsset(detail.id, id)
+          await store.deleteAsset(detail.name, id)
           onChanged()
         } finally {
           setBusy(false)
@@ -954,8 +954,8 @@ function useSkillFiles(
       /* A skill no library record holds is read where its place keeps it; the
          library's own files are also where a linked skill's files end up. */
       return hold === undefined || inLibrary(skill)
-        ? store.readFile(skill.id, path)
-        : store.placeFile(skill.id, path, { scope: hold.scope, dir: hold.dir })
+        ? store.readFile(skill.name, path)
+        : store.placeFile(skill.name, path, { scope: hold.scope, dir: hold.dir })
     },
     [store, skill, hold]
   )
@@ -1039,7 +1039,7 @@ function LightboxBody({
   /* Each skill's directory: the library's for a library skill, the place's for
      one kept there. */
   const base = inPlace ? placePath : root
-  const path = base === null ? null : `${base.replaceAll("\\", "/")}/${skill.id}`
+  const path = base === null ? null : `${base.replaceAll("\\", "/")}/${skill.name}`
 
   /* The catalog stays mounted behind the dialog; stop its previews decoding. */
   React.useEffect(() => {
@@ -1137,9 +1137,9 @@ export function SkillDetailDialog({
   tagSuggestions: string[]
   onOpenChange: (open: boolean) => void
 }) {
-  const [loaded, setLoaded] = React.useState<{ id: string; detail: SkillDetail } | null>(null)
-  const [held, setHeld] = React.useState<{ id: string; detail: PlaceSkillDetail } | null>(null)
-  const id = skill?.id ?? null
+  const [loaded, setLoaded] = React.useState<{ name: string; detail: SkillDetail } | null>(null)
+  const [held, setHeld] = React.useState<{ name: string; detail: PlaceSkillDetail } | null>(null)
+  const name = skill?.name ?? null
   /* Where the row's files live, and whether the library holds it too. */
   const place = skill === null ? null : placeOf(skill, places)
   const inLib = skill !== null && inLibrary(skill)
@@ -1150,12 +1150,12 @@ export function SkillDetailDialog({
      again after a write moves its timestamp. A skill no library record holds
      has none, and asking for one is a request that can only fail. */
   React.useEffect(() => {
-    if (store === null || id === null || !inLib) return
+    if (store === null || name === null || !inLib) return
     let live = true
     void (async () => {
       try {
-        const detail = await store.get(id)
-        if (live) setLoaded({ id, detail })
+        const detail = await store.get(name)
+        if (live) setLoaded({ name, detail })
       } catch {
         /* A removed or unreadable skill leaves the dialog on the catalog row. */
       }
@@ -1163,20 +1163,20 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, id, inLib, skill?.stamp])
+  }, [store, name, inLib, skill?.stamp])
 
   /* Only the record for the skill on screen counts; a stale one is ignored. */
-  const detail = loaded !== null && loaded.id === id ? loaded.detail : null
+  const detail = loaded !== null && loaded.name === name ? loaded.detail : null
 
   /* A skill no library record holds lives outside the library, so its own
      manifest and files are read from the place that keeps them. */
   React.useEffect(() => {
-    if (store === null || id === null || !placeOnly || placeRef === null) return
+    if (store === null || name === null || !placeOnly || placeRef === null) return
     let live = true
     void (async () => {
       try {
-        const found = await store.placeSkill(id, placeRef)
-        if (live && found !== null) setHeld({ id, detail: found })
+        const found = await store.placeSkill(name, placeRef)
+        if (live && found !== null) setHeld({ name, detail: found })
       } catch {
         /* An unreadable skill leaves the panel on the catalog row it came from. */
       }
@@ -1184,9 +1184,9 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, id, placeOnly, placeRef])
+  }, [store, name, placeOnly, placeRef])
 
-  const workspace = held !== null && held.id === id ? held.detail : null
+  const workspace = held !== null && held.name === name ? held.detail : null
 
   return (
     <Dialog open={skill !== null} onOpenChange={onOpenChange}>

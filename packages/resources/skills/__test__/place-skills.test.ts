@@ -102,7 +102,7 @@ describe("installing", () => {
     const held = await readPlaceSkills(workspace, library, SHARED)
     expect(held.skills).toHaveLength(1)
     expect(held.skills[0]?.origin).toBe("hub")
-    expect(held.skills[0]?.name).toBe("Alpha")
+    expect(held.skills[0]?.name).toBe("alpha")
     expect(held.skills[0]?.description).toBe("First skill")
   })
 })
@@ -116,13 +116,13 @@ describe("a skill the project wrote itself", () => {
 
   it("is listed, and reads as its own rather than the hub's", async () => {
     const withOwn = await readPlaceSkills(workspace, library, SHARED)
-    expect(withOwn.skills.map((skill) => skill.id)).toContain("own-one")
-    expect(withOwn.skills.find((skill) => skill.id === "own-one")?.origin).toBe("own")
+    expect(withOwn.skills.map((skill) => skill.name)).toContain("own-one")
+    expect(withOwn.skills.find((skill) => skill.name === "own-one")?.origin).toBe("own")
   })
 
   it("ignores a directory with no manifest", async () => {
     const withOwn = await readPlaceSkills(workspace, library, SHARED)
-    expect(withOwn.skills.map((skill) => skill.id)).not.toContain("not-a-skill")
+    expect(withOwn.skills.map((skill) => skill.name)).not.toContain("not-a-skill")
   })
 })
 
@@ -135,7 +135,7 @@ describe("a link the library no longer answers for", () => {
 
   it("reads as stale, keeping its id as a name", async () => {
     const broken = await readPlaceSkills(workspace, library, SHARED)
-    const stale = broken.skills.find((skill) => skill.id === "beta")
+    const stale = broken.skills.find((skill) => skill.name === "beta")
     expect(stale?.origin).toBe("stale")
     expect(stale?.name).toBe("beta")
   })
@@ -167,7 +167,7 @@ describe("removing", () => {
 describe("reading one place skill", () => {
   it("reads its own manifest, description, text and files", async () => {
     const own = await readPlaceSkill(workspace, "own-one", SHARED)
-    expect(own?.name).toBe("Own one")
+    expect(own?.name).toBe("own-one")
     expect(own?.description).toBe("Written here")
     expect(own?.text.startsWith("---\n"), "the manifest as written, frontmatter included").toBe(true)
     expect(own?.files.map((file) => file.path)).toEqual(["SKILL.md"])
@@ -331,17 +331,17 @@ describe("the store", () => {
       JSON.stringify({ folders: [{ name: "project", path: workspace }], current: workspace })
     )
     const forWorkspace = await store.placeSkills(sharedRef)
-    expect(forWorkspace?.skills.map((skill) => skill.id)).toContain("own-one")
+    expect(forWorkspace?.skills.map((skill) => skill.name)).toContain("own-one")
     expect(forWorkspace?.root).toBe(sharedRoot())
   })
 
   it("installs into that workspace and takes it back out", async () => {
     expect(await store.installInto("alpha", sharedRef)).toBe("link")
-    expect((await readPlaceSkills(workspace, library, SHARED)).skills.map((s) => s.id)).toContain(
+    expect((await readPlaceSkills(workspace, library, SHARED)).skills.map((s) => s.name)).toContain(
       "alpha"
     )
     await store.removeFrom("alpha", sharedRef)
-    expect((await readPlaceSkills(workspace, library, SHARED)).skills.map((s) => s.id)).not.toContain(
+    expect((await readPlaceSkills(workspace, library, SHARED)).skills.map((s) => s.name)).not.toContain(
       "alpha"
     )
   })
@@ -359,14 +359,14 @@ describe("the library's own list", () => {
   })
 
   it("lists a linked skill, with where its files live", () => {
-    const linkedRow = rows.find((item) => item.id === "linked-one")
+    const linkedRow = rows.find((item) => item.name === "linked-one")
     expect(linkedRow).toBeDefined()
     expect(linkedRow?.link).toBe(linkedOne())
     expect(linkedRow?.updatedAt, "a linked row carries no date").toBe("")
   })
 
   it("carries no link on a skill the library holds itself, and its files' own date", () => {
-    const heldRow = rows.find((item) => item.id === "alpha")
+    const heldRow = rows.find((item) => item.name === "alpha")
     expect(heldRow?.link).toBeUndefined()
     expect(heldRow?.updatedAt).not.toBe("")
   })
@@ -397,7 +397,7 @@ describe("adopting a place skill", () => {
       })}\n`
     )
     await store.adoptFrom("tracked-one", sharedRef)
-    tracked = (await store.list()).items.find((item) => item.id === "tracked-one")
+    tracked = (await store.list()).items.find((item) => item.name === "tracked-one")
 
     await store.remove("tracked-one")
     await fs.rm(path.join(sharedRoot(), "tracked-one"), { recursive: true, force: true })
@@ -439,10 +439,10 @@ describe("a place of its own", () => {
   it("installs into the place, leaving the shared directory untouched", async () => {
     expect(await installSkillInto(workspace, library, "alpha", AGENT_DIR)).toBe("link")
     expect(await fs.lstat(path.join(sharedRoot(), "alpha")).catch(() => null)).toBeNull()
-    expect((await readPlaceSkills(workspace, library, AGENT_DIR)).skills.map((s) => s.id)).toContain(
+    expect((await readPlaceSkills(workspace, library, AGENT_DIR)).skills.map((s) => s.name)).toContain(
       "alpha"
     )
-    expect((await readPlaceSkill(workspace, "alpha", AGENT_DIR))?.name).toBe("Alpha")
+    expect((await readPlaceSkill(workspace, "alpha", AGENT_DIR))?.name).toBe("alpha")
   })
 
   it("leaves the place empty again when it is taken back out", async () => {
@@ -474,13 +474,13 @@ describe("a global place", () => {
   it("lists a skill written there as somebody else's, not the hub's", async () => {
     await writeSkill(path.join(globalRoot(), "global-one"), "Global one", "Machine wide")
     const globalHeld = await readPlaceSkills(userHome, library, AGENT_DIR)
-    expect(globalHeld.skills.map((skill) => skill.id)).toContain("global-one")
-    expect(globalHeld.skills.find((skill) => skill.id === "global-one")?.origin).toBe("own")
+    expect(globalHeld.skills.map((skill) => skill.name)).toContain("global-one")
+    expect(globalHeld.skills.find((skill) => skill.name === "global-one")?.origin).toBe("own")
   })
 
   it("is never seen by the workspace's own directory", async () => {
     const held = await readPlaceSkills(workspace, library, SHARED)
-    expect(held.skills.map((skill) => skill.id)).not.toContain("global-one")
+    expect(held.skills.map((skill) => skill.name)).not.toContain("global-one")
   })
 
   describe("through the store", () => {
@@ -496,20 +496,20 @@ describe("a global place", () => {
 
     it("reads the global place, naming the home directory's root", async () => {
       const storeGlobal = await store.placeSkills(globalRef)
-      expect(storeGlobal?.skills.map((skill) => skill.id)).toContain("global-one")
+      expect(storeGlobal?.skills.map((skill) => skill.name)).toContain("global-one")
       expect(storeGlobal?.root).toBe(globalRoot())
     })
 
     it("installs into it, leaving the workspace's shared directory alone, and takes it out", async () => {
       await store.installInto("alpha", globalRef)
       expect(
-        (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.map((s) => s.id)
+        (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.map((s) => s.name)
       ).toContain("alpha")
       expect(await fs.lstat(path.join(sharedRoot(), "alpha")).catch(() => null)).toBeNull()
 
       await store.removeFrom("alpha", globalRef)
       expect(
-        (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.map((s) => s.id)
+        (await readPlaceSkills(userHome, library, AGENT_DIR)).skills.map((s) => s.name)
       ).not.toContain("alpha")
     })
   })

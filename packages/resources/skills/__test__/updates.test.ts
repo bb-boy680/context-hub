@@ -49,8 +49,8 @@ async function commit(message: string) {
 }
 
 /** One row of a store's current catalog, read fresh. */
-const row = async (library: Library, id: string) =>
-  (await library.list()).items.find((item) => item.id === id)
+const row = async (library: Library, name: string) =>
+  (await library.list()).items.find((item) => item.name === name)
 
 beforeAll(async () => {
   home = await fs.mkdtemp(path.join(tmpdir(), "context-hub-updates-"))
@@ -165,11 +165,12 @@ describe("updating", () => {
 describe("a fresh process", () => {
   beforeAll(async () => {
     store.dispose()
-    const catalogPath = path.join(home, "skills", "index.json")
-    const catalog = JSON.parse(await fs.readFile(catalogPath, "utf8")) as {
-      skills: Record<string, Record<string, unknown>>
-    }
-    catalog.skills["ghost-test"] = {
+    const catalogPath = path.join(home, "skills", "skills.json")
+    const catalog = JSON.parse(await fs.readFile(catalogPath, "utf8")) as Record<
+      string,
+      unknown
+    >[]
+    catalog.push({
       name: "ghost-test",
       description: "The source for this one cannot be read",
       tags: [],
@@ -184,7 +185,7 @@ describe("a fresh process", () => {
         skillPath: "skills/ghost-test/SKILL.md",
         hash: "0".repeat(64),
       },
-    }
+    })
     await fs.writeFile(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`)
     await fs.mkdir(path.join(home, "skills", "ghost-test"), { recursive: true })
     await fs.writeFile(
@@ -219,7 +220,7 @@ describe("what cannot be answered", () => {
   it("refuses an unknown skill, and one with no recorded source", async () => {
     await expect(store2.checkUpdate("nope")).rejects.toThrow(/unknown skill/)
     const created = await store2.create({ name: "No Source", description: "Written here" })
-    await expect(store2.checkUpdate(created.id)).rejects.toThrow(/no recorded source/)
+    await expect(store2.checkUpdate(created.name)).rejects.toThrow(/no recorded source/)
   })
 
   it("touches nothing when asked about no skills", async () => {

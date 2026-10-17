@@ -244,14 +244,14 @@ export function sourceLabel(
 }
 
 /**
- * A row's identity for React and for the open lightbox. The same id can be on
+ * A row's identity for React and for the open lightbox. The same name can be on
  * screen twice — a library skill and a same-named skill a place wrote are two
  * rows — so the side a row comes from is part of it. Which places hold it is
  * not: installing into one changes no identity, so the card behind an open
  * menu is re-rendered rather than replaced.
  */
 export function skillKey(skill: Skill): string {
-  return inLibrary(skill) ? `library:${skill.id}` : `${skill.location}:${skill.id}`
+  return inLibrary(skill) ? `library:${skill.name}` : `${skill.location}:${skill.name}`
 }
 
 /** Token count as a compact label, the way the cards show it. */
@@ -300,8 +300,8 @@ export function useSkillDocument(
         const hold = holdsOf(skill)[0]
         const record =
           hold === undefined
-            ? await store.get(skill.id)
-            : await store.placeSkill(skill.id, { scope: hold.scope, dir: hold.dir })
+            ? await store.get(skill.name)
+            : await store.placeSkill(skill.name, { scope: hold.scope, dir: hold.dir })
         if (record === undefined || record === null) return
         const text = "body" in record ? record.body : record.text
         const read: SkillDocument = {
@@ -350,7 +350,6 @@ export function toSkill(
 ): Omit<Skill, "location" | "installed"> {
   const gallery = row.assets.map((ref) => store.assetUrl(ref))
   return {
-    id: row.id,
     name: row.name,
     summary: row.description,
     description: row.description,
@@ -372,7 +371,6 @@ const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
 /** One skill's row for a skill a place holds and the library does not. */
 function placeRow(skill: PlaceSkill, place: SkillHold): Skill {
   return {
-    id: skill.id,
     name: skill.name,
     summary: skill.description,
     description: skill.description,
@@ -505,7 +503,7 @@ export function useSkillLibrary(
         scope,
         dir,
         root: view?.root ?? null,
-        byId: new Map((view?.skills ?? []).map((skill) => [skill.id, skill])),
+        byId: new Map((view?.skills ?? []).map((skill) => [skill.name, skill])),
       }
     })
     /** Whether a library row reaches its files through a link into one place. */
@@ -523,7 +521,7 @@ export function useSkillLibrary(
       let linkAt: "library" | SkillPlaceId | undefined
       const takenAt: SkillPlaceId[] = []
       for (const place of roots) {
-        const own = place.byId.get(item.id)
+        const own = place.byId.get(item.name)
         const adopted = reachedFrom(item, place.root)
         const installed = own?.origin === "hub"
         if (adopted || installed) {
@@ -552,10 +550,10 @@ export function useSkillLibrary(
     for (const place of roots) {
       for (const skill of held[place.id]?.skills ?? []) {
         if (skill.origin === "hub") continue
-        if (items.some((item) => item.id === skill.id && reachedFrom(item, place.root))) continue
+        if (items.some((item) => item.name === skill.name && reachedFrom(item, place.root))) continue
         own.push({
           ...placeRow(skill, place),
-          inLibrary: items.some((item) => item.id === skill.id),
+          inLibrary: items.some((item) => item.name === skill.name),
         })
       }
     }

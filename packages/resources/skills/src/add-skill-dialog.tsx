@@ -216,7 +216,7 @@ export function AddSkillDialog({
     if (store === null) return []
     try {
       const page = await store.list({ limit: 1000 })
-      return page.items.map((item) => item.id.toLowerCase())
+      return page.items.map((item) => item.name.toLowerCase())
     } catch {
       /* An unreadable library leaves every row selectable; the import itself
          still refuses a name the library holds. */

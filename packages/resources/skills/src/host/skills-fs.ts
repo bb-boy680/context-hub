@@ -1,12 +1,20 @@
 /**
  * The disk-backed skill library. Two files carry the state, with one owner each:
  *
- * - `<root>/<id>/SKILL.md` — the portable truth for one skill. YAML frontmatter
- *   plus body; an agent reads it directly, and a copied directory keeps its
- *   name, description, and tags.
- * - `<root>/index.json` — the catalog the list renders. One read serves a page,
- *   so browsing never walks directories; `refresh()` is the only scan, and it
- *   reconciles the catalog with the manifests after external edits.
+ * - `<root>/skills.json` — the hub's record of one skill per row: what a list
+ *   renders, plus the facts a manifest cannot carry (`enabled`, the media it
+ *   references, where it was installed from, the last update answer). This file
+ *   is the truth for `description` and `tags`; editing them here never writes
+ *   the manifest back.
+ * - `<root>/<name>/SKILL.md` — the skill itself. An agent reads it directly, so
+ *   a newly created skill still receives frontmatter; after that the hub leaves
+ *   the file alone. A directory arriving from outside — copied in, or installed
+ *   by the skills CLI — seeds its row from this file the first time it is seen.
+ *
+ * A row is keyed by its name, which is also the directory it lives in.
+ * `refresh()` is the only scan; it reconciles the record with the directories,
+ * so an externally added or removed skill reaches the list and an externally
+ * edited manifest does not overwrite what the record says.
  *
  * A skill's media is a reference, not a file in its directory: a remote URL the
  * hub leaves alone, or a path into the hub's asset library, which this store
@@ -31,13 +39,11 @@ import { createFsWorkspaceStore } from "@context-hub/core/host/workspaces"
 import type { AssetStore } from "@context-hub/core"
 import type { AssetScope } from "@context-hub/extensions"
 
-import {
-  parseSkillFile,
-  starterSkillFile,
-  writeSkillFile,
-} from "../frontmatter.ts"
+import { parseSkillFile, starterSkillFile } from "../frontmatter.ts"
+import type { Frontmatter } from "../frontmatter.ts"
 import { importFolder } from "./folder-import.ts"
 import { walkSkillDir } from "./file-tree.ts"
+import { assertNewSkillName } from "./names.ts"
 import { downloadPackageSkills, fetchUpstreamRecords, listPackageSkills } from "./skills-cli.ts"
 import { readLockedUpstream, skillFolderHash } from "./upstream.ts"
 import {
@@ -75,14 +81,16 @@ import type {
   SkillUpstream,
 } from "../store.ts"
 
-const CATALOG_FILE = "index.json"
+const CATALOG_FILE = "skills.json"
+/** What older builds wrote, moved into `skills.json` on first use. */
+const LEGACY_CATALOG_FILE = "index.json"
 const MANIFEST = "SKILL.md"
-const CATALOG_VERSION = 1
 /** Sources asked in parallel by one batch check; each run clones a package. */
 const CHECK_CONCURRENCY = 3
 
 /** One skill as the catalog records it. */
 interface CatalogEntry {
+  /** The row's identity, and the directory under the skills root it lives in. */
   name: string
   description: string
   tags: string[]
@@ -92,6 +100,9 @@ interface CatalogEntry {
    * The directory this entry is a link to, absolute, when the hub linked a
    * skill in from somewhere else instead of holding the files itself. Absent
    * for a skill whose files live under the library root.
+   *
+   * The filesystem is the only thing that knows this, so it is read on every
+   * scan and never written to `skills.json`.
    */
   link?: string
   /** What the skills CLI recorded it was installed from; absent when nothing did. */
@@ -100,16 +111,161 @@ interface CatalogEntry {
   checked?: SkillCheck
   /** Media references, in the order the UI shows them. */
   assets: string[]
-  /** Manifest mtime when this row was last read; drives refreshes. */
+  /** Manifest mtime when this row was last scanned. */
   mtimeMs: number
   /** ISO timestamp of the last recorded change; empty for a linked skill. */
   updatedAt: string
 }
 
 interface CatalogFile {
-  version: number
-  revision: number
   skills: Record<string, CatalogEntry>
+}
+
+/**
+ * One row as the file holds it. The key order is fixed so a diff shows the
+ * value that changed, not the path that built the row; `link` is left out
+ * because it is a fact about the filesystem, read again by every scan.
+ */
+function serializeEntry(entry: CatalogEntry): Record<string, unknown> {
+  return {
+    name: entry.name,
+    description: entry.description,
+    tags: entry.tags,
+    enabled: entry.enabled,
+    source: entry.source,
+    assets: entry.assets,
+    mtimeMs: entry.mtimeMs,
+    updatedAt: entry.updatedAt,
+    ...(entry.upstream === undefined ? {} : { upstream: entry.upstream }),
+    ...(entry.checked === undefined ? {} : { checked: entry.checked }),
+  }
+}
+
+/** The whole record: rows in name order, two-space JSON, one closing newline. */
+function serializeCatalog(skills: Record<string, CatalogEntry>): string {
+  const rows = Object.values(skills)
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .map(serializeEntry)
+  return `${JSON.stringify(rows, null, 2)}\n`
+}
+
+/** One recorded row, read defensively: a hand-edited file must not crash a scan. */
+function entryOf(record: Record<string, unknown>, name: string): CatalogEntry {
+  return {
+    name,
+    description: typeof record.description === "string" ? record.description : "",
+    tags: Array.isArray(record.tags)
+      ? record.tags.filter((tag): tag is string => typeof tag === "string")
+      : [],
+    enabled: record.enabled !== false,
+    source:
+      record.source === "builtin" || record.source === "registry"
+        ? record.source
+        : "local",
+    assets: Array.isArray(record.assets)
+      ? record.assets.filter((item): item is string => typeof item === "string")
+      : [],
+    mtimeMs: typeof record.mtimeMs === "number" ? record.mtimeMs : 0,
+    updatedAt: typeof record.updatedAt === "string" ? record.updatedAt : "",
+    ...(record.upstream === undefined
+      ? {}
+      : { upstream: record.upstream as SkillUpstream }),
+    ...(record.checked === undefined ? {} : { checked: record.checked as SkillCheck }),
+  }
+}
+
+/**
+ * Read the record. A row is only a row when it carries a non-empty name, which
+ * is both its identity and its directory; anything else is skipped rather than
+ * guessed at. A file that will not parse reads as no rows, and the scan then
+ * seeds every directory from its manifest.
+ */
+async function readCatalogFile(file: string): Promise<Record<string, CatalogEntry>> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await fs.readFile(file, "utf8"))
+  } catch {
+    return {}
+  }
+  if (!Array.isArray(parsed)) return {}
+  const skills: Record<string, CatalogEntry> = {}
+  for (const row of parsed) {
+    if (typeof row !== "object" || row === null) continue
+    const record = row as Record<string, unknown>
+    if (typeof record.name !== "string" || record.name === "") continue
+    skills[record.name] = entryOf(record, record.name)
+  }
+  return skills
+}
+
+/** The hub-owned fields of one manifest, or `null` when it cannot be read. */
+async function readManifestFrontmatter(file: string): Promise<Frontmatter | null> {
+  const text = await fs.readFile(file, "utf8").catch(() => null)
+  return text === null ? null : parseSkillFile(text).frontmatter
+}
+
+/**
+ * Read the old `{ version, revision, skills: { <id>: row } }` shape, keyed by
+ * directory. `null` means the file is there but is not that shape, which is a
+ * reason to leave it alone rather than replace it.
+ */
+async function readLegacyCatalog(
+  file: string
+): Promise<Record<string, CatalogEntry> | null> {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await fs.readFile(file, "utf8"))
+  } catch {
+    return null
+  }
+  if (typeof parsed !== "object" || parsed === null) return null
+  const skills = (parsed as { skills?: unknown }).skills
+  if (typeof skills !== "object" || skills === null || Array.isArray(skills)) {
+    return null
+  }
+  const rows: Record<string, CatalogEntry> = {}
+  for (const [id, value] of Object.entries(skills as Record<string, unknown>)) {
+    if (typeof value !== "object" || value === null) continue
+    rows[id] = entryOf(value as Record<string, unknown>, id)
+  }
+  return rows
+}
+
+/**
+ * Move the record an older build left behind into `skills.json`.
+ *
+ * The old file is not a cache: `enabled`, `source`, `assets`, `upstream` and
+ * `checked` are recorded there and nowhere else, so rebuilding from manifests
+ * would lose them. Every row keeps those as they are; `description` and `tags`
+ * are read again from the manifest, because the old reader could not parse a
+ * block scalar and wrote the indicator in their place.
+ *
+ * A `skills.json` already present wins by name — a person may have written one
+ * by hand. The new file is written before the old one is removed, so a failure
+ * leaves everything readable and the next start tries again.
+ */
+async function migrateLegacyCatalog(root: string): Promise<void> {
+  const legacyPath = path.join(root, LEGACY_CATALOG_FILE)
+  if ((await statOrNull(legacyPath)) === null) return
+  const legacy = await readLegacyCatalog(legacyPath)
+  if (legacy === null) return
+  const catalogPath = path.join(root, CATALOG_FILE)
+  const current = await readCatalogFile(catalogPath)
+  const merged: Record<string, CatalogEntry> = { ...legacy, ...current }
+  for (const [name, row] of Object.entries(legacy)) {
+    if (current[name] !== undefined) continue
+    const frontmatter = await readManifestFrontmatter(
+      path.join(root, name, MANIFEST)
+    )
+    if (frontmatter === null) continue
+    merged[name] = {
+      ...row,
+      description: frontmatter.description ?? "",
+      tags: frontmatter.tags ?? [],
+    }
+  }
+  await writeFileAtomic(catalogPath, serializeCatalog(merged))
+  await fs.rm(legacyPath, { force: true })
 }
 
 /** Where the skill library lives under one hub home. */
@@ -139,24 +295,6 @@ function assertSafePath(base: string, relative: string): string {
   return resolved
 }
 
-/** Make a display name safe to use as a directory name. */
-function toId(name: string): string {
-  return name
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-}
-
-async function readJson<T>(file: string, fallback: T): Promise<T> {
-  try {
-    return JSON.parse(await fs.readFile(file, "utf8")) as T
-  } catch {
-    /* Absent, unreadable, or malformed state falls back to a rebuilt catalog. */
-    return fallback
-  }
-}
-
 async function statOrNull(target: string) {
   try {
     return await fs.stat(target)
@@ -177,14 +315,14 @@ async function readdirOrEmpty(dir: string) {
 
 /**
  * One uploaded file, named so its owner keeps it apart from every other
- * owner's: the skill's id prefixes the name, so two skills that upload a
+ * owner's: the skill's name prefixes the file name, so two skills that upload a
  * picture of the same name never end up sharing one file — which is what lets
  * either of them drop its own without taking the other's with it.
  *
  * The bytes are not copied: a file is itself valid file data.
  */
-function owned(id: string, file: File): File {
-  return new File([file], `${id}-${file.name}`, { type: file.type })
+function owned(name: string, file: File): File {
+  return new File([file], `${name}-${file.name}`, { type: file.type })
 }
 
 /** What a disk-backed store needs to know about where it writes. */
@@ -219,6 +357,8 @@ export async function createFsSkillStore(
   const homeDir = options.userHome ?? userHome()
   const assets = options.assets ?? createAssetStore(createFsAssetLibrary(home))
   await fs.mkdir(root, { recursive: true })
+  /* Before anything reads: the old record carries fields no manifest has. */
+  await migrateLegacyCatalog(root)
   const catalogPath = path.join(root, CATALOG_FILE)
   const listeners = new Set<() => void>()
   /** In-memory copy of the catalog; a page render never re-reads the file. */
@@ -248,40 +388,26 @@ export async function createFsSkillStore(
     return base
   }
 
-  const skillDir = (id: string) =>
-    path.join(root, assertSafeSegment(id, "skill id"))
+  const skillDir = (name: string) =>
+    path.join(root, assertSafeSegment(name, "skill name"))
 
-  /** Read one manifest into a catalog row. */
+  /** Read one directory's manifest into a row, for a skill the record does not know. */
   const readEntry = async (
-    id: string,
-    previous: CatalogEntry | undefined,
+    name: string,
     link: string | undefined
   ): Promise<CatalogEntry | null> => {
-    const manifest = path.join(skillDir(id), MANIFEST)
+    const manifest = path.join(skillDir(name), MANIFEST)
     const stat = await statOrNull(manifest)
     if (stat === null) return null
-    /* An untouched manifest keeps its recorded row without re-parsing; a link
-       keeps its row only once it carries no date, so a row recorded with one
-       is read again and dropped. */
-    if (previous !== undefined && previous.mtimeMs === stat.mtimeMs && previous.link === link) {
-      if (link === undefined || previous.updatedAt === "") return previous
-    }
     const { frontmatter } = parseSkillFile(await fs.readFile(manifest, "utf8"))
     return {
-      name: frontmatter.name ?? id,
+      name,
       description: frontmatter.description ?? "",
       tags: frontmatter.tags ?? [],
-      enabled: previous?.enabled ?? true,
-      source: previous?.source ?? "local",
+      enabled: true,
+      source: "local",
       ...(link === undefined ? {} : { link }),
-      /* Where the files came from is not in the manifest, so a scan carries
-         the recorded answer forward; only an install writes a new one. */
-      ...(previous?.upstream === undefined ? {} : { upstream: previous.upstream }),
-      /* The last check's answer is the same kind of record: the manifest does
-         not carry it, and a scan must not throw it away. */
-      ...(previous?.checked === undefined ? {} : { checked: previous.checked }),
-      /* A skill's manifest carries no media; the references it had stay as they are. */
-      assets: previous?.assets ?? [],
+      assets: [],
       mtimeMs: stat.mtimeMs,
       /*
        * A linked skill's files are somebody else's: the hub has recorded no
@@ -294,18 +420,39 @@ export async function createFsSkillStore(
   }
 
   /**
-   * Walk the skills root and rebuild the catalog. External edits (a copied-in
-   * directory, a hand-edited manifest, a deleted folder) reach the list here;
-   * recorded fields the manifest does not carry — enablement and asset order —
-   * survive.
+   * A row the record already holds, with the facts only the disk can answer
+   * refreshed. Everything else stays: `skills.json` is the record, so a
+   * manifest edited by hand must not overwrite its description or tags.
+   */
+  const carried = async (
+    known: CatalogEntry,
+    name: string,
+    link: string | undefined
+  ): Promise<CatalogEntry | null> => {
+    const stat = await statOrNull(path.join(skillDir(name), MANIFEST))
+    if (stat === null) return null
+    const next: CatalogEntry = { ...known, name, mtimeMs: stat.mtimeMs }
+    delete next.link
+    if (link !== undefined) next.link = link
+    /* A linked skill has no date of its own; a manifest touched from outside
+       moves the date the row reports, which is what it reports today. */
+    if (link !== undefined) next.updatedAt = ""
+    else if (stat.mtimeMs !== known.mtimeMs) next.updatedAt = stat.mtime.toISOString()
+    return next
+  }
+
+  /**
+   * Walk the skills root and rebuild the record. A directory the record does
+   * not know is read from its manifest; one it knows keeps what the record
+   * says. A directory whose manifest is gone is dropped, and one added or
+   * removed outside the hub reaches the list here.
    *
    * A skill the hub linked in from elsewhere is a directory entry too, reached
    * through the link; it is listed as a skill and remembered as a link, because
    * who owns those files is a different answer.
    */
   const rebuild = async (): Promise<CatalogFile> => {
-    const previous =
-      catalog ?? (await readJson<CatalogFile | null>(catalogPath, null))
+    const previous = catalog ?? { skills: await readCatalogFile(catalogPath) }
     const entries = await readdirOrEmpty(root)
     const skills: Record<string, CatalogEntry> = {}
     for (const entry of entries) {
@@ -321,20 +468,20 @@ export async function createFsSkillStore(
       } else if (!entry.isDirectory()) {
         continue
       }
-      const row = await readEntry(entry.name, previous?.skills[entry.name], link)
+      const known = previous.skills[entry.name]
+      const row =
+        known === undefined
+          ? await readEntry(entry.name, link)
+          : await carried(known, entry.name, link)
       if (row !== null) skills[entry.name] = row
     }
-    return {
-      version: CATALOG_VERSION,
-      revision: previous?.revision ?? 0,
-      skills,
-    }
+    return { skills }
   }
 
-  /** Publish the catalog atomically; the revision lets callers skip unchanged pages. */
+  /** Publish the record atomically; the next scan merges against it. */
   const saveCatalog = async (next: CatalogFile): Promise<CatalogFile> => {
-    catalog = { ...next, revision: next.revision + 1 }
-    await writeFileAtomic(catalogPath, `${JSON.stringify(catalog, null, 2)}\n`)
+    catalog = next
+    await writeFileAtomic(catalogPath, serializeCatalog(next.skills))
     return catalog
   }
 
@@ -397,39 +544,39 @@ export async function createFsSkillStore(
    * read at the same moment, so a badge and the detail dialog read a whole
    * answer back without asking the network again.
    *
-   * @returns the local hashes that were recorded, by skill id.
+   * @returns the local hashes that were recorded, by skill name.
    */
   const recordChecks = async (
     latest: Map<string, string>
   ): Promise<Map<string, string>> => {
     const hashes = new Map<string, string>()
-    for (const id of latest.keys()) {
+    for (const name of latest.keys()) {
       /* The files are read where they are, link or not: the question is what
          this copy holds, not which directory holds it. The CLI never hashes
          what is on disk, so this is the one number it cannot supply. */
-      const hash = await skillFolderHash(skillDir(id)).catch(() => null)
-      if (hash !== null) hashes.set(id, hash)
+      const hash = await skillFolderHash(skillDir(name)).catch(() => null)
+      if (hash !== null) hashes.set(name, hash)
     }
     if (hashes.size === 0) return hashes
     const at = new Date().toISOString()
     await mutate((skills) => {
-      for (const [id, currentHash] of hashes) {
-        const row = skills[id]
-        const found = latest.get(id)
+      for (const [name, currentHash] of hashes) {
+        const row = skills[name]
+        const found = latest.get(name)
         if (row === undefined || found === undefined) continue
-        skills[id] = { ...row, checked: { at, latest: found, currentHash } }
+        skills[name] = { ...row, checked: { at, latest: found, currentHash } }
       }
     })
     return hashes
   }
 
   /** Record one reference last in the display order. */
-  const recordAsset = async (id: string, ref: string): Promise<SkillAsset> => {
+  const recordAsset = async (name: string, ref: string): Promise<SkillAsset> => {
     const kind = assetKind(ref)
     await mutate((skills) => {
-      const row = skills[id]
+      const row = skills[name]
       if (row === undefined) return
-      skills[id] = {
+      skills[name] = {
         ...row,
         assets: [...row.assets.filter((item) => item !== ref), ref],
         updatedAt: new Date().toISOString(),
@@ -445,22 +592,21 @@ export async function createFsSkillStore(
     }
   }
 
-  const detailOf = async (id: string): Promise<SkillDetail> => {
+  const detailOf = async (name: string): Promise<SkillDetail> => {
     const current = await loadCatalog()
-    const row = current.skills[id]
-    if (row === undefined) throw new Error(`unknown skill: ${id}`)
-    const dir = skillDir(id)
+    const row = current.skills[name]
+    if (row === undefined) throw new Error(`unknown skill: ${name}`)
+    const dir = skillDir(name)
     const manifest = await fs
       .readFile(path.join(dir, MANIFEST), "utf8")
       .catch(() => null)
-    if (manifest === null) throw new Error(`skill has no ${MANIFEST}: ${id}`)
+    if (manifest === null) throw new Error(`skill has no ${MANIFEST}: ${name}`)
     const files = await walkSkillDir(dir)
     const assetDetails: SkillAsset[] = row.assets.map((ref) => ({
       ref,
       kind: assetKind(ref),
     }))
     return {
-      id,
       name: row.name,
       description: row.description,
       tags: row.tags,
@@ -494,7 +640,7 @@ export async function createFsSkillStore(
       const current = await loadCatalog()
       const needle = query.q?.trim().toLowerCase()
       const matching: SkillSummary[] = []
-      for (const [id, row] of Object.entries(current.skills)) {
+      for (const row of Object.values(current.skills)) {
         if (query.tag !== undefined && !row.tags.includes(query.tag)) continue
         if (query.enabled !== undefined && row.enabled !== query.enabled) continue
         if (
@@ -507,7 +653,6 @@ export async function createFsSkillStore(
           continue
         }
         matching.push({
-          id,
           name: row.name,
           description: row.description,
           tags: row.tags,
@@ -534,9 +679,9 @@ export async function createFsSkillStore(
           : matching.filter((row) => row.source === query.source)
       rows.sort((a, b) => {
         if (query.sort === "name") return a.name.localeCompare(b.name)
-        /* Newest first, id as the tiebreaker so paging never drifts. */
+        /* Newest first, name as the tiebreaker so paging never drifts. */
         return (
-          b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id)
+          b.updatedAt.localeCompare(a.updatedAt) || a.name.localeCompare(b.name)
         )
       })
       const offset = Math.max(0, query.offset ?? 0)
@@ -545,7 +690,6 @@ export async function createFsSkillStore(
         items: rows.slice(offset, offset + limit),
         total: rows.length,
         counts,
-        revision: current.revision,
         root: displayPath(root),
       }
     },
@@ -553,19 +697,16 @@ export async function createFsSkillStore(
     get: detailOf,
 
     async create(draft: SkillDraft): Promise<SkillDetail> {
-      const base = toId(draft.name)
-      if (base === "")
-        throw new Error("name must contain at least one letter or digit")
+      const name = assertNewSkillName(draft.name)
       const current = await loadCatalog()
-      let id = base
-      let suffix = 1
-      while (
-        current.skills[id] !== undefined ||
-        (await statOrNull(skillDir(id))) !== null
+      /* The name is the directory, so a second skill cannot take it quietly. */
+      if (
+        current.skills[name] !== undefined ||
+        (await statOrNull(skillDir(name))) !== null
       ) {
-        id = `${base}-${suffix++}`
+        throw new Error(`a skill with this name is already in the library: ${name}`)
       }
-      const dir = skillDir(id)
+      const dir = skillDir(name)
       await fs.mkdir(path.join(dir, "assets"), { recursive: true })
       await fs.mkdir(path.join(dir, "references"), { recursive: true })
       await fs.mkdir(path.join(dir, "scripts"), { recursive: true })
@@ -573,8 +714,8 @@ export async function createFsSkillStore(
       await writeFileAtomic(manifest, starterSkillFile(draft))
       const stat = await statOrNull(manifest)
       await mutate((skills) => {
-        skills[id] = {
-          name: draft.name,
+        skills[name] = {
+          name,
           description: draft.description,
           tags: draft.tags ?? [],
           enabled: true,
@@ -584,43 +725,35 @@ export async function createFsSkillStore(
           updatedAt: new Date().toISOString(),
         }
       })
-      return detailOf(id)
+      return detailOf(name)
     },
 
-    async update(id: string, patch: SkillPatch): Promise<SkillDetail> {
+    async update(name: string, patch: SkillPatch): Promise<SkillDetail> {
       const current = await loadCatalog()
-      const row = current.skills[id]
-      if (row === undefined) throw new Error(`unknown skill: ${id}`)
-      const manifest = path.join(skillDir(id), MANIFEST)
-      let mtimeMs = row.mtimeMs
-      if (patch.description !== undefined || patch.tags !== undefined) {
-        const text = await fs.readFile(manifest, "utf8")
-        await writeFileAtomic(
-          manifest,
-          writeSkillFile(text, {
-            description: patch.description,
-            tags: patch.tags,
-          })
-        )
-        mtimeMs = (await statOrNull(manifest))?.mtimeMs ?? mtimeMs
-      }
+      const row = current.skills[name]
+      if (row === undefined) throw new Error(`unknown skill: ${name}`)
+      /*
+       * The record only. `skills.json` is the truth for these two fields, so an
+       * edit here must not reach the manifest: the file is what an agent reads
+       * in place, and the hub has no business rewriting a description it was
+       * told to keep its own copy of.
+       */
       await mutate((skills) => {
-        skills[id] = {
+        skills[name] = {
           ...row,
           description: patch.description ?? row.description,
           tags: patch.tags ?? row.tags,
           enabled: patch.enabled ?? row.enabled,
-          mtimeMs,
           updatedAt: new Date().toISOString(),
         }
       })
-      return detailOf(id)
+      return detailOf(name)
     },
 
-    async remove(id: string): Promise<void> {
+    async remove(name: string): Promise<void> {
       const current = await loadCatalog()
-      const row = current.skills[id]
-      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const row = current.skills[name]
+      if (row === undefined) throw new Error(`unknown skill: ${name}`)
       /* Files first: a failure leaves the row intact rather than orphaning them. */
       /*
        * The catalog first, the files second: if the write fails, the files are
@@ -629,10 +762,10 @@ export async function createFsSkillStore(
        * would ever bring the two back in step.
        */
       await mutate((skills) => {
-        delete skills[id]
+        delete skills[name]
       })
       await dropStored(row.assets)
-      const dir = skillDir(id)
+      const dir = skillDir(name)
       if ((await fs.lstat(dir).catch(() => null))?.isSymbolicLink() === true) {
         /* A linked skill is somebody else's directory; the hub takes back its
            own link and leaves those files where they are. */
@@ -646,19 +779,19 @@ export async function createFsSkillStore(
       return listPackageSkills(source)
     },
 
-    async installPackage(source: string, ids: string[]): Promise<SkillImport> {
-      const result = await downloadPackageSkills(source, ids, root)
+    async installPackage(source: string, names: string[]): Promise<SkillImport> {
+      const result = await downloadPackageSkills(source, names, root)
       await refreshCatalog()
       /* A row says where it came from and which revision, so a download
          records both: they are what a later update check compares against. */
       const arrived = new Set(result.installed)
       if (arrived.size > 0) {
         await mutate((skills) => {
-          for (const id of arrived) {
-            const row = skills[id]
+          for (const name of arrived) {
+            const row = skills[name]
             if (row === undefined) continue
-            const record = result.records?.[id]
-            skills[id] = {
+            const record = result.records?.[name]
+            skills[name] = {
               ...row,
               source: "registry",
               ...(record === undefined ? {} : { upstream: record }),
@@ -675,50 +808,50 @@ export async function createFsSkillStore(
       return result
     },
 
-    async readFile(id: string, file: string): Promise<string> {
-      return fs.readFile(assertSafePath(skillDir(id), file), "utf8")
+    async readFile(name: string, file: string): Promise<string> {
+      return fs.readFile(assertSafePath(skillDir(name), file), "utf8")
     },
 
-    async writeFile(id: string, file: string, text: string): Promise<void> {
-      await writeFileAtomic(assertSafePath(skillDir(id), file), text)
+    async writeFile(name: string, file: string, text: string): Promise<void> {
+      await writeFileAtomic(assertSafePath(skillDir(name), file), text)
       await mutate((skills) => {
-        const row = skills[id]
+        const row = skills[name]
         if (row !== undefined)
-          skills[id] = { ...row, updatedAt: new Date().toISOString() }
+          skills[name] = { ...row, updatedAt: new Date().toISOString() }
       })
     },
 
-    async putAsset(id: string, file: File): Promise<SkillAsset> {
+    async putAsset(name: string, file: File): Promise<SkillAsset> {
       const current = await loadCatalog()
-      if (current.skills[id] === undefined)
-        throw new Error(`unknown skill: ${id}`)
-      return recordAsset(id, await assets.put(owned(id, file)))
+      if (current.skills[name] === undefined)
+        throw new Error(`unknown skill: ${name}`)
+      return recordAsset(name, await assets.put(owned(name, file)))
     },
 
-    async addAssetSource(id: string, source: string): Promise<SkillAsset> {
+    async addAssetSource(name: string, source: string): Promise<SkillAsset> {
       const current = await loadCatalog()
-      const row = current.skills[id]
-      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const row = current.skills[name]
+      if (row === undefined) throw new Error(`unknown skill: ${name}`)
       const parsed = readSource(source)
       if (parsed.kind === "link") {
         /* Re-adding a link keeps one entry; the hub does not own it. */
         if (row.assets.includes(parsed.ref)) {
           return { ref: parsed.ref, kind: assetKind(parsed.ref) }
         }
-        return recordAsset(id, parsed.ref)
+        return recordAsset(name, parsed.ref)
       }
-      return recordAsset(id, await assets.put(owned(id, parsed.file)))
+      return recordAsset(name, await assets.put(owned(name, parsed.file)))
     },
 
-    async deleteAsset(id: string, ref: string): Promise<void> {
+    async deleteAsset(name: string, ref: string): Promise<void> {
       const current = await loadCatalog()
-      const row = current.skills[id]
-      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const row = current.skills[name]
+      if (row === undefined) throw new Error(`unknown skill: ${name}`)
       await assets.remove(ref)
       await mutate((skills) => {
-        const next = skills[id]
+        const next = skills[name]
         if (next === undefined) return
-        skills[id] = {
+        skills[name] = {
           ...next,
           assets: next.assets.filter((item) => item !== ref),
           updatedAt: new Date().toISOString(),
@@ -733,60 +866,60 @@ export async function createFsSkillStore(
       return base === null ? null : readPlaceSkills(base, root, ref.dir)
     },
 
-    async placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
+    async placeSkill(name: string, ref: SkillPlaceRef): Promise<PlaceSkillRecord | null> {
       const base = await placeBase(ref.scope)
-      return base === null ? null : readPlaceSkill(base, id, ref.dir)
+      return base === null ? null : readPlaceSkill(base, name, ref.dir)
     },
 
-    async placeFile(id: string, file: string, ref: SkillPlaceRef): Promise<string> {
+    async placeFile(name: string, file: string, ref: SkillPlaceRef): Promise<string> {
       const base = await requiredBase(ref.scope)
-      const text = await readPlaceSkillFile(base, id, file, ref.dir)
+      const text = await readPlaceSkillFile(base, name, file, ref.dir)
       if (text === null) {
-        throw new Error(`the place holds no such file: ${id}/${file}`)
+        throw new Error(`the place holds no such file: ${name}/${file}`)
       }
       return text
     },
 
-    async installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async installInto(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const base = await requiredBase(ref.scope)
-      return installSkillInto(base, root, id, ref.dir)
+      return installSkillInto(base, root, name, ref.dir)
     },
 
-    async adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const base = await requiredBase(ref.scope)
-      const landed = await linkSkillIntoLibrary(base, root, id, ref.dir)
+      const landed = await linkSkillIntoLibrary(base, root, name, ref.dir)
       /* What the skills CLI installed this from, if it did: the lock beside
          the place's skills is the record, and its hash is what an update
          check compares against. Without it the skill is still listed, but
          nothing can tell whether the upstream moved. */
-      const upstream = await readLockedUpstream(base, id)
+      const upstream = await readLockedUpstream(base, name)
       await refreshCatalog()
       if (upstream !== null) {
         await mutate((skills) => {
-          const row = skills[id]
-          if (row !== undefined) skills[id] = { ...row, upstream }
+          const row = skills[name]
+          if (row !== undefined) skills[name] = { ...row, upstream }
         })
       }
       return landed
     },
 
-    async checkUpdate(id: string): Promise<SkillUpdateCheck> {
+    async checkUpdate(name: string): Promise<SkillUpdateCheck> {
       const current = await loadCatalog()
-      const row = current.skills[id]
-      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const row = current.skills[name]
+      if (row === undefined) throw new Error(`unknown skill: ${name}`)
       const upstream = row.upstream
       if (upstream === undefined) {
-        throw new Error(`no recorded source for this skill, so nothing can be compared: ${id}`)
+        throw new Error(`no recorded source for this skill, so nothing can be compared: ${name}`)
       }
-      const { latest, failed } = await askSources(new Map([[upstream.source, [id]]]))
-      const found = latest.get(id)
+      const { latest, failed } = await askSources(new Map([[upstream.source, [name]]]))
+      const found = latest.get(name)
       if (found === undefined) {
         /* The CLI's own reason is worth more to a person than a generic one. */
-        const reason = failed.find((entry) => entry.name === id)?.reason
-        throw new Error(reason ?? `the source answered nothing about this skill: ${id}`)
+        const reason = failed.find((entry) => entry.name === name)?.reason
+        throw new Error(reason ?? `the source answered nothing about this skill: ${name}`)
       }
       const recorded = await recordChecks(latest)
-      const currentHash = recorded.get(id) ?? found
+      const currentHash = recorded.get(name) ?? found
       return {
         recordedHash: upstream.hash,
         currentHash,
@@ -800,20 +933,20 @@ export async function createFsSkillStore(
       const current = await loadCatalog()
       /* One group per source: the CLI answers a whole package in one run. */
       const groups = new Map<string, string[]>()
-      for (const [id, row] of Object.entries(current.skills)) {
+      for (const [name, row] of Object.entries(current.skills)) {
         const source = row.upstream?.source
         if (source === undefined) continue
-        const ids = groups.get(source)
-        if (ids === undefined) groups.set(source, [id])
-        else ids.push(id)
+        const names = groups.get(source)
+        if (names === undefined) groups.set(source, [name])
+        else names.push(name)
       }
       const { latest, failed } = await askSources(groups)
       const recorded = await recordChecks(latest)
       let outdated = 0
       let modified = 0
-      for (const [id, currentHash] of recorded) {
-        const installed = current.skills[id]?.upstream?.hash
-        if (installed !== latest.get(id)) outdated += 1
+      for (const [name, currentHash] of recorded) {
+        const installed = current.skills[name]?.upstream?.hash
+        if (installed !== latest.get(name)) outdated += 1
         /* A source that has not moved on does not make a changed copy any less
            changed, so the two are counted apart. */
         if (currentHash !== installed) modified += 1
@@ -821,26 +954,26 @@ export async function createFsSkillStore(
       return { checked: recorded.size, outdated, modified, failed }
     },
 
-    async updateFromUpstream(id: string): Promise<void> {
+    async updateFromUpstream(name: string): Promise<void> {
       const current = await loadCatalog()
-      const row = current.skills[id]
-      if (row === undefined) throw new Error(`unknown skill: ${id}`)
+      const row = current.skills[name]
+      if (row === undefined) throw new Error(`unknown skill: ${name}`)
       const upstream = row.upstream
       if (upstream === undefined) {
-        throw new Error(`no recorded source for this skill, so there is nothing to install from: ${id}`)
+        throw new Error(`no recorded source for this skill, so there is nothing to install from: ${name}`)
       }
       const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-skill-update-"))
       try {
-        const result = await downloadPackageSkills(upstream.source, [id], work)
+        const result = await downloadPackageSkills(upstream.source, [name], work)
         const landed = result.installed[0]
         if (landed === undefined) {
-          const reason = result.failed.find((entry) => entry.name === id)?.reason
-          throw new Error(reason ?? `the skills CLI installed nothing for ${id}`)
+          const reason = result.failed.find((entry) => entry.name === name)?.reason
+          throw new Error(reason ?? `the skills CLI installed nothing for ${name}`)
         }
         /* The files live in the library's own directory, or in the workspace's
            when the library reaches the skill through a link; that copy is the
            one an update replaces, and the link keeps pointing at it. */
-        const held = skillDir(id)
+        const held = skillDir(name)
         const isLink = (await fs.lstat(held).catch(() => null))?.isSymbolicLink() === true
         const target = isLink ? await fs.readlink(held) : held
         await replaceDirectory(path.join(work, landed), target)
@@ -848,9 +981,9 @@ export async function createFsSkillStore(
            installed, not a second reading of the same bytes. */
         const fresh = result.records?.[landed]?.hash ?? (await skillFolderHash(target))
         await mutate((skills) => {
-          const next = skills[id]
+          const next = skills[name]
           if (next !== undefined) {
-            skills[id] = {
+            skills[name] = {
               ...next,
               upstream: { ...upstream, hash: fresh },
               /* What the CLI just installed is, by construction, both the
@@ -869,14 +1002,14 @@ export async function createFsSkillStore(
       await refreshCatalog()
     },
 
-    async deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void> {
+    async deleteInPlace(name: string, ref: SkillPlaceRef): Promise<void> {
       const base = await requiredBase(ref.scope)
-      await deleteSkillIn(base, id, ref.dir)
+      await deleteSkillIn(base, name, ref.dir)
     },
 
-    async removeFrom(id: string, ref: SkillPlaceRef): Promise<void> {
+    async removeFrom(name: string, ref: SkillPlaceRef): Promise<void> {
       const base = await requiredBase(ref.scope)
-      await removeSkillFrom(base, root, id, ref.dir)
+      await removeSkillFrom(base, root, name, ref.dir)
     },
 
     subscribe(listener: () => void): () => void {

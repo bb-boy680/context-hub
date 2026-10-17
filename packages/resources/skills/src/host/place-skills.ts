@@ -118,14 +118,15 @@ export async function readPlaceSkills(
     if (text === null && origin !== "stale") continue
     const frontmatter = text === null ? {} : parseSkillFile(text).frontmatter
     skills.push({
-      id: dirent.name,
-      name: frontmatter.name ?? dirent.name,
+      /* The directory is what the place can address, so it is the row's name;
+         a manifest that calls itself something else is not reachable here. */
+      name: dirent.name,
       description: frontmatter.description ?? "",
       origin,
       ...(link === null ? {} : { link }),
     })
   }
-  skills.sort((left, right) => left.id.localeCompare(right.id))
+  skills.sort((left, right) => left.name.localeCompare(right.name))
   return { ...view, skills }
 }
 
@@ -140,16 +141,15 @@ export async function readPlaceSkills(
  */
 export async function readPlaceSkill(
   base: string,
-  id: string,
+  name: string,
   dir: string
 ): Promise<PlaceSkillDetail | null> {
-  const dirPath = path.join(placeSkillRoot(base, dir), assertSkillName(id))
+  const dirPath = path.join(placeSkillRoot(base, dir), assertSkillName(name))
   const text = await fs.readFile(path.join(dirPath, MANIFEST), "utf8").catch(() => null)
   if (text === null) return null
   const frontmatter = parseSkillFile(text).frontmatter
   return {
-    id,
-    name: frontmatter.name ?? id,
+    name,
     description: frontmatter.description ?? "",
     text,
     files: await walkSkillDir(dirPath),

@@ -44,7 +44,6 @@ function formWorkspaces(agents: string[]) {
         items: [],
         total: 0,
         counts: { all: 0, builtin: 0, local: 0, registry: 0 },
-        revision: 1,
         root: "/somewhere",
       }
     },

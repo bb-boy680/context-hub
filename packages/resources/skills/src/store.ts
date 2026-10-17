@@ -50,8 +50,11 @@ export interface SkillCheck {
 }
 /** One row of the catalog: the metadata the list renders, without file bodies. */
 export interface SkillSummary {
-  /** Directory name under the skills root; the skill's identity. */
-  id: string
+  /**
+   * The directory name under the skills root: the skill's identity, and the
+   * name every action targets. A row is keyed by this, so renaming a skill
+   * means renaming its directory.
+   */
   name: string
   description: string
   tags: string[]
@@ -139,8 +142,6 @@ export interface SkillPage {
    * describe the tag and search filters, not the origin filter itself.
    */
   counts: SkillCounts
-  /** Bumped on every change, so callers can skip reloading unchanged data. */
-  revision: number
   /** The root these rows came from, shown to a person; a browser cannot read
       `SkillStore.root` off the machine it is talking to. */
   root: string
@@ -234,8 +235,10 @@ export type PlaceSkillOrigin =
 
 /** One skill a place holds, as its directory has it. */
 export interface PlaceSkill {
-  /** Directory name under the place's skills root. */
-  id: string
+  /**
+   * Directory name under the place's skills root: the name the place can
+   * address, so it is the row's identity even when the manifest says otherwise.
+   */
   name: string
   description: string
   origin: PlaceSkillOrigin
@@ -266,7 +269,6 @@ export interface PlaceSkillsView {
 /** One place skill with its files, read where it lives. */
 export interface PlaceSkillDetail {
   /** Directory name under the place's skills root. */
-  id: string
   name: string
   description: string
   /** SKILL.md as it is written on disk, frontmatter included. */
@@ -294,13 +296,13 @@ export interface SkillStore {
   /** One page of the catalog, filtered and sorted, read from the catalog file. */
   list(query?: SkillQuery): Promise<SkillPage>
   /** Full detail for one skill: catalog row, body, and file tree. */
-  get(id: string): Promise<SkillDetail>
+  get(name: string): Promise<SkillDetail>
   /** Create a skill directory with a starter SKILL.md, then index it. */
   create(draft: SkillDraft): Promise<SkillDetail>
   /** Change the mutable fields; omitted fields stay as they are. */
-  update(id: string, patch: SkillPatch): Promise<SkillDetail>
+  update(name: string, patch: SkillPatch): Promise<SkillDetail>
   /** Delete the skill: its directory, and every file the hub stores for it. */
-  remove(id: string): Promise<void>
+  remove(name: string): Promise<void>
   /**
    * The skills a package offers, read without writing anything — what the
    * download list shows before a person picks.
@@ -314,18 +316,18 @@ export interface SkillStore {
   /** Take over the skills a folder read produced, writing each into the library. */
   importFolder(skills: ImportedSkill[]): Promise<SkillImport>
   /** Read one text file inside the skill directory. */
-  readFile(id: string, path: string): Promise<string>
+  readFile(name: string, path: string): Promise<string>
   /** Replace one text file inside the skill directory. */
-  writeFile(id: string, path: string, text: string): Promise<void>
+  writeFile(name: string, path: string, text: string): Promise<void>
   /** Take over one uploaded file, record it last, and answer with its reference. */
-  putAsset(id: string, file: File): Promise<SkillAsset>
+  putAsset(name: string, file: File): Promise<SkillAsset>
   /**
    * Add one pasted source. A remote address is recorded as it is; a `data:`
    * source is stored as a file the hub owns.
    */
-  addAssetSource(id: string, source: string): Promise<SkillAsset>
+  addAssetSource(name: string, source: string): Promise<SkillAsset>
   /** Drop one reference, deleting the stored file when the hub owns it. */
-  deleteAsset(id: string, ref: string): Promise<void>
+  deleteAsset(name: string, ref: string): Promise<void>
   /** The URL that shows one reference; a remote URL passes through unchanged. */
   assetUrl(ref: string): string
   /**
@@ -341,58 +343,58 @@ export interface SkillStore {
    * such skill. Such a skill is not in the library, so this is the only way to
    * show its own manifest and files.
    *
-   * @param id — the skill's directory name under that place.
+   * @param name — the skill's directory name under that place.
    * @param ref — the place to read.
    */
-  placeSkill(id: string, ref: SkillPlaceRef): Promise<PlaceSkillDetail | null>
+  placeSkill(name: string, ref: SkillPlaceRef): Promise<PlaceSkillDetail | null>
   /**
    * One text file of a skill in one place, read where it lives. A linked
    * skill's files belong to the library, but they are read through this too:
    * the path is the one the place sees.
    *
-   * @param id — the skill's directory name under that place.
+   * @param name — the skill's directory name under that place.
    * @param path — the file's path inside the skill directory.
    * @param ref — the place to read.
    */
-  placeFile(id: string, path: string, ref: SkillPlaceRef): Promise<string>
+  placeFile(name: string, path: string, ref: SkillPlaceRef): Promise<string>
   /**
    * Put one library skill into one place.
    *
-   * @param id — the skill's directory name in the library.
+   * @param name — the skill's directory name in the library.
    * @param ref — the place to write into.
    * @returns how it landed.
    */
-  installInto(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
+  installInto(name: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /**
    * Link one skill of one place into the library; the place keeps its own
    * directory.
    *
-   * @param id — the skill's directory name under that place.
+   * @param name — the skill's directory name under that place.
    * @param ref — the place to read.
    * @returns how it landed: a link, or a copy where the filesystem cannot hold one.
    */
-  adoptFrom(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
+  adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /**
    * Delete one skill from one place, its directory included. This is the
    * destructive one; `removeFrom` only takes back a link.
    *
-   * @param id — the skill's directory name under that place.
+   * @param name — the skill's directory name under that place.
    * @param ref — the place to delete from.
    */
-  deleteInPlace(id: string, ref: SkillPlaceRef): Promise<void>
+  deleteInPlace(name: string, ref: SkillPlaceRef): Promise<void>
   /**
    * Take one library-installed skill out of one place.
    *
-   * @param id — the skill's directory name under that place.
+   * @param name — the skill's directory name under that place.
    * @param ref — the place to remove from.
    */
-  removeFrom(id: string, ref: SkillPlaceRef): Promise<void>
+  removeFrom(name: string, ref: SkillPlaceRef): Promise<void>
   /**
    * Measure one skill against the upstream it was installed from. Reads the
    * source over the network, so it is asked for, never automatic. The answer
    * is recorded on the row, where a badge and the detail dialog read it back.
    */
-  checkUpdate(id: string): Promise<SkillUpdateCheck>
+  checkUpdate(name: string): Promise<SkillUpdateCheck>
   /**
    * Measure every skill that records a source against it — one CLI run per
    * source, so a package holding several skills is cloned once, not once per
@@ -404,7 +406,7 @@ export interface SkillStore {
    * Install the upstream's current revision over the skill's files, wherever
    * they live, and record the new hash. Refuses when nothing recorded a source.
    */
-  updateFromUpstream(id: string): Promise<void>
+  updateFromUpstream(name: string): Promise<void>
   /** Change notifications from directory watching; returns an unsubscribe. */
   subscribe(listener: () => void): () => void
   /** Release the directory watcher. The store is unusable afterwards. */

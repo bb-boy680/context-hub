@@ -60,7 +60,7 @@ interface Call {
 
 /** One skill in the library to work on, made fresh for the calls that need one. */
 async function one(store: SkillStore, name: string): Promise<string> {
-  return (await store.create({ name, description: "made by the check", tags: ["one"] })).id
+  return (await store.create({ name, description: "made by the check", tags: ["one"] })).name
 }
 
 const CALLS: readonly Call[] = [
@@ -75,17 +75,17 @@ const CALLS: readonly Call[] = [
   {
     label: "one skill",
     run: async (s) => s.get(await one(s, "bridge-get")),
-    keys: ["id", "name", "description", "body", "files"],
+    keys: ["name", "description", "body", "files"],
   },
   {
     label: "adding one",
     run: (s) => s.create({ name: "bridge-create", description: "made by the check" }),
-    keys: ["id", "name", "description"],
+    keys: ["name", "description"],
   },
   {
     label: "changing one",
     run: async (s) => s.update(await one(s, "bridge-update"), { description: "changed", enabled: false }),
-    keys: ["id", "description"],
+    keys: ["name", "description"],
   },
   {
     label: "taking one out",
@@ -141,7 +141,7 @@ const CALLS: readonly Call[] = [
       await s.installInto(id, REF)
       return s.placeSkill(id, REF)
     },
-    keys: ["id", "name"],
+    keys: ["name"],
   },
   {
     label: "one file of a skill in a place",

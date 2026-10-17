@@ -92,18 +92,18 @@ async function fillDetails(
 
 /** One skill this library holds, as its row in the catalog records it. */
 interface HeldSkill {
-  /** The directory name it took on disk, which is the registry's skill id. */
-  id: string
+  /** The directory name it took on disk, which is the registry's skill name. */
+  name: string
   /** The upstream it was installed from, so a same-named fork is not mistaken for it. */
   source: string
 }
 
-/** Whether the library already holds this row: same skill id, from the same source. */
+/** Whether the library already holds this row: same name, from the same source. */
 function holds(held: HeldSkill[], skill: RemoteSkill): boolean {
   const name = skill.name.toLowerCase()
   return held.some(
     (item) =>
-      item.id.toLowerCase() === name &&
+      item.name.toLowerCase() === name &&
       (skill.package === undefined || item.source.toLowerCase() === skill.package.toLowerCase())
   )
 }
@@ -380,7 +380,7 @@ export function SearchSkillsDialog({
         if (!live) return
         setHeld(
           answer.items.map((item) => ({
-            id: item.id,
+            name: item.name,
             source: item.upstream?.source ?? "",
           }))
         )
@@ -414,7 +414,7 @@ export function SearchSkillsDialog({
     const key = rowKey(skill)
     if (store === null || skill.package === undefined) {
       /* Nothing sits behind a preview row, so the mark is all this form can show. */
-      setHeld((current) => [...current, { id: skill.name, source: skill.package ?? "" }])
+      setHeld((current) => [...current, { name: skill.name, source: skill.package ?? "" }])
       return
     }
     setPending((current) => [...current, key])
@@ -427,7 +427,7 @@ export function SearchSkillsDialog({
        * showing. It is said as a toast, so the list keeps its rows.
        */
       if (result.installed.length > 0) {
-        setHeld((current) => [...current, { id: skill.name, source: skill.package ?? "" }])
+        setHeld((current) => [...current, { name: skill.name, source: skill.package ?? "" }])
         onInstalled()
       }
       if (result.failed.length > 0) {
