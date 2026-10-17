@@ -16,7 +16,7 @@
 import * as React from "react"
 
 import { createCatalog, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
-import { useCatalog, useHub, useI18n } from "@context-hub/extensions/react"
+import { useCatalog, useHub, useI18n, useSettings } from "@context-hub/extensions/react"
 
 import {
   PLUGIN_ROUTE,
@@ -392,6 +392,7 @@ const NO_LIBRARY: Catalog<PluginLibraryValue> = createCatalog({
    the menu without a reload of the page. */
 export function usePluginLibrary(): PluginLibrary {
   const { t, state } = useI18n()
+  const { downloadRemoteImages } = useSettings()
   const ctx = useHub()
   const shared = React.useMemo(() => ctx.get(PLUGIN_LIBRARY_SERVICE) ?? null, [ctx])
   const catalog = shared ?? NO_LIBRARY
@@ -550,7 +551,13 @@ export function usePluginLibrary(): PluginLibrary {
     restore,
     remove: (name) => write<void>({ action: "remove", name }),
     setTags: (name, tags) => write<void>({ action: "tags", name, tags }),
-    addAssets: (name, sources) => write<void>({ action: "asset-add", name, sources }),
+    addAssets: (name, sources) =>
+      write<void>({
+        action: "asset-add",
+        name,
+        sources,
+        download: downloadRemoteImages,
+      }),
     removeAsset: (name, ref) => write<void>({ action: "asset-remove", name, ref }),
     install: (name, client, scope) =>
       deliver(client, (installer, tools) => installer.install(name, scope, tools)),

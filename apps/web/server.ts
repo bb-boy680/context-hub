@@ -16,7 +16,10 @@
  * the bound port back over its own channel. Without `--static` this answers on
  * its routes only, which is what development needs.
  */
+import { promises as fs } from "node:fs"
+
 import {
+  createAboutHandler,
   createAssetHandler,
   createExtensionHandler,
   createNetHandler,
@@ -83,12 +86,19 @@ const placed = {
 }
 const root = pathOf(given, "static")
 
+/* This server's own manifest is the version the About row shows. */
+const manifest = JSON.parse(
+  await fs.readFile(new URL("./package.json", import.meta.url), "utf8")
+) as { version?: unknown }
+const version = typeof manifest.version === "string" ? manifest.version : "0.0.0"
+
 const options: HubServerOptions = {
   /* The order the dev server mounted them in, kept: a route that answers on one
      carrier has to answer on the other. */
   middlewares: [
     createAssetHandler(placed),
     createStateHandler({ ...placed, log: (message) => console.warn(message) }),
+    createAboutHandler({ version, ...placed }),
     createExtensionHandler(placed),
     createWorkspaceHandler(placed),
     createNetHandler(),

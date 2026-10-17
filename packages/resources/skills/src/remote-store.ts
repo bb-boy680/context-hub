@@ -5,6 +5,8 @@
  * the difference.
  */
 import { assetRef } from "@context-hub/core"
+import type { AssetImageStats, AssetLocalizeSummary } from "@context-hub/core"
+import type { InstallMode } from "@context-hub/extensions"
 
 import {
   SKILL_ROUTE,
@@ -145,8 +147,20 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       )
     },
 
-    addAssetSource(name: string, source: string): Promise<SkillAsset> {
-      return write<SkillAsset>(base, "add-asset-source", { name, source })
+    addAssetSource(
+      name: string,
+      source: string,
+      download = false
+    ): Promise<SkillAsset> {
+      return write<SkillAsset>(base, "add-asset-source", { name, source, download })
+    },
+
+    assetStats(): Promise<AssetImageStats> {
+      return read<AssetImageStats>(base, "action=asset-stats")
+    },
+
+    localizeAssets(): Promise<AssetLocalizeSummary> {
+      return write<AssetLocalizeSummary>(base, "localize-assets", {})
     },
 
     async deleteAsset(name: string, ref: string): Promise<void> {
@@ -186,18 +200,28 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       return body.text
     },
 
-    async installInto(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async installInto(
+      name: string,
+      ref: SkillPlaceRef,
+      mode: InstallMode = "auto"
+    ): Promise<SkillInstall> {
       const body = await write<{ mode: SkillInstall }>(base, "install-place", {
         name,
         ...placeBody(ref),
+        mode,
       })
       return body.mode
     },
 
-    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async adoptFrom(
+      name: string,
+      ref: SkillPlaceRef,
+      mode: InstallMode = "auto"
+    ): Promise<SkillInstall> {
       const body = await write<{ mode: SkillInstall }>(base, "adopt-place", {
         name,
         ...placeBody(ref),
+        mode,
       })
       return body.mode
     },

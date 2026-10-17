@@ -11,6 +11,7 @@ import { chosenAgentsOf } from "./agents.ts"
 import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
+import type { HubSettings } from "./settings.ts"
 import type { ContributionMap, ExtensionPointId } from "./types.ts"
 
 const HubContext = React.createContext<Context | null>(null)
@@ -104,6 +105,29 @@ export function useI18n(): I18n {
       state,
       t: (key) => ctx.i18n.t(key),
       setLocale: (id) => ctx.i18n.setLocale(id),
+    }),
+    [ctx, state]
+  )
+}
+
+/**
+ * Settings and their control returned by {@link useSettings}.
+ */
+export interface SettingsControl extends HubSettings {
+  set(patch: Partial<HubSettings>): void
+}
+
+/** This machine's hub settings, re-rendering on every change. */
+export function useSettings(): SettingsControl {
+  const ctx = useHub()
+  const state = React.useSyncExternalStore(
+    (onChange) => ctx.on("settings/change", onChange),
+    () => ctx.settings.state
+  )
+  return React.useMemo<SettingsControl>(
+    () => ({
+      ...state,
+      set: (patch) => ctx.settings.set(patch),
     }),
     [ctx, state]
   )

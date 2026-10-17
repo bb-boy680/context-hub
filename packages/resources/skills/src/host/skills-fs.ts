@@ -30,7 +30,10 @@ import { promises as fs, watch } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
-import { assetKind, assetRef, readSource } from "@context-hub/core"
+import { assetKind, assetRef, imageRefsOf, isLink, readSource } from "@context-hub/core"
+import type { AssetImageStats, AssetLocalizeSummary } from "@context-hub/core"
+import { downloadRemoteImage } from "@context-hub/core/host/remote-image"
+import type { InstallMode } from "@context-hub/extensions"
 import { createAssetStore } from "@context-hub/core"
 import { createFsAssetLibrary } from "@context-hub/core/host"
 import { TEMP_PREFIX, writeFileAtomic } from "@context-hub/core/host/atomic"
@@ -828,7 +831,11 @@ export async function createFsSkillStore(
       return recordAsset(name, await assets.put(owned(name, file)))
     },
 
-    async addAssetSource(name: string, source: string): Promise<SkillAsset> {
+    async addAssetSource(
+      name: string,
+      source: string,
+      download = false
+    ): Promise<SkillAsset> {
       const current = await loadCatalog()
       const row = current.skills[name]
       if (row === undefined) throw new Error(`unknown skill: ${name}`)
@@ -838,9 +845,65 @@ export async function createFsSkillStore(
         if (row.assets.includes(parsed.ref)) {
           return { ref: parsed.ref, kind: assetKind(parsed.ref) }
         }
+        if (download) {
+          const kept = await downloadRemoteImage(parsed.ref).then(
+            (file) => assets.put(owned(name, file)),
+            (error: unknown) => {
+              /* A dead or oversized picture must not stop the skill being
+                 edited; the address stays recorded instead. */
+              console.warn(`context hub: could not download ${parsed.ref}`, error)
+              return null
+            }
+          )
+          if (kept !== null) return recordAsset(name, kept)
+        }
         return recordAsset(name, parsed.ref)
       }
       return recordAsset(name, await assets.put(owned(name, parsed.file)))
+    },
+
+    async assetStats(): Promise<AssetImageStats> {
+      const current = await loadCatalog()
+      const refs = Object.values(current.skills).flatMap((row) => row.assets)
+      const { remote, localized } = imageRefsOf(refs)
+      return { remote: remote.length, localized: localized.length }
+    },
+
+    async localizeAssets(): Promise<AssetLocalizeSummary> {
+      const current = await loadCatalog()
+      const replacements = new Map<string, string>()
+      const failed: { ref: string; reason: string }[] = []
+      let downloaded = 0
+      for (const [name, row] of Object.entries(current.skills)) {
+        for (const ref of row.assets) {
+          if (!isLink(ref) || assetKind(ref) !== "image") continue
+          try {
+            const file = await downloadRemoteImage(ref)
+            replacements.set(`${name}\u0000${ref}`, await assets.put(owned(name, file)))
+            downloaded += 1
+          } catch (error) {
+            failed.push({
+              ref,
+              reason: error instanceof Error ? error.message : String(error),
+            })
+          }
+        }
+      }
+      if (replacements.size > 0) {
+        /* One write for the whole pass: a row keeps every reference the pass
+           could not replace, and nothing is recorded twice. */
+        await mutate((skills) => {
+          for (const [name, row] of Object.entries(skills)) {
+            const next = row.assets.map(
+              (ref) => replacements.get(`${name}\u0000${ref}`) ?? ref
+            )
+            if (next.some((ref, at) => ref !== row.assets[at])) {
+              skills[name] = { ...row, assets: next, updatedAt: new Date().toISOString() }
+            }
+          }
+        })
+      }
+      return { downloaded, failed }
     },
 
     async deleteAsset(name: string, ref: string): Promise<void> {
@@ -880,14 +943,22 @@ export async function createFsSkillStore(
       return text
     },
 
-    async installInto(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async installInto(
+      name: string,
+      ref: SkillPlaceRef,
+      mode: InstallMode = "auto"
+    ): Promise<SkillInstall> {
       const base = await requiredBase(ref.scope)
-      return installSkillInto(base, root, name, ref.dir)
+      return installSkillInto(base, root, name, ref.dir, mode)
     },
 
-    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
+    async adoptFrom(
+      name: string,
+      ref: SkillPlaceRef,
+      mode: InstallMode = "auto"
+    ): Promise<SkillInstall> {
       const base = await requiredBase(ref.scope)
-      const landed = await linkSkillIntoLibrary(base, root, name, ref.dir)
+      const landed = await linkSkillIntoLibrary(base, root, name, ref.dir, mode)
       /* What the skills CLI installed this from, if it did: the lock beside
          the place's skills is the record, and its hash is what an update
          check compares against. Without it the skill is still listed, but

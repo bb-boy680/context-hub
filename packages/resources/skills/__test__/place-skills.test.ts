@@ -32,6 +32,9 @@ const SHARED = path.join(".agents", "skills")
 /** One agent's own directory, which is what a place is for. */
 const AGENT_DIR = path.join(".claude", "skills")
 
+/** A place of its own for the copy cases, so they leave the shared list alone. */
+const COPY_DIR = path.join(".copy", "skills")
+
 /* Built at module scope, not in a hook, so a case table below can name the
    workspace's own absolute path — which is one of the inputs under test. */
 const home = mkdtempSync(path.join(tmpdir(), "context-hub-place-skills-"))
@@ -107,8 +110,37 @@ describe("installing", () => {
   })
 })
 
-/* The project's own skills belong to the project, and are read, never claimed. */
-describe("a skill the project wrote itself", () => {
+/* An explicit mode is a choice, not a hint: copying never makes a link. */
+describe("installing by copy", () => {
+  it("keeps its own copy instead of linking into the library", async () => {
+    const target = path.join(placeSkillRoot(workspace, COPY_DIR), "beta")
+    expect(await installSkillInto(workspace, library, "beta", COPY_DIR, "copy")).toBe("copy")
+
+    const stat = await fs.lstat(target)
+    expect(stat.isSymbolicLink(), "a copy is not a link").toBe(false)
+    expect(await fs.readFile(path.join(target, "SKILL.md"), "utf8")).toContain("Beta")
+  })
+})
+
+describe("copying a place skill into the library", () => {
+  it("keeps the library's own copy when asked to copy", async () => {
+    await writeSkill(
+      path.join(placeSkillRoot(workspace, COPY_DIR), "copied-one"),
+      "Copied",
+      "From a place"
+    )
+    expect(await linkSkillIntoLibrary(workspace, library, "copied-one", COPY_DIR, "copy")).toBe(
+      "copy"
+    )
+
+    const target = path.join(library, "copied-one")
+    const stat = await fs.lstat(target)
+    expect(stat.isSymbolicLink(), "a copy is not a link").toBe(false)
+    expect(await fs.readFile(path.join(target, "SKILL.md"), "utf8")).toContain("Copied")
+  })
+})
+
+/* The project's own skills belong to the project, and are read, never claimed. */describe("a skill the project wrote itself", () => {
   beforeAll(async () => {
     await writeSkill(path.join(sharedRoot(), "own-one"), "Own one", "Written here")
     await fs.mkdir(path.join(sharedRoot(), "not-a-skill"), { recursive: true })

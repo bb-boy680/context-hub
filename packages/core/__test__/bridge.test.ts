@@ -24,15 +24,18 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createHubServer, type HubListener } from "@context-hub/core/host/server"
 
 import {
+  createAboutHandler,
   createAssetHandler,
   createExtensionHandler,
   createNetHandler,
   createStateHandler,
 } from "../handlers.ts"
+import { ABOUT_ROUTE } from "../src/about.ts"
 import { ASSET_ROUTE } from "../src/assets.ts"
 import { EXTENSION_ROUTE } from "../src/plugins.ts"
 import { NET_ROUTE, createRemoteNet } from "../src/net.ts"
 import { STATE_ROUTE } from "../src/state.ts"
+import { displayPath } from "../src/host/home.ts"
 
 const PACK_ID = "check.plugin"
 const MANIFEST = JSON.stringify({ id: PACK_ID, name: "Check", version: "0.0.1" })
@@ -56,6 +59,7 @@ beforeAll(async () => {
     middlewares: [
       createAssetHandler({ home }),
       createStateHandler({ home, log: () => undefined }),
+      createAboutHandler({ version: "9.9.9", home }),
       createExtensionHandler({ home }),
       createNetHandler(),
     ],
@@ -71,6 +75,22 @@ afterAll(async () => {
 })
 
 const at = (route: string) => `${base}${route}`
+
+describe("the about read", () => {
+  it("names this build and this machine's hub home", async () => {
+    const response = await fetch(at(ABOUT_ROUTE))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      version: "9.9.9",
+      home: displayPath(home),
+    })
+  })
+
+  it("does not answer for a path that merely starts with it", async () => {
+    const response = await fetch(at(`${ABOUT_ROUTE}X`))
+    expect(response.status).toBe(404)
+  })
+})
 
 describe("the state documents", () => {
   it("are listed, written and read back", async () => {

@@ -27,7 +27,7 @@ import type {
   SkillUpdateCheck,
 } from "./store.ts"
 
-import { useI18n } from "@context-hub/extensions/react"
+import { useI18n, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 import {
   CodeCard,
@@ -147,6 +147,7 @@ function useMediaItems(
   detail: SkillDetail | null,
   onChanged: () => void
 ): MediaSource {
+  const { downloadRemoteImages } = useSettings()
   const [preview, setPreview] = React.useState<MediaItem[]>(() => seedItems(skill))
   const [busy, setBusy] = React.useState(false)
   const objectUrls = React.useRef<string[]>([])
@@ -209,13 +210,13 @@ function useMediaItems(
       }
       setBusy(true)
       try {
-        await store.addAssetSource(detail.name, src)
+        await store.addAssetSource(detail.name, src, downloadRemoteImages)
         onChanged()
       } finally {
         setBusy(false)
       }
     },
-    [store, detail, onChanged]
+    [store, detail, onChanged, downloadRemoteImages]
   )
 
   const remove = React.useCallback(

@@ -20,6 +20,7 @@
   },
   "exports": {
     ".": "./src/assets.ts",
+    "./about": "./src/about.ts",
     "./net": "./src/net.ts",
     "./place-files": "./src/place-files.ts",
     "./plugins": "./src/plugins.ts",
@@ -35,6 +36,7 @@
     "./host/server": "./src/host/server.ts",
     "./host/plugins": "./src/host/plugins-fs.ts",
     "./host/place-files": "./src/host/place-files.ts",
+    "./host/remote-image": "./src/host/remote-image.ts",
     "./host/state": "./src/host/state-fs.ts",
     "./host/workspaces": "./src/host/workspaces-fs.ts",
     "./handlers": "./handlers.ts"

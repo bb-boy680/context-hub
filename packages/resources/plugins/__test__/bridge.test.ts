@@ -78,6 +78,11 @@ const post = (body: unknown): RequestInit => ({
 const CALLS: readonly Call[] = [
   { label: "the whole library", path: "?action=list", keys: ["root", "plugins", "missing"] },
   {
+    label: "how many of its pictures are remote",
+    path: "?action=asset-stats",
+    keys: ["remote", "localized"],
+  },
+  {
     label: "one pack's files, by name",
     path: `?action=files&name=${PACK}`,
     keys: [],

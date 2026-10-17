@@ -4,7 +4,8 @@
  * carry the same calls over their own channel, so nothing here assumes a
  * transport.
  */
-import type { AssetScope } from "@context-hub/extensions"
+import type { AssetScope, InstallMode } from "@context-hub/extensions"
+import type { AssetImageStats, AssetLocalizeSummary } from "@context-hub/core"
 
 /**
  * Route this library answers on, whichever channel the form carries it over.
@@ -323,9 +324,18 @@ export interface SkillStore {
   putAsset(name: string, file: File): Promise<SkillAsset>
   /**
    * Add one pasted source. A remote address is recorded as it is; a `data:`
-   * source is stored as a file the hub owns.
+   * source is stored as a file the hub owns. With `download`, a remote image is
+   * fetched into the hub's own assets first, and only stays a link when that
+   * fetch fails.
    */
-  addAssetSource(name: string, source: string): Promise<SkillAsset>
+  addAssetSource(name: string, source: string, download?: boolean): Promise<SkillAsset>
+  /** How many of this library's pictures are remote and how many it keeps. */
+  assetStats(): Promise<AssetImageStats>
+  /**
+   * Download every remote image this library holds into its own assets. A
+   * reference that fails keeps its link and is reported; the rest land once.
+   */
+  localizeAssets(): Promise<AssetLocalizeSummary>
   /** Drop one reference, deleting the stored file when the hub owns it. */
   deleteAsset(name: string, ref: string): Promise<void>
   /** The URL that shows one reference; a remote URL passes through unchanged. */
@@ -364,7 +374,7 @@ export interface SkillStore {
    * @param ref — the place to write into.
    * @returns how it landed.
    */
-  installInto(name: string, ref: SkillPlaceRef): Promise<SkillInstall>
+  installInto(name: string, ref: SkillPlaceRef, mode?: InstallMode): Promise<SkillInstall>
   /**
    * Link one skill of one place into the library; the place keeps its own
    * directory.
@@ -373,7 +383,7 @@ export interface SkillStore {
    * @param ref — the place to read.
    * @returns how it landed: a link, or a copy where the filesystem cannot hold one.
    */
-  adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall>
+  adoptFrom(name: string, ref: SkillPlaceRef, mode?: InstallMode): Promise<SkillInstall>
   /**
    * Delete one skill from one place, its directory included. This is the
    * destructive one; `removeFrom` only takes back a link.

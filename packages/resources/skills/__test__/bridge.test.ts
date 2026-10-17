@@ -130,6 +130,11 @@ const CALLS: readonly Call[] = [
     keys: [],
   },
   {
+    label: "counting the library's pictures",
+    run: (s) => s.assetStats(),
+    keys: ["remote", "localized"],
+  },
+  {
     label: "reading a place",
     run: (s) => s.placeSkills(REF),
     keys: ["root", "display", "skills"],
@@ -155,6 +160,13 @@ const CALLS: readonly Call[] = [
   {
     label: "installing into a place",
     run: async (s) => ({ mode: await s.installInto(await one(s, "bridge-install"), REF) }),
+    keys: ["mode"],
+  },
+  {
+    label: "installing into a place by copy",
+    run: async (s) => ({
+      mode: await s.installInto(await one(s, "bridge-copy"), REF, "copy"),
+    }),
     keys: ["mode"],
   },
   {
@@ -189,6 +201,19 @@ const CALLS: readonly Call[] = [
         "utf8"
       )
       return { mode: await s.adoptFrom("adopted-here", REF) }
+    },
+    keys: ["mode"],
+  },
+  {
+    label: "adopting one out of a place by copy",
+    run: async (s) => {
+      await fs.mkdir(path.join(place, "adopted-copy"), { recursive: true })
+      await fs.writeFile(
+        path.join(place, "adopted-copy", "SKILL.md"),
+        "---\nname: adopted-copy\ndescription: copied from the place\n---\n\nBody.\n",
+        "utf8"
+      )
+      return { mode: await s.adoptFrom("adopted-copy", REF, "copy") }
     },
     keys: ["mode"],
   },

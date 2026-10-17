@@ -15,7 +15,7 @@ import { execFile } from "node:child_process"
 import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 
 import { Context } from "@deepseek-ai/cordis"
 
@@ -1958,5 +1958,66 @@ describe("what a pack carries inside it", () => {
     )
     expect(none.commands, "and no commands").toHaveLength(0)
     expect(none.mcp, "and no declared server").toBeNull()
+  })
+})
+
+describe("downloading pictures on arrival", () => {
+  it("keeps a copy when asked, and counts what it keeps", async () => {
+    const hub = path.join(root, "images-hub")
+    const pack = path.join(root, "images-pack")
+    await writePack(pack, "1.0.0")
+    const imageLibrary = createFsPluginLibrary(hub)
+    await createPluginCollector(imageLibrary).add(pack)
+
+    vi.stubGlobal(
+      "fetch",
+      async () =>
+        new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        })
+    )
+    try {
+      await imageLibrary.addAssets("acme-hello", ["https://cdn.test/one.png"], true)
+      const row = (await imageLibrary.list()).find((one) => one.name === "acme-hello")
+      expect(row?.assets[0], "a downloaded picture is the hub's").toMatch(/^assets\//)
+      expect(await imageLibrary.assetStats(), "and is counted as local").toEqual({
+        remote: 0,
+        localized: 1,
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it("downloads existing remote pictures and keeps what it cannot reach", async () => {
+    const hub = path.join(root, "images-pass-hub")
+    const pack = path.join(root, "images-pass-pack")
+    await writePack(pack, "1.0.0")
+    const imageLibrary = createFsPluginLibrary(hub)
+    await createPluginCollector(imageLibrary).add(pack)
+    await imageLibrary.addAssets("acme-hello", [
+      "https://cdn.test/good.png",
+      "https://cdn.test/bad.png",
+    ])
+
+    vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+      if (String(input).endsWith("bad.png")) return new Response("gone", { status: 404 })
+      return new Response(new Uint8Array([4]), {
+        status: 200,
+        headers: { "content-type": "image/png" },
+      })
+    })
+    try {
+      const summary = await imageLibrary.localizeAssets()
+      expect(summary.downloaded, "the reachable picture landed").toBe(1)
+      expect(summary.failed, "the unreachable one is reported").toHaveLength(1)
+      expect(await imageLibrary.assetStats(), "one of each now").toEqual({
+        remote: 1,
+        localized: 1,
+      })
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 })

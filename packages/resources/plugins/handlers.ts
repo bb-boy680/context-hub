@@ -152,6 +152,12 @@ export function createPluginHandler(
         return
       }
 
+      /* How many of the pictures a person added are remote and how many the hub keeps. */
+      if (method === "GET" && action === "asset-stats") {
+        sendJson(response, 200, await library.assetStats())
+        return
+      }
+
       /* One pack's files. `name` reads a pack this hub holds, `dir` reads
          one an agent keeps in place — a pack the hub never collected is
          still a directory with files in it, and its panel reads that. */
@@ -280,9 +286,13 @@ export function createPluginHandler(
         case "asset-add":
           await library.addAssets(
             requiredString(body.name, "name"),
-            sourceStrings(body.sources)
+            sourceStrings(body.sources),
+            body.download === true
           )
           sendJson(response, 200, { root: library.root, plugins: await library.list() })
+          return
+        case "localize-assets":
+          sendJson(response, 200, await library.localizeAssets())
           return
         case "asset-remove":
           await library.removeAsset(

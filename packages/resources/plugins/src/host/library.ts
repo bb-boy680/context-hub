@@ -20,7 +20,9 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import { isLink, readSource } from "@context-hub/core"
+import { assetKind, imageRefsOf, isLink, readSource } from "@context-hub/core"
+import type { AssetImageStats, AssetLocalizeSummary } from "@context-hub/core"
+import { downloadRemoteImage } from "@context-hub/core/host/remote-image"
 import { createAssetStore } from "@context-hub/core"
 import { createFsAssetLibrary } from "@context-hub/core/host"
 import { writeFileAtomic } from "@context-hub/core/host/atomic"
@@ -123,7 +125,14 @@ export interface PluginLibrary {
    * @throws {Error} when the name is not a pack this hub holds, which is the one
    * thing that stops a picture being recorded with nothing to belong to.
    */
-  addAssets(name: string, sources: readonly string[]): Promise<void>
+  addAssets(name: string, sources: readonly string[], download?: boolean): Promise<void>
+  /** How many of the pictures a person added are remote and how many the hub keeps. */
+  assetStats(): Promise<AssetImageStats>
+  /**
+   * Download every remote picture a pack records into the hub's own assets. A
+   * reference that fails keeps its link and is reported; the rest land once.
+   */
+  localizeAssets(): Promise<AssetLocalizeSummary>
   /**
    * Drop one picture a person added, and the file the hub kept for it.
    *
@@ -530,7 +539,7 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
       })
     },
 
-    addAssets(name, sources) {
+    addAssets(name, sources, download = false) {
       return run(async () => {
         const records = await readDocument()
         const record = records.find((one) => one.name === name)
@@ -538,9 +547,25 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
         const added: string[] = []
         for (const source of sources) {
           const chosen = readSource(source)
-          /* An address is recorded as it stands — the hub owns none of it — while
-             what a person carried in is bytes it keeps. */
-          added.push(chosen.kind === "link" ? chosen.ref : await store.put(owned(name, chosen.file)))
+          if (chosen.kind === "link") {
+            if (download) {
+              const kept = await downloadRemoteImage(chosen.ref).then(
+                (file) => store.put(owned(name, file)),
+                (error: unknown) => {
+                  /* A dead or oversized picture must not stop the pack being
+                     edited; the address stays recorded instead. */
+                  console.warn(`context hub: could not download ${chosen.ref}`, error)
+                  return null
+                }
+              )
+              added.push(kept ?? chosen.ref)
+              continue
+            }
+            /* An address is recorded as it stands — the hub owns none of it. */
+            added.push(chosen.ref)
+            continue
+          }
+          added.push(await store.put(owned(name, chosen.file)))
         }
         if (added.length === 0) return
         /* Newest first: this array is the order a pack is drawn by, so what was
@@ -552,6 +577,55 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
               : one
           )
         )
+      })
+    },
+
+    assetStats() {
+      return run(async () => {
+        const records = await readDocument()
+        const refs = records.flatMap((record) => record.assets)
+        const { remote, localized } = imageRefsOf(refs)
+        return { remote: remote.length, localized: localized.length }
+      })
+    },
+
+    localizeAssets() {
+      return run(async () => {
+        const records = await readDocument()
+        const replacements = new Map<string, string>()
+        const failed: { ref: string; reason: string }[] = []
+        let downloaded = 0
+        for (const record of records) {
+          for (const ref of record.assets) {
+            if (!isLink(ref) || assetKind(ref) !== "image") continue
+            try {
+              const file = await downloadRemoteImage(ref)
+              replacements.set(
+                `${record.name}\u0000${ref}`,
+                await store.put(owned(record.name, file))
+              )
+              downloaded += 1
+            } catch (error) {
+              failed.push({
+                ref,
+                reason: error instanceof Error ? error.message : String(error),
+              })
+            }
+          }
+        }
+        if (replacements.size > 0) {
+          await save(
+            records.map((record) => {
+              const next = record.assets.map(
+                (ref) => replacements.get(`${record.name}\u0000${ref}`) ?? ref
+              )
+              return next.some((ref, at) => ref !== record.assets[at])
+                ? { ...record, assets: next }
+                : record
+            })
+          )
+        }
+        return { downloaded, failed }
       })
     },
 

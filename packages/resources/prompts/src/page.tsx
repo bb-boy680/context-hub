@@ -40,7 +40,7 @@ import {
   type PlaceOption,
 } from "@context-hub/extensions/components"
 import type { AssetScope } from "@context-hub/extensions"
-import { useI18n } from "@context-hub/extensions/react"
+import { useI18n, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
@@ -375,7 +375,8 @@ export function PromptsPage() {
   const places = usePromptPlaces()
   const files = usePlaceFiles()
 
-  const [view, setView] = React.useState<"grid" | "list">("grid")
+  const settings = useSettings()
+  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   const [query, setQuery] = React.useState("")
   const [tag, setTag] = React.useState<string>("")
   const [page, setPage] = React.useState(0)

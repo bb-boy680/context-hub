@@ -14,7 +14,7 @@
 import { promises as fs } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { afterAll, beforeAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 
 import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import type { SkillStore } from "../src/store.ts"
@@ -611,5 +611,80 @@ describe("creating with a name of your own", () => {
     )
     named.dispose()
     await fs.rm(nameHome, { recursive: true, force: true })
+  })
+})
+
+describe("downloading remote pictures", () => {
+  it("counts them, downloads what it can, and keeps what it cannot", async () => {
+    const imageHome = await fs.mkdtemp(path.join(tmpdir(), "context-hub-images-"))
+    const imageStore = await createFsSkillStore({ home: imageHome, userHome: imageHome })
+    try {
+      await imageStore.create({ name: "pictured", description: "Has pictures" })
+      await imageStore.addAssetSource("pictured", "https://cdn.test/one.png")
+      await imageStore.addAssetSource("pictured", "https://cdn.test/two.png")
+
+      expect(await imageStore.assetStats(), "both are remote").toEqual({
+        remote: 2,
+        localized: 0,
+      })
+
+      vi.stubGlobal("fetch", async (input: string | URL | Request) => {
+        if (String(input).endsWith("two.png")) {
+          return new Response("gone", { status: 404 })
+        }
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        })
+      })
+
+      const summary = await imageStore.localizeAssets()
+      expect(summary.downloaded, "the reachable picture landed").toBe(1)
+      expect(summary.failed, "the unreachable one is reported").toHaveLength(1)
+      expect(summary.failed[0]?.ref, "by its address").toBe("https://cdn.test/two.png")
+      expect(await imageStore.assetStats(), "one of each now").toEqual({
+        remote: 1,
+        localized: 1,
+      })
+
+      const row = await imageStore.get("pictured")
+      expect(
+        row.assets.some((ref) => ref.startsWith("assets/")),
+        "the downloaded picture is the hub's"
+      ).toBe(true)
+      expect(row.assets, "and the failed one is still its address").toContain(
+        "https://cdn.test/two.png"
+      )
+    } finally {
+      vi.unstubAllGlobals()
+      await fs.rm(imageHome, { recursive: true, force: true })
+    }
+  })
+
+  it("downloads a picture as it is added when asked", async () => {
+    const imageHome = await fs.mkdtemp(path.join(tmpdir(), "context-hub-images-"))
+    const imageStore = await createFsSkillStore({ home: imageHome, userHome: imageHome })
+    try {
+      await imageStore.create({ name: "pictured", description: "Has pictures" })
+      vi.stubGlobal(
+        "fetch",
+        async () =>
+          new Response(new Uint8Array([9]), {
+            status: 200,
+            headers: { "content-type": "image/png" },
+          })
+      )
+
+      const kept = await imageStore.addAssetSource(
+        "pictured",
+        "https://cdn.test/three.png",
+        true
+      )
+      expect(kept.ref, "a downloaded addition is the hub's").toMatch(/^assets\//)
+      expect(kept.kind, "and reports the kind it is").toBe("image")
+    } finally {
+      vi.unstubAllGlobals()
+      await fs.rm(imageHome, { recursive: true, force: true })
+    }
   })
 })

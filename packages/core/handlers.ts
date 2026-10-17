@@ -16,6 +16,7 @@ import { createReadStream, promises as fs } from "node:fs"
 import type { ServerResponse } from "node:http"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
+import { ABOUT_ROUTE } from "./src/about.ts"
 import { NET_ROUTE } from "./src/net.ts"
 import { PLACE_FILES_ROUTE, readPlaceCall } from "./src/place-files.ts"
 import { EXTENSION_ROUTE } from "./src/plugins.ts"
@@ -23,7 +24,8 @@ import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
 import { hostFolder } from "./src/host/fs-browse.ts"
-import { resolveHubHome } from "./src/host/home.ts"
+import { displayPath, resolveHubHome } from "./src/host/home.ts"
+import { isPublicHostname } from "./src/host/remote-image.ts"
 import {
   contentTypeOf,
   readBody,
@@ -171,6 +173,28 @@ export function createStateHandler(
     } catch (error) {
       sendError(response, error)
     }
+  }
+}
+
+/** Says which build this is and where this machine keeps its files. */
+export function createAboutHandler(options: {
+  version: string
+  home?: string
+}): HubMiddleware {
+  return async (request, response, next) => {
+    const url = new URL(request.url ?? "/", "http://localhost")
+    if (under(ABOUT_ROUTE, url.pathname) !== "") {
+      next()
+      return
+    }
+    if ((request.method ?? "GET") !== "GET") {
+      sendError(response, new Error(`unsupported method ${request.method ?? "GET"}`), 405)
+      return
+    }
+    sendJson(response, 200, {
+      version: options.version,
+      home: displayPath(resolveHubHome(options.home)),
+    })
   }
 }
 
@@ -334,24 +358,6 @@ const NET_TIMEOUT_MS = 10_000
 /** Most body bytes this route will read from an upstream response. */
 const NET_MAX_BYTES = 4 * 1024 * 1024
 
-/** Hosts a request from a plugin never reaches: this machine and its neighbours. */
-function isPublicHost(hostname: string): boolean {
-  const host = hostname.replace(/^\[|\]$/g, "").toLowerCase()
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local")) return false
-  if (host === "::1" || host.startsWith("fe80:") || host.startsWith("fc") || host.startsWith("fd")) return false
-  const parts = host.split(".")
-  if (parts.length === 4 && parts.every((part) => /^\d+$/.test(part))) {
-    const [a, b] = parts.map(Number)
-    if (a === 10 || a === 127 || a === 0) return false
-    if (a === 172 && b >= 16 && b <= 31) return false
-    if (a === 192 && b === 168) return false
-    if (a === 169 && b === 254) return false
-    return true
-  }
-  /* A name with no dot resolves through search domains; refuse it rather than guess. */
-  return parts.length > 1
-}
-
 /** Read one upstream response, refusing anything the rules above exclude. */
 async function fetchThroughProxy(asked: NetRequest): Promise<NetReply> {
   if (typeof asked.url !== "string" || asked.url === "") {
@@ -366,7 +372,7 @@ async function fetchThroughProxy(asked: NetRequest): Promise<NetReply> {
   if (target.protocol !== "https:") {
     throw new Error("net: only https URLs are fetched")
   }
-  if (!isPublicHost(target.hostname)) {
+  if (!isPublicHostname(target.hostname)) {
     throw new Error(`net: refusing to fetch ${target.hostname}`)
   }
   const upstream = await fetch(target, {

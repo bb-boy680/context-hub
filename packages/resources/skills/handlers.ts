@@ -10,6 +10,7 @@
  */
 import { createAssetStore } from "@context-hub/core"
 import type { AssetSink, AssetStore } from "@context-hub/core"
+import type { InstallMode } from "@context-hub/extensions"
 import { createFsAssetLibrary } from "@context-hub/core/host"
 import { hostFolder } from "@context-hub/core/host/fs-browse"
 import { resolveHubHome } from "@context-hub/core/host/home"
@@ -187,6 +188,11 @@ export function createSkillHandler(
             sendJson(response, 200, await api.tags())
             return
 
+          /* How many of this library's pictures are remote and how many it keeps. */
+          case "asset-stats":
+            sendJson(response, 200, await api.assetStats())
+            return
+
           /* What a package offers, before anything is written to disk. */
           case "package":
             sendJson(
@@ -300,9 +306,15 @@ export function createSkillHandler(
             200,
             await api.addAssetSource(
               requiredText(body.name, "skill name"),
-              requiredText(body.source, "source")
+              requiredText(body.source, "source"),
+              body.download === true
             )
           )
+          return
+
+        /* Download every remote picture this library holds. */
+        case "localize-assets":
+          sendJson(response, 200, await api.localizeAssets())
           return
 
         case "delete-asset":
@@ -326,13 +338,21 @@ export function createSkillHandler(
         /* Link one library skill into a place, or adopt one out of it. */
         case "install-place":
           sendJson(response, 200, {
-            mode: await api.installInto(requiredText(body.name, "skill name"), bodyRef(body)),
+            mode: await api.installInto(
+              requiredText(body.name, "skill name"),
+              bodyRef(body),
+              bodyMode(body.mode)
+            ),
           })
           return
 
         case "adopt-place":
           sendJson(response, 200, {
-            mode: await api.adoptFrom(requiredText(body.name, "skill name"), bodyRef(body)),
+            mode: await api.adoptFrom(
+              requiredText(body.name, "skill name"),
+              bodyRef(body),
+              bodyMode(body.mode)
+            ),
           })
           return
 
@@ -356,8 +376,14 @@ export function createSkillHandler(
 }
 
 /** A field a body carries, refused when it is missing or not a string. */
-function requiredText(value: unknown, what: string): string {
-  if (typeof value !== "string" || value === "") throw new Error(`missing ${what}`)
+/** The installation method a write names; omitted keeps the automatic choice. */
+function bodyMode(value: unknown): InstallMode {
+  if (value === undefined) return "auto"
+  if (value === "auto" || value === "link" || value === "copy") return value
+  throw new Error(`unknown install mode: ${String(value)}`)
+}
+
+function requiredText(value: unknown, what: string): string {  if (typeof value !== "string" || value === "") throw new Error(`missing ${what}`)
   return value
 }
 

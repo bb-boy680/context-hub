@@ -14,6 +14,7 @@ import { promises as fs } from "node:fs"
 import path from "node:path"
 
 import { displayPath } from "@context-hub/core/host/home"
+import type { InstallMode } from "@context-hub/extensions"
 
 import { parseSkillFile } from "../frontmatter.ts"
 import { walkSkillDir } from "./file-tree.ts"
@@ -51,6 +52,46 @@ export function assertSkillDir(dir: string): string {
  * anything else.
  */
 const LINK_UNSUPPORTED = new Set(["EPERM", "EACCES", "ENOTSUP", "EINVAL", "UNKNOWN"])
+
+/**
+ * Move one skill directory into place by the chosen method. `auto` keeps the
+ * historical behavior — link where the filesystem holds one, copy where it does
+ * not. An explicit choice never falls back: a person who asked for a link
+ * should hear that this filesystem cannot hold one, not silently receive a
+ * second copy that will drift.
+ */
+async function placeSkill(
+  mode: InstallMode,
+  source: string,
+  target: string,
+  dereference: boolean
+): Promise<SkillInstall> {
+  if (mode !== "copy") {
+    try {
+      await fs.symlink(source, target, process.platform === "win32" ? "junction" : "dir")
+      return "link"
+    } catch (error) {
+      const code = (error as { code?: string }).code ?? ""
+      if (mode === "link") {
+        throw new Error("this filesystem cannot hold a link; choose copy or automatic", {
+          cause: error,
+        })
+      }
+      if (!LINK_UNSUPPORTED.has(code)) throw error
+    }
+  }
+  try {
+    await fs.cp(
+      source,
+      target,
+      dereference ? { recursive: true, dereference: true } : { recursive: true }
+    )
+  } catch (failure) {
+    await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
+    throw failure
+  }
+  return "copy"
+}
 
 /** Whether one path sits inside a directory, on either separator. */
 function isInside(root: string, target: string): boolean {
@@ -194,7 +235,8 @@ export async function installSkillInto(
   base: string,
   libraryRoot: string,
   id: string,
-  dir: string
+  dir: string,
+  mode: InstallMode = "auto"
 ): Promise<SkillInstall> {
   const name = assertSkillName(id)
   const source = path.join(libraryRoot, name)
@@ -207,22 +249,7 @@ export async function installSkillInto(
   const existing = await fs.lstat(target).catch(() => null)
   if (existing !== null) throw new Error(`already in this place: ${id}`)
 
-  try {
-    await fs.symlink(source, target, process.platform === "win32" ? "junction" : "dir")
-    return "link"
-  } catch (error) {
-    const code = (error as { code?: string }).code ?? ""
-    if (!LINK_UNSUPPORTED.has(code)) throw error
-    /* The filesystem cannot hold a link, so the skill lands as its own copy and
-       stops being the hub's to track. */
-    try {
-      await fs.cp(source, target, { recursive: true })
-    } catch (failure) {
-      await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
-      throw failure
-    }
-    return "copy"
-  }
+  return placeSkill(mode, source, target, false)
 }
 
 /**
@@ -242,7 +269,8 @@ export async function linkSkillIntoLibrary(
   base: string,
   libraryRoot: string,
   id: string,
-  dir: string
+  dir: string,
+  mode: InstallMode = "auto"
 ): Promise<SkillInstall> {
   const name = assertSkillName(id)
   const source = path.join(placeSkillRoot(base, dir), name)
@@ -255,22 +283,7 @@ export async function linkSkillIntoLibrary(
     throw new Error(`a skill with this name is already in the library: ${id}`)
   }
 
-  try {
-    await fs.symlink(source, target, process.platform === "win32" ? "junction" : "dir")
-    return "link"
-  } catch (error) {
-    const code = (error as { code?: string }).code ?? ""
-    if (!LINK_UNSUPPORTED.has(code)) throw error
-    /* The filesystem cannot hold a link, so the library keeps its own copy and
-       the two stop being the same skill. */
-    try {
-      await fs.cp(source, target, { recursive: true, dereference: true })
-    } catch (failure) {
-      await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
-      throw failure
-    }
-    return "copy"
-  }
+  return placeSkill(mode, source, target, true)
 }
 
 /**

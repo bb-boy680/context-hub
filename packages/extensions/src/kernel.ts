@@ -8,6 +8,7 @@ import { createContributionPoints } from "./contributions.ts"
 import { Context } from "./cordis.ts"
 
 import { I18nService } from "./i18n.ts"
+import { SettingsService } from "./settings.ts"
 import { ExtensionService } from "./service.ts"
 import type { PlatformHost } from "./host.ts"
 import type { ExtensionModule } from "./types.ts"
@@ -47,5 +48,7 @@ export async function createHubKernel(options: KernelOptions): Promise<HubKernel
   await extensions.await()
   const i18n = ctx.plugin(I18nService)
   await i18n.await()
+  const settings = ctx.plugin(SettingsService)
+  await settings.await()
   return { ctx, start: () => ctx.extensions.start() }
 }

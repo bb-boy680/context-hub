@@ -6,11 +6,12 @@ import { ExtensionsPage } from "@/pages/extensions"
 import { OverviewPage } from "@/pages/overview"
 import { PlaceholderPage } from "@/pages/placeholder"
 import { RepositoryPage } from "@/pages/repository"
+import { SettingsPage } from "@/pages/settings"
 import { useContributions } from "@context-hub/extensions/react"
 import { Toaster } from "@context-hub/shadcn-ui/components/toast"
 
 /** Pages the shell owns; every other route comes from an extension. */
-const designedPaths = ["/", "/extensions", "/repository"]
+const designedPaths = ["/", "/extensions", "/repository", "/settings"]
 
 export function App() {
   const contributed = useContributions("route")
@@ -29,6 +30,7 @@ export function App() {
             <Route index element={<OverviewPage />} />
             <Route path="/extensions" element={<ExtensionsPage />} />
             <Route path="/repository" element={<RepositoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             {contributed.map((route) => {
               const Page = route.Component
               return (

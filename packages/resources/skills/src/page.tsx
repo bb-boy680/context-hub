@@ -32,7 +32,7 @@ import { tagTone } from "./tags.ts"
 import type { SkillPlaceRef, SkillStore } from "./store.ts"
 import type { Skill } from "./types.ts"
 
-import { useContributions, useI18n } from "@context-hub/extensions/react"
+import { useContributions, useI18n, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
 import {
   AutoplayVideo,
@@ -957,7 +957,8 @@ export function SkillsPage() {
   /* One place inside the current scope, once a person picked one from the tab's
      menu; `null` leaves the scope whole. */
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
-  const [view, setView] = React.useState<"grid" | "list">("grid")
+  const settings = useSettings()
+  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tag, setTag] = React.useState("All tags")

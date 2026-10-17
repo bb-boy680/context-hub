@@ -34,7 +34,7 @@ import { ServerDialog } from "./server-dialog.tsx"
 import type { ServerFormValues } from "./server-form.tsx"
 import { declarationOf } from "./server-form.tsx"
 import type { McpAgentPlace, McpPlaceKind, McpServer } from "./types.ts"
-import { useI18n } from "@context-hub/extensions/react"
+import { useI18n, useSettings } from "@context-hub/extensions/react"
 import {
   FilterBar,
   PageBody,
@@ -425,7 +425,8 @@ export function McpServersPage() {
     [servers]
   )
 
-  const [view, setView] = React.useState<ViewId>("grid")
+  const settings = useSettings()
+  const [view, setView] = React.useState<ViewId>(settings.layout)
   const [tab, setTab] = React.useState<TabId>("all")
   /* No tag narrows the list until one is picked. */
   const [tag, setTag] = React.useState("")

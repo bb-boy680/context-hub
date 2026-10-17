@@ -6,7 +6,7 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
@@ -399,6 +399,7 @@ export function useSkillLibrary(
 ): SkillLibrary {
   const ctx = useHub()
   const { state } = useI18n()
+  const { installMode } = useSettings()
   const locale = state.active
   const store = React.useMemo(() => ctx.get("hub.skills") ?? null, [ctx])
   const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
@@ -563,22 +564,22 @@ export function useSkillLibrary(
   const install = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
-      const landed = await store.installInto(id, ref)
+      const landed = await store.installInto(id, ref, installMode)
       await reload()
       return landed
     },
-    [store, reload]
+    [store, reload, installMode]
   )
 
   const adopt = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
       /* The place keeps its files; the library reaches them through a link. */
-      const landed = await store.adoptFrom(id, ref)
+      const landed = await store.adoptFrom(id, ref, installMode)
       await reload()
       return landed
     },
-    [store, reload]
+    [store, reload, installMode]
   )
 
   const deleteInPlace = React.useCallback(
