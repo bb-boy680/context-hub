@@ -17,13 +17,6 @@ import {
 import { Badge } from "@context-hub/shadcn-ui/components/badge"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Input } from "@context-hub/shadcn-ui/components/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@context-hub/shadcn-ui/components/select"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
 
@@ -130,7 +123,7 @@ function ExtensionActionButton({
 }
 
 export function ExtensionsPage() {
-  const { t, state, setLocale } = useI18n()
+  const { t } = useI18n()
   const snapshot = useExtensionSnapshot()
   const [query, setQuery] = React.useState("")
   const [detailId, setDetailId] = React.useState<string | null>(null)
@@ -141,39 +134,11 @@ export function ExtensionsPage() {
 
   return (
     <>
-      <div className="flex items-start justify-between gap-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">{t("extensions.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("extensions.description")}
-          </p>
-        </div>
-        {state.locales.length > 1 ? (
-          <Select
-            value={
-              state.locales.find((locale) => locale.id === state.active)?.label ??
-              state.active
-            }
-            onValueChange={(label) => {
-              const locale = state.locales.find((item) => item.label === label)
-              if (locale !== undefined) setLocale(locale.id)
-            }}
-          >
-            <SelectTrigger
-              className={`w-[150px] data-[size=default]:h-9 ${outline}`}
-              aria-label={t("extensions.language")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {state.locales.map((locale) => (
-                <SelectItem key={locale.id} value={locale.label}>
-                  {locale.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">{t("extensions.title")}</h1>
+        <p className="text-sm text-muted-foreground">
+          {t("extensions.description")}
+        </p>
       </div>
 
       <div className="flex flex-col gap-6">
