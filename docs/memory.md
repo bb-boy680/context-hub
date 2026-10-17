@@ -1066,3 +1066,23 @@ ctx.get("hub.workspaces")?.subscribe(() => {
 配套：这类"多读了但结果一样"的问题，**日志和页面上都看不出来**。它和
 [[同一份状态被两处各读一次，就一定会分家]] 的区别是：那边是两份数据会不一致，
 这边只有一份数据、但被反复重读。判据同样是**数请求**。
+
+## 内核启动时读 contribution 的服务，会把"还没激活"当成"已经没了"（2026-10-17）
+
+**问题模式**：用户报「装好中文语言包、选中文、刷新后又变回英文」。`I18nService`
+在 `createHubKernel` 里**比 `kernel.start()` 更早**构造，构造函数里的 `refresh()`
+读 `contributions("locale")` —— 那时一个语言包都还没激活，列表是空的，
+于是 `active`（从 state 读到的 `"zh-CN"`）被判为"未知 locale"，**回退 `en` 并写回 state**。
+下一次读到的已经是 `"en"`，刷新再多次也回不来。
+
+**规则**：服务如果在构造期读 contribution / 别的插件注册的东西，必须先问一句
+**"这一刻它们注册了吗"**。本仓的顺序是 `createHubKernel`（构造服务）→ `kernel.start()`
+（激活插件、注册 contribution），所以构造期读到的永远是空集。空集在启动前
+表示"还没来"，不表示"被移除了"；把两者的判据分开（这里加了
+`ExtensionService.settled`，只在 `start()` 之后才允许回退），比在 UI 里补一次重读可靠。
+
+**验证方式**：这个 bug 只在"重启一个进程/页面"时出现，单测默认的 host 没有持久 state，
+所以既有的 69 条测试全绿。判据是写一条**带持久 storage 的 kernel 测试**：
+seed `locale = "zh-CN"` → `createHubKernel` + `start()` → 断言 `active` 仍是 `zh-CN`
+且 storage 里没有 `"en"` 写入。真机侧用隔离 hub home（seed `state/locale.json`）
+起 `server.ts --static dist`，改前构建会当场把 state 改成 `"en"`，改后连刷三次仍是中文。
