@@ -14,6 +14,7 @@ import { beforeAll, describe, expect, it } from "vitest"
 
 import { createHubKernel } from "@context-hub/extensions"
 import type { PlatformHost } from "@context-hub/extensions"
+import type { PromptProvider } from "@context-hub/prompts/contract"
 import { skillsModuleWith, SKILLS_ID } from "@context-hub/skills/extension"
 
 import { claudeCodeModuleWith } from "../src/extension.ts"
@@ -40,6 +41,16 @@ function testHost(): PlatformHost {
    is asserted on its own below. */
 const stubbed = () => ({ register: () => () => undefined, tools: {} })
 
+/** The providers Claude Code hands the prompts service, kept for inspection. */
+const promptProviders: PromptProvider[] = []
+const recordedPrompts = () => ({
+  register: (provider: PromptProvider) => {
+    promptProviders.push(provider)
+    return () => undefined
+  },
+  tools: {},
+})
+
 type Kernel = Awaited<ReturnType<typeof createHubKernel>>
 
 let kernel: Kernel
@@ -50,7 +61,7 @@ const placesOf = () => (kernel.ctx.get("skills")?.providers() ?? []).map((one) =
 beforeAll(async () => {
   kernel = await createHubKernel({
     host: testHost(),
-    services: { prompts: stubbed(), mcp: stubbed(), plugins: stubbed() },
+    services: { prompts: recordedPrompts(), mcp: stubbed(), plugins: stubbed() },
     extensions: [skillsModuleWith(() => null), claudeCodeModuleWith(() => null)],
   })
   await kernel.start()
@@ -72,6 +83,16 @@ describe("with both extensions on", () => {
     const service = kernel.ctx.get("skills") as unknown as Record<string, unknown>
     expect(typeof Object.getPrototypeOf(service)?.register).toBe("function")
     expect(Object.hasOwn(service, "register")).toBe(false)
+  })
+
+  /* The agents directory is declared by the agent, not assumed by the page: a
+     place without one is not offered the action at all. */
+  it("declares an agents directory for both of its prompt places", () => {
+    const places = promptProviders.flatMap((provider) => provider.places)
+    expect(places.map((place) => place.id)).toEqual(
+      expect.arrayContaining(["claude-code", "claude-code-global"])
+    )
+    for (const place of places) expect(place.agentDir).toBe(".claude/agents")
   })
 })
 

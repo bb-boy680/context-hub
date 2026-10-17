@@ -25,7 +25,19 @@ export * from "./provider.ts"
 export { PromptService } from "./provider.ts"
 export { PromptLibrary, PROMPT_LIBRARY_SERVICE } from "./library-store.ts"
 export { createRemotePromptStore } from "./remote-store.ts"
-export { deliver, delivered, targetOf, undeliver, type Delivery } from "./deliver.ts"
+export {
+  deliver,
+  delivered,
+  targetOf,
+  undeliver,
+  heldAt,
+  heldMarks,
+  holdsSomething,
+  NOTHING_HELD,
+  type Delivery,
+  type Held,
+  type HeldMark,
+} from "./deliver.ts"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -42,10 +54,11 @@ const PROMPTS_ID = "hub.prompt.catalog"
  * forms it makes out of a prompt.
  *
  * `.agents/` is the directory the agents in this hub already share — the skills
- * module keeps its own `.agents/skills` there — so a command or a rule written
- * under it is found by whoever has been taught to look, rather than being put
- * in one agent's own directory. It takes no install: there is no file a prompt
- * itself would be written to here, only the forms made from one.
+ * module keeps its own `.agents/skills` there — so a command, a rule or an
+ * agents file written under it is found by whoever has been taught to look,
+ * rather than being put in one agent's own directory. It takes no prompt of its
+ * own: there is no file a prompt itself would be written to here, only the
+ * forms made from one.
  */
 const WORKSPACE_PLACE: PromptPlace = {
   id: "workspace",
@@ -56,11 +69,22 @@ const WORKSPACE_PLACE: PromptPlace = {
   scope: "workspace",
   commandDir: ".agents/commands",
   ruleDir: ".agents/rules",
+  agentDir: ".agents/agents",
   /* The two files a project keeps its standing conventions in. Both are named
      by the workspace's own root, and both are written into rather than over. */
   documents: [
-    { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
-    { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
+    {
+      id: "agents",
+      labelKey: "prompts.menu.document.agents",
+      removeLabelKey: "prompts.menu.document.agents.remove",
+      file: "AGENTS.md",
+    },
+    {
+      id: "design",
+      labelKey: "prompts.menu.document.design",
+      removeLabelKey: "prompts.menu.document.design.remove",
+      file: "DESIGN.md",
+    },
   ],
   generatedOnly: true,
   /* Before the agents' own places, which all rank 20: what this hub writes for

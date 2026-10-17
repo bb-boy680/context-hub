@@ -22,6 +22,7 @@ import type { SkillPlace } from "@context-hub/skills/contract"
 
 import { claudeCodeInstaller } from "./installer.ts"
 import {
+  CLAUDE_CODE_AGENT_DIR,
   CLAUDE_CODE_COMMAND_DIR,
   CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE,
   CLAUDE_CODE_ID,
@@ -85,6 +86,7 @@ function promptPlaces(icon: ExtensionIcon): PromptPlace[] {
       scope: "workspace",
       commandDir: CLAUDE_CODE_COMMAND_DIR,
       ruleDir: CLAUDE_CODE_RULE_DIR,
+      agentDir: CLAUDE_CODE_AGENT_DIR,
       order: 20,
     },
     {
@@ -95,12 +97,14 @@ function promptPlaces(icon: ExtensionIcon): PromptPlace[] {
       scope: "global",
       commandDir: CLAUDE_CODE_COMMAND_DIR,
       ruleDir: CLAUDE_CODE_RULE_DIR,
+      agentDir: CLAUDE_CODE_AGENT_DIR,
       /* The one file a prompt is added to here, named the way the menu that
          offers it reads. */
       documents: [
         {
           id: "claude",
           labelKey: "claudeCode.menu.instructions",
+          removeLabelKey: "claudeCode.menu.instructions.remove",
           file: CLAUDE_CODE_GLOBAL_INSTRUCTION_FILE,
         },
       ],

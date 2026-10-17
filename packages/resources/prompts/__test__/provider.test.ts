@@ -20,6 +20,7 @@ function place(id: string, agent: string, scope: "workspace" | "global", order: 
     scope,
     commandDir: `.${id}/commands`,
     ruleDir: `.${id}/rules`,
+    agentDir: `.${id}/agents`,
     order,
   }
 }
@@ -58,5 +59,14 @@ describe("the places a prompt can be delivered to", () => {
 
   it("does not offer another agent's places", () => {
     expect(idsOf(["hub.target.one"])).not.toContain("two-global")
+  })
+
+  /* Everything a place declares travels with it: the menu reads the agents
+     directory off the same object it reads the name from. */
+  it("carries each place's directories through unchanged", () => {
+    const one = promptPlaces(providers, ["hub.target.one"]).find((place) => place.id === "one-global")
+    expect(one?.commandDir).toBe(".one-global/commands")
+    expect(one?.ruleDir).toBe(".one-global/rules")
+    expect(one?.agentDir).toBe(".one-global/agents")
   })
 })

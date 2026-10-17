@@ -3,17 +3,18 @@
  * ledger, with the two things a prompt can be sent to.
  *
  * It is the shape the other asset pages have — the same toolbar, the same
- * filter row, the same two views — minus the parts that would have nothing to
- * say here. There is one tab, because a prompt has nowhere to be but in the
- * library: no scope it is enabled at, no source it came from, nothing missing
- * that could be gathered. What it *does* have is a destination: an agent's
- * files, which the row's menu writes, or no file at all, which is the copy
- * beside it.
+ * filter row, the same two views. The tab row carries one dimension: where a
+ * prompt has been written out. Everything is the library itself; the two scope
+ * tabs are the places an agent reads from, each narrowing to one place the way
+ * the skills page's scopes do. What a prompt has besides that is the copy
+ * beside it, which needs no agent at all.
  */
 import {
   CheckIcon,
+  ContainerIcon,
   CopyIcon,
   FileTextIcon,
+  GlobeIcon,
   LayoutGridIcon,
   ListIcon,
   PlusIcon,
@@ -26,15 +27,19 @@ import * as React from "react"
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import {
   AutoplayVideo,
+  AvatarStack,
   FilterBar,
   Ledger,
   PageBody,
+  PlaceScopePicker,
   TablePagination,
   knownAspect,
   mediaKind,
   rememberAspect,
   type LedgerColumn,
+  type PlaceOption,
 } from "@context-hub/extensions/components"
+import type { AssetScope } from "@context-hub/extensions"
 import { useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
@@ -42,9 +47,17 @@ import { toast } from "@context-hub/shadcn-ui/components/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui/components/tabs"
 
 import { AddPromptDialog } from "./add-prompt-dialog.tsx"
-import { deliver, delivered, undeliver, type Delivery } from "./deliver.ts"
-import { BatchActions, cardActionShell, PromptActions } from "./install-menu.tsx"
-import { formatAge, tokenLabel, useInstalled, usePlaceFiles, usePromptLibrary, usePromptPlaces } from "./library.ts"
+import { deliver, generatedUnder, heldMarks, holdsSomething, undeliver, type Delivery } from "./deliver.ts"
+import { BatchActions, cardActionShell, PromptActions, usePlaceWords } from "./install-menu.tsx"
+import {
+  formatAge,
+  tokenLabel,
+  useHoldsMap,
+  usePlaceFiles,
+  usePromptLibrary,
+  usePromptPlaces,
+  type Holds,
+} from "./library.ts"
 import { PromptMeta, PromptTile } from "./parts.tsx"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
@@ -57,6 +70,9 @@ const pillSurface =
   "inline-flex h-5 shrink-0 items-center rounded-full bg-card/95 px-[9px] text-[12px] leading-none font-semibold text-foreground ring-1 ring-border"
 
 const viewToggleSurface = "flex h-11 gap-1 rounded-full bg-secondary p-1"
+
+/** The two scopes, in the order a tab row reads them. */
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
 /** The ratio a card's cover takes before its own picture reports one. */
 const FALLBACK_RATIO = 16 / 9
@@ -263,15 +279,19 @@ interface CardProps {
   /** The form's library, which is what turns a recorded reference into a URL. */
   store: PromptStore | null
   places: readonly PromptPlace[]
+  /** What each place already holds of this prompt, read once for the page. */
+  holds: Holds
   onOpen: () => void
-  onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
 }
 
-function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, onGenerate }: CardProps) {
+function PromptCard({ prompt, updated, busy, store, places, holds, onOpen, onGenerate }: CardProps) {
+  const { t } = useI18n()
   const files = usePlaceFiles()
-  const [stamp, setStamp] = React.useState(0)
-  const installed = useInstalled(prompt, places, files, stamp)
+  const marks = React.useMemo(
+    () => heldMarks(places, holds, (place) => t(place.labelKey)),
+    [places, holds, t]
+  )
 
   return (
     <div
@@ -317,11 +337,17 @@ function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, on
           )}
         </div>
         <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">{prompt.description}</p>
-        {/* The action sits at the row's end on its own: where a prompt has been
-            delivered is what the menu's ticks answer, and a line that only
-            appears once it has been delivered would put the button in one place
-            before and another after. */}
-        <div className="flex items-center justify-end gap-2">
+        {/* The marks answer "which agents have this" without the menu being
+            opened, and they take the left of the row the way the plugin cards'
+            do; the actions keep the right whether or not anything holds it. */}
+        <div className="flex items-center gap-2">
+          <span className="mr-auto flex min-w-0 items-center">
+            <AvatarStack
+              marks={marks}
+              seam="ring-card"
+              label={marks.map((mark) => mark.label).join(" · ")}
+            />
+          </span>
           {/* Taking the text itself, which needs no agent to go to, and then
               the delivery — the one the row is read for, so it keeps the end. */}
           <CopyAction text={prompt.prompt} />
@@ -331,17 +357,10 @@ function PromptCard({ prompt, updated, busy, store, places, onOpen, onToggle, on
             <PromptActions
               prompt={prompt}
               places={places}
-              installed={installed}
+              holds={holds}
               files={files}
               busy={busy}
-              onToggle={(place) => {
-                onToggle(place)
-                setStamp((current) => current + 1)
-              }}
-              onGenerate={(place, action) => {
-                onGenerate(place, action)
-                setStamp((current) => current + 1)
-              }}
+              onGenerate={onGenerate}
             />
           </span>
         </div>
@@ -365,8 +384,19 @@ export function PromptsPage() {
   const [addOpen, setAddOpen] = React.useState(false)
   const [detailId, setDetailId] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
-  /* Raised after a delivery, so the detail dialog re-reads where the prompt is. */
+  /* Raised after a delivery, so the page and the detail dialog re-read where the
+     prompt is. */
   const [stamp, setStamp] = React.useState(0)
+  /* Which tab is on screen, and — inside a scope tab — the one place it is
+     narrowed to. Both are page state: the tab row and the list are one screen. */
+  const [tab, setTab] = React.useState<"all" | AssetScope>("all")
+  const [narrowed, setNarrowed] = React.useState<string | null>(null)
+
+  /* One scan for the page: a card reads its own row from here, and the scope
+     tabs count and filter by the same answer. */
+  const holdsMap = useHoldsMap(library.rows, places, files, stamp)
+
+  const placeWords = usePlaceWords()
 
   const needle = useSettled(query).trim().toLowerCase()
   const allTag = t("prompts.filter.all")
@@ -389,11 +419,51 @@ export function PromptsPage() {
     [offered, tag]
   )
 
-  const pageCount = Math.max(1, Math.ceil(matching.length / pageSize))
+  /** Whether a row has been written out in a scope — or in one place of it. */
+  const heldIn = React.useCallback(
+    (row: StoredPrompt, scope: AssetScope, place: string | null) =>
+      places.some(
+        (one) =>
+          one.scope === scope &&
+          (place === null || one.id === place) &&
+          holdsSomething(holdsMap[row.id]?.[one.id])
+      ),
+    [places, holdsMap]
+  )
+
+  /* The scope tabs filter what the library holds by where it has been written;
+     "all" is the library itself, which is why the query and tag filters above
+     come first and the tab narrows that answer rather than replacing it. */
+  const scoped = React.useMemo(
+    () =>
+      tab === "all"
+        ? matching
+        : matching.filter((row) => heldIn(row, tab, narrowed)),
+    [matching, tab, narrowed, heldIn]
+  )
+
+  /* What each place holds, for the scope pills' menus: the count is a number of
+     prompts, which is what a person scanning the list is counting too. */
+  const scopePlaces = React.useMemo(() => {
+    const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
+    for (const place of places) {
+      byScope[place.scope].push({
+        id: place.id,
+        icon: place.icon,
+        label: t(place.labelKey),
+        where: generatedUnder(place),
+        count: library.rows.filter((row) => holdsSomething(holdsMap[row.id]?.[place.id]))
+          .length,
+      })
+    }
+    return byScope
+  }, [places, library.rows, holdsMap, t])
+
+  const pageCount = Math.max(1, Math.ceil(scoped.length / pageSize))
   const shownPage = Math.min(page, pageCount - 1)
   const rows = React.useMemo(
-    () => matching.slice(shownPage * pageSize, (shownPage + 1) * pageSize),
-    [matching, shownPage, pageSize]
+    () => scoped.slice(shownPage * pageSize, (shownPage + 1) * pageSize),
+    [scoped, shownPage, pageSize]
   )
 
   const detail = matching.find((row) => row.id === detailId) ?? null
@@ -409,15 +479,36 @@ export function PromptsPage() {
     []
   )
 
-  /** Carry one of the four forms into one place, and say so. */
+  /** Write one of the forms into one place, or take back what is there. */
   const generate = React.useCallback(
-    async (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => {
+    async (
+      prompt: StoredPrompt,
+      place: PromptPlace,
+      action: Delivery,
+      document?: string,
+      remove?: boolean
+    ) => {
       if (files === null) {
         refuse(new Error(t("prompts.menu.blocked")))
         return
       }
       setBusy(true)
       try {
+        if (remove === true) {
+          const taken = await undeliver(files, place, prompt, action, document)
+          setStamp((current) => current + 1)
+          if (taken) {
+            const where = place.documents?.find((one) => one.id === document)
+            toast.add({
+              type: "success",
+              title:
+                where === undefined
+                  ? t("prompts.done.remove").replace("{agent}", t(place.labelKey))
+                  : t("prompts.done.document.remove").replace("{file}", t(where.labelKey)),
+            })
+          }
+          return
+        }
         await deliver(files, place, prompt, action, document)
         setStamp((current) => current + 1)
         /* A section says which file it went into; a file is its own answer. */
@@ -429,38 +520,6 @@ export function PromptsPage() {
               ? t(`prompts.done.${action}`).replace("{agent}", t(place.labelKey))
               : t("prompts.done.document").replace("{file}", t(where.labelKey)),
         })
-      } catch (failure) {
-        refuse(failure)
-      } finally {
-        setBusy(false)
-      }
-    },
-    [files, refuse, t]
-  )
-
-  /** Install, or take back what install wrote; the file itself is the answer. */
-  const toggle = React.useCallback(
-    async (prompt: StoredPrompt, place: PromptPlace) => {
-      if (files === null) {
-        refuse(new Error(t("prompts.menu.blocked")))
-        return
-      }
-      setBusy(true)
-      try {
-        if (await delivered(files, place, prompt, "install")) {
-          await undeliver(files, place, prompt, "install")
-          toast.add({
-            type: "success",
-            title: t("prompts.done.remove").replace("{agent}", t(place.labelKey)),
-          })
-        } else {
-          await deliver(files, place, prompt, "install")
-          toast.add({
-            type: "success",
-            title: t("prompts.done.install").replace("{agent}", t(place.labelKey)),
-          })
-        }
-        setStamp((current) => current + 1)
       } catch (failure) {
         refuse(failure)
       } finally {
@@ -532,10 +591,10 @@ export function PromptsPage() {
     busy,
     store: library.store,
     places,
+    holds: holdsMap[prompt.id] ?? {},
     onOpen: () => setDetailId(prompt.id),
-    onToggle: (place: PromptPlace) => void toggle(prompt, place),
-    onGenerate: (place: PromptPlace, action: Delivery, document?: string) =>
-      void generate(prompt, place, action, document),
+    onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) =>
+      void generate(prompt, place, action, document, remove),
   })
 
   const columns: LedgerColumn<StoredPrompt>[] = [
@@ -599,7 +658,14 @@ export function PromptsPage() {
       label: t("prompts.column.action"),
       width: "14.5%",
       cell: (prompt) => (
-        <LedgerAction prompt={prompt} places={places} files={files} busy={busy} onToggle={toggle} onGenerate={generate} />
+        <LedgerAction
+          prompt={prompt}
+          places={places}
+          holds={holdsMap[prompt.id] ?? {}}
+          files={files}
+          busy={busy}
+          onGenerate={generate}
+        />
       ),
     },
   ]
@@ -643,7 +709,16 @@ export function PromptsPage() {
         </p>
       </div>
 
-      <Tabs value="all" className="flex-1 gap-8">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => {
+          setTab(value as "all" | AssetScope)
+          setNarrowed(null)
+          setPage(0)
+          setChecked([])
+        }}
+        className="flex-1 gap-8"
+      >
         <div className="flex items-center justify-between gap-6">
           <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
             <TabsTrigger
@@ -656,6 +731,28 @@ export function PromptsPage() {
                 {library.error === null ? matching.length : "—"}
               </span>
             </TabsTrigger>
+            {/* A scope stands for the places it spans, so a scope holding no
+                place is not a tab at all: with no agent chosen the machine-wide
+                one has nothing to open. */}
+            {SCOPES.filter((scope) => scopePlaces[scope].length > 0).map((scope) => (
+              <PlaceScopePicker
+                key={scope}
+                scopeIcon={scope === "workspace" ? ContainerIcon : GlobeIcon}
+                scopeLabel={t(`prompts.tab.${scope}`)}
+                places={scopePlaces[scope]}
+                chosen={tab === scope ? narrowed : null}
+                active={tab === scope}
+                allLabel={t("prompts.place.all")}
+                title={t("prompts.place.which")}
+                words={placeWords}
+                onChoose={(id) => {
+                  setTab(scope)
+                  setNarrowed(id)
+                  setPage(0)
+                  setChecked([])
+                }}
+              />
+            ))}
           </TabsList>
           <div className="flex shrink-0 items-center gap-2">
             <div className={viewToggleSurface}>
@@ -701,7 +798,7 @@ export function PromptsPage() {
           }}
         />
 
-        <TabsContent value="all" className="flex flex-col">
+        <TabsContent value={tab} className="flex flex-col">
           <PageBody footer={footer}>
             {library.store === null ? (
               /* No library at all is a different answer from an empty one: the
@@ -726,7 +823,7 @@ export function PromptsPage() {
                   </Button>
                 }
               />
-            ) : matching.length === 0 ? (
+            ) : scoped.length === 0 ? (
               needle !== "" || tag !== "" ? (
                 <EmptyState
                   icon={SearchXIcon}
@@ -744,7 +841,7 @@ export function PromptsPage() {
                     </Button>
                   }
                 />
-              ) : (
+              ) : tab === "all" ? (
                 <EmptyState
                   icon={FileTextIcon}
                   title={t("prompts.empty.none")}
@@ -755,6 +852,14 @@ export function PromptsPage() {
                       {t("prompts.action.add")}
                     </Button>
                   }
+                />
+              ) : (
+                /* A scope tab is a question about where a prompt has been
+                   written, so an empty one is not an empty library. */
+                <EmptyState
+                  icon={FileTextIcon}
+                  title={t("prompts.empty.scope")}
+                  hint={t("prompts.empty.scopeHint")}
                 />
               )
             ) : view === "grid" ? (
@@ -784,11 +889,6 @@ export function PromptsPage() {
                       places={places}
                       files={files}
                       busy={busy}
-                      onDeliver={(place) => {
-                        for (const prompt of rows.filter((row) => checked.includes(row.id))) {
-                          void generate(prompt, place, "install")
-                        }
-                      }}
                       onGenerate={(place, action, chosen) => {
                         for (const prompt of rows.filter((row) => checked.includes(row.id))) {
                           void generate(prompt, place, action, chosen)
@@ -823,8 +923,9 @@ export function PromptsPage() {
         onOpenChange={(open) => {
           if (!open) setDetailId(null)
         }}
-        onToggle={(prompt, place) => void toggle(prompt, place)}
-        onGenerate={(prompt, place, action, document) => void generate(prompt, place, action, document)}
+        onGenerate={(prompt, place, action, document, remove) =>
+          void generate(prompt, place, action, document, remove)
+        }
         onDelete={(prompt) => void drop(prompt)}
         onChanged={() => void library.reload()}
         onRename={(prompt, name) => void describe(prompt, { name })}
@@ -838,43 +939,41 @@ export function PromptsPage() {
 
 /**
  * One row's action in the ledger. It is the same menu the card ends its body
- * with, and it keeps its own stamp so the ticks re-read the files after a
- * delivery made from here.
+ * with, reading the same page-wide scan of what each place holds.
  */
 function LedgerAction({
   prompt,
   places,
+  holds,
   files,
   busy,
-  onToggle,
   onGenerate,
 }: {
   prompt: StoredPrompt
   places: readonly PromptPlace[]
+  /** What each place already holds of this prompt, read once for the page. */
+  holds: Holds
   files: PlaceFiles | null
   busy: boolean
-  onToggle: (prompt: StoredPrompt, place: PromptPlace) => Promise<void>
-  onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => Promise<void>
+  onGenerate: (
+    prompt: StoredPrompt,
+    place: PromptPlace,
+    action: Delivery,
+    document?: string,
+    remove?: boolean
+  ) => Promise<void>
 }) {
-  const [stamp, setStamp] = React.useState(0)
-  const installed = useInstalled(prompt, places, files, stamp)
-
   return (
     <span onClick={(event) => event.stopPropagation()}>
       <PromptActions
         prompt={prompt}
         places={places}
-        installed={installed}
+        holds={holds}
         files={files}
         busy={busy}
-        onToggle={(place) => {
-          void onToggle(prompt, place)
-          setStamp((current) => current + 1)
-        }}
-        onGenerate={(place, action) => {
-          void onGenerate(prompt, place, action)
-          setStamp((current) => current + 1)
-        }}
+        onGenerate={(place, action, document, remove) =>
+          void onGenerate(prompt, place, action, document, remove)
+        }
       />
     </span>
   )

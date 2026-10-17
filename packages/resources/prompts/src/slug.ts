@@ -1,12 +1,13 @@
 /**
  * The one place a prompt's name becomes a file name.
  *
- * Three actions write a file named after the prompt — install, generate a
- * command, generate a rule — so they all call this, and a name reaches the same
- * file from any of them. It is also the trust boundary: the name is typed into
- * a dialog, and everything downstream (`PlaceRef.file`, the dev bridge's
- * `assertPlaceFile`) validates by splitting on `/`, which a backslash walks
- * straight past. So the safety is settled here rather than borrowed.
+ * Four actions write a file named after the prompt — install, generate a
+ * command, generate a rule, generate an agents file — so they all call this,
+ * and a name reaches the same file from any of them. It is also the trust
+ * boundary: the name is typed into a dialog, and everything downstream
+ * (`PlaceRef.file`, the dev bridge's `assertPlaceFile`) validates by splitting
+ * on `/`, which a backslash walks straight past. So the safety is settled here
+ * rather than borrowed.
  *
  * Letters and digits of any script survive — a name written in Chinese should
  * read as itself on disk, not collapse to an empty string.

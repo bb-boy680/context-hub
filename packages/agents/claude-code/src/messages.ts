@@ -5,6 +5,7 @@
 export const claudeCodeMessages: Record<string, string> = {
   "claudeCode.tab": "Claude Code",
   "claudeCode.menu.instructions": "Add to CLAUDE.md",
+  "claudeCode.menu.instructions.remove": "Remove from CLAUDE.md",
   "claudeCode.error.refused": "The hub could not read or write Claude Code's config files.",
   "claudeCode.error.unknownPlace": "Claude Code has no client file called {place}.",
   "claudeCode.error.noProject":

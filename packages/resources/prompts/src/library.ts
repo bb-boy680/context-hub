@@ -15,7 +15,7 @@ import type { PlaceFiles } from "@context-hub/core/place-files"
 import { createCatalog, type Catalog } from "@context-hub/extensions"
 import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
 
-import { delivered } from "./deliver.ts"
+import { heldAt, NOTHING_HELD, type Held } from "./deliver.ts"
 import type { PromptLibraryValue } from "./library-store.ts"
 import { promptPlaces, type PromptPlace } from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
@@ -180,11 +180,11 @@ export function tokenLabel(body: string): string {
   return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count)
 }
 
-/** Whether one prompt is installed at each place, keyed by place id. */
-export type Installed = Readonly<Record<string, boolean>>
+/** What each place already holds of one prompt, keyed by place id. */
+export type Holds = Readonly<Record<string, Held>>
 
 /**
- * Which places already hold this prompt, read from the files themselves.
+ * What every place already holds of this prompt, read from the files.
  *
  * Nothing records a delivery: the file being there is the whole answer, and a
  * second copy of that answer kept here would be the one that goes stale when
@@ -196,13 +196,13 @@ export type Installed = Readonly<Record<string, boolean>>
  * @param files — the form's client-file port; `null` disables the question.
  * @param stamp — changes whenever a delivery may have happened.
  */
-export function useInstalled(
+export function useHolds(
   prompt: StoredPrompt | null,
   places: readonly PromptPlace[],
   files: PlaceFiles | null,
   stamp: number
-): Installed {
-  const [held, setHeld] = React.useState<Installed>({})
+): Holds {
+  const [held, setHeld] = React.useState<Holds>({})
 
   React.useEffect(() => {
     if (prompt === null || files === null || places.length === 0) return
@@ -211,10 +211,10 @@ export function useInstalled(
       const answers = await Promise.all(
         places.map(async (place) => {
           try {
-            return [place.id, await delivered(files, place, prompt, "install")] as const
+            return [place.id, await heldAt(files, place, prompt)] as const
           } catch {
-            /* A place whose file cannot be read is not one this prompt is in. */
-            return [place.id, false] as const
+            /* A place whose files cannot be read holds nothing that is known. */
+            return [place.id, NOTHING_HELD] as const
           }
         })
       )
@@ -224,6 +224,57 @@ export function useInstalled(
       live = false
     }
   }, [prompt, places, files, stamp])
+
+  return held
+}
+
+/**
+ * What every place holds of every prompt, keyed by prompt id and then place id.
+ *
+ * One scan for the page rather than one per card: the scope tabs count what
+ * each place holds and filter by it, which is a question about every row at
+ * once. A card reading the answer for its own row from here keeps the two from
+ * disagreeing, and keeps the page from reading the same files twice.
+ *
+ * @param rows — every prompt the library holds.
+ * @param places — every place a delivery can go to.
+ * @param files — the form's client-file port; `null` answers with nothing held.
+ * @param stamp — changes whenever a delivery may have happened.
+ */
+export function useHoldsMap(
+  rows: readonly StoredPrompt[],
+  places: readonly PromptPlace[],
+  files: PlaceFiles | null,
+  stamp: number
+): Readonly<Record<string, Holds>> {
+  const [held, setHeld] = React.useState<Readonly<Record<string, Holds>>>({})
+
+  React.useEffect(() => {
+    /* Nothing to ask, so nothing is asked: a lookup for a row that is gone finds
+       no entry, which reads as "nothing held" without clearing the last answer. */
+    if (files === null || places.length === 0 || rows.length === 0) return
+    let live = true
+    void (async () => {
+      const entries = await Promise.all(
+        rows.map(async (row) => {
+          const answers = await Promise.all(
+            places.map(async (place) => {
+              try {
+                return [place.id, await heldAt(files, place, row)] as const
+              } catch {
+                return [place.id, NOTHING_HELD] as const
+              }
+            })
+          )
+          return [row.id, Object.fromEntries(answers)] as const
+        })
+      )
+      if (live) setHeld(Object.fromEntries(entries))
+    })()
+    return () => {
+      live = false
+    }
+  }, [rows, places, files, stamp])
 
   return held
 }

@@ -3,16 +3,15 @@
  *
  * A prompt has no switch — nothing loads it or unloads it — so the only choice
  * a row presents is *which agent* gets it, and then *as what*. That second
- * question is small and belongs to the row it is asked about, so each agent
- * inside the menu carries its own `⋯` and the three ways of writing a prompt
- * hang off that. A place whose agent reads no instruction file simply has two
- * of the three, because the place says so rather than the menu deciding it.
+ * question belongs to the row it is asked about, so every place inside the menu
+ * carries its own `⋯`, and the menu behind it is the same one the detail panel
+ * opens: installing, removing what is there, and writing the derived forms.
  *
- * Both menus live in a portal while staying React children of the card they sit
- * on, so their clicks stop at their own row: without that, opening the menu
- * would also open the prompt.
+ * The menu lives in a portal while staying a React child of the card it sits
+ * on, so its clicks stop at their own row: without that, opening the menu would
+ * also open the prompt.
  */
-import { CheckIcon, ChevronDownIcon, DownloadIcon, MoreHorizontalIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon, DownloadIcon, EllipsisIcon } from "lucide-react"
 
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import { PlaceMenu, type PlaceGroup, type PlaceOption, type PlaceWords } from "@context-hub/extensions/components"
@@ -20,16 +19,14 @@ import { useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   DropdownMenu,
+  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@context-hub/shadcn-ui/components/dropdown-menu"
 
-import type { Delivery } from "./deliver.ts"
-import type { Installed } from "./library.ts"
+import { generatedUnder, holdsSomething, NOTHING_HELD, type Delivery, type Held } from "./deliver.ts"
+import type { Holds } from "./library.ts"
 import type { PromptPlace } from "./provider.ts"
 import type { Prompt } from "./store.ts"
 
@@ -44,66 +41,87 @@ const SCOPES = ["workspace", "global"] as const
 export const cardActionShell =
   "h-8 gap-1.5 rounded-full px-3 text-[13px] font-semibold text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
 
-/** The `⋯` that opens one agent's own actions; sized to the row it sits in. */
-const MORE =
-  "flex size-7 shrink-0 items-center justify-center rounded-full text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-
 /**
- * The one mark a submenu trigger draws for itself, hidden here.
+ * Writing one form out, or taking back what is there.
  *
- * A chevron pointing right is the affordance of a text row that opens a nested
- * menu; this trigger is a 28px icon button, and a second arrow inside it says
- * nothing the `⋯` has not already said. Hiding it is the only way to keep the
- * shared trigger's own keyboard and hover behaviour.
+ * @param remove — true when the entry was offered as a removal, which is the
+ * only thing that tells the two apart once the menu has closed.
  */
-const NO_CHEVRON = "[&>svg:last-child]:hidden"
+export type DeliveryRun = (
+  place: PromptPlace,
+  action: Delivery,
+  document?: string,
+  remove?: boolean
+) => void
 
 /**
- * One agent's own ways of writing a prompt out, as menu entries.
+ * One place's own ways of writing a prompt out — or taking one back, where it
+ * is already there.
  *
- * The two files a prompt becomes, and then one entry for every document this
- * place says it keeps — a place that declares none simply has two, rather than
- * being offered an action that would fail.
- *
- * Exported because the detail panel lists agents flat rather than inside a
- * menu: the same entries hang off the same row in both places, and only the
- * surface around them differs.
+ * The files a prompt becomes, and then one entry for every document this place
+ * says it keeps. A place that declares no agents directory or no documents
+ * simply has fewer entries, rather than being offered an action that would
+ * fail.
  *
  * The list is about *where*, and these are about *what*: the two questions have
  * different answers at every row, which is why they are not more rows of it.
  */
 export function GenerateItems({
   place,
+  held,
+  disabled = false,
   onGenerate,
 }: {
   place: PromptPlace
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  held: Held
+  /** A form that cannot reach the files says so here, rather than refusing. */
+  disabled?: boolean
+  onGenerate: DeliveryRun
 }) {
   const { t } = useI18n()
+  const documents = place.documents ?? []
 
   return (
     <>
-      <DropdownMenuItem onClick={() => onGenerate(place, "commands")}>
-        {t("prompts.menu.commands")}
+      <DropdownMenuItem
+        disabled={disabled}
+        onClick={() => onGenerate(place, "commands", undefined, held.commands)}
+      >
+        {t(held.commands ? "prompts.menu.commands.remove" : "prompts.menu.commands")}
       </DropdownMenuItem>
-      <DropdownMenuItem onClick={() => onGenerate(place, "rule")}>
-        {t("prompts.menu.rule")}
+      <DropdownMenuItem
+        disabled={disabled}
+        onClick={() => onGenerate(place, "rule", undefined, held.rule)}
+      >
+        {t(held.rule ? "prompts.menu.rule.remove" : "prompts.menu.rule")}
       </DropdownMenuItem>
-      {/* The actions that follow appear because the place declares the files
-          they write. A menu that decided them per agent would be a list of
-          agents to keep in step, which is the thing this registry exists to
-          avoid. */}
-      {place.documents === undefined || place.documents.length === 0 ? null : (
+      {/* The agents file appears because the place declares a directory for it. */}
+      {place.agentDir === undefined ? null : (
+        <DropdownMenuItem
+          disabled={disabled}
+          onClick={() => onGenerate(place, "agent", undefined, held.agent)}
+        >
+          {t(held.agent ? "prompts.menu.agent.remove" : "prompts.menu.agent")}
+        </DropdownMenuItem>
+      )}
+      {/* The entries that follow exist because the place declares the files
+          they write — and a removal only where the place names a word for it. */}
+      {documents.length === 0 ? null : (
         <>
           <DropdownMenuSeparator />
-          {place.documents.map((document) => (
-            <DropdownMenuItem
-              key={document.id}
-              onClick={() => onGenerate(place, "instructions", document.id)}
-            >
-              {t(document.labelKey)}
-            </DropdownMenuItem>
-          ))}
+          {documents.map((document) => {
+            const removable =
+              held.documents.includes(document.id) && document.removeLabelKey !== undefined
+            return (
+              <DropdownMenuItem
+                key={document.id}
+                disabled={disabled}
+                onClick={() => onGenerate(place, "instructions", document.id, removable)}
+              >
+                {t(removable ? (document.removeLabelKey ?? document.labelKey) : document.labelKey)}
+              </DropdownMenuItem>
+            )
+          })}
         </>
       )}
     </>
@@ -111,77 +129,90 @@ export function GenerateItems({
 }
 
 /**
- * Those same entries, as a submenu of the row that names the agent.
+ * Everything one place's row can do, behind the single control it carries.
  *
- * A submenu rather than three more rows in the list above it, because the list
- * is shared by every prompt in the library and these belong to one row of it.
+ * The row itself is not an action — it names a place, and the list beside it
+ * says what that place is — so every action is in this menu. The card and the
+ * detail panel open this same component, which is what keeps them telling one
+ * story about the same place.
  */
-function PlaceMore({
+export function PlaceGenerate({
   place,
+  held,
+  busy,
+  files,
   onGenerate,
 }: {
   place: PromptPlace
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  held: Held
+  busy: boolean
+  files: PlaceFiles | null
+  onGenerate: DeliveryRun
 }) {
   const { t } = useI18n()
 
   return (
-    <DropdownMenuSub>
-      <DropdownMenuSubTrigger
+    <DropdownMenu>
+      <DropdownMenuTrigger
         render={
           <button
             type="button"
+            disabled={busy}
             aria-label={`${t("prompts.action.more")} · ${t(place.labelKey)}`}
-            /* The row underneath is itself an action — pressing it installs —
-               so a press here has to stop before it reaches that. */
-            onClick={(event) => event.stopPropagation()}
-            onPointerDown={(event) => event.stopPropagation()}
-            className={`${MORE} ${NO_CHEVRON}`}
+            className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           />
         }
       >
-        <MoreHorizontalIcon className="size-4" />
-      </DropdownMenuSubTrigger>
-      <DropdownMenuSubContent
-        className="w-[210px]"
+        <EllipsisIcon className="size-4" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        /* The app's own menu chrome, as the sidebar draws its row menus: the
+           surface, the hairline and the row rhythm are one house style, so a
+           menu here reads as a menu anywhere else in the app. */
+        className="flex w-[200px] flex-col gap-0.5 rounded-md p-1.5 ring-1 ring-border shadow-soft"
         onClick={(event) => event.stopPropagation()}
       >
-        <GenerateItems place={place} onGenerate={onGenerate} />
-      </DropdownMenuSubContent>
-    </DropdownMenuSub>
+        <GenerateItems
+          place={place}
+          held={held}
+          disabled={busy || files === null}
+          onGenerate={onGenerate}
+        />
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 
 /**
- * The list itself: one row per agent that takes prompts, under the scope that
- * names its root, with both of a row's actions hanging off it.
+ * The places a prompt can be taken to, grouped by scope, one `⋯` per place.
  *
- * It renders the popup, so a caller owns only the trigger that opens it — the
- * page's card and its batch strip ask the same question of the same places and
- * must not be able to answer it differently.
+ * The row is a name and its directory, not a button: every action belongs to
+ * the place's own menu, and the panel and the card open the same one.
  *
  * @param places — every agent place a delivery can go to.
- * @param installed — which of them already hold what is being sent.
- * @param files — the form's client-file port; `null` makes every row say so.
+ * @param holds — what each of them already holds of what is being sent.
+ * @param files — the form's client-file port; `null` makes every entry say so.
  * @param words — the strings this menu draws, in the active locale.
- * @param onPick — deliver what is being sent into a place.
- * @param onGenerate — write one of the derived forms into a place; a document's
- *   id says which file a section goes into.
+ * @param countHolds — whether the header counts the places already holding it,
+ * rather than the places themselves.
+ * @param onGenerate — write or take back one of the forms; a document's id says
+ * which file a section goes into.
  */
 function PlaceChoices({
   places,
-  installed,
+  holds,
   files,
   words,
-  onPick,
+  countHolds,
   onGenerate,
 }: {
   places: readonly PromptPlace[]
-  installed: Installed
+  holds: Holds
   files: PlaceFiles | null
   words: PlaceWords
-  onPick: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  countHolds: boolean
+  onGenerate: DeliveryRun
 }) {
   const { t } = useI18n()
 
@@ -189,11 +220,14 @@ function PlaceChoices({
     id: place.id,
     icon: place.icon,
     label: t(place.labelKey),
-    /* The directory the row writes into, which is what tells an agent's two
-       places apart: they are the same name under two different roots. */
-    where: place.commandDir,
-    selected: installed[place.id] === true,
-    blocked: files === null ? t("prompts.menu.blocked") : null,
+    /* The line under the name is whichever of the two answers the row cannot
+       give by its name. A place that is only a directory has no name to
+       recognise, so it gives the root its forms land under; an agent's name
+       says what it is, so it explains what its `⋯` is for instead. */
+    ...(place.generatedOnly === true
+      ? { where: generatedUnder(place) }
+      : { note: t("prompts.place.generates") }),
+    selected: holdsSomething(holds[place.id]),
   }))
   const byId = new Map(places.map((place) => [place.id, place]))
 
@@ -206,36 +240,38 @@ function PlaceChoices({
     <PlaceMenu
       title={t("prompts.menu.installTo")}
       align="end"
-      /* Installing can go to several agents, and the row just taken shows its
-         tick in place, so the menu stays up. */
-      closeOnClick={false}
+      /* A row carries its own menu, so the row is not the action. */
+      activation="control"
       words={words}
       groups={groups}
+      {...(countHolds
+        ? { count: (all: readonly PlaceOption[]) => all.filter((one) => one.selected === true).length }
+        : {})}
       trailing={(option) => {
         const place = byId.get(option.id)
         if (place === undefined) return null
-        /* A row carries two things once it is taken: the mark saying so, and
-           the button for this agent's own actions. A trailing node replaces
-           the tick the list draws by default rather than joining it, so the
-           tick is drawn here — `mt-1` is the list's own offset, since every
-           row of this menu carries the directory as its second line. */
+        /* A trailing node replaces the check the list draws by default rather
+           than joining it, so the check is drawn here too — `mt-1` is the list's
+           own offset, since every row carries the directory as its second line. */
         return (
           <span className="flex shrink-0 items-center gap-1">
             {option.selected === true ? <CheckIcon className="mt-1 size-4 shrink-0" /> : null}
-            <PlaceMore place={place} onGenerate={onGenerate} />
+            <PlaceGenerate
+              place={place}
+              held={holds[place.id] ?? NOTHING_HELD}
+              busy={false}
+              files={files}
+              onGenerate={onGenerate}
+            />
           </span>
         )
-      }}
-      onPick={(id) => {
-        const place = byId.get(id)
-        if (place !== undefined) onPick(place)
       }}
     />
   )
 }
 
 /** The words every list of places in this module draws. */
-function usePlaceWords(): PlaceWords {
+export function usePlaceWords(): PlaceWords {
   const { t } = useI18n()
   return {
     search: t("prompts.place.search"),
@@ -252,29 +288,26 @@ function usePlaceWords(): PlaceWords {
  *
  * @param prompt — the prompt being delivered.
  * @param places — every agent place it can go to.
- * @param installed — which of them already hold it, read from the files.
+ * @param holds — what each of them already holds of it, read from the files.
  * @param files — the form's client-file port; `null` makes every row say so.
  * @param busy — a delivery is in flight; the trigger waits.
- * @param onToggle — install into a place, or take it back out of one.
- * @param onGenerate — write one of the derived forms into a place; a document's
- *   id says which file a section goes into.
+ * @param onGenerate — write or take back one of the forms; a document's id says
+ *   which file a section goes into.
  */
 export function PromptActions({
   prompt,
   places,
-  installed,
+  holds,
   files,
   busy,
-  onToggle,
   onGenerate,
 }: {
   prompt: Prompt
   places: readonly PromptPlace[]
-  installed: Installed
+  holds: Holds
   files: PlaceFiles | null
   busy: boolean
-  onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  onGenerate: DeliveryRun
 }) {
   const { t } = useI18n()
   const words = usePlaceWords()
@@ -299,10 +332,10 @@ export function PromptActions({
       </DropdownMenuTrigger>
       <PlaceChoices
         places={places}
-        installed={installed}
+        holds={holds}
         files={files}
         words={words}
-        onPick={onToggle}
+        countHolds
         onGenerate={onGenerate}
       />
     </DropdownMenu>
@@ -310,35 +343,32 @@ export function PromptActions({
 }
 
 /**
- * What the batch strip offers: taking every ticked prompt to one place.
+ * What the batch strip offers: writing the ticked prompts out into one place.
  *
- * It is the same list of the same places, with the same two actions per row —
- * so a prompt can be installed to an agent in bulk exactly as it can be one at
- * a time, without the two drifting apart. Nothing here reads a tick state: a
- * batch is a run of writes, not a place a set of prompts does or does not sit
- * in, and a half-installed set has no single answer to show.
+ * It is the same list of the same places, with the same menu per row, so a run
+ * of prompts can be written out in bulk exactly as one can. Nothing here reads
+ * a held state: a batch is a run of writes, not a place a set of prompts does or
+ * does not sit in, and a half-written set has no single answer to show — which
+ * is why every entry here writes, and none removes.
  *
  * @param count — how many prompts are ticked, for the trigger's own label.
  * @param places — every agent place the ticked prompts can go to.
  * @param files — the form's client-file port.
  * @param busy — a delivery is in flight.
- * @param onDeliver — send the ticked prompts into a place.
- * @param onGenerate — write one of the three derived forms for each of them.
+ * @param onGenerate — write one of the forms for each of the ticked prompts.
  */
 export function BatchActions({
   count,
   places,
   files,
   busy,
-  onDeliver,
   onGenerate,
 }: {
   count: number
   places: readonly PromptPlace[]
   files: PlaceFiles | null
   busy: boolean
-  onDeliver: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  onGenerate: DeliveryRun
 }) {
   const { t } = useI18n()
   const words = usePlaceWords()
@@ -363,12 +393,12 @@ export function BatchActions({
       </DropdownMenuTrigger>
       <PlaceChoices
         places={places}
-        /* A batch has no tick to show: what is ticked is not what any one place
-           holds, and marking a row would claim something untrue of the set. */
-        installed={{}}
+        /* A batch has no held state to show: what is ticked is not what any one
+           place holds, and marking a row would claim something untrue. */
+        holds={{}}
         files={files}
         words={words}
-        onPick={onDeliver}
+        countHolds={false}
         onGenerate={onGenerate}
       />
     </DropdownMenu>

@@ -16,7 +16,7 @@ import { commandFile, describeBody } from "../src/command-file.ts"
 import { targetOf } from "../src/deliver.ts"
 import type { PromptPlace } from "../src/provider.ts"
 import { slugOf } from "../src/slug.ts"
-import { withSection } from "../src/instruction.ts"
+import { withSection, withoutSection } from "../src/instruction.ts"
 
 /* The dangerous names are the point: everything downstream splits the name on
    `/` to check it, so a backslash, a drive letter or a leading dot has to have
@@ -221,8 +221,52 @@ describe("withSection", () => {
   })
 })
 
-/* Where each action writes, which is the other thing a wrong answer to would be
-   quiet about: a path that climbs, or a document the place never declared. */
+/* Taking a section back out: the inverse of `withSection`, and the thing that
+   lets a document stay the person's own after the hub has written in it. */
+describe("withoutSection", () => {
+  const section = (body: string) => ({ slug: "code-review", title: "Code Review", body })
+
+  it("answers null where the section was never there, leaving the file alone", () => {
+    expect(withoutSection("Nobody writes to main.\n", "code-review")).toBeNull()
+  })
+
+  /* The section in the middle leaves the two sides reading as two paragraphs. */
+  it("takes a section out of the middle and keeps both sides", () => {
+    const middle = `top\n\n${withSection(null, { slug: "s", title: "S", body: "old" }).trimEnd()}\n\nbottom`
+    expect(withoutSection(middle, "s")).toBe("top\n\nbottom\n")
+  })
+
+  it("keeps the file's own line endings", () => {
+    const crlf = withSection("# House rules\r\n\r\nNobody writes to main.\r\n", section("x"))
+    const next = withoutSection(crlf, "code-review")
+    expect(next).toContain("Nobody writes to main.")
+    expect(/[^\r]\n/.test(String(next).replace(/\r\n/g, "")), "a stray LF").toBe(false)
+    expect(next).toBe("# House rules\r\n\r\nNobody writes to main.\r\n")
+  })
+
+  /* A file someone edited into an unterminated block is still that block's. */
+  it("takes an unterminated section to the end of the file", () => {
+    const text = `top\n\n${withSection(null, section("x")).replace(/<!-- \/context-hub:code-review -->\n$/, "")}`
+    expect(withoutSection(text, "code-review")).toBe("top\n")
+  })
+
+  it("answers empty when the section was all the file held", () => {
+    const only = withSection(null, section("x"))
+    expect(withoutSection(only, "code-review")).toBe("")
+  })
+
+  it("is idempotent: the second take finds nothing", () => {
+    const pair = withSection(
+      withSection(null, section("x")),
+      { slug: "other", title: "Other", body: "y" }
+    )
+    const once = withoutSection(pair, "other")
+    expect(once).not.toBeNull()
+    expect(String(once)).not.toContain("other")
+    expect(withoutSection(String(once), "other")).toBeNull()
+  })
+})
+
 describe("where each action writes", () => {
   const place: PromptPlace = {
     id: "workspace",
@@ -232,6 +276,7 @@ describe("where each action writes", () => {
     scope: "workspace",
     commandDir: ".agents/commands",
     ruleDir: ".agents/rules",
+    agentDir: ".agents/agents",
     documents: [
       { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
       { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
@@ -250,16 +295,22 @@ describe("where each action writes", () => {
     assets: [],
   }
 
-  it("puts a command under the place's command directory, and a rule under its own", () => {
+  it("puts a command under the place's command directory, a rule under its own, and an agents file under its own", () => {
     expect(targetOf(place, prompt, "commands").file).toBe(".agents/commands/code-review.md")
     expect(targetOf(place, prompt, "rule").file).toBe(".agents/rules/code-review.md")
+    expect(targetOf(place, prompt, "agent").file).toBe(".agents/agents/code-review.md")
   })
 
-  it("sends an install where a command goes, at the place's own scope", () => {
-    expect(targetOf(place, prompt, "install").file).toBe(
-      targetOf(place, prompt, "commands").file
-    )
+  /* A place that never declared an agents directory is not asked to write one. */
+  it("refuses an agents file where the place has no such directory", () => {
+    const bare: PromptPlace = { ...place, agentDir: undefined }
+    expect(() => targetOf(bare, prompt, "agent")).toThrow(/agents directory/)
+  })
+
+  it("writes every generated form at the place's own scope", () => {
+    expect(targetOf(place, prompt, "commands").scope).toBe("workspace")
     expect(targetOf(place, prompt, "rule").scope).toBe("workspace")
+    expect(targetOf(place, prompt, "agent").scope).toBe("workspace")
   })
 
   it("reads a document as the file the place declared", () => {

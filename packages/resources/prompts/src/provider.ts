@@ -1,8 +1,8 @@
 /**
  * The one service an agent plugin publishes into when it knows where an agent
  * takes a prompt: the directory a prompt is delivered to as a command, the
- * directory a generated rule goes in, and the instruction file a prompt can be
- * added to.
+ * directory a generated rule goes in, the directory an agents file goes in, and
+ * the instruction file a prompt can be added to.
  *
  * The prompts module owns the page, the library and the four delivery actions;
  * it knows no agent's directories. Each agent extension knows exactly one agent
@@ -35,6 +35,12 @@ export interface PromptDocument {
   readonly id: string
   /** Message key for the file's name, as the row that offers it reads. */
   readonly labelKey: string
+  /**
+   * Message key for taking the section back out; without it the file stays
+   * add-only, which is what an external place that never wrote a removable
+   * marker gets instead of a broken label.
+   */
+  readonly removeLabelKey?: string
   /** Path of the file, relative to the same root the two directories are read under. */
   readonly file: string
 }
@@ -63,6 +69,13 @@ export interface PromptPlace {
   /** Where a generated rule goes, e.g. ".claude/rules". */
   readonly ruleDir: string
   /**
+   * Where a prompt is written as an agents file, e.g. ".agents/agents".
+   *
+   * Absent where the agent has no such directory: the action is then not
+   * offered at all, rather than offered and failing.
+   */
+  readonly agentDir?: string
+  /**
    * The files a prompt can be added to, in the order a menu offers them.
    * Absent where the place holds none: the actions that write one are then not
    * offered at all, rather than offered and failing.
@@ -70,13 +83,13 @@ export interface PromptPlace {
   readonly documents?: readonly PromptDocument[]
   /**
    * Whether this place takes only what a prompt is written *out* as — a
-   * command, a rule, a section of one of its documents — and not the prompt
-   * itself.
+   * command, a rule, an agents file, a section of one of its documents — and
+   * not the prompt itself.
    *
-   * A place that belongs to an agent has a directory the agent reads a prompt
-   * out of, so putting one there is a thing to offer. A place that is a
-   * workspace's own output directory has no such reading: it is where the
-   * generated forms land, and "install the prompt here" names no file.
+   * A place that is a workspace's own output directory has no such reading: it
+   * is where the generated forms land, and "install the prompt here" names no
+   * file. A place that belongs to an agent does have one, so it is also offered
+   * as somewhere the prompt itself can be read.
    */
   readonly generatedOnly?: boolean
   /** Sort rank among the places of its own scope. */

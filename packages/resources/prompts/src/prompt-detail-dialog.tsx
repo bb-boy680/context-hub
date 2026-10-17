@@ -15,10 +15,7 @@
 import {
   CheckIcon,
   CopyIcon,
-  EllipsisIcon,
   LibraryIcon,
-  MinusIcon,
-  PlusIcon,
   Trash2Icon,
   XIcon,
 } from "lucide-react"
@@ -44,13 +41,6 @@ import {
 import { useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@context-hub/shadcn-ui/components/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@context-hub/shadcn-ui/components/dropdown-menu"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
 import {
   Popover,
@@ -63,26 +53,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui
 import { Textarea } from "@context-hub/shadcn-ui/components/textarea"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
-import type { Delivery } from "./deliver.ts"
-import { GenerateItems } from "./install-menu.tsx"
-import { useInstalled, usePromptStore, type Installed } from "./library.ts"
+import { generatedUnder, holdsSomething, NOTHING_HELD, type Delivery } from "./deliver.ts"
+import { PlaceGenerate } from "./install-menu.tsx"
+import { useHolds, usePromptStore, type Holds } from "./library.ts"
 import { PromptMeta, PromptTile } from "./parts.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptStore, StoredPrompt } from "./store.ts"
 
 /** The scopes, in the order a list of places reads them. */
 const SCOPES = ["workspace", "global"] as const
-
-/**
- * The directory a place writes its generated forms under.
- *
- * Both directories a place declares sit under one root, which is what a row
- * with nothing else to say about itself shows a person.
- */
-function generatedUnder(place: PromptPlace): string {
-  const parts = place.commandDir.split("/")
-  return parts.length > 1 ? parts.slice(0, -1).join("/") : place.commandDir
-}
 
 /**
  * The name a prompt's text is coloured and titled under.
@@ -228,27 +207,23 @@ function usePromptMediaWords(): MediaPaneWords {
  * rather than one to leave out.
  */
 function PlacesSection({
-  prompt,
   root,
   places,
-  installed,
+  holds,
   files,
   busy,
-  onToggle,
   onGenerate,
 }: {
-  prompt: StoredPrompt
   /** Where the library keeps its prompts, as a person reads it; `null` when unknown. */
   root: string | null
   places: readonly PromptPlace[]
-  installed: Installed
+  holds: Holds
   files: PlaceFiles | null
   busy: boolean
-  onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
 }) {
   const { t } = useI18n()
-  const held = places.filter((place) => installed[place.id] === true).length
+  const held = places.filter((place) => holdsSomething(holds[place.id])).length
   const byId = React.useMemo(() => new Map(places.map((place) => [place.id, place])), [places])
 
   /* The measurements the skill lightbox lists its own places at. */
@@ -267,12 +242,10 @@ function PlacesSection({
     return (
       <span className="flex shrink-0 items-center gap-1">
         <PlaceGenerate
-          prompt={prompt}
           place={place}
-          held={installed[place.id] === true}
+          held={holds[place.id] ?? NOTHING_HELD}
           busy={busy}
           files={files}
-          onToggle={onToggle}
           onGenerate={onGenerate}
         />
       </span>
@@ -297,7 +270,7 @@ function PlacesSection({
         ...(place.generatedOnly === true
           ? { where: generatedUnder(place) }
           : { note: t("prompts.place.generates") }),
-        selected: installed[place.id] === true,
+        selected: holds[place.id]?.commands === true,
       })),
   }))
 
@@ -345,85 +318,6 @@ function PlacesSection({
         )}
       </ul>
     </section>
-  )
-}
-
-/**
- * Everything one agent's row can do, behind the single control it carries.
- *
- * The row itself is not an action here — it names a place, and the list beside
- * it says what that place is — so the two things that can be done with the
- * place are both in this menu: put the prompt there, take it back out, and
- * write one of the three derived forms. The last three are the shared entries,
- * so this menu and the card's nested one cannot come apart.
- */
-function PlaceGenerate({
-  prompt,
-  place,
-  held,
-  busy,
-  files,
-  onToggle,
-  onGenerate,
-}: {
-  prompt: StoredPrompt
-  place: PromptPlace
-  /** Whether this place already holds the prompt, read from the file. */
-  held: boolean
-  busy: boolean
-  files: PlaceFiles | null
-  onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
-}) {
-  const { t } = useI18n()
-  /* A place that takes only what a prompt is written out as has nothing to
-     install into: it is where the generated forms land, and "install the
-     prompt here" would name no file. */
-  const installs = place.generatedOnly !== true
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <button
-            type="button"
-            disabled={busy}
-            aria-label={`${t("prompts.action.more")} · ${t(place.labelKey)}`}
-            className="flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          />
-        }
-      >
-        <EllipsisIcon className="size-4" aria-hidden />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        /* The app's own menu chrome, as the sidebar draws its row menus: the
-           surface, the hairline and the row rhythm are one house style, so a
-           menu here reads as a menu anywhere else in the app. */
-        className="flex w-[200px] flex-col gap-0.5 rounded-md p-1.5 ring-1 ring-border shadow-soft"
-      >
-        {installs ? (
-          <DropdownMenuItem
-            /* A form that cannot reach the file says so where the action is,
-               rather than refusing once it has been pressed. */
-            disabled={files === null || busy}
-            title={files === null ? t("prompts.menu.blocked") : undefined}
-            className="h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
-            onClick={() => onToggle(place)}
-          >
-            {held ? (
-              <MinusIcon className="size-[15px]" aria-hidden />
-            ) : (
-              <PlusIcon className="size-[15px]" aria-hidden />
-            )}
-            {t(held ? "prompts.action.remove" : "prompts.action.install")}
-            <span className="sr-only">{prompt.name}</span>
-          </DropdownMenuItem>
-        ) : null}
-        {installs ? <DropdownMenuSeparator /> : null}
-        <GenerateItems place={place} onGenerate={onGenerate} />
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
 
@@ -658,10 +552,9 @@ function InfoPanel({
   updated,
   root,
   places,
-  installed,
+  holds,
   files,
   busy,
-  onToggle,
   onGenerate,
   onDelete,
   onRename,
@@ -675,11 +568,10 @@ function InfoPanel({
   /** Where the library keeps its prompts, as a person reads it; `null` when unknown. */
   root: string | null
   places: readonly PromptPlace[]
-  installed: Installed
+  holds: Holds
   files: PlaceFiles | null
   busy: boolean
-  onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
   onDelete: () => void
   onRename: (name: string) => void
   onDescribe: (description: string) => void
@@ -742,13 +634,11 @@ function InfoPanel({
         />
 
         <PlacesSection
-          prompt={prompt}
           root={root}
           places={places}
-          installed={installed}
+          holds={holds}
           files={files}
           busy={busy}
-          onToggle={onToggle}
           onGenerate={onGenerate}
         />
 
@@ -876,8 +766,7 @@ function BodyTab({
  * @param busy — a delivery is in flight.
  * @param stamp — changes whenever a delivery may have happened elsewhere.
  * @param onOpenChange — closing it.
- * @param onToggle — install into a place, or take it back out of one.
- * @param onGenerate — write one of the three derived forms into a place.
+ * @param onGenerate — write one of the derived forms into a place, or take one back.
  * @param onDelete — remove the prompt from the library.
  * @param onChanged — the stored row changed; the caller re-reads its page.
  * @param onRename — correct the prompt's title.
@@ -894,7 +783,6 @@ export function PromptDetailDialog({
   busy,
   stamp,
   onOpenChange,
-  onToggle,
   onGenerate,
   onDelete,
   onChanged,
@@ -912,8 +800,13 @@ export function PromptDetailDialog({
   busy: boolean
   stamp: number
   onOpenChange: (open: boolean) => void
-  onToggle: (prompt: StoredPrompt, place: PromptPlace) => void
-  onGenerate: (prompt: StoredPrompt, place: PromptPlace, action: Delivery, document?: string) => void
+  onGenerate: (
+    prompt: StoredPrompt,
+    place: PromptPlace,
+    action: Delivery,
+    document?: string,
+    remove?: boolean
+  ) => void
   onDelete: (prompt: StoredPrompt) => void
   onChanged: () => void
   onRename: (prompt: StoredPrompt, name: string) => void
@@ -936,8 +829,9 @@ export function PromptDetailDialog({
           files={files}
           busy={busy}
           stamp={stamp}
-          onToggle={(place) => onToggle(prompt, place)}
-          onGenerate={(place, action, document) => onGenerate(prompt, place, action, document)}
+          onGenerate={(place, action, document, remove) =>
+            onGenerate(prompt, place, action, document, remove)
+          }
           onDelete={() => onDelete(prompt)}
           onChanged={onChanged}
           onRename={(name) => onRename(prompt, name)}
@@ -958,7 +852,6 @@ function Lightbox({
   files,
   busy,
   stamp,
-  onToggle,
   onGenerate,
   onDelete,
   onChanged,
@@ -975,8 +868,7 @@ function Lightbox({
   files: PlaceFiles | null
   busy: boolean
   stamp: number
-  onToggle: (place: PromptPlace) => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string) => void
+  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
   onDelete: () => void
   onChanged: () => void
   onRename: (name: string) => void
@@ -998,7 +890,7 @@ function Lightbox({
   const [saving, setSaving] = React.useState(false)
   const media = usePromptMedia(prompt, store, onChanged)
   const mediaWords = usePromptMediaWords()
-  const installed = useInstalled(prompt, places, files, stamp + own)
+  const holds = useHolds(prompt, places, files, stamp + own)
 
   const editing = draft !== null && draft.id === prompt.id
   const text = editing ? (draft?.text ?? prompt.prompt) : prompt.prompt
@@ -1078,12 +970,11 @@ function Lightbox({
           updated={updated}
           root={root}
           places={places}
-          installed={installed}
+          holds={holds}
           files={files}
           busy={busy}
-          onToggle={(place) => acted(() => onToggle(place))}
-          onGenerate={(place, action, document) =>
-            acted(() => onGenerate(place, action, document))
+          onGenerate={(place, action, document, remove) =>
+            acted(() => onGenerate(place, action, document, remove))
           }
           onDelete={onDelete}
           onRename={onRename}

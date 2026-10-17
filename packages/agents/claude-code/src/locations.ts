@@ -72,6 +72,13 @@ export const CLAUDE_CODE_COMMAND_DIR = ".claude/commands"
 export const CLAUDE_CODE_RULE_DIR = ".claude/rules"
 
 /**
+ * Where Claude Code reads agent definitions, under the same two roots. Written
+ * the same way a command is — one file per name — for the same reason: the
+ * file's name is what the agent is called.
+ */
+export const CLAUDE_CODE_AGENT_DIR = ".claude/agents"
+
+/**
  * The instruction file Claude Code reads outside every project — its own memory
  * file, which is only ever the person's. It is named here as where a prompt is
  * added when it is added to a memory file; the project-side `CLAUDE.md` is a

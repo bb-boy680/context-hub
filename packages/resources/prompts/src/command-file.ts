@@ -1,11 +1,11 @@
 /**
  * The text a prompt becomes when it is delivered as a file.
  *
- * Two of the four delivery actions write the same file — a command under the
- * agent's commands directory — and the difference between them is exactly this
- * module: "install" drops the prompt in as it was written, while "generate a
- * command" puts the frontmatter an agent needs in front of it. Keeping both in
- * one function is what stops the two files drifting apart.
+ * A command, an agents file and a rule all write one file named after the
+ * prompt, and the difference between them is exactly this module: a command and
+ * an agents file put the frontmatter an agent needs in front of the body, while
+ * a rule (and an install) is the prompt as it was written. Keeping all of them
+ * in one function is what stops the files drifting apart.
  *
  * Text is normalised here and nowhere else, so a prompt typed on Windows and a
  * prompt typed in the browser land on disk byte for byte the same.

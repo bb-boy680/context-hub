@@ -19,7 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFsPlaceFiles } from "@context-hub/core/host/place-files"
 
-import { deliver, delivered, targetOf, undeliver } from "../src/deliver.ts"
+import { deliver, delivered, heldAt, heldMarks, holdsSomething, NOTHING_HELD, targetOf, undeliver } from "../src/deliver.ts"
 import type { PromptPlace } from "../src/provider.ts"
 import type { Prompt } from "../src/store.ts"
 
@@ -44,6 +44,7 @@ const WORKSPACE: PromptPlace = {
   scope: "workspace",
   commandDir: ".agents/commands",
   ruleDir: ".agents/rules",
+  agentDir: ".agents/agents",
   documents: [
     { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
     { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
@@ -111,13 +112,28 @@ describe("the two directories", () => {
     expect(rule).toContain("Report what it changes.")
   })
 
-  /* An install and a command are one file, not two: a second copy beside the
-     first would be the one that goes stale. */
-  it("writes the same file for an install as for a command, and only one of them", async () => {
-    await deliver(files, WORKSPACE, prompt, "install")
-    const plain = await read(at(".agents", "commands", "code-review.md"))
-    expect(plain.startsWith("---"), "an install carries no block").toBe(false)
-    expect(await fs.readdir(at(".agents", "commands"))).toEqual(["code-review.md"])
+})
+
+/* The agents file: one per prompt, named after it, with the two fields an agent
+   reads a name and a description out of. */
+describe("the agents file", () => {
+  it("lands under .agents/agents, carrying exactly name and description", async () => {
+    await deliver(files, WORKSPACE, prompt, "agent")
+    const agent = await read(at(".agents", "agents", "code-review.md"))
+    expect(agent.startsWith("---\nname: Code Review\n")).toBe(true)
+    /* Nothing beyond the two fields: a third one would be a promise to an agent
+       this module never meant to make. */
+    const block = agent.split("---\n")[1]
+    expect(block.trim().split("\n")).toHaveLength(2)
+    expect(block).toContain("description: Reads the diff and says what it changes")
+    expect(agent).toContain("Review the diff.")
+    expect(await delivered(files, WORKSPACE, prompt, "agent")).toBe(true)
+  })
+
+  it("is taken back by deleting its file", async () => {
+    expect(await undeliver(files, WORKSPACE, prompt, "agent")).toBe(true)
+    expect(await exists(at(".agents", "agents", "code-review.md"))).toBe(false)
+    expect(await undeliver(files, WORKSPACE, prompt, "agent")).toBe(false)
   })
 })
 
@@ -165,10 +181,27 @@ describe("the documents", () => {
 })
 
 describe("taking things back", () => {
-  it("refuses to take a document's section back, and changes nothing", async () => {
-    const before = await read(at("AGENTS.md"))
-    await expect(undeliver(files, WORKSPACE, prompt, "instructions", "agents")).rejects.toThrow()
-    expect(await read(at("AGENTS.md"))).toBe(before)
+  it("takes a document's section out, keeping the person's own text", async () => {
+    expect(await undeliver(files, WORKSPACE, prompt, "instructions", "agents")).toBe(true)
+    const after = await read(at("AGENTS.md"))
+    expect(after).toContain("Nobody writes to main.")
+    expect(after).not.toContain("context-hub:code-review")
+    /* The line endings are the file's, before and after. */
+    expect(/[^\r]\n/.test(after.replace(/\r\n/g, "")), "a stray LF").toBe(false)
+    expect(after.endsWith("\r\n")).toBe(true)
+    expect(await delivered(files, WORKSPACE, prompt, "instructions", "agents")).toBe(false)
+    expect(await undeliver(files, WORKSPACE, prompt, "instructions", "agents")).toBe(false)
+  })
+
+  it("deletes a document that held nothing but the section", async () => {
+    const notes: PromptPlace = {
+      ...WORKSPACE,
+      documents: [{ id: "notes", labelKey: "x", file: "NOTES.md" }],
+    }
+    await deliver(files, notes, prompt, "instructions", "notes")
+    expect(await exists(at("NOTES.md"))).toBe(true)
+    expect(await undeliver(files, notes, prompt, "instructions", "notes")).toBe(true)
+    expect(await exists(at("NOTES.md"))).toBe(false)
   })
 
   it("takes a rule back, and reports nothing done the second time", async () => {
@@ -203,5 +236,84 @@ describe("the machine-wide root", () => {
     expect(targetOf(GLOBAL, prompt, "instructions", "agents").scope).toBe("global")
     await deliver(files, GLOBAL, prompt, "instructions", "design")
     expect(await exists(path.join(machine, "DESIGN.md"))).toBe(true)
+  })
+})
+
+/* What a place already holds, read from the files: the one answer the menus,
+   the ticks and the row of marks are all drawn from. A prompt of its own keeps
+   these cases out of the ones above. */
+describe("what one place already holds", () => {
+  const probe: Prompt = { ...prompt, name: "Held Probe", prompt: "Probe body." }
+  const park: PromptPlace = {
+    ...WORKSPACE,
+    id: "park",
+    commandDir: ".probe/commands",
+    ruleDir: ".probe/rules",
+    agentDir: ".probe/agents",
+    documents: [
+      { id: "agents", labelKey: "prompts.menu.document.agents", file: "PROBE-AGENTS.md" },
+      { id: "design", labelKey: "prompts.menu.document.design", file: "PROBE-DESIGN.md" },
+    ],
+  }
+
+  it("holds nothing before anything is written", async () => {
+    expect(await heldAt(files, park, probe)).toEqual(NOTHING_HELD)
+    expect(holdsSomething(NOTHING_HELD)).toBe(false)
+  })
+
+  it("reports each kind it has, and only the documents carrying a section", async () => {
+    await deliver(files, park, probe, "commands")
+    await deliver(files, park, probe, "rule")
+    await deliver(files, park, probe, "agent")
+    await deliver(files, park, probe, "instructions", "design")
+
+    const held = await heldAt(files, park, probe)
+    expect(held).toEqual({ commands: true, rule: true, agent: true, documents: ["design"] })
+    expect(holdsSomething(held)).toBe(true)
+  })
+})
+
+describe("the marks of the agents holding a prompt", () => {
+  const spot = (id: string, agent: string): PromptPlace => ({
+    ...WORKSPACE,
+    id,
+    agent,
+    commandDir: `.${id}/commands`,
+    ruleDir: `.${id}/rules`,
+    agentDir: `.${id}/agents`,
+  })
+  const labelOf = (place: PromptPlace) => place.id
+  const has = { commands: true, rule: false, agent: false, documents: [] } as const
+  const none = NOTHING_HELD
+
+  it("draws nothing when no place holds it", () => {
+    expect(heldMarks([spot("one", "a")], { one: none }, labelOf)).toEqual([])
+  })
+
+  /* The two scopes of one agent are one agent, and a row of marks answers
+     "which agents". */
+  it("merges the scopes of one agent into one mark", () => {
+    const marks = heldMarks(
+      [spot("a-workspace", "a"), spot("a-global", "a")],
+      { "a-workspace": has, "a-global": has },
+      labelOf
+    )
+    expect(marks.map((mark) => mark.id)).toEqual(["a"])
+    expect(marks[0].label).toBe("a-workspace · a-global")
+  })
+
+  it("gives each agent its own mark, in the order the places read", () => {
+    const marks = heldMarks(
+      [spot("a", "one"), spot("b", "two")],
+      { a: has, b: has },
+      labelOf
+    )
+    expect(marks.map((mark) => mark.id)).toEqual(["one", "two"])
+  })
+
+  /* A section in a document is a delivery too, and the card says so. */
+  it("counts a document's section as a mark", () => {
+    const marks = heldMarks([spot("a", "one")], { a: { ...none, documents: ["agents"] } }, labelOf)
+    expect(marks.map((mark) => mark.id)).toEqual(["one"])
   })
 })

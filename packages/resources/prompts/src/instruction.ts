@@ -80,3 +80,32 @@ export function withSection(text: string | null, input: SectionInput): string {
 
   return newline === "\n" ? `${next}\n` : `${next.replace(/\n/g, newline)}${newline}`
 }
+
+/**
+ * Take one prompt's section out of an instruction file, leaving every other
+ * byte as it was.
+ *
+ * @param text — the file's current contents.
+ * @param slug — the prompt's file name, which is the section's identity.
+ * @returns the file's new contents, or `null` when there is no such section.
+ * `""` means the section was everything the file held, and the caller decides
+ * what an empty document is worth.
+ */
+export function withoutSection(text: string, slug: string): string | null {
+  const newline = newlineOf(text)
+  const current = toLf(text)
+  const opened = current.indexOf(OPEN(slug))
+  if (opened < 0) return null
+
+  /* A file that ends inside the block — someone deleted the closing marker —
+     is still this block's, the same way `withSection` reads it. */
+  const closed = current.indexOf(CLOSE(slug), opened)
+  const head = current.slice(0, opened).replace(/\s+$/, "")
+  const tail =
+    closed < 0
+      ? ""
+      : current.slice(closed + CLOSE(slug).length).replace(/^\n+/, "")
+  const next = head === "" ? tail : tail === "" ? head : `${head}\n\n${tail}`
+  if (next === "") return ""
+  return newline === "\n" ? `${next}\n` : `${next.replace(/\n/g, newline)}${newline}`
+}

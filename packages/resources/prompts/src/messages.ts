@@ -13,13 +13,14 @@ export const promptsMessages: Record<string, string> = {
     "The prompts this hub keeps, and the agents each one has been delivered to.",
 
   "prompts.tab.all": "All",
+  "prompts.tab.workspace": "Workspace",
+  "prompts.tab.global": "Global",
 
   "prompts.view.grid": "Card view",
   "prompts.view.list": "List view",
 
   "prompts.action.add": "Add prompt",
   "prompts.action.install": "Install",
-  "prompts.action.remove": "Remove",
   "prompts.action.copy": "Copy",
   "prompts.action.copied": "Copied",
   "prompts.action.more": "More actions",
@@ -41,6 +42,9 @@ export const promptsMessages: Record<string, string> = {
   "prompts.batch.clear": "Clear selection",
 
   "prompts.empty.none": "No prompts yet",
+  "prompts.empty.scope": "Nothing written here yet",
+  "prompts.empty.scopeHint":
+    "Open a prompt's ⋯ and write it out into this scope, and it shows up here.",
   "prompts.empty.noneHint":
     "Add one and deliver it to an agent, or generate a rule or a command from it.",
   "prompts.empty.filter": "Nothing matches",
@@ -59,13 +63,15 @@ export const promptsMessages: Record<string, string> = {
   "prompts.place.searchClear": "Clear the search",
   "prompts.place.searchEmpty": "No agent matches",
   "prompts.place.none": "No agent takes prompts yet",
+  "prompts.place.all": "All places",
+  "prompts.place.which": "Places",
   "prompts.location.workspace": "Workspace",
   "prompts.location.library": "Prompt library",
   "prompts.place.body": "This hub",
-  "prompts.place.generates": "Commands and rules, from the ⋯",
+  "prompts.place.generates": "Commands, rules, and agents files, from the ⋯",
   "prompts.place.expand": "Show {count} more",
   "prompts.place.collapse": "Show fewer",
-  "prompts.location.count": "{count} targets",
+  "prompts.location.count": "{count} installed",
 
   "prompts.media.play": "Play",
   "prompts.media.pause": "Pause",
@@ -97,9 +103,15 @@ export const promptsMessages: Record<string, string> = {
 
   "prompts.menu.installTo": "Install to",
   "prompts.menu.commands": "Generate a command",
+  "prompts.menu.commands.remove": "Remove the command",
   "prompts.menu.rule": "Generate a rule",
+  "prompts.menu.rule.remove": "Remove the rule",
+  "prompts.menu.agent": "Create an agents file",
+  "prompts.menu.agent.remove": "Remove the agents file",
   "prompts.menu.document.agents": "Add to AGENTS.md",
+  "prompts.menu.document.agents.remove": "Remove from AGENTS.md",
   "prompts.menu.document.design": "Add to DESIGN.md",
+  "prompts.menu.document.design.remove": "Remove from DESIGN.md",
   "prompts.menu.blocked": "This form cannot reach that file",
 
   "prompts.add.title": "Add a prompt",
@@ -143,10 +155,11 @@ export const promptsMessages: Record<string, string> = {
   "prompts.detail.places": "Places",
   "prompts.detail.places.held": "{count} installed",
 
-  "prompts.done.install": "Delivered to {agent}",
   "prompts.done.remove": "Taken back from {agent}",
   "prompts.done.commands": "A command was generated for {agent}",
+  "prompts.done.agent": "An agents file was created for {agent}",
   "prompts.done.rule": "A rule was generated for {agent}",
   "prompts.done.document": "Added to {file}",
+  "prompts.done.document.remove": "Removed from {file}",
   "prompts.done.deleted": "Deleted “{name}”",
 }
