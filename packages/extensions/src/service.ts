@@ -102,6 +102,7 @@ export class ExtensionService extends Service {
   private tail: Promise<void> = Promise.resolve()
   private revision = 0
   private cached: ExtensionSnapshot
+  private started = false
 
   constructor(ctx: Context, config: ExtensionServiceConfig) {
     super(ctx, "extensions")
@@ -138,7 +139,16 @@ export class ExtensionService extends Service {
         await this.run(() => this.activate(entry))
       }
     }
+    this.started = true
     this.publish()
+  }
+
+  /**
+   * Whether the first activation pass has settled. Before that, an extension
+   * that contributes nothing has not loaded yet — not withdrawn its contribution.
+   */
+  get settled(): boolean {
+    return this.started
   }
 
   /** Current catalog state; stable between changes. */
