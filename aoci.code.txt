@@ -56,7 +56,7 @@ workspaces.ts[ID8S]: F:工作区列表客户端服务 | R:code:apps/web/src/lib/
 preload.ts[AE7T]: F:启动时并行开始全部共享库读取 | R:code:apps/web/src/lib/hub.ts | A:PRELOADED,preloadCatalogs | S:PRELOADED 名单写死，模块新增 catalog 读取时必须在此登记才会在启动时读；不等待答案，页面先画已有内容
 
 ===D:/work-space/dsh-context-hub/apps/web/src/pages/===
-extensions.tsx[AE8M]: F:扩展目录页 | R:code:apps/web/src/components/extension-detail-dialog.tsx,code:apps/web/src/lib/extensions.ts | A:ExtensionsPage | S:分类无条目时整段不渲染；搜索只匹配 name、id、description 三段；locked 与 incompatible 的行不显示启停按钮
+extensions.tsx[AE8M]: F:扩展目录页 | R:code:apps/web/src/components/extension-detail-dialog.tsx,code:apps/web/src/lib/extensions.ts | A:ExtensionsPage | S:分类无条目时整段不渲染；搜索只匹配 name、id、description 三段；locked 与 incompatible 的行不显示启停按钮；语言选择器已移除，语言只在设置页
 overview.tsx[AU5L]: F:概览页看板 | R:code:packages/extensions/src/components/pagination.tsx | A:OverviewPage | S:KPI、图表、来源表与问题列表全是写死的演示数据，未接任何真实来源；时间范围下拉只改本地状态
 placeholder.tsx[AU3T]: F:未设计路由的占位页 | R:code:apps/web/src/lib/navigation.ts | A:PlaceholderPage | S:标题取最长匹配的导航项；正文文案是硬编码英文，未走 i18n
 repository.tsx[AU5M]: F:仓库同步页 | R:- | A:RepositoryPage | S:仓库、分支、同步记录与连接状态全是演示常量未接 GitHub；断开只停同步，已同步文件保留
