@@ -52,7 +52,7 @@ function under(route: string, pathname: string): string | null {
 /**
  * Exposes the prompt library.
  *
- * @param options.home — the hub home; the library is the `prompts/prompts.json` inside it.
+ * @param options.home — the hub home; the library is the `prompts` directory inside it.
  */
 export function createPromptHandler(options: { home?: string } = {}): HubMiddleware {
   let ready: Promise<PromptStore> | null = null

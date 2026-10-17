@@ -7,7 +7,9 @@
  * A record is written the way a person reads it: `name` is the short title,
  * `description` the sentence under it, `prompt` the text. The field names are
  * the file's own, so the file and this shape stay one thing and a hand edit
- * needs no translation.
+ * needs no translation. On disk the text lives in its own markdown file beside
+ * the index; `prompt` here is still the whole text, so nothing above this seam
+ * has to know that.
  *
  * A row is known by an id, opaque and written down the first time the row is,
  * so a name can be corrected without the row changing what it is: the id is what
