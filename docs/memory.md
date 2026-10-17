@@ -1086,3 +1086,23 @@ ctx.get("hub.workspaces")?.subscribe(() => {
 seed `locale = "zh-CN"` → `createHubKernel` + `start()` → 断言 `active` 仍是 `zh-CN`
 且 storage 里没有 `"en"` 写入。真机侧用隔离 hub home（seed `state/locale.json`）
 起 `server.ts --static dist`，改前构建会当场把 state 改成 `"en"`，改后连刷三次仍是中文。
+
+## 在 `packages/extensions` 里新增声明 `Context` 的文件，必须同时从 `./cordis.ts` 引用它（2026-10-17）
+
+**问题模式**：新加 `src/agents.ts`，里面写 `declare module "@deepseek-ai/cordis" { interface Context { … } }`，
+但文件本身**没有 import 这个包**（只 import 了 `@context-hub/core/workspace` 的类型）。结果不是
+这一条声明没生效，而是**整个包的类型全崩**：`i18n.ts`、`service.ts`、`react.tsx`、`kernel.ts`
+一起报 `Property 'get' does not exist on type 'Context'`，外加两个不同的 `Context` 身份
+（`lib/types/index` vs `lib/types/context`）互不兼容。错误全落在我没碰过的文件上，看起来像依赖坏了。
+
+`src/cordis.ts` 的文件头早就写了原因：**只有把包根当值导入，TypeScript 才会把 augmentation
+折进同一个 symbol**。没有导入的那个 `declare module` 被当成一个全新的环境模块，于是同一份
+`Context` 出现两个身份。把 `agents.ts` 删掉，全部报错消失——这才是归属证据。
+
+**规则**：在 `packages/extensions` 里写 `declare module "@deepseek-ai/cordis"` 的文件，
+**必须**从 `./cordis.ts` 导入那个包（哪怕只是 `import type { Context }`），并且让这个导入
+**真的被用到**，否则 `noUnusedLocals` 会再报一次。本轮的用法是把 `Context` 收进一个
+`chosenAgentsOf(ctx)`，顺带省掉调用处的 `ctx.get("hub.workspaces")`。
+
+判据：`tsc` 报大量「同一个类型两个来源路径」时，先看**最近新增的那个 `declare module` 文件**
+有没有导入它声明的包，而不是去查 node_modules。

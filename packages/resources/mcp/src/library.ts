@@ -17,12 +17,12 @@
 import * as React from "react"
 import { ServerIcon } from "lucide-react"
 
-import { createCatalog, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
-import { useCatalog, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
+import { createCatalog, chosenProviders, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
 
 import { buildCatalog, placesOf, type ScannedPlace } from "./catalog.ts"
 import { McpError, failureText, mcpFailure } from "./contract.ts"
-import type { McpDeclaration, McpIo, McpProvider, McpService } from "./contract.ts"
+import type { McpDeclaration, McpIo } from "./contract.ts"
 import {
   EMPTY_MCP_LIBRARY,
   loadRecords,
@@ -143,33 +143,25 @@ export function useMcpLibrary(): McpLibrary {
   )
 
   /* Which providers exist is what a scan follows: an extension being enabled or
-     disabled changes it, and the snapshot's revision is what says so. */
+     disabled changes it, and the snapshot's revision is what says so. Which of
+     them are read is the sidebar's choice — a client nobody chose has no file
+     this hub scans, probes, or offers as an install target. */
+  const chosen = useChosenAgents()
   const providers = React.useMemo(() => {
     void revision
-    return service?.providers() ?? []
-  }, [service, revision])
-  const places = React.useMemo(
-    () => placesOf(providers, iconFor).map((entry) => entry.place),
-    [providers, iconFor]
-  )
+    return chosenProviders(service?.providers() ?? [], chosen)
+  }, [service, revision, chosen])
+  const scanned = React.useMemo(() => placesOf(providers, iconFor), [providers, iconFor])
+  const places = React.useMemo(() => scanned.map((entry) => entry.place), [scanned])
 
   const catalog = React.useMemo(() => {
     if (value.scan === null) return null
-    /* The revision is a reload key too: a provider appearing decides the places. */
-    void revision
     const problems: McpScanProblem[] = value.scan.answer.problems.map((problem) => ({
       place: problem.place,
       message: failureText(t, problem.failure),
     }))
-    return buildCatalog(
-      value.records,
-      value.scan.answer,
-      placesOf(currentProviders(service), iconFor),
-      problems,
-      value.scan.at,
-      value.checks
-    )
-  }, [value, service, revision, iconFor, t])
+    return buildCatalog(value.records, value.scan.answer, scanned, problems, value.scan.at, value.checks)
+  }, [value, scanned, t])
 
   const log = React.useCallback(
     (level: "info" | "warn" | "error", message: string) => {
@@ -218,14 +210,14 @@ export function useMcpLibrary(): McpLibrary {
   /** The provider that owns one place, or a failure naming it. */
   const providerAt = React.useCallback(
     (place: string): { found: ScannedPlace; io: McpIo } => {
-      const found = placesOf(currentProviders(service), iconFor).find(
-        (entry) => entry.place.id === place
-      )
+      /* Read from the places this page offers, so a place whose agent was
+         un-chosen is not one a write can still reach. */
+      const found = scanned.find((entry) => entry.place.id === place)
       if (found === undefined) throw new McpError("mcp.error.unknownPlace", { place })
       if (files === null) throw new McpError("mcp.error.noFiles")
       return { found, io: { files, log } }
     },
-    [service, iconFor, files, log]
+    [scanned, files, log]
   )
 
   /** Run one change, then read every file again. `force` re-probes as well. */
@@ -280,7 +272,7 @@ export function useMcpLibrary(): McpLibrary {
           {
             name: id,
             declaration,
-            scope: targetScope(server, currentPlaces(service, iconFor)),
+            scope: targetScope(server, scanned),
           },
           (catalog?.servers ?? []).map((held) => held.id)
         )
@@ -426,19 +418,6 @@ export function useMcpLibrary(): McpLibrary {
       return { place, path: found.place.path, content: text, lines }
     },
   }
-}
-
-/** The providers registered right now, read at call time rather than captured. */
-function currentProviders(service: McpService | null): readonly McpProvider[] {
-  return service?.providers() ?? []
-}
-
-/** The places those providers describe, read at call time. */
-function currentPlaces(
-  service: McpService | null,
-  iconFor: (id: string) => ExtensionIcon
-): ScannedPlace[] {
-  return placesOf(currentProviders(service), iconFor)
 }
 
 /** Whether a declaration says enough to be written into a file. */

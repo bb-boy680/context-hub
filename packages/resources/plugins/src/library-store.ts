@@ -24,8 +24,16 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 import { PlugIcon } from "lucide-react"
 
+import type { WorkspaceService } from "@context-hub/core/workspace"
 import type { ExtensionIcon } from "@context-hub/extensions"
-import { createCatalog, type Catalog, type CatalogState, type Commit } from "@context-hub/extensions"
+import {
+  chosenAgents,
+  chosenProviders,
+  createCatalog,
+  type Catalog,
+  type CatalogState,
+  type Commit,
+} from "@context-hub/extensions"
 
 import { PLUGIN_ROUTE } from "./contract.ts"
 import { call, type PluginClient } from "./library.ts"
@@ -218,12 +226,18 @@ export class PluginLibrary extends Service {
       }
     }
 
-    /* Every client is asked, a few at a time, and each answer stands on its own:
-       see ./scan.ts for why both of those matter. An agent whose program is
-       missing, or which cannot answer at all, is still listed — a person then
-       sees that the hub looked for it rather than wondering why an agent they
-       use is absent, and one that failed says so in its own words. */
-    const probes = await probeInstallers(service.installers(), tools)
+    /* Every client the sidebar chose is asked, a few at a time, and each answer
+       stands on its own: see ./scan.ts for why both of those matter. A client
+       nobody chose is not asked at all — its command line is not run, nothing of
+       it is read, and it is not offered as an install target. An agent whose
+       program is missing, or which cannot answer, is still listed — a person
+       then sees that the hub looked for it rather than wondering why an agent
+       they use is absent, and one that failed says so in its own words. */
+    const chosen = chosenAgents(this.owner.get("hub.workspaces"))
+    const probes = await probeInstallers(
+      chosenProviders(service.installers(), chosen),
+      tools
+    )
 
     return {
       records: answer.plugins,
@@ -260,10 +274,11 @@ export class PluginLibrary extends Service {
    * Read again whenever the answer could have changed.
    *
    * Two things decide which clients exist and what each of them holds: which
-   * agents are enabled, and which folder is in use. Both already had to be
-   * watched by every page that drew this library; watching them here means
-   * watching them once, and means a change made while no page is open is already
-   * reflected when one opens.
+   * agents are enabled, and what the workspace list says — the folder in use,
+   * and which agents were chosen. Both already had to be watched by every page
+   * that drew this library; watching them here means watching them once, and
+   * means a change made while no page is open is already reflected when one
+   * opens.
    */
   private watch(): void {
     /* An agent extension activating registers its installer, and that registry is
@@ -275,25 +290,30 @@ export class PluginLibrary extends Service {
     this.owner.effect(() => {
       const workspaces = this.owner.get("hub.workspaces")
       if (workspaces === undefined) return () => undefined
-      /* The folder in use is the only thing about the workspace list this read
-         goes through — it decides which of a client's own files each answer is
-         read from — so it, and not the list, is what is watched. A rename, or
-         choosing one more agent to deliver to, is not this library's business.
+      /* The folder in use decides which of a client's own files each answer is
+         read from, and the chosen agents decide which clients are asked at all,
+         so the two together are what this read goes through. A rename, or a
+         folder added beside this one, is not this library's business.
 
-         Read off the folder rather than taken from the announcement, because
-         this read makes a workspace read of its own and would otherwise be woken
-         by its own asking: that is a loop, and it ran hot enough to be measured
-         before the folder was compared. A form's workspace service is the form's
-         — `hub.workspaces` is answered by whichever one a build provides — so
-         this does not lean on that service choosing to stay quiet. */
-      let seen = workspaces.current()?.current ?? null
+         Compared against what the last read was about rather than taken from the
+         announcement, because this read makes a workspace read of its own and
+         would otherwise be woken by its own asking: that is a loop, and it ran
+         hot enough to be measured before the key was compared. The key moves on
+         with the read, or every later announcement would look like a change. */
+      let seen = this.key(workspaces)
       return workspaces.subscribe(() => {
-        const now = workspaces.current()?.current ?? null
+        const now = this.key(workspaces)
         if (now === seen) return
         seen = now
         if (this.started) void this.reload()
       })
     })
+  }
+
+  /** What decides which clients are asked and which folders they are read in. */
+  private key(workspaces: WorkspaceService | undefined): string {
+    const folder = workspaces?.current()?.current ?? ""
+    return `${folder}\n${chosenAgents(workspaces).join(",")}`
   }
 
   /**

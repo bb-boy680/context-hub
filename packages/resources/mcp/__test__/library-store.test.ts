@@ -53,6 +53,33 @@ function recordsPort(answer: { document: unknown; file: string } | Error): McpRe
   }
 }
 
+/**
+ * The workspace list as a form provides it, holding one choice.
+ *
+ * `announce` is any change that keeps the choice — a rename, a folder added —
+ * and `choose` is the one that decides which agents' files are read.
+ */
+function formWorkspaces(agents: string[]) {
+  let chosen = [...agents]
+  const listeners = new Set<() => void>()
+  const tell = () => {
+    for (const listener of [...listeners]) listener()
+  }
+  return {
+    current: () => ({ folders: [], current: null, agents: chosen }),
+    subscribe: (listener: () => void) => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+    refresh: async () => undefined,
+    announce: tell,
+    choose(id: string, on: boolean) {
+      chosen = on ? [...chosen, id] : chosen.filter((one) => one !== id)
+      tell()
+    },
+  }
+}
+
 describe("the library a form starts", () => {
   it("is under the name the form reads it by once the module is active", async () => {
     const kernel = await createHubKernel({
@@ -205,9 +232,12 @@ describe("a read with probes behind it", () => {
     })
 
     /* A whole kernel, because the library reads the registry and the locale off
-       it and those are its own module's neighbours, not this test's to fake. */
+       it and those are its own module's neighbours, not this test's to fake.
+       The client is chosen, because a provider nobody chose is not scanned at
+       all — that is the rule this library now follows. */
     const kernel = await createHubKernel({
       host: { ...bareHost(), files: noFiles() },
+      services: { "hub.workspaces": formWorkspaces([PROVIDER.id]) },
       extensions: [mcpModuleWith(() => null)],
     })
     await kernel.start()
@@ -269,5 +299,41 @@ describe("what makes the library read again", () => {
     await until(() => records > read)
 
     expect(records, "the scan did not follow the extension that arrived").toBeGreaterThan(read)
+  })
+
+  it("follows the agents that were chosen, and only a change of key", async () => {
+    let records = 0
+    const json = (body: unknown) => new Response(JSON.stringify(body), { status: 200 })
+    vi.stubGlobal("fetch", async (url: string) => {
+      if (String(url).includes("action=records")) {
+        records += 1
+        return json({ value: [], file: "~/mcp/mcp.json" })
+      }
+      return json({ entries: {} })
+    })
+
+    const workspaces = formWorkspaces([])
+    const kernel = await createHubKernel({
+      host: { ...bareHost(), files: noFiles() },
+      services: { "hub.workspaces": workspaces },
+      extensions: [mcpModuleWith(() => null)],
+    })
+    await kernel.start()
+    const library = kernel.ctx.get(MCP_LIBRARY_SERVICE)
+    if (library === undefined) throw new Error("the module is not up")
+    await library.load()
+    await until(() => records > 0)
+
+    /* A rename, a folder added: the form announces all of them, and none of
+       them changes which client files a scan reads. */
+    const before = records
+    workspaces.announce()
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(records, "an announcement that moves nothing re-read the library").toBe(before)
+
+    /* Choosing an agent is what adds its files to the scan. */
+    workspaces.choose(PROVIDER.id, true)
+    await until(() => records > before)
+    expect(records, "choosing an agent did not re-read the library").toBeGreaterThan(before)
   })
 })

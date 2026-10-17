@@ -7,12 +7,16 @@ import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/w
 
 import type { Context } from "./cordis.ts"
 
+import { chosenAgentsOf } from "./agents.ts"
 import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
 import type { ContributionMap, ExtensionPointId } from "./types.ts"
 
 const HubContext = React.createContext<Context | null>(null)
+
+/** Nothing to follow when this form provides no workspace list. */
+const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
 
 /** Provide the composed kernel to the component tree. */
 export function HubProvider({
@@ -58,6 +62,27 @@ export function useExtensionContributions<P extends ExtensionPointId>(
   const ctx = useHub()
   useExtensionSnapshot()
   return ctx.extensions.contributionsFrom(id, point)
+}
+
+/**
+ * The agents the sidebar chose, re-rendering when the choice changes.
+ *
+ * Which agents a person works with is one choice, shared by every library: the
+ * modules that read an agent's files filter what they read by this, so a
+ * provider nobody chose is not read at all.
+ *
+ * @returns the chosen integration ids, or an empty list when nothing is chosen
+ *   or this form has no workspace list.
+ */
+export function useChosenAgents(): readonly string[] {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(() => chosenAgentsOf(ctx), [ctx])
+  return React.useSyncExternalStore(subscribe, read)
 }
 
 /** Translation and locale control returned by {@link useI18n}. */

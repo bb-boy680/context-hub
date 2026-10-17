@@ -1003,6 +1003,15 @@ export function SkillsPage() {
     return byScope
   }, [places, library.places, t])
 
+  /* A scope tab stands for the places it spans, so a scope holding none is not a
+     tab at all: with no agent chosen the machine-wide one has nothing to open,
+     and the row says only what this hub can actually read. */
+  const scopeHasPlaces = React.useCallback(
+    (value: SkillTab) =>
+      value === "workspace" || value === "global" ? scopePlaces[value].length > 0 : true,
+    [scopePlaces]
+  )
+
   /* The page filters and pages what the hook hands it: rows come from the
      library and the places both, and only the library has a server page. */
   const rows = library.rows
@@ -1040,10 +1049,13 @@ export function SkillsPage() {
 
   /* A screen holding nothing leaves the row rather than opening empty, and the
      row is read before the filters: a category that happens to match none of
-     them must not make the tab itself disappear under the pointer. */
+     them must not make the tab itself disappear under the pointer. A scope with
+     no places left — the last agent chosen for it was un-chosen — is one of
+     those screens too. */
   const screenTab: SkillTab =
     (tab === "unstored" && library.counts.unstored === 0) ||
-    (tab === "updates" && library.counts.updates === 0)
+    (tab === "updates" && library.counts.updates === 0) ||
+    !scopeHasPlaces(tab)
       ? "all"
       : tab
 
@@ -1295,7 +1307,8 @@ export function SkillsPage() {
             {SHELL_TABS.filter(
               (item) =>
                 (item.value !== "unstored" || library.counts.unstored > 0) &&
-                (item.value !== "updates" || library.counts.updates > 0)
+                (item.value !== "updates" || library.counts.updates > 0) &&
+                scopeHasPlaces(item.value)
             ).map((item) => {
               const scope = SCOPE_TABS.includes(item.value) ? (item.value as AssetScope) : null
               const stack = scope === null ? null : scopePlaces[scope]

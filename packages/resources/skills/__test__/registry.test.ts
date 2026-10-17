@@ -52,6 +52,7 @@ describe("the skill registry", () => {
 
 describe("which places a set of chosen agents makes readable", () => {
   const providers = [
+    { id: "hub.skill.catalog", shared: true, places: [place("shared", "workspace", 5)] },
     { id: "hub.target.one", places: [place("one-global", "global", 30)] },
     {
       id: "hub.target.two",
@@ -60,12 +61,17 @@ describe("which places a set of chosen agents makes readable", () => {
   ]
   const idsOf = (chosen: string[]) => readablePlaces(providers, chosen).map((each) => each.id)
 
-  it("reads a workspace place with no agent chosen", () => {
-    expect(idsOf([])).toEqual(["two-workspace"])
+  it("reads only the module's own place when no agent is chosen", () => {
+    expect(idsOf([])).toEqual(["shared"])
   })
 
-  it("holds a machine-wide place back until its own agent is chosen", () => {
-    expect(idsOf(["hub.target.two"])).toEqual(["two-global", "two-workspace"])
+  it("reads both scopes of an agent once it is chosen", () => {
+    expect(idsOf(["hub.target.two"])).toEqual(["shared", "two-global", "two-workspace"])
+  })
+
+  it("stops reading an agent's places when it is un-chosen", () => {
+    expect(idsOf([])).not.toContain("two-workspace")
+    expect(idsOf([])).not.toContain("two-global")
   })
 
   it("does not read another agent's places", () => {
@@ -74,6 +80,7 @@ describe("which places a set of chosen agents makes readable", () => {
 
   it("orders the places by their own rank", () => {
     expect(idsOf(["hub.target.one", "hub.target.two"])).toEqual([
+      "shared",
       "two-global",
       "two-workspace",
       "one-global",

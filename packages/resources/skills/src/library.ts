@@ -6,7 +6,7 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useCatalog, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
@@ -32,9 +32,6 @@ import type {
   SkillPlaceId,
   SkillSource,
 } from "./types.ts"
-
-/** Nothing chosen, as a stable value: a reload key must not change identity. */
-const NO_AGENTS: string[] = []
 
 /**
  * What a page watches when this module is not loaded: always empty, never
@@ -99,28 +96,6 @@ export interface SkillLibrary {
 /** Every place holding a row's files. */
 export function holdsOf(skill: Skill): SkillHold[] {
   return skill.places ?? []
-}
-
-/**
- * The agents the sidebar has chosen, re-read whenever the choice changes. It is
- * the page's own read, not the loader's: which places to load follows from it,
- * and the loader only loads what it is handed.
- *
- * @returns the chosen integrations' ids, and nothing when this form has no
- *   workspace service.
- */
-export function useChosenAgents(): string[] {
-  const ctx = useHub()
-  const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
-  const subscribe = React.useCallback(
-    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
-    [workspaces]
-  )
-  const read = React.useCallback(
-    () => workspaces?.current()?.agents ?? NO_AGENTS,
-    [workspaces]
-  )
-  return React.useSyncExternalStore(subscribe, read)
 }
 
 /**

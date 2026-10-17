@@ -861,17 +861,10 @@ export function PluginsPage() {
     [filtered]
   )
 
-  /* A tab whose set is empty leaves the row rather than sitting there saying
-     nothing, and the screen follows it off: a person who emptied the set by
-     acting on it lands back on the whole catalog rather than on a blank page. */
-  const screenTab: PluginTab =
-    (tab === "unstored" && counts.unstored === 0) || (tab === "updates" && counts.updates === 0)
-      ? "all"
-      : tab
-
   /* The agents each scope tab spans, as the tab's own stack and menu draw them.
      Which of them is a place of which tab is the same reading the rows go
-     through, so a client no tab can show is not offered by one either. */
+     through, so a client no tab can show is not offered by one either. Only the
+     clients the sidebar chose are read, so a scope with none left has no tab. */
   const scopePlaces = React.useMemo(() => {
     const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
     for (const scope of SCOPE_TABS as AssetScope[]) {
@@ -891,6 +884,26 @@ export function PluginsPage() {
     }
     return byScope
   }, [library.clients, catalog])
+
+  /* A scope with no agents left has nothing to open: with nothing chosen, its
+     client files are not read at all. */
+  const scopeHasPlaces = React.useCallback(
+    (value: PluginTab) =>
+      value === "workspace" || value === "global"
+        ? scopePlaces[value as AssetScope].length > 0
+        : true,
+    [scopePlaces]
+  )
+
+  /* A tab whose set is empty leaves the row rather than sitting there saying
+     nothing, and the screen follows it off: a person who emptied the set by
+     acting on it lands back on the whole catalog rather than on a blank page. */
+  const screenTab: PluginTab =
+    (tab === "unstored" && counts.unstored === 0) ||
+    (tab === "updates" && counts.updates === 0) ||
+    !scopeHasPlaces(tab)
+      ? "all"
+      : tab
 
   /* A choice from a scope tab's menu only means something while it is a place of
      the scope on screen; anywhere else the scope is whole. */
@@ -1122,7 +1135,8 @@ export function PluginsPage() {
             {SHELL_TABS.filter(
               (item) =>
                 (item.value !== "unstored" || counts.unstored > 0) &&
-                (item.value !== "updates" || counts.updates > 0)
+                (item.value !== "updates" || counts.updates > 0) &&
+                scopeHasPlaces(item.value)
             ).map((item) => {
               const active = screenTab === item.value
               /* A set of what is missing opens through the one action it is for:

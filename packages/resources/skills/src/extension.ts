@@ -54,13 +54,14 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
       /* The places travel through the registry rather than a contribution point,
          so an agent integration registers into this module the same way whether
          it was built here or installed as a folder. This module's own place is
-         the first one in it: it is in every workspace, so no agent has to be
-         chosen for it to be read.
+         the first one in it, and it is marked shared: it is in every workspace,
+         so it is read whatever agents the sidebar chose — unlike an agent's
+         places, which are read only while that agent is chosen.
 
          Constructing the service publishes it, and it belongs to this plugin —
          so the places it holds, including this module's own, go away with it. */
       const service = new SkillService(ctx)
-      service.register({ id: SKILLS_ID, places: [SHARED_PLACE] })
+      service.register({ id: SKILLS_ID, shared: true, places: [SHARED_PLACE] })
 
       /* The shared read of the library. Constructed here and read by name from
          the form's own startup, so the rows are already there when a page opens

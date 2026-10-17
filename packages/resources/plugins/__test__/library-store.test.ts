@@ -15,6 +15,7 @@ import { Context } from "@deepseek-ai/cordis"
 import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { NOTHING_READ, PLUGIN_LIBRARY_SERVICE, PluginLibrary } from "../src/library-store.ts"
+import { PLUGIN_SERVICE, type PluginInstaller } from "../src/provider.ts"
 
 /** Every case here answers its own host; none of them keeps one. */
 afterEach(() => {
@@ -25,22 +26,24 @@ afterEach(() => {
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 30))
 
 /**
- * The workspace list as a form provides it, holding one folder.
+ * The workspace list as a form provides it, holding one folder and one choice.
  *
  * `tell` is called on every change, including the ones a read makes itself,
  * because that is what the web form's own service does.
  *
- * @returns the service, and the two ways a test moves it: `move` is picking
- *   another folder, `announce` is any of the changes that keep the same one.
+ * @returns the service, and the ways a test moves it: `move` is picking another
+ *   folder, `choose` is which agents this hub delivers to, and `announce` is any
+ *   of the changes that keep both.
  */
 function formWorkspaces(ctx: Context) {
   const listeners = new Set<() => void>()
   let folder: string | null = null
+  let agents: string[] = []
   const tell = () => {
     for (const listener of [...listeners]) listener()
   }
   const service = {
-    current: () => ({ folders: [], current: folder, agents: [] }),
+    current: () => ({ folders: [], current: folder, agents }),
     subscribe: (listener: () => void) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -53,6 +56,10 @@ function formWorkspaces(ctx: Context) {
     },
     move: (to: string) => {
       folder = to
+      tell()
+    },
+    choose: (id: string, on = true) => {
+      agents = on ? [...agents, id] : agents.filter((one) => one !== id)
       tell()
     },
     announce: tell,
@@ -121,7 +128,7 @@ describe("watching the folder in use", () => {
     expect(reads(), "a workspace announcement kept asking for another read").toBe(soFar)
   })
 
-  it("reads again when the folder moves, and not for an announcement that does not", async () => {
+  it("reads again when the folder moves or the chosen agents change, and not for an announcement", async () => {
     const ctx = new Context()
     const form = formWorkspaces(ctx)
     const reads = countReads()
@@ -130,8 +137,8 @@ describe("watching the folder in use", () => {
     await library.load()
     await settle()
 
-    /* A rename, another agent chosen, another folder added: the form announces
-       all of them, and none of them changes which folder a client is read in. */
+    /* A rename, a folder added beside this one: the form announces all of them,
+       and none of them changes which client files a read goes through. */
     const before = reads()
     form.announce()
     await settle()
@@ -140,5 +147,64 @@ describe("watching the folder in use", () => {
     form.move("D:/other")
     await settle()
     expect(reads() - before, "moving to another folder did not re-read the library").toBe(1)
+
+    /* Choosing an agent is what adds its client files to the read. */
+    const moved = reads()
+    form.choose("hub.target.one")
+    await settle()
+    expect(reads() - moved, "choosing an agent did not re-read the library").toBe(1)
+
+    /* And announcing that choice again is not a second change. */
+    form.announce()
+    await settle()
+    expect(reads() - moved, "the key stayed behind, so every announcement re-read").toBe(1)
+  })
+})
+
+describe("which clients a read asks", () => {
+  it("asks the chosen agents and no others", async () => {
+    const ctx = new Context()
+    const form = formWorkspaces(ctx)
+    form.choose("hub.target.one")
+    /* The installer toolkit reaches the form's client files; this form has none,
+       which is not what this case is about. */
+    ctx.provide("host", { files: null } as never)
+
+    const asked: string[] = []
+    const installer = (id: string): PluginInstaller => ({
+      id,
+      label: id,
+      places: [],
+      available: async () => {
+        asked.push(id)
+        return true
+      },
+      held: async () => [],
+      install: async () => ({ message: "" }),
+      remove: async () => ({ message: "" }),
+    })
+    ctx.provide(PLUGIN_SERVICE, {
+      installers: () => [installer("hub.target.one"), installer("hub.target.two")],
+      tools: {
+        root: async () => "/library",
+        syncMarketplace: async () => undefined,
+        run: async () => "",
+        files: null,
+        has: async () => true,
+        describe: async () => ({ name: "", version: "", description: "" }),
+      },
+    } as never)
+
+    vi.stubGlobal("fetch", async () => ({
+      ok: true,
+      json: async () => ({ root: "/library", plugins: [], missing: [] }),
+    }))
+
+    const library = new PluginLibrary(ctx)
+    await library.load()
+    await settle()
+
+    expect(asked, "the chosen agent was not asked").toContain("hub.target.one")
+    expect(asked, "an un-chosen agent's command line was run").not.toContain("hub.target.two")
   })
 })

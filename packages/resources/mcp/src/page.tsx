@@ -74,12 +74,20 @@ const TAB_ORDER: TabId[] = ["all", "library", "unstored", "failed", "workspace",
 /**
  * The tabs a screen shows right now. A screen that holds nothing is left out
  * rather than drawn empty: nothing is failing, or every server is already in
- * the library, is good news the tab row does not need to repeat.
+ * the library, is good news the tab row does not need to repeat. The same goes
+ * for a scope with no places left — with no agent chosen, its places are not
+ * read at all, so there is nothing behind the tab to open.
+ *
+ * @param counts — how many rows each screen holds.
+ * @param hasPlaces — whether a scope still spans any place this hub reads.
  */
-function tabsToShow(counts: Record<ShellTab, number>): TabId[] {
-  return TAB_ORDER.filter((id) => id !== "failed" || counts.failed > 0).filter(
-    (id) => id !== "unstored" || counts.unstored > 0
-  )
+function tabsToShow(
+  counts: Record<ShellTab, number>,
+  hasPlaces: (id: TabId) => boolean
+): TabId[] {
+  return TAB_ORDER.filter((id) => id !== "failed" || counts.failed > 0)
+    .filter((id) => id !== "unstored" || counts.unstored > 0)
+    .filter((id) => (id !== "workspace" && id !== "global") || hasPlaces(id))
 }
 
 /** How long ago something happened, in the three steps a card or a footer prints. */
@@ -162,6 +170,7 @@ function FilterTabs({
   tab,
   onTab,
   counts,
+  hasPlaces,
   scopePlaces,
   chosen,
   onChoose,
@@ -170,6 +179,8 @@ function FilterTabs({
   tab: TabId
   onTab: (tab: TabId) => void
   counts: Record<ShellTab, number>
+  /** Whether a scope still spans any place, which is what draws its tab. */
+  hasPlaces: (id: TabId) => boolean
   /** The places each scope holds, which its own pill draws as a stack. */
   scopePlaces: Record<McpPlaceKind, readonly PlaceOption[]>
   /** The place the scope on screen is narrowed to; `null` when it is whole. */
@@ -185,7 +196,7 @@ function FilterTabs({
        too narrow for the tabs scrolls inside the wrapper instead of squashing
        them into unreadable slivers. */
     <div className="flex h-11 w-fit items-center gap-1 rounded-full bg-secondary p-1">
-      {tabsToShow(counts).map((id) => {
+      {tabsToShow(counts, hasPlaces).map((id) => {
         const Icon = TAB_MARKS[id]
 
         /* A scope says which places it spans instead of how many servers it
@@ -438,14 +449,6 @@ export function McpServersPage() {
     } satisfies Record<ShellTab, number>
   }, [servers])
 
-  /* A screen whose tab has just gone — the last failure cleared, the last
-     unstored server taken in — leaves the person on the whole list instead of
-     an empty one. */
-  const activeTab: TabId =
-    (tab === "failed" && counts.failed === 0) || (tab === "unstored" && counts.unstored === 0)
-      ? "all"
-      : tab
-
   /* Each scope pill names the places it holds by their marks, and its menu
      counts what each place declares, so a person can tell two client files
      apart before opening one. */
@@ -464,6 +467,23 @@ export function McpServersPage() {
     }
     return byScope
   }, [places, servers])
+
+  /* A scope with no places left has no tab to open: with no agent chosen, none
+     of its client files is read at all. */
+  const scopeHasPlaces = React.useCallback(
+    (id: TabId) => (id === "workspace" || id === "global" ? scopePlaces[id].length > 0 : true),
+    [scopePlaces]
+  )
+
+  /* A screen whose tab has just gone — the last failure cleared, the last
+     unstored server taken in, or the last place of a scope un-chosen — leaves
+     the person on the whole list instead of an empty one. */
+  const activeTab: TabId =
+    (tab === "failed" && counts.failed === 0) ||
+    (tab === "unstored" && counts.unstored === 0) ||
+    !scopeHasPlaces(tab)
+      ? "all"
+      : tab
 
   /* A choice from a scope's menu only means something while that scope is the
      one on screen; anywhere else the scope is whole. */
@@ -620,6 +640,7 @@ export function McpServersPage() {
                   setPage(0)
                 }}
                 counts={counts}
+                hasPlaces={scopeHasPlaces}
                 scopePlaces={scopePlaces}
                 chosen={chosen}
                 onChoose={(scope, place) => {

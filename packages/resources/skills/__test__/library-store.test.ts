@@ -20,8 +20,21 @@ function place(id: string, scope: "workspace" | "global"): SkillPlace {
   return { id, labelKey: `${id}.tab`, icon: () => null, scope, dir: `.${id}/skills`, order: 10 }
 }
 
-/** A library that answers with one empty page and one empty place view. */
-function libraryOver() {
+/**
+ * The workspace list as a form provides it, holding one choice.
+ *
+ * Only the two members the library reads are here: which agents are chosen, and
+ * the notification that they changed.
+ */
+function formWorkspaces(agents: string[]) {
+  return {
+    current: () => ({ folders: [], current: null, agents }),
+    subscribe: () => () => undefined,
+    refresh: async () => undefined,
+  }
+}
+
+/** A library that answers with one empty page and one empty place view. */function libraryOver() {
   const asked: string[] = []
   const store = {
     root: "host",
@@ -54,25 +67,59 @@ describe("the skill library a form starts", () => {
     expect(ctx.get(SKILL_LIBRARY_SERVICE)).toBeInstanceOf(SkillLibrary)
   })
 
-  it("reads the catalog and every place the chosen agents make readable", async () => {
+  it("reads the catalog, the module's own place, and both scopes of the chosen agent", async () => {
     const { store, asked } = libraryOver()
     const ctx = new Context()
     ctx.provide("hub.skills", store as never)
+    ctx.provide("hub.workspaces", formWorkspaces(["hub.target.two"]) as never)
     const registry = new SkillService(ctx)
-    registry.register({ id: "hub.target.one", places: [place("one", "global")] })
-    /* Nothing has chosen that agent, so its machine-wide place is not read; the
-       workspace place of another module is, whatever is chosen. */
-    registry.register({ id: "hub.target.two", places: [place("two", "workspace")] })
+    registry.register({
+      id: "hub.skill.catalog",
+      shared: true,
+      places: [place("shared", "workspace")],
+    })
+    /* Chosen, so both of its scopes are read: the workspace one and the
+       machine-wide one are the same agent's files. */
+    registry.register({
+      id: "hub.target.two",
+      places: [place("two", "workspace"), place("two-global", "global")],
+    })
+    /* Nobody chose this one, so neither of its places is read. */
+    registry.register({
+      id: "hub.target.one",
+      places: [place("one", "workspace"), place("one-global", "global")],
+    })
 
     const library = new SkillLibrary(ctx)
     await library.load()
 
     expect(asked).toContain("list")
+    expect(asked).toContain(".shared/skills")
     expect(asked).toContain(".two/skills")
-    expect(asked, "a machine-wide place was read without its agent being chosen").not.toContain(
-      ".one/skills"
+    expect(asked).toContain(".two-global/skills")
+    expect(asked, "an un-chosen agent's workspace place was read").not.toContain(".one/skills")
+    expect(asked, "an un-chosen agent's machine-wide place was read").not.toContain(
+      ".one-global/skills"
     )
     expect(library.state().value?.tags).toEqual(["demo"])
+  })
+
+  it("reads no agent's place when no agent is chosen", async () => {
+    const { store, asked } = libraryOver()
+    const ctx = new Context()
+    ctx.provide("hub.skills", store as never)
+    ctx.provide("hub.workspaces", formWorkspaces([]) as never)
+    const registry = new SkillService(ctx)
+    registry.register({ id: "hub.skill.catalog", shared: true, places: [place("shared", "workspace")] })
+    registry.register({
+      id: "hub.target.two",
+      places: [place("two", "workspace"), place("two-global", "global")],
+    })
+
+    await new SkillLibrary(ctx).load()
+
+    /* The catalog is this hub's own; the only place read is the shared one. */
+    expect(asked).toEqual(["list", ".shared/skills"])
   })
 
   it("reads nothing, and reports nothing, when this form has no library", async () => {

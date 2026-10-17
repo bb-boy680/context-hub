@@ -94,11 +94,12 @@ export const promptsExtension: ExtensionModule = {
     /* The delivery targets travel through the registry rather than a
        contribution point, so an agent integration registers into this module
        the same way whether it was built here or installed as a folder. The
-       workspace place is the module's own: `.agents/` is the one directory the
-       agents in this hub share, and what lands there is what this hub wrote,
-       not what an agent reads a prompt out of. */
+       workspace place is the module's own and is marked shared: `.agents/` is
+       the one directory the agents in this hub share, and it is read whatever
+       agents the sidebar chose — unlike an agent's places, which are offered
+       only while that agent is chosen. */
     const service = new PromptService(ctx)
-    service.register({ id: PROMPTS_ID, places: [WORKSPACE_PLACE] })
+    service.register({ id: PROMPTS_ID, shared: true, places: [WORKSPACE_PLACE] })
 
     ctx.nav.register({
       path: "/prompts",

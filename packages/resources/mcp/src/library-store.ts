@@ -19,6 +19,8 @@ import { ServerIcon } from "lucide-react"
 
 import type { ExtensionIcon } from "@context-hub/extensions"
 import {
+  chosenAgents,
+  chosenProviders,
   createCatalog,
   mapLimit,
   type Catalog,
@@ -162,8 +164,12 @@ export class McpLibrary extends Service {
   private readonly probing = new Map<string, Promise<McpCacheEntry>>()
   /** Whether the read under way was asked to prove every server again. */
   private forced = false
-  /** The folder the last read was about, so a change to the list is what reloads. */
-  private workspace: string | null = null
+  /**
+   * What the last read was about: the folder in use, and the agents chosen.
+   * Either one decides which files a scan reads, so the pair is what says
+   * whether an announcement needs a read at all.
+   */
+  private seen: string
   /** The translator; a failure this read reports has no page to render it. */
   private readonly t = (key: string): string => this.ctx.i18n.t(key)
   /** One diagnostic line a provider wrote, passed through to the host. */
@@ -175,22 +181,35 @@ export class McpLibrary extends Service {
       initial: EMPTY_MCP_LIBRARY,
       read: (commit) => this.read(commit),
     })
-    this.workspace = this.folder()
+    this.seen = this.key()
 
     /* Two things decide which files a scan reads, and each is a reason to read
        again: the extensions that describe places — an agent enabled while the
-       page is open appears in it, one disabled leaves — and the folder in use,
-       which is what a workspace place resolves inside. Both are watched here
-       rather than by the page, because the read outlives any page. */
+       page is open appears in it, one disabled leaves — and what the sidebar
+       chose, which is the folder in use together with the agents this hub
+       delivers to. Both are watched here rather than by the page, because the
+       read outlives any page. */
     ctx.on("extensions/changed", () => {
       if (this.started) void this.catalog.reload()
     })
     ctx.get("hub.workspaces")?.subscribe(() => {
-      const now = this.folder()
-      if (!this.started || now === this.workspace) return
-      this.workspace = now
+      const now = this.key()
+      if (!this.started || now === this.seen) return
+      /* Moved on before the read: a key that stays behind makes every later
+         announcement look like a change, and each one a read of its own. */
+      this.seen = now
       void this.catalog.reload()
     })
+  }
+
+  /**
+   * What decides which files a read scans: the folder every workspace place
+   * resolves inside, and the agents whose places are read at all.
+   */
+  private key(): string {
+    const workspaces = this.ctx.get("hub.workspaces")
+    const folder = workspaces?.current()?.current ?? ""
+    return `${folder}\n${chosenAgents(workspaces).join(",")}`
   }
 
   /** The records port this library reads and writes through. */
@@ -473,9 +492,16 @@ export class McpLibrary extends Service {
     return this.ctx.get("mcp")?.providers() ?? []
   }
 
-  /** The places those providers describe, read at call time. */
+  /**
+   * The places those providers describe, read at call time.
+   *
+   * A provider belongs to one agent, and the sidebar's choice says which agents
+   * this hub works with: a client nobody chose has no file scanned, so nothing
+   * of it is read, probed or offered as an install target.
+   */
   private places(): ScannedPlace[] {
-    return placesOf(this.providers(), (id) => this.icon(id))
+    const chosen = chosenAgents(this.ctx.get("hub.workspaces"))
+    return placesOf(chosenProviders(this.providers(), chosen), (id) => this.icon(id))
   }
 
   /**
@@ -489,11 +515,6 @@ export class McpLibrary extends Service {
       this.ctx.extensions.snapshot().entries.find((entry) => entry.manifest.id === id)?.manifest
         .icon ?? ServerIcon
     )
-  }
-
-  /** The folder in use, as the form keeps it; null when this form has no list. */
-  private folder(): string | null {
-    return this.ctx.get("hub.workspaces")?.current()?.current ?? null
   }
 }
 

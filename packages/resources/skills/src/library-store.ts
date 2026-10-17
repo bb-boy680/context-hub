@@ -16,7 +16,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope } from "@context-hub/core/place-files"
-import { createCatalog, type Catalog, type CatalogState } from "@context-hub/extensions"
+import { chosenAgents, createCatalog, type Catalog, type CatalogState } from "@context-hub/extensions"
 
 import { readablePlaces } from "./provider.ts"
 import type { PlaceSkillsView, SkillPage, SkillStore } from "./store.ts"
@@ -114,15 +114,16 @@ export class SkillLibrary extends Service {
   /**
    * Which places to read, as ids with the roots they resolve under.
    *
-   * A workspace-scope place is read whatever the sidebar chose, because the
-   * folder in use is a fact rather than a preference; a machine-wide one is read
-   * only while that agent is chosen. This is the module's own rule, reached
-   * through the registry it publishes rather than through a contribution point,
-   * so an agent built here and one installed as a folder are read the same way.
+   * A place an agent keeps is read only while the sidebar chose that agent — in
+   * either scope, because both are that agent's files. The module's own place is
+   * shared, so it is read whatever is chosen. This is the module's own rule,
+   * reached through the registry it publishes rather than through a contribution
+   * point, so an agent built here and one installed as a folder are read the same
+   * way.
    */
   targets(): [string, AssetScope, string][] {
     const providers = this.ctx.get("skills")?.providers() ?? []
-    const chosen = this.ctx.get("hub.workspaces")?.current()?.agents ?? []
+    const chosen = chosenAgents(this.ctx.get("hub.workspaces"))
     return readablePlaces(providers, chosen).map((place) => [place.id, place.scope, place.dir])
   }
 

@@ -16,7 +16,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope } from "@context-hub/core/place-files"
-import type { ExtensionIcon } from "@context-hub/extensions"
+import { chosenProviders, type ExtensionIcon } from "@context-hub/extensions"
 
 /** The service name the skills module publishes and every agent plugin requires. */
 export const SKILL_SERVICE = "skills"
@@ -48,6 +48,11 @@ export interface SkillPlace {
 export interface SkillProvider {
   /** The agent's id, e.g. "hub.target.claude-code". */
   readonly id: string
+  /**
+   * True when this is the module's own place rather than an agent's: it is in
+   * every workspace, so it is read whatever the sidebar chose.
+   */
+  readonly shared?: boolean
   /** Every place this agent keeps skills in. */
   readonly places: readonly SkillPlace[]
 }
@@ -93,11 +98,11 @@ export class SkillService extends Service {
 /**
  * The places a set of providers makes readable.
  *
- * Every workspace-scope place is read: a workspace is a folder the hub was
- * pointed at, so its directories are a fact about it rather than a choice. A
- * machine-wide place belongs to one agent, so it is read only while `chosen`
- * names that agent — the choice is what says which of the machine's agents this
- * hub delivers to.
+ * A provider belongs to one agent, and the sidebar's choice says which agents
+ * this hub works with: a provider nobody chose contributes nothing, in either
+ * scope — its workspace places and its machine-wide ones are both that agent's
+ * files. The one exception is the module's own place, which is in every
+ * workspace whatever is chosen and says so with `shared`.
  *
  * @param providers — every registered provider.
  * @param chosen — the agents the sidebar chose, by provider id.
@@ -107,11 +112,7 @@ export function readablePlaces(
   providers: readonly SkillProvider[],
   chosen: readonly string[]
 ): SkillPlace[] {
-  const places = providers.flatMap((provider) =>
-    provider.places.filter(
-      (place) => place.scope === "workspace" || chosen.includes(provider.id)
-    )
-  )
+  const places = chosenProviders(providers, chosen).flatMap((provider) => provider.places)
   return places.sort((left, right) => left.order - right.order)
 }
 

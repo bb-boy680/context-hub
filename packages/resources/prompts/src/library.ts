@@ -13,7 +13,7 @@ import * as React from "react"
 
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import { createCatalog, type Catalog } from "@context-hub/extensions"
-import { useCatalog, useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
 
 import { delivered } from "./deliver.ts"
 import type { PromptLibraryValue } from "./library-store.ts"
@@ -54,17 +54,19 @@ export interface PromptLibrary {
  *
  * The registry's own array is what a render reads, so the list follows the
  * snapshot's revision rather than the array identity: enabling or disabling an
- * agent is what makes a place appear or go.
+ * agent is what makes a place appear or go. Which agents are offered is the
+ * sidebar's choice — an agent nobody chose is not a delivery target.
  */
 export function usePromptPlaces(): readonly PromptPlace[] {
   const ctx = useHub()
   const { revision } = useExtensionSnapshot()
   const service = React.useMemo(() => ctx.get("prompts") ?? null, [ctx])
+  const chosen = useChosenAgents()
 
   return React.useMemo(() => {
     void revision
-    return service === null ? [] : promptPlaces(service.providers())
-  }, [service, revision])
+    return service === null ? [] : promptPlaces(service.providers(), chosen)
+  }, [service, revision, chosen])
 }
 
 /** The form's client-file port, or `null` when this form cannot reach one. */

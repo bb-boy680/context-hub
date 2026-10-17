@@ -2,6 +2,7 @@
 export * from "./types.ts"
 export * from "./host.ts"
 export * from "./catalog.ts"
+export * from "./agents.ts"
 export * from "./skill-registry.ts"
 export * from "./service.ts"
 export * from "./contributions.ts"

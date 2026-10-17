@@ -18,7 +18,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope } from "@context-hub/core/place-files"
-import type { ExtensionIcon } from "@context-hub/extensions"
+import { chosenProviders, type ExtensionIcon } from "@context-hub/extensions"
 
 /** The service name the prompts module publishes and every agent plugin requires. */
 export const PROMPT_SERVICE = "prompts"
@@ -87,6 +87,11 @@ export interface PromptPlace {
 export interface PromptProvider {
   /** The agent's id, e.g. "hub.target.claude-code". */
   readonly id: string
+  /**
+   * True when this is the module's own place rather than an agent's: the
+   * workspace's own output directory, which exists whatever the sidebar chose.
+   */
+  readonly shared?: boolean
   /** Every place this agent takes prompts in. */
   readonly places: readonly PromptPlace[]
 }
@@ -124,18 +129,23 @@ export class PromptService extends Service {
 }
 
 /**
- * Every place the registered providers declare.
+ * Every place the registered providers make available.
  *
- * All of them, in the order the agents registered: a place is where a delivery
- * can go, and which agents the sidebar is narrowed to says what this hub reads,
- * not what it may write to. So a machine-wide place is offered as soon as its
- * agent is enabled, the same way the install menus of the other asset kinds
- * list every client they can reach.
+ * A provider belongs to one agent, and the sidebar's choice says which agents
+ * this hub works with: an agent nobody chose is not offered as a delivery
+ * target, so neither is anything it reads. The module's own workspace place is
+ * not an agent's — it is where this hub writes what it generates, whatever is
+ * chosen — and says so with `shared`.
+ *
+ * @param providers — every registered provider.
+ * @param chosen — the agents the sidebar chose, by provider id.
+ * @returns the places, ordered by scope and then by their own rank.
  */
 export function promptPlaces(
-  providers: readonly PromptProvider[]
+  providers: readonly PromptProvider[],
+  chosen: readonly string[]
 ): readonly PromptPlace[] {
-  return providers
+  return chosenProviders(providers, chosen)
     .flatMap((provider) => provider.places)
     .slice()
     .sort((a, b) => a.scope.localeCompare(b.scope) || a.order - b.order)
