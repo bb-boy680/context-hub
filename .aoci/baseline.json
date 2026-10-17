@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-17T07:00:16Z",
+  "updated_at": "2026-10-17T07:17:07Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "323cacfc72e9c7f3788b25226694fc346c362d7a73d4f431bbeecbc7e537bd50",
-      "size": 100257,
-      "normalized_sha256": "323cacfc72e9c7f3788b25226694fc346c362d7a73d4f431bbeecbc7e537bd50"
+      "sha256": "60d09432f794bd0d489147bbce624788fc9ed124cbcaee03b898ea4b793acae2",
+      "size": 100541,
+      "normalized_sha256": "60d09432f794bd0d489147bbce624788fc9ed124cbcaee03b898ea4b793acae2"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -549,6 +549,12 @@
       "size": 12185,
       "normalized_sha256": "eec1fe30a3b90830df5901d504470dd4744a7b1f55f53a636655fd8151b7ec6f"
     },
+    "packages/extensions/__test__/i18n.test.ts": {
+      "role": "observe",
+      "sha256": "1b9953abe5bf8723ed6382a153e561d78374c3f3d8fb5a124a0cf87a5c5f79bb",
+      "size": 2648,
+      "normalized_sha256": "1b9953abe5bf8723ed6382a153e561d78374c3f3d8fb5a124a0cf87a5c5f79bb"
+    },
     "packages/extensions/__test__/plugins.test.ts": {
       "role": "observe",
       "sha256": "1cafade5569672f1af5a5f0b9d0f37e65822ea97f8980cbd38a0b4226e01ea00",
@@ -737,9 +743,9 @@
     },
     "packages/extensions/src/i18n.ts": {
       "role": "index",
-      "sha256": "f7b722be53c34782780d2101cdb3e20b9c8ba1c9464b563570e56cc80291f599",
-      "size": 4200,
-      "normalized_sha256": "e450e480e45de77d6b67947ca91b9ae918eed60299647f83679e972c5194614e"
+      "sha256": "587d24626c8988cb243504c3e879cb67870235d03c0265f576186ad0813fa4b8",
+      "size": 4396,
+      "normalized_sha256": "587d24626c8988cb243504c3e879cb67870235d03c0265f576186ad0813fa4b8"
     },
     "packages/extensions/src/icons.ts": {
       "role": "index",
@@ -779,9 +785,9 @@
     },
     "packages/extensions/src/service.ts": {
       "role": "index",
-      "sha256": "234264e49e7c0c1e160b97695bd366d5f1c8c8e75c2bfe800abcca4ab2eb7824",
-      "size": 12897,
-      "normalized_sha256": "234264e49e7c0c1e160b97695bd366d5f1c8c8e75c2bfe800abcca4ab2eb7824"
+      "sha256": "ce5b37b8eb9c8c6e4a038213ace5f7c79bb6e974a226d7f20a316772b2766f78",
+      "size": 13178,
+      "normalized_sha256": "ce5b37b8eb9c8c6e4a038213ace5f7c79bb6e974a226d7f20a316772b2766f78"
     },
     "packages/extensions/src/skill-registry.ts": {
       "role": "index",
