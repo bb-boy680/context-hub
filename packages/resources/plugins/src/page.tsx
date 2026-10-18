@@ -1129,8 +1129,10 @@ export function PluginsPage() {
         }
         className="flex-1 gap-8"
       >
-        <div className="flex items-center justify-between gap-6">
-          <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
+        {/* The tabs and the actions each want a whole line, so they wrap onto
+            two rather than scroll sideways out of the page. */}
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-6">
+          <TabsList className="h-11! min-w-0 max-w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1">
             {SHELL_TABS.filter(
               (item) =>
                 (item.value !== "unstored" || counts.unstored > 0) &&
