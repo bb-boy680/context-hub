@@ -11,6 +11,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
+    "resolveJsonModule": true,
     "moduleDetection": "force",
     "noEmit": true,
 
@@ -20,5 +21,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts", "dev.ts", "hub-port.ts", "server.ts"]
+  "include": ["vite.config.ts", "dev.ts", "hub-port.ts", "server.ts", "shutdown.ts", "build-cli.ts"]
 }

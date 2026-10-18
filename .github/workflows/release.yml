@@ -1,0 +1,133 @@
+# Build every distributable form on a tag, and keep them on one Release.
+#
+# The CLI crosses to five targets from one Linux runner; the desktop app has to
+# be built on each OS because electron-builder needs that platform's toolchain.
+# A manual run stops before publishing, which keeps the workflow usable without
+# creating a tag.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # One release version: the root manifest. A tag that names another version
+  # would produce an update feed the installed app does not match.
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.read.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: read
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            test "$GITHUB_REF_NAME" = "v$VERSION"
+          fi
+
+  cli:
+    needs: version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter web build
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.2
+      - run: pnpm --filter web build:cli
+      - name: Smoke test the Linux binary
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          ./apps/web/release/cli/context-hub-linux-x64 --port 5299 &
+          pid=$!
+          for _ in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:5299/ > /dev/null; then break; fi
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:5299/ | grep -q 'id="root"'
+          curl -sf http://127.0.0.1:5299/hub/about | grep -qF "\"version\":\"$VERSION\""
+          kill "$pid"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-binaries
+          path: apps/web/release/cli/*
+          if-no-files-found: error
+
+  desktop:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Build the desktop installer
+        run: pnpm --filter @context-hub/desktop exec electron-builder --config electron-builder.config.mjs --publish never
+        env:
+          # Signing and notarization stay off unless the repository owns the
+          # certificates and Apple credentials. Empty secrets keep CI unsigned.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ runner.os == 'macOS' && secrets.CSC_LINK != '' && 'true' || 'false' }}
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/latest*.yml
+            apps/desktop/release/*.blockmap
+          if-no-files-found: error
+
+  publish:
+    needs: [cli, desktop]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+          merge-multiple: true
+      - run: |
+          gh release view "$GITHUB_REF_NAME" || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+          gh release upload "$GITHUB_REF_NAME" dist-artifacts/* --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}

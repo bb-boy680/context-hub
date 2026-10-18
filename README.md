@@ -21,6 +21,40 @@ so a route that answers in development answers after a build.
 To stop it, stop the hub server: it is Vite's child, and its exit takes Vite
 with it.
 
+## Command-line binary
+
+```bash
+pnpm build:cli   # builds apps/web/release/cli for five targets
+```
+
+One standalone executable per platform (Windows x64, Linux x64 and arm64, macOS
+arm64 and x64). The built page is embedded in it, so nothing has to sit beside
+the file. `bun` must be on PATH to build it; running it needs no Node, npm or
+`dist/`. See [docs/building.md](docs/building.md) for the target list and the
+release workflow.
+
+## Desktop app
+
+```bash
+pnpm --filter @context-hub/desktop package:win   # or package:mac / package:linux
+```
+
+The desktop app starts the hub as its own process and shows the page that
+process serves, so it runs the same server and routes as every other form.
+Closing the window hides it to the tray; the hub keeps running until Quit is
+chosen from the tray menu.
+
+`pnpm --filter @context-hub/desktop dev` watches both bundles and restarts
+Electron after a change; the application menu has Reload Page, Restart App and
+Toggle DevTools while it runs. Set `CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271`
+to point the window at the Vite dev server instead of starting its own server.
+
+The release version is the root `package.json` version. A packaged app checks
+GitHub Releases for a newer one and installs it in place after the hub server
+has stopped. Releases are built by `.github/workflows/release.yml`; see
+[docs/building.md](docs/building.md) for signing, feeds and the limits of what
+can be verified locally.
+
 ## Tests
 
 Vitest, one project per package, and **a package's tests live in `__test__/`

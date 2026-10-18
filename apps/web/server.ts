@@ -11,12 +11,19 @@
  * Usage:
  *   node apps/web/server.ts [--port <n>] [--host <addr>] [--folder <path>]
  *                           [--static <dir>] [--home <dir>]
+ *   context-hub [--port <n>] ...   (compiled binary; serves its embedded page)
  *
  * `--port 0` lets the OS choose, which is what a desktop host wants: it reports
  * the bound port back over its own channel. Without `--static` this answers on
- * its routes only, which is what development needs.
+ * its routes only, which is what development needs; a compiled binary instead
+ * serves the page embedded beside it.
  */
-import { promises as fs } from "node:fs"
+import { existsSync } from "node:fs"
+import path from "node:path"
+
+import manifest from "../../package.json" with { type: "json" }
+
+import { isShutdownMessage } from "./shutdown.ts"
 
 import {
   createAboutHandler,
@@ -57,6 +64,21 @@ function pathOf(found: Map<string, string | true>, name: string): string | undef
   return typeof value === "string" && value !== "" ? value : undefined
 }
 
+/**
+ * The built page embedded beside a compiled entry, if this process is one.
+ *
+ * `--asset dist` places it under Bun's virtual directory, which `import.meta.dir`
+ * names. The `process.versions.bun` guard keeps a plain `node server.ts` from
+ * silently serving a stale `dist/`: only a compiled binary falls back here.
+ */
+function embeddedRoot(): string | undefined {
+  if (process.versions.bun === undefined) return undefined
+  const here = (import.meta as ImportMeta & { dir?: string }).dir
+  if (here === undefined) return undefined
+  const root = path.join(here, "dist")
+  return existsSync(path.join(root, "index.html")) ? root : undefined
+}
+
 const given = flags(process.argv.slice(2))
 
 /* An unknown flag is a mistake worth naming: silently ignoring it would look
@@ -71,7 +93,7 @@ for (const name of given.keys()) {
 }
 
 if (given.has("help")) {
-  console.log("usage: node apps/web/server.ts [--port <n>] [--host <addr>] [--folder <path>] [--static <dir>] [--home <dir>]")
+  console.log("usage: context-hub [--port <n>] [--host <addr>] [--folder <path>] [--static <dir>] [--home <dir>]")
   process.exit(0)
 }
 
@@ -85,12 +107,12 @@ const placed = {
   ...(pathOf(given, "home") === undefined ? {} : { home: pathOf(given, "home") as string }),
   ...(pathOf(given, "folder") === undefined ? {} : { folder: pathOf(given, "folder") as string }),
 }
-const root = pathOf(given, "static")
+const root = pathOf(given, "static") ?? embeddedRoot()
 
-/* This server's own manifest is the version the About row shows. */
-const manifest = JSON.parse(
-  await fs.readFile(new URL("./package.json", import.meta.url), "utf8")
-) as { version?: unknown }
+/* The repository's root manifest is the one release version: About, the
+   installer and the update feed all name it. It is a JSON import so every
+   carrier — `node server.ts`, the esbuild bundle, and the Bun compiled binary
+   — reads the same value without depending on a file beside the executable. */
 const version = typeof manifest.version === "string" ? manifest.version : "0.0.0"
 
 const options: HubServerOptions = {
@@ -119,9 +141,29 @@ const listener = await createHubServer(options).listen()
 console.log(`context hub server listening on ${listener.url}`)
 if (root !== undefined) console.log(`serving the built page from ${root}`)
 
-/* A form that spawned this process says when to stop. */
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    void listener.close().then(() => process.exit(0))
+/* A carrier that spawned this process says when to stop. Electron's utility
+   process sends the message through `process.parentPort`; a plain child uses
+   signals. Both close the listener exactly once. */
+type ParentPort = {
+  on(event: "message", listener: (event: unknown) => void): void
+}
+
+const parentPort = (process as NodeJS.Process & { parentPort?: ParentPort }).parentPort
+let closing = false
+
+async function shutdown(): Promise<void> {
+  if (closing) return
+  closing = true
+  await listener.close()
+  process.exit(0)
+}
+
+if (parentPort !== undefined) {
+  parentPort.on("message", (event) => {
+    if (isShutdownMessage(event)) void shutdown()
   })
+}
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => void shutdown())
 }

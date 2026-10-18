@@ -1238,3 +1238,32 @@ Settings、Extensions 四个分组静默消失，**typecheck 和 lint 全绿**�
   所以 MCP 模块也补了。
 - 判据：provider 返回空组时，不要让 catch 完全静默——至少 `console.error` 出 provider 名和
   错误；浏览器里捕获一次 console 就能看到 `without inject`。
+
+## 桌面打包要离线：`electronDist` 指向已安装的 Electron（2026-10-18）
+
+**问题模式**：给桌面端加完 `electron-updater` 后重新打包，`electron-builder` 在
+`packaging ... electron=44.9.0` 之后直接 `connect ETIMEDOUT 20.205.243.166:443`。
+`%LOCALAPPDATA%\electron\Cache` 里明明有完整的 158MB Electron zip，`unzip -t` 也通过；
+它仍然要联网。GitHub 在那段时间不可达，于是同一个配置前一次能打包、后一次不能。
+
+**规则**：
+- 打包配置里显式写 `electronDist: "node_modules/electron/dist"`。它用 `pnpm install`
+  已经下载好的 Electron，打包不再访问 GitHub，也保证打的就是开发时用的那个二进制。
+  判据：日志里应出现 `using custom unpacked Electron distribution`，而不是
+  `unpacking default Electron distribution` 后再下载。
+- `electron-builder` 26 的顶层 schema 不认 `updaterCacheDirName`（会报 unknown property）。
+  不要从旧文档/旧版本抄这个字段；`app-update.yml` 里那个自动生成的名字不影响功能。
+- `electron-updater` 可以作为生产依赖、在 esbuild 里标 external；electron-builder 会把它
+  和传递依赖复制进 `app.asar/node_modules`。验证方式不是看构建日志（依赖树会打印一大串
+  `duplicate dependency references`），而是用
+  `@electron/asar` 的 `listPackage()` 数一下 `node_modules/electron-updater` 的条目。
+- 本地重复打包同一个输出目录时，`release/win-unpacked/resources/app.asar` 可能被某个
+  看不见的进程/扫描器锁住，`package:win` 报 `EBUSY`，`rm` 和 `mv` 都是
+  `Device or resource busy`。这时不要按进程名清场，也不要改配置；用
+  `--config.directories.output` 换一个**仓库外**的临时目录验证（例如
+  `%TEMP%/hub-release-verify`），不要在 `apps/desktop` 下造 `release-verify*`。CI 的
+  工作区本来就是干净的。**这个锁会让“本机 package:win 通过”这句话不成立，汇报时要如实写明。**
+- 锁的持有者可以用 Windows **Restart Manager API**（`RmStartSession` →
+  `RmRegisterResources` → `RmGetList`）查到，不要只按名字猜进程。本次锁的持有者
+  是用户本地的 `Orca.exe`，不是 Electron 或 electron-builder；这类第三方程序
+  开着时，任何新造的 `app.asar` 都可能被立刻锁住。
