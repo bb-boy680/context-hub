@@ -20,8 +20,18 @@ import type { HubKernel } from "@context-hub/extensions"
  *
  * Written out rather than discovered: a module that publishes one of these is
  * asking to be read at startup, and the list is what says which ones do.
+ *
+ * The five asset libraries are here: skills, prompts, MCP, plugins, and the
+ * environment variables. The last one is a library too — its page used to read
+ * on mount — so a global search can find its names without a visit.
  */
-export const PRELOADED = ["catalog.skills", "catalog.prompts", "catalog.mcp", "catalog.plugins"]
+export const PRELOADED = [
+  "catalog.skills",
+  "catalog.prompts",
+  "catalog.mcp",
+  "catalog.plugins",
+  "catalog.variables",
+]
 
 /**
  * Ask every shared read to start.

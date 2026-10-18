@@ -17,6 +17,7 @@ import { promptsMessages } from "./messages.ts"
 import { PromptsPage } from "./page.tsx"
 import { PROMPT_LIBRARY_SERVICE, PromptLibrary } from "./library-store.ts"
 import { PROMPT_SERVICE, PromptService, type PromptPlace } from "./provider.ts"
+import { promptSearch } from "./search.ts"
 import type { PromptStore } from "./store.ts"
 
 export { PromptsPage }
@@ -107,13 +108,17 @@ export const promptsExtension: ExtensionModule = {
     permissions: ["assets.read", "filesystem"],
     provides: [PROMPT_SERVICE, PROMPT_LIBRARY_SERVICE],
   },
-  inject: ["nav", "routes", "locales"],
+  inject: ["nav", "routes", "locales", "search"],
 
   apply(ctx) {
     /* The shared read of the library. Constructed here and read by name from
        the form's own startup, so the rows are already there when a page opens
        rather than being read again on the way in. */
-    new PromptLibrary(ctx)
+    const library = new PromptLibrary(ctx)
+
+    /* The palette reaches this module through one function rather than by
+       knowing which fields the page's filter reads. */
+    ctx.search.register(promptSearch(library))
 
     /* The delivery targets travel through the registry rather than a
        contribution point, so an agent integration registers into this module

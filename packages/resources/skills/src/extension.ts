@@ -14,6 +14,7 @@ import type { ExtensionModule } from "@context-hub/extensions"
 import { SKILL_LIBRARY_SERVICE, SkillLibrary } from "./library-store.ts"
 import { skillsMessages } from "./messages.ts"
 import { SKILL_SERVICE, SkillService, type SkillPlace } from "./provider.ts"
+import { skillSearch } from "./search.ts"
 
 /** This module's own id; the kernel matches it against the manifest. */
 export const SKILLS_ID = "hub.skill.catalog"
@@ -48,7 +49,7 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
       permissions: ["assets.read", "assets.write"],
       provides: [SKILL_SERVICE, SKILL_LIBRARY_SERVICE],
     },
-    inject: ["nav", "routes", "locales"],
+    inject: ["nav", "routes", "locales", "search"],
 
     apply(ctx) {
       /* The places travel through the registry rather than a contribution point,
@@ -66,7 +67,11 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
       /* The shared read of the library. Constructed here and read by name from
          the form's own startup, so the rows are already there when a page opens
          rather than being read again on the way in. */
-      new SkillLibrary(ctx)
+      const library = new SkillLibrary(ctx)
+
+      /* The palette reaches this module through one function rather than by
+         knowing how a skill row is built. */
+      ctx.search.register(skillSearch(library))
 
       ctx.nav.register({
         path: "/skills",

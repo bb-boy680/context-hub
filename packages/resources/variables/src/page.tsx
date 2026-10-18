@@ -2,11 +2,12 @@
  * Environment variables: the group rail, the list, the batch create dialog and
  * the row actions, from `designs/settings.pen`.
  *
- * The page owns one read of the whole library. Every write answers with the
- * next document, so a change lands in the rows and in the rail's counts at the
- * same time; there is no second read to fall behind. Names are the identity, so
- * the create and rename dialogs refuse a duplicate before the host does, and the
- * host refuses it again.
+ * The library is read once at startup and shared by everyone who draws it; this
+ * page only watches that answer and sends writes through it. Every write answers
+ * with the next document, so a change lands in the rows and in the rail's counts
+ * at the same time; there is no second read to fall behind. Names are the
+ * identity, so the create and rename dialogs refuse a duplicate before the host
+ * does, and the host refuses it again.
  */
 import {
   CheckIcon,
@@ -30,7 +31,8 @@ import * as React from "react"
 
 import { cn } from "cn"
 
-import { useI18n } from "@context-hub/extensions/react"
+import { useI18n, useSearchPage } from "@context-hub/extensions/react"
+import { Highlighted } from "@context-hub/extensions/components"
 import { Badge } from "@context-hub/shadcn-ui/components/badge"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
@@ -53,12 +55,11 @@ import {
 import { Input } from "@context-hub/shadcn-ui/components/input"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
-import { createRemoteVariableStore } from "./remote-store.ts"
+import { useVariableLibrary } from "./library.ts"
 import {
   DEFAULT_GROUP,
   VARIABLE_NAME,
   type Variable,
-  type VariableDocument,
   type VariableDraft,
 } from "./store.ts"
 
@@ -923,10 +924,13 @@ function RowMenu({
 /** The page. */
 export function VariablesPage() {
   const { t } = useI18n()
-  const store = React.useMemo(() => createRemoteVariableStore(), [])
-  const [document, setDocument] = React.useState<VariableDocument | null>(null)
-  const [failure, setFailure] = React.useState<string | null>(null)
-  const [query, setQuery] = React.useState("")
+  const library = useVariableLibrary()
+  const document = library.document
+  const failure = library.failure
+  /* The query lives in the address so the global search can seed it. */
+  const search = useSearchPage()
+  const query = search.query
+  const setQuery = search.setQuery
   const [group, setGroup] = React.useState<string | null>(null)
   const [revealed, setRevealed] = React.useState<ReadonlySet<string>>(new Set())
   const [createOpen, setCreateOpen] = React.useState(false)
@@ -938,21 +942,6 @@ export function VariablesPage() {
   const [deletingGroup, setDeletingGroup] = React.useState<string | null>(null)
   /* A new group opened from "move to group" moves the row as soon as it exists. */
   const [moveAfterGroup, setMoveAfterGroup] = React.useState<Variable | null>(null)
-
-  const load = React.useCallback(() => {
-    void store.read()
-      .then((next) => {
-        setDocument(next)
-        setFailure(null)
-      })
-      .catch((error: unknown) => {
-        setFailure(textOf(error))
-      })
-  }, [store])
-
-  React.useEffect(() => {
-    load()
-  }, [load])
 
   const toggle = (name: string) => {
     setRevealed((current) => {
@@ -988,13 +977,11 @@ export function VariablesPage() {
     })
   }, [document, group, query])
 
-  const remember = (next: VariableDocument) => {
-    setDocument(next)
-  }
+  /* The typed text, kept as typed so the mark keeps the case a person used. */
+  const needle = query.trim()
 
   const create = async (drafts: VariableDraft[]) => {
-    const next = await store.create(drafts)
-    remember(next)
+    await library.create(drafts)
     setCreateOpen(false)
     toast.add({
       type: "success",
@@ -1003,8 +990,7 @@ export function VariablesPage() {
   }
 
   const createGroup = async (name: string): Promise<string> => {
-    const next = await store.createGroup(name)
-    remember(next)
+    await library.createGroup(name)
     toast.add({ type: "success", title: t("variables.groupDialog.done") })
     return name
   }
@@ -1020,16 +1006,14 @@ export function VariablesPage() {
     ) {
       throw new Error(t("variables.groupRename.exists"))
     }
-    const next = await store.renameGroup(renamingGroup, nextName)
-    remember(next)
+    await library.renameGroup(renamingGroup, nextName)
     if (group === renamingGroup) setGroup(nextName)
     setRenamingGroup(null)
     toast.add({ type: "success", title: t("variables.groupRename.done") })
   }
 
   const removeGroupNow = async (target: string, count: number) => {
-    const next = await store.removeGroup(target)
-    remember(next)
+    await library.removeGroup(target)
     if (group === target) setGroup(null)
     setDeletingGroup(null)
     toast.add({
@@ -1056,33 +1040,29 @@ export function VariablesPage() {
 
   const saveValue = async (value: string) => {
     if (editing === null) return
-    const next = await store.update(editing.name, { value })
-    remember(next)
+    await library.edit(editing.name, { value })
     setEditing(null)
     toast.add({ type: "success", title: t("variables.edit.done") })
   }
 
   const rename = async (name: string) => {
     if (renaming === null) return
-    const next = await store.update(renaming.name, { name })
-    remember(next)
+    await library.edit(renaming.name, { name })
     setRenaming(null)
     toast.add({ type: "success", title: t("variables.rename.done") })
   }
 
   const remove = async (variable: Variable) => {
-    const next = await store.remove(variable.name)
-    remember(next)
+    await library.remove(variable.name)
     setDeleting(null)
     toast.add({ type: "success", title: t("variables.delete.done") })
   }
 
   const move = (variable: Variable, nextGroup: string) => {
     if (variable.group === nextGroup) return
-    void store
-      .update(variable.name, { group: nextGroup })
-      .then((next) => {
-        remember(next)
+    void library
+      .edit(variable.name, { group: nextGroup })
+      .then(() => {
         toast.add({
           type: "success",
           title: t("variables.move.done").replace("{group}", nextGroup),
@@ -1163,7 +1143,7 @@ export function VariablesPage() {
               {t("variables.load.failed")}
             </span>
             <span className="font-mono text-[11px] text-destructive/80">{failure}</span>
-            <Button variant="outline" size="sm" onClick={load}>
+            <Button variant="outline" size="sm" onClick={() => void library.reload()}>
               {t("variables.retry")}
             </Button>
           </div>
@@ -1293,10 +1273,10 @@ export function VariablesPage() {
                     >
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="min-w-0 truncate font-mono text-[12.5px] font-semibold text-foreground">
-                          {variable.name}
+                          <Highlighted text={variable.name} needle={needle} />
                         </span>
                         <Badge variant="secondary" className="shrink-0 text-[10px]">
-                          {variable.group}
+                          <Highlighted text={variable.group} needle={needle} />
                         </Badge>
                       </span>
                       <span className="hidden min-w-0 md:block">

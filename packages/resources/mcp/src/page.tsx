@@ -34,7 +34,7 @@ import { ServerDialog } from "./server-dialog.tsx"
 import type { ServerFormValues } from "./server-form.tsx"
 import { declarationOf } from "./server-form.tsx"
 import type { McpAgentPlace, McpPlaceKind, McpServer } from "./types.ts"
-import { useI18n, useSettings } from "@context-hub/extensions/react"
+import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import {
   FilterBar,
   PageBody,
@@ -426,11 +426,21 @@ export function McpServersPage() {
   )
 
   const settings = useSettings()
-  const [view, setView] = React.useState<ViewId>(settings.layout)
+  const search = useSearchPage()
+  /* A result from the global search asks for the list view, where the matched
+     text is marked; the page's own choice is what remains once that is cleared. */
+  const [localView, setLocalView] = React.useState<ViewId>(settings.layout)
+  const view = search.listView ? "list" : localView
+  const chooseView = (next: ViewId) => {
+    search.clearListView()
+    setLocalView(next)
+  }
   const [tab, setTab] = React.useState<TabId>("all")
   /* No tag narrows the list until one is picked. */
   const [tag, setTag] = React.useState("")
-  const [query, setQuery] = React.useState("")
+  /* The query lives in the address so the global search can seed it. */
+  const query = search.query
+  const setQuery = search.setQuery
   /* One place inside the current scope, once a person picked one from the
      scope's menu; `null` leaves the scope whole. */
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
@@ -655,7 +665,7 @@ export function McpServersPage() {
             </div>
             <ToolbarActions
               view={view}
-              onView={setView}
+              onView={chooseView}
               onAdd={() => setAdding(true)}
               onCheck={library.refresh}
               checking={library.testing.length > 0}
@@ -722,6 +732,7 @@ export function McpServersPage() {
           <ServerListView
             servers={rows}
             places={places}
+            needle={query.trim()}
             selected={selected}
             age={checkedAge}
             onCheck={(keys) => setSelected(new Set(keys))}

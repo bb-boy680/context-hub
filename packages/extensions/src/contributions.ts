@@ -25,6 +25,7 @@ import type {
   LocaleContribution,
   NavContribution,
   RouteContribution,
+  SearchContribution,
 } from "./types.ts"
 
 /** One contributed value, with the plugin that contributed it. */
@@ -81,6 +82,7 @@ export const POINT_SERVICES: Readonly<Record<ExtensionPointId, string>> = {
   locale: "locales",
   target: "targets",
   skillRegistry: "skillRegistries",
+  search: "search",
 }
 
 declare module "@deepseek-ai/cordis" {
@@ -97,6 +99,8 @@ declare module "@deepseek-ai/cordis" {
     targets: ContributionPoint<AgentTargetDescriptor>
     /** Remote skill catalogs a search dialog can ask. */
     skillRegistries: ContributionPoint<SkillRegistry>
+    /** Each module's search function, collected by the global search palette. */
+    search: ContributionPoint<SearchContribution>
   }
 }
 
@@ -113,6 +117,7 @@ export function createContributionPoints(ctx: Context): void {
   new ContributionPoint<LocaleContribution>(ctx, POINT_SERVICES.locale)
   new ContributionPoint<AgentTargetDescriptor>(ctx, POINT_SERVICES.target)
   new ContributionPoint<SkillRegistry>(ctx, POINT_SERVICES.skillRegistry)
+  new ContributionPoint<SearchContribution>(ctx, POINT_SERVICES.search)
 }
 
 /** The value type of one point, for a caller that has only the point id. */

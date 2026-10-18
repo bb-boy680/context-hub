@@ -4,6 +4,7 @@
  * depending on it, and a key no pack covers keeps its English text here.
  */
 export const mcpMessages: Record<string, string> = {
+  "search.group.mcp": "MCP servers",
   "mcp.title": "MCP servers",
   "mcp.description":
     "Declare the servers your agents may use, and choose which config files each one is written into.",

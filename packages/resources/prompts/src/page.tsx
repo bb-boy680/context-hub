@@ -29,6 +29,7 @@ import {
   AutoplayVideo,
   AvatarStack,
   FilterBar,
+  Highlighted,
   Ledger,
   PageBody,
   PlaceScopePicker,
@@ -40,7 +41,7 @@ import {
   type PlaceOption,
 } from "@context-hub/extensions/components"
 import type { AssetScope } from "@context-hub/extensions"
-import { useI18n, useSettings } from "@context-hub/extensions/react"
+import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
@@ -376,8 +377,18 @@ export function PromptsPage() {
   const files = usePlaceFiles()
 
   const settings = useSettings()
-  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
-  const [query, setQuery] = React.useState("")
+  const search = useSearchPage()
+  /* A result from the global search asks for the list view, where the matched
+     text is marked; the page's own choice is what remains once that is cleared. */
+  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
+  const view = search.listView ? "list" : localView
+  const chooseView = (next: "grid" | "list") => {
+    search.clearListView()
+    setLocalView(next)
+  }
+  /* The query lives in the address so the global search can seed it. */
+  const query = search.query
+  const setQuery = search.setQuery
   const [tag, setTag] = React.useState<string>("")
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
@@ -610,9 +621,11 @@ export function PromptsPage() {
               ledger draws, at that ledger's own sizes. The prompt's own opening
               is not here — the description already says what the row is for,
               and the text itself is one click away in the panel. */}
-          <span className="truncate text-[14px] leading-[18px] font-semibold">{prompt.name}</span>
+          <span className="truncate text-[14px] leading-[18px] font-semibold">
+            <Highlighted text={prompt.name} needle={needle} />
+          </span>
           <span className="truncate text-[12px] leading-[17px] text-muted-foreground">
-            {prompt.description}
+            <Highlighted text={prompt.description} needle={needle} />
           </span>
         </span>
       ),
@@ -761,13 +774,13 @@ export function PromptsPage() {
                 icon={LayoutGridIcon}
                 label={t("prompts.view.grid")}
                 active={view === "grid"}
-                onClick={() => setView("grid")}
+                onClick={() => chooseView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("prompts.view.list")}
                 active={view === "list"}
-                onClick={() => setView("list")}
+                onClick={() => chooseView("list")}
               />
             </div>
             <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddOpen(true)}>

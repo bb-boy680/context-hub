@@ -3,6 +3,7 @@
  * a separate entry so the kernel itself carries no UI framework.
  */
 import * as React from "react"
+import { useSearchParams } from "react-router"
 import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector"
 
 import type { Context } from "./cordis.ts"
@@ -131,6 +132,71 @@ export function useSettings(): SettingsControl {
     }),
     [ctx, state]
   )
+}
+
+/**
+ * The query string the global search writes into a page.
+ *
+ * A page keeps its filter in the address rather than in a local state so the
+ * palette can open the same page already narrowed, even when that page is the
+ * one on screen: navigating to `/skills?q=pdf` is a render the page can see,
+ * while a local setter in another component is not.
+ */
+export interface SearchPage {
+  /** The text in `?q=`, or an empty string when the page is not searching. */
+  query: string
+  /** Write the query back; clearing it drops the palette's list request too. */
+  setQuery(next: string): void
+  /** The palette asked for the list view, where the matched text is marked. */
+  listView: boolean
+  /** Stop forcing the list view, leaving the page's own choice in charge. */
+  clearListView(): void
+}
+
+/**
+ * Read and write the search parameters a page's filter uses.
+ *
+ * `replace` is deliberate: one keystroke is one narrowing, not one history
+ * entry, and a person pressing Back should leave the page rather than walk
+ * their query backwards.
+ */
+export function useSearchPage(): SearchPage {
+  const [params, setParams] = useSearchParams()
+  const query = params.get("q") ?? ""
+  const listView = params.get("view") === "list"
+
+  const setQuery = React.useCallback(
+    (next: string) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current)
+          if (next === "") {
+            updated.delete("q")
+            updated.delete("view")
+          } else {
+            updated.set("q", next)
+          }
+          return updated
+        },
+        { replace: true }
+      )
+    },
+    [setParams]
+  )
+
+  const clearListView = React.useCallback(() => {
+    setParams(
+      (current) => {
+        if (!current.has("view")) return current
+        const updated = new URLSearchParams(current)
+        updated.delete("view")
+        return updated
+      },
+      { replace: true }
+    )
+  }, [setParams])
+
+  return { query, setQuery, listView, clearListView }
 }
 
 /**

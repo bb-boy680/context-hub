@@ -6,6 +6,7 @@
  * module without depending on it; a key no pack covers keeps the English here.
  */
 export const variablesMessages: Record<string, string> = {
+  "search.group.variables": "Environment variables",
   "nav.variables": "Environment variables",
 
   "variables.title": "Environment variables",
@@ -37,7 +38,7 @@ export const variablesMessages: Record<string, string> = {
   "variables.group.actions": "Group actions",
   "variables.group.rename": "Rename group",
   "variables.group.delete": "Delete group",
-  "variables.list.hint": "Read when this page opens",
+  "variables.list.hint": "Loaded at startup",
   "variables.list.count": "{count} variables",
   "variables.list.empty": "No variables in this group",
   "variables.list.emptyHint": "Add one, or pick another group.",

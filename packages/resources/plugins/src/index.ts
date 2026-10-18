@@ -18,6 +18,7 @@ import { pluginsMessages } from "./messages.ts"
 import { PluginsPage } from "./page.tsx"
 import { PLUGIN_LIBRARY_SERVICE, PluginLibrary } from "./library-store.ts"
 import { PLUGIN_SERVICE, PluginService } from "./provider.ts"
+import { pluginSearch } from "./search.ts"
 import { createRemotePluginTools } from "./tools.ts"
 
 declare module "@deepseek-ai/cordis" {
@@ -55,7 +56,7 @@ export const pluginsExtension: ExtensionModule = {
     permissions: ["assets.read", "assets.write"],
     provides: [PLUGIN_SERVICE, PLUGIN_LIBRARY_SERVICE],
   },
-  inject: ["nav", "routes", "locales"],
+  inject: ["nav", "routes", "locales", "search", "i18n"],
 
   apply(ctx) {
     /* The service carries the registry agent plugins register into and the tools
@@ -70,7 +71,11 @@ export const pluginsExtension: ExtensionModule = {
        than being read again on the way in — and constructed after the registry,
        which is where it reads the clients from. It reads nothing yet: a module
        enabled is not a module asked to start probing a machine. */
-    new PluginLibrary(ctx)
+    const library = new PluginLibrary(ctx)
+
+    /* The palette reaches this module through one function rather than by
+       knowing how a record and a client's answer fold into a row. */
+    ctx.search.register(pluginSearch(ctx, library))
 
     ctx.nav.register({
       path: "/plugins",

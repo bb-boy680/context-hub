@@ -52,6 +52,7 @@ import {
   AutoplayVideo,
   AvatarStack,
   FilterBar,
+  Highlighted,
   Ledger,
   PageBody,
   PlaceScopePicker,
@@ -63,7 +64,7 @@ import {
   type PlaceOption,
   type PlaceWords,
 } from "@context-hub/extensions/components"
-import { useI18n, useSettings } from "@context-hub/extensions/react"
+import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
 import {
@@ -533,26 +534,6 @@ function PluginGrid({
   )
 }
 
-/**
- * The query's own characters, marked in the accent. Only the table marks them:
- * its rows all look alike, so without the mark there is no way to see which
- * words matched.
- */
-function Highlighted({ text, needle }: { text: string; needle: string }) {
-  const at = needle === "" ? -1 : text.toLowerCase().indexOf(needle.toLowerCase())
-  if (at < 0) return <>{text}</>
-
-  return (
-    <>
-      {text.slice(0, at)}
-      <mark className="bg-transparent font-semibold text-primary">
-        {text.slice(at, at + needle.length)}
-      </mark>
-      {text.slice(at + needle.length)}
-    </>
-  )
-}
-
 function PluginTable({
   plugins,
   needle,
@@ -771,14 +752,24 @@ export function PluginsPage() {
      menu; `null` leaves the scope whole. */
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const settings = useSettings()
-  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
+  const search = useSearchPage()
+  /* A result from the global search asks for the list view, where the matched
+     text is marked; the page's own choice is what remains once that is cleared. */
+  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
+  const view = search.listView ? "list" : localView
+  const chooseView = (next: "grid" | "list") => {
+    search.clearListView()
+    setLocalView(next)
+  }
   /* Which segment the Add dialog opens on; `null` while it is closed. */
   const [addTab, setAddTab] = React.useState<AddPluginTab | null>(null)
   /* The pack the detail lightbox is open on, by id. */
   const [detailId, setDetailId] = React.useState<string | null>(null)
   const [tag, setTag] = React.useState(ALL_TAGS)
-  /* Typing narrows the same list the tag chips do; it is not a new view. */
-  const [query, setQuery] = React.useState("")
+  /* Typing narrows the same list the tag chips do; it is not a new view. The
+     query lives in the address so the global search can seed it. */
+  const query = search.query
+  const setQuery = search.setQuery
   const needle = useSettled(query)
   /* Ticked rows, by key. Narrowing the list drops them: a batch action names
      what the person can still see. */
@@ -1213,13 +1204,13 @@ export function PluginsPage() {
                 icon={LayoutGridIcon}
                 label={t("plugins.view.grid")}
                 active={view === "grid"}
-                onClick={() => setView("grid")}
+                onClick={() => chooseView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("plugins.view.list")}
                 active={view === "list"}
-                onClick={() => setView("list")}
+                onClick={() => chooseView("list")}
               />
             </div>
             <Button

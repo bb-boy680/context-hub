@@ -9,6 +9,7 @@
 import { claudeCodeExtension } from "@context-hub/claude-code"
 import { STATE_ROUTE } from "@context-hub/core/state"
 import { createRemoteNet } from "@context-hub/core/net"
+import { globalSearchExtension } from "@context-hub/global-search"
 import {
   builtinExtensions,
   createHubKernel,
@@ -24,7 +25,7 @@ import { pluginsExtension } from "@context-hub/plugins"
 import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
 import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-hub/skills"
 import { skillsShExtension } from "@context-hub/skills-sh"
-import { variablesExtension } from "@context-hub/variables"
+import { createRemoteVariableStore, variablesExtension } from "@context-hub/variables"
 import * as ui from "./ui-kit.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { preloadCatalogs } from "./preload.ts"
@@ -171,6 +172,9 @@ export async function startHub(): Promise<HubKernel> {
   }
   const workspaces = createRemoteWorkspaceService()
   services["hub.workspaces"] = workspaces
+  /* The variable library answers on its own route, which this form always
+     mounts; the module's shared read starts it with the other catalogs. */
+  services["hub.variables"] = createRemoteVariableStore()
   void workspaces.refresh()
   const kernel = await createHubKernel({
     host: webHost,
@@ -182,6 +186,9 @@ export async function startHub(): Promise<HubKernel> {
       mcpExtension,
       pluginsExtension,
       variablesExtension,
+      /* The palette last among the shipped modules, so the settings and
+         extensions groups follow the asset groups in the result list. */
+      globalSearchExtension,
       /* Only the agent integrations this build is being tried against. The
          others are still written and still shipped; they are left out here so
          the page's module graph is small enough to boot quickly while the

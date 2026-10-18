@@ -5,8 +5,10 @@
  */
 import { CheckIcon, CopyIcon } from "lucide-react"
 import * as React from "react"
+import { useLocation } from "react-router"
 
-import { useHub, useI18n, useSettings } from "@context-hub/extensions/react"
+import { useHub, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
+import { Highlighted } from "@context-hub/extensions/components"
 import type { AssetImageStats, AssetLocalizeSummary } from "@context-hub/core"
 import { ABOUT_ROUTE, type AboutInfo } from "@context-hub/core/about"
 import { PLUGIN_ROUTE } from "@context-hub/plugins"
@@ -205,11 +207,24 @@ function ThumbnailChoice({
 }
 
 /** One setting's title and explanation, for rows whose control sits below. */
-function SettingText({ title, description }: { title: string; description: string }) {
+function SettingText({
+  title,
+  description,
+  needle = "",
+}: {
+  title: string
+  description: string
+  /** The query the global search opened this page with, marked where it matched. */
+  needle?: string
+}) {
   return (
     <span className="flex flex-col gap-1">
-      <span className="text-[16px] font-semibold text-foreground">{title}</span>
-      <span className="text-[14px] leading-relaxed text-copy">{description}</span>
+      <span className="text-[16px] font-semibold text-foreground">
+        <Highlighted text={title} needle={needle} />
+      </span>
+      <span className="text-[14px] leading-relaxed text-copy">
+        <Highlighted text={description} needle={needle} />
+      </span>
     </span>
   )
 }
@@ -218,15 +233,17 @@ function SettingText({ title, description }: { title: string; description: strin
 function SettingRow({
   title,
   description,
+  needle,
   children,
 }: {
   title: string
   description: string
+  needle?: string
   children: React.ReactNode
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-8 py-5">
-      <SettingText title={title} description={description} />
+      <SettingText title={title} description={description} needle={needle} />
       <div className="shrink-0">{children}</div>
     </div>
   )
@@ -234,19 +251,28 @@ function SettingRow({
 
 /** A section: a heading, one line of context, and the card holding its rows. */
 function Group({
+  id,
   title,
   description,
+  needle = "",
   children,
 }: {
+  /** The anchor a global-search result scrolls to. */
+  id?: string
   title: string
   description: string
+  needle?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="flex flex-col gap-4">
+    <section id={id} className="flex scroll-mt-24 flex-col gap-4">
       <div className="flex flex-col gap-1">
-        <h2 className="text-[20px] font-semibold tracking-[-0.2px] text-foreground">{title}</h2>
-        <p className="text-[14px] leading-relaxed text-copy">{description}</p>
+        <h2 className="text-[20px] font-semibold tracking-[-0.2px] text-foreground">
+          <Highlighted text={title} needle={needle} />
+        </h2>
+        <p className="text-[14px] leading-relaxed text-copy">
+          <Highlighted text={description} needle={needle} />
+        </p>
       </div>
       <div className="rounded-xl border border-border bg-card p-8">{children}</div>
     </section>
@@ -290,12 +316,15 @@ function InstallChoiceCard({
   description,
   badge,
   selected,
+  needle = "",
   onSelect,
 }: {
   title: string
   description: string
   badge?: string
   selected: boolean
+  /** The query the global search opened this page with, marked where it matched. */
+  needle?: string
   onSelect: () => void
 }) {
   return (
@@ -309,7 +338,9 @@ function InstallChoiceCard({
       }`}
     >
       <span className="flex items-center justify-between gap-3">
-        <span className="text-[16px] font-semibold text-foreground">{title}</span>
+        <span className="text-[16px] font-semibold text-foreground">
+          <Highlighted text={title} needle={needle} />
+        </span>
         <span
           className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
             selected ? "bg-ring" : "ring-[1.5px] ring-border"
@@ -318,7 +349,9 @@ function InstallChoiceCard({
           {selected ? <span className="size-2 rounded-full bg-white" /> : null}
         </span>
       </span>
-      <span className="text-[13px] leading-relaxed text-copy">{description}</span>
+      <span className="text-[13px] leading-relaxed text-copy">
+        <Highlighted text={description} needle={needle} />
+      </span>
       {badge === undefined ? null : (
         <span className="mt-auto w-fit rounded-pill bg-ring/10 px-2.5 py-1 text-[12px] font-semibold text-ring">
           {badge}
@@ -378,6 +411,17 @@ export function SettingsPage() {
   const settings = useSettings()
   const ctx = useHub()
   const host = ctx.get("host")
+  const search = useSearchPage()
+  const needle = search.query.trim()
+  const { hash } = useLocation()
+
+  /* The palette opens this page at the group a result belongs to. React Router
+     does not scroll to a changed hash on its own, so the page does it. */
+  React.useEffect(() => {
+    const id = hash.replace(/^#/, "")
+    if (id === "") return
+    document.getElementById(id)?.scrollIntoView({ block: "start" })
+  }, [hash, needle])
 
   /* Filled in by the about read; the row already exists so the page never
      changes shape once that answer lands. */
@@ -520,14 +564,17 @@ export function SettingsPage() {
         </header>
 
         <Group
+          id="appearance"
           title={t("settings.appearance.title")}
           description={t("settings.appearance.description")}
+          needle={needle}
         >
           <div className="flex flex-col divide-y divide-border">
             <div className="flex flex-col gap-4 py-5">
               <SettingText
                 title={t("settings.theme.title")}
                 description={t("settings.theme.description")}
+                needle={needle}
               />
               <div
                 role="radiogroup"
@@ -550,6 +597,7 @@ export function SettingsPage() {
             <SettingRow
               title={t("settings.language.title")}
               description={t("settings.language.description")}
+              needle={needle}
             >
               <Segmented
                 value={i18n.active}
@@ -565,6 +613,7 @@ export function SettingsPage() {
               <SettingText
                 title={t("settings.layout.title")}
                 description={t("settings.layout.description")}
+                needle={needle}
               />
               <div
                 role="radiogroup"
@@ -587,8 +636,10 @@ export function SettingsPage() {
         </Group>
 
         <Group
+          id="install"
           title={t("settings.install.title")}
           description={t("settings.install.description")}
+          needle={needle}
         >
           <div className="flex flex-col gap-3">
             <div
@@ -603,6 +654,7 @@ export function SettingsPage() {
                   description={t(choice.descriptionKey)}
                   {...(choice.badgeKey === undefined ? {} : { badge: t(choice.badgeKey) })}
                   selected={settings.installMode === choice.id}
+                  needle={needle}
                   onSelect={() => settings.set({ installMode: choice.id })}
                 />
               ))}
@@ -614,14 +666,17 @@ export function SettingsPage() {
         </Group>
 
         <Group
+          id="images"
           title={t("settings.images.title")}
           description={t("settings.images.description")}
+          needle={needle}
         >
           <div className="flex flex-col">
             <div className="flex flex-wrap items-center justify-between gap-8 border-b border-border py-5">
               <SettingText
                 title={t("settings.images.download.title")}
                 description={t("settings.images.download.description")}
+                needle={needle}
               />
               <Switch
                 checked={settings.downloadRemoteImages}
@@ -646,13 +701,15 @@ export function SettingsPage() {
         </Group>
 
         <Group
+          id="about"
           title={t("settings.about.title")}
           description={t("settings.about.description")}
+          needle={needle}
         >
           <div className="flex flex-col divide-y divide-border">
             <div className="flex items-center justify-between gap-8 py-5">
               <span className="text-[16px] font-semibold text-foreground">
-                {t("settings.about.version")}
+                <Highlighted text={t("settings.about.version")} needle={needle} />
               </span>
               <span className="font-mono text-[14px] text-foreground">
                 {about?.version ?? "—"}
@@ -660,7 +717,7 @@ export function SettingsPage() {
             </div>
             <div className="flex items-center justify-between gap-8 py-5">
               <span className="text-[16px] font-semibold text-foreground">
-                {t("settings.about.home")}
+                <Highlighted text={t("settings.about.home")} needle={needle} />
               </span>
               <span className="flex items-center gap-2">
                 <span className="font-mono text-[14px] text-foreground">
@@ -671,7 +728,7 @@ export function SettingsPage() {
             </div>
             <div className="flex items-center justify-between gap-8 py-5">
               <span className="text-[16px] font-semibold text-foreground">
-                {t("settings.about.host")}
+                <Highlighted text={t("settings.about.host")} needle={needle} />
               </span>
               <span className="text-[14px] text-foreground">{hostLabel}</span>
             </div>

@@ -14,6 +14,7 @@ import { MCP_SERVICE } from "./contract.ts"
 import { MCP_LIBRARY_SERVICE, McpLibrary } from "./library-store.ts"
 import { mcpMessages } from "./messages.ts"
 import { McpService } from "./provider.ts"
+import { mcpSearch } from "./search.ts"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -45,7 +46,7 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
       permissions: ["storage.self", "filesystem"],
       provides: [MCP_SERVICE, MCP_LIBRARY_SERVICE],
     },
-    inject: ["nav", "routes", "locales"],
+    inject: ["nav", "routes", "locales", "search", "i18n", "extensions"],
 
     apply(ctx) {
       new McpService(ctx)
@@ -54,7 +55,11 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
          from the form's own startup, so the rows are already there when a page
          opens rather than being read again on the way in. Constructing it asks
          for nothing: what it reads, it reads when something asks it to. */
-      new McpLibrary(ctx)
+      const library = new McpLibrary(ctx)
+
+      /* The palette reaches this module through one function rather than by
+         knowing how a client file and a record fold into a row. */
+      ctx.search.register(mcpSearch(library))
 
       ctx.nav.register({
         path: "/mcp-servers",

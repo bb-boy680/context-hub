@@ -27,7 +27,7 @@ import {
 } from "./parts.tsx"
 import type { McpAgentPlace, McpServer } from "./types.ts"
 import { useI18n } from "@context-hub/extensions/react"
-import { Ledger, type LedgerColumn } from "@context-hub/extensions/components"
+import { Highlighted, Ledger, type LedgerColumn } from "@context-hub/extensions/components"
 
 /** A server installed nowhere, which the batch menu draws its list against. */
 const NOWHERE: McpServer = {
@@ -72,6 +72,7 @@ function RowActionCluster({ server, actions }: { server: McpServer; actions: Ser
 export function ServerListView({
   servers,
   places,
+  needle,
   selected,
   age,
   onCheck,
@@ -81,6 +82,8 @@ export function ServerListView({
 }: {
   servers: McpServer[]
   places: readonly McpAgentPlace[]
+  /** What the filter box holds, marked in the fields it matched. */
+  needle: string
   selected: ReadonlySet<string>
   /** How long ago one server was checked, which its own cell says. */
   age: (server: McpServer) => string
@@ -103,7 +106,7 @@ export function ServerListView({
           <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
             <div className="flex items-center gap-2">
               <span className="truncate text-[13.5px] leading-[1.3] font-semibold text-foreground">
-                {server.name}
+                <Highlighted text={server.name} needle={needle} />
               </span>
               <TransportChip transport={server.transport} />
               {server.stored ? null : <UnstoredChip />}
@@ -112,7 +115,11 @@ export function ServerListView({
             {/* A server that says nothing about itself reads as the sentence
                 saying so, rather than an empty line that looks unloaded. */}
             <span className="truncate text-[11.5px] leading-[1.3] text-muted-soft">
-              {server.description || t("mcp.description.missing")}
+              {server.description === "" ? (
+                t("mcp.description.missing")
+              ) : (
+                <Highlighted text={server.description} needle={needle} />
+              )}
             </span>
           </div>
         </div>

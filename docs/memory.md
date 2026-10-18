@@ -1222,3 +1222,19 @@ frontmatter 解析器，还会把"元数据在哪"搬走一遍。
 - 菜单项之间不加分割线；用行距和层级表达分组，只有真正不同的语义分区才考虑线。
 - 判据：触发按钮的 `getComputedStyle(trigger).backgroundColor` 是透明；菜单内
   `[role="separator"]` 数量为 0。
+
+## 插件里 `ctx.i18n` / `ctx.extensions` 不是想读就能读（2026-10-18）
+
+**问题模式**：全局搜索的 provider 在 `apply` 时注册，之后由弹窗调用；provider 里读
+`ctx.i18n` 和 `ctx.extensions`，但对应插件没有把这两个服务写进 `inject`。运行时抛
+`cannot get property "i18n" without inject`，被弹窗的 try/catch 吞掉，于是 MCP、Plugins、
+Settings、Extensions 四个分组静默消失，**typecheck 和 lint 全绿**。页面上直接看数据又都存在，
+很容易误判成“共享读取还没落地”。
+
+**规则**：
+- `inject` 不是只给等待依赖用的声明；Cordis 在运行时按它给属性访问放行。provider / 回调
+  只要在 `apply` 之后读 `ctx.<service>`，那个服务就必须在 `inject` 里。
+- 这次需要的是 `i18n`（翻译）和 `extensions`（读目录快照）；MCP 的 library 还读 `ctx.i18n`，
+  所以 MCP 模块也补了。
+- 判据：provider 返回空组时，不要让 catch 完全静默——至少 `console.error` 出 provider 名和
+  错误；浏览器里捕获一次 console 就能看到 `without inject`。

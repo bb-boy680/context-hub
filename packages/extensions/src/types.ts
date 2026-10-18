@@ -125,6 +125,53 @@ export interface RouteContribution {
   Component: ComponentType
 }
 
+/**
+ * One row a module offers to the global search.
+ *
+ * A row is display data and an address, not an action: the palette renders it
+ * and navigates to {@link path}, and the page it names decides what the query
+ * means there.
+ */
+export interface SearchResult {
+  /** Stable within the provider that returned it; what the list keys on. */
+  id: string
+  /** The row's own title, already worded for the locale it was read in. */
+  title: string
+  /** The sentence under the title; omitted when the row has nothing to add. */
+  description?: string
+  /** The row's own picture, as a URL; drawn before {@link icon}. */
+  avatar?: string
+  /** The row's own mark, drawn when it has no avatar. */
+  icon?: ExtensionIcon
+  /** The page the row opens, query and anchor included. */
+  path: string
+}
+
+/**
+ * One module's search function, offered to the shell's global search.
+ *
+ * Synchronous on purpose: every provider reads a shared in-memory library, and
+ * a keystroke must not start I/O. A module that later needs a remote search can
+ * take the query and answer from its own cache.
+ */
+export interface SearchContribution {
+  /** Message key naming the module in the result list, resolved where it renders. */
+  labelKey: string
+  /** The mark drawn for a result that names neither an avatar nor an icon. */
+  icon: ExtensionIcon
+  /** Rows matching the text; an empty query is the palette's business, not the provider's. */
+  search(query: string): SearchResult[]
+  /**
+   * Tells the palette the rows may have changed.
+   *
+   * Optional because a module whose data cannot move while the palette is open
+   * has nothing to announce. A provider that does offer this lets a slow read —
+   * an MCP probe, a client's own command line — land in a dialog already
+   * showing.
+   */
+  subscribe?(listener: () => void): () => void
+}
+
 /** One contribution type per point id; a point indexes every value contributed to it. */
 export interface ContributionMap {
   /** A selectable UI language. */
@@ -139,6 +186,8 @@ export interface ContributionMap {
   header: HeaderContribution
   /** A page. */
   route: RouteContribution
+  /** One module's search function, for the global search palette. */
+  search: SearchContribution
 }
 
 /** Contribution point ids the kernel indexes. */

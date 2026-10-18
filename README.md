@@ -58,17 +58,24 @@ packets instead of refusing them. Run it with the sandbox off.
 
 ### Where an asset page's data comes from
 
-The four asset libraries (Skills, MCP, Plugins, Prompts) are **read once, at
-startup**, not when a page that draws them is opened. Each module publishes its
-own read as a service — `catalog.skills`, `catalog.mcp`, `catalog.plugins`,
-`catalog.prompts` — and `apps/web/src/lib/preload.ts` starts all four after the
-kernel is up, without waiting for the answers. The page watches that read
-through `useCatalog`; it does not make one of its own.
+The five asset libraries (Skills, MCP, Plugins, Prompts, Environment variables)
+are **read once, at startup**, not when a page that draws them is opened. Each
+module publishes its own read as a service — `catalog.skills`, `catalog.mcp`,
+`catalog.plugins`, `catalog.prompts`, `catalog.variables` — and
+`apps/web/src/lib/preload.ts` starts all five after the kernel is up, without
+waiting for the answers. The page watches that read through `useCatalog`; it
+does not make one of its own.
 
 A page that opens before the read lands starts it itself, which is the same read
 answered twice rather than a second one. What this buys: leaving a page no
-longer throws its rows away, and something outside the page — a global search,
-say — can see what the hub holds without having visited it.
+longer throws its rows away, and something outside the page — the global search,
+for instance — can see what the hub holds without having visited it.
+
+Global search is itself an extension (`@context-hub/global-search`). Every
+module offers one `search(query)` through the kernel's `search` contribution
+point; the palette calls them and never names a skill, server, pack, prompt, or
+variable itself. Settings and Extensions are shell pages rather than extensions,
+so that package offers their providers.
 
 Two rules to keep in mind when adding to this:
 

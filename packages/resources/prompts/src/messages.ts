@@ -6,6 +6,7 @@
  * module without depending on it; a key no pack covers keeps the English here.
  */
 export const promptsMessages: Record<string, string> = {
+  "search.group.prompts": "Prompts",
   "nav.prompts": "Prompts",
 
   "prompts.title": "Prompts",

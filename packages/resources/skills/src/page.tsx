@@ -32,7 +32,7 @@ import { tagTone } from "./tags.ts"
 import type { SkillPlaceRef, SkillStore } from "./store.ts"
 import type { Skill } from "./types.ts"
 
-import { useContributions, useI18n, useSettings } from "@context-hub/extensions/react"
+import { useContributions, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
 import {
   AutoplayVideo,
@@ -41,6 +41,7 @@ import {
   rememberAspect,
   ActionTab,
   FilterBar,
+  Highlighted,
   Ledger,
   PageBody,
   PlaceMenu,
@@ -693,27 +694,6 @@ function SkillThumb({ skill }: { skill: Skill }) {
   )
 }
 
-/**
- * The query's own characters, marked in the accent. Only the table marks them:
- * its rows all look alike, so without the mark there is no way to see which
- * words matched. A card is big enough to read on its own, and marking twelve
- * of them at once turns the grid into a pattern.
- */
-function Highlighted({ text, needle }: { text: string; needle: string }) {
-  const at = needle === "" ? -1 : text.toLowerCase().indexOf(needle.toLowerCase())
-  if (at < 0) return <>{text}</>
-
-  return (
-    <>
-      {text.slice(0, at)}
-      <mark className="bg-transparent font-semibold text-primary">
-        {text.slice(at, at + needle.length)}
-      </mark>
-      {text.slice(at + needle.length)}
-    </>
-  )
-}
-
 /* The batch strip's own action: the places a skill can be installed into. The
    strip around it belongs to the ledger. */
 function BatchInstall({
@@ -958,12 +938,22 @@ export function SkillsPage() {
      menu; `null` leaves the scope whole. */
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const settings = useSettings()
-  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
+  const search = useSearchPage()
+  /* A result from the global search asks for the list view, where the matched
+     text is marked; the page's own choice is what remains once that is cleared. */
+  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
+  const view = search.listView ? "list" : localView
+  const chooseView = (next: "grid" | "list") => {
+    search.clearListView()
+    setLocalView(next)
+  }
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tag, setTag] = React.useState("All tags")
-  /* Typing narrows the same list the category chips do; it is not a new view. */
-  const [query, setQuery] = React.useState("")
+  /* Typing narrows the same list the category chips do; it is not a new view.
+     The query lives in the address so the global search can seed it. */
+  const query = search.query
+  const setQuery = search.setQuery
   const needle = useSettled(query)
   /* Ticked rows, by key. Narrowing the list drops them: a batch action names
      what the person can still see. */
@@ -1386,13 +1376,13 @@ export function SkillsPage() {
                 icon={LayoutGridIcon}
                 label={t("skills.view.grid")}
                 active={view === "grid"}
-                onClick={() => setView("grid")}
+                onClick={() => chooseView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("skills.view.list")}
                 active={view === "list"}
-                onClick={() => setView("list")}
+                onClick={() => chooseView("list")}
               />
             </div>
             <Button

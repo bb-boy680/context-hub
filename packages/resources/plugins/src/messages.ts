@@ -5,6 +5,7 @@
  * English text here.
  */
 export const pluginsMessages: Record<string, string> = {
+  "search.group.plugins": "Plugins",
   "plugins.title": "Plugins",
   "plugins.description":
     "The packs this hub knows: what each one carries, and where it came from.",

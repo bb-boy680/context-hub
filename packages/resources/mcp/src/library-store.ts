@@ -52,7 +52,7 @@ import {
   type McpProbeReport,
 } from "./probe.ts"
 import { createRemoteRecords, readRecords, type McpRecordsPort } from "./records.ts"
-import type { McpPlaceKind, McpRecord, McpServer } from "./types.ts"
+import type { McpCatalog, McpPlaceKind, McpRecord, McpServer } from "./types.ts"
 
 /** How many probes run side by side; a stdio server takes seconds to answer. */
 const PROBE_CONCURRENCY = 3
@@ -219,6 +219,27 @@ export class McpLibrary extends Service {
 
   state(): CatalogState<McpLibraryValue> {
     return this.catalog.state()
+  }
+
+  /**
+   * The rows the page draws, built from what has been read so far.
+   *
+   * The page's hook used to be the only place this fold existed; the global
+   * search needs the same rows, so it is published here rather than written a
+   * second time with a different idea of what a server is. `null` means there
+   * has not been a scan yet — not that the library is empty.
+   */
+  rows(): McpCatalog | null {
+    const value = this.catalog.state().value
+    if (value === null || value.scan === null) return null
+    return buildCatalog(
+      value.records,
+      value.scan.answer,
+      this.places(),
+      [],
+      value.scan.at,
+      value.checks
+    )
   }
 
   subscribe(listener: () => void): () => void {

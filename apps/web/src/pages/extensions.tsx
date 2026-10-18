@@ -13,7 +13,9 @@ import {
   useExtensionSnapshot,
   useHub,
   useI18n,
+  useSearchPage,
 } from "@context-hub/extensions/react"
+import { Highlighted } from "@context-hub/extensions/components"
 import { Badge } from "@context-hub/shadcn-ui/components/badge"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Input } from "@context-hub/shadcn-ui/components/input"
@@ -33,9 +35,12 @@ function matches(entry: ExtensionView, query: string): boolean {
 
 function ExtensionRow({
   entry,
+  needle,
   onOpen,
 }: {
   entry: ExtensionView
+  /** What the filter box holds, marked in the fields it matched. */
+  needle: string
   onOpen: () => void
 }) {
   const { t } = useI18n()
@@ -57,7 +62,7 @@ function ExtensionRow({
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex items-center gap-2 text-sm leading-5 font-medium">
-            {manifest.name}
+            <Highlighted text={manifest.name} needle={needle} />
             {manifest.locked === true ? (
               <Badge variant="secondary">{t("extensions.status.builtin")}</Badge>
             ) : null}
@@ -76,7 +81,7 @@ function ExtensionRow({
             ) : null}
           </span>
           <span className="truncate text-[13px] leading-[18px] text-muted-foreground">
-            {manifest.description}
+            <Highlighted text={manifest.description} needle={needle} />
           </span>
         </span>
       </button>
@@ -125,10 +130,13 @@ function ExtensionActionButton({
 export function ExtensionsPage() {
   const { t } = useI18n()
   const snapshot = useExtensionSnapshot()
-  const [query, setQuery] = React.useState("")
+  const search = useSearchPage()
+  const query = search.query
+  const setQuery = search.setQuery
   const [detailId, setDetailId] = React.useState<string | null>(null)
 
   const entries = snapshot.entries.filter((entry) => matches(entry, query))
+  const needle = query.trim()
   const detail =
     snapshot.entries.find((entry) => entry.manifest.id === detailId) ?? null
 
@@ -175,6 +183,7 @@ export function ExtensionsPage() {
                   <ExtensionRow
                     key={entry.manifest.id}
                     entry={entry}
+                    needle={needle}
                     onOpen={() => setDetailId(entry.manifest.id)}
                   />
                 ))}

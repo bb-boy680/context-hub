@@ -5,6 +5,7 @@
  * English text here.
  */
 export const skillsMessages: Record<string, string> = {
+  "search.group.skills": "Skills",
   "skills.title": "Skills",
   "skills.description":
     "The skills this hub knows: where each one lives, and which place holds it.",
