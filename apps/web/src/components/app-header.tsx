@@ -1,5 +1,5 @@
-import { GitForkIcon, RefreshCwIcon, SearchIcon } from "lucide-react"
-import { Link, useLocation } from "react-router"
+import { SearchIcon } from "lucide-react"
+import { useLocation } from "react-router"
 
 import {
   Breadcrumb,
@@ -9,21 +9,20 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@context-hub/shadcn-ui/components/breadcrumb"
-import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Kbd } from "@context-hub/shadcn-ui/components/kbd"
 import { SidebarTrigger } from "@context-hub/shadcn-ui/components/sidebar"
 
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useNavItem } from "@/lib/navigation"
-import { useI18n } from "@context-hub/extensions/react"
-
-/** Changes waiting to leave the workspace; mirrored on the Repository page. */
-const pendingChanges = 3
+import { useContributions, useI18n } from "@context-hub/extensions/react"
 
 export function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
   const { pathname } = useLocation()
   const { t } = useI18n()
   const page = useNavItem(pathname)?.labelKey
+  const contributions = useContributions("header")
+  /* Catalog order breaks ties; sort is stable, so equal orders keep it. */
+  const headerItems = [...contributions].sort((a, b) => a.order - b.order)
 
   return (
     <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-header px-6">
@@ -48,23 +47,10 @@ export function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
         <span>{t("header.search")}</span>
         <Kbd className="ml-auto border-0 bg-transparent">Ctrl K</Kbd>
       </button>
-      <Button
-        size="lg"
-        variant="outline"
-        nativeButton={false}
-        render={<Link to="/repository" />}
-        className="hidden rounded-full border-border bg-transparent px-4 lg:inline-flex dark:bg-transparent"
-      >
-        <GitForkIcon />
-        {t("header.connectRepo")}
-      </Button>
-      <Button size="lg" className="rounded-full px-4">
-        <RefreshCwIcon />
-        {t("header.syncRepo")}
-        <span className="ml-1 inline-flex h-[18px] min-w-[19px] items-center justify-center rounded-full bg-primary-foreground px-1 text-[11px] font-semibold text-primary">
-          {pendingChanges}
-        </span>
-      </Button>
+      {headerItems.map((item, index) => {
+        const Component = item.Component
+        return <Component key={`${item.id}:${index}`} />
+      })}
       <ThemeToggle />
     </header>
   )

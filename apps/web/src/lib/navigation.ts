@@ -1,8 +1,4 @@
-import {
-  BlocksIcon,
-  GitBranchIcon,
-  SettingsIcon,
-} from "lucide-react"
+import { BlocksIcon, SettingsIcon } from "lucide-react"
 import * as React from "react"
 
 import type { ExtensionIcon, NavGroupId } from "@context-hub/extensions"
@@ -15,8 +11,8 @@ export type NavItem = {
   /** The shell's own entries use lucide icons; a contribution may use any. */
   icon: ExtensionIcon
   /**
-   * Sort rank inside the group. Built-in entries keep gaps between them (10,
-   * 20, 30 …), so a contributed entry can be inserted between two of them.
+   * Sort rank inside the group. Built-in entries keep gaps between them (20,
+   * 30 …), so a contributed entry can be inserted between two of them.
    */
   order: number
 }
@@ -40,7 +36,6 @@ export const navGroups: NavGroup[] = [
     id: "operate",
     labelKey: "nav.group.operate",
     items: [
-      { labelKey: "nav.repository", path: "/repository", icon: GitBranchIcon, order: 10 },
       { labelKey: "nav.settings", path: "/settings", icon: SettingsIcon, order: 20 },
       { labelKey: "nav.extensions", path: "/extensions", icon: BlocksIcon, order: 30 },
     ],

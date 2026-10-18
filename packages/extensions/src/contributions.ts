@@ -1,11 +1,12 @@
 /**
  * The contribution points, as services.
  *
- * A contribution is data for the screen — a navigation entry, a page, a
- * language pack — as opposed to a service, which carries behaviour another
- * plugin calls. Each point is its own service so that contributing to one is
- * the same act as registering into a module: `ctx.nav.register(entry)` from the
- * plugin's `apply`, with nothing else to remember.
+ * A contribution is data for the screen — a navigation entry, a header
+ * control, a page, a language pack — as opposed to a service, which carries
+ * behaviour another plugin calls. Each point is its own service so that
+ * contributing to one is the same act as registering into a module:
+ * `ctx.nav.register(entry)` from the plugin's `apply`, with nothing else to
+ * remember.
  *
  * The point is where the lifetime comes from. `register` wraps itself in an
  * effect on the context it was called through, so what it added comes out when
@@ -20,6 +21,7 @@ import type {
   AgentTargetDescriptor,
   ContributionMap,
   ExtensionPointId,
+  HeaderContribution,
   LocaleContribution,
   NavContribution,
   RouteContribution,
@@ -74,6 +76,7 @@ export class ContributionPoint<T> extends Service {
 /** The service each point is published under. */
 export const POINT_SERVICES: Readonly<Record<ExtensionPointId, string>> = {
   nav: "nav",
+  header: "header",
   route: "routes",
   locale: "locales",
   target: "targets",
@@ -84,6 +87,8 @@ declare module "@deepseek-ai/cordis" {
   interface Context {
     /** Sidebar entries the shell renders, in the order their own `order` field asks for. */
     nav: ContributionPoint<NavContribution>
+    /** Controls the shell renders in its header, in their own `order`. */
+    header: ContributionPoint<HeaderContribution>
     /** Pages the shell mounts at their paths. */
     routes: ContributionPoint<RouteContribution>
     /** Language packs a person can switch to. */
@@ -103,6 +108,7 @@ declare module "@deepseek-ai/cordis" {
  */
 export function createContributionPoints(ctx: Context): void {
   new ContributionPoint<NavContribution>(ctx, POINT_SERVICES.nav)
+  new ContributionPoint<HeaderContribution>(ctx, POINT_SERVICES.header)
   new ContributionPoint<RouteContribution>(ctx, POINT_SERVICES.route)
   new ContributionPoint<LocaleContribution>(ctx, POINT_SERVICES.locale)
   new ContributionPoint<AgentTargetDescriptor>(ctx, POINT_SERVICES.target)

@@ -107,11 +107,11 @@ const contributor: ExtensionModule = {
     apiVersion: "^0.1",
     kind: "code",
     category: "integration",
-    description: "Adds one navigation entry.",
+    description: "Adds one navigation entry and one header control.",
     icon: () => null,
     defaultEnabled: true,
   },
-  inject: ["nav"],
+  inject: ["nav", "header"],
 
   apply(ctx) {
     ctx.nav.register({
@@ -120,6 +120,11 @@ const contributor: ExtensionModule = {
       icon: () => null,
       group: "assets",
       order: 99,
+    })
+    ctx.header.register({
+      id: "test.header",
+      order: 50,
+      Component: () => null,
     })
     log.push("contributor applied")
   },
@@ -212,6 +217,25 @@ describe("a kernel of three plugins", () => {
     it("comes back when the extension is enabled again", async () => {
       await kernel.ctx.extensions.enable("test.contributor")
       expect(nav().map((one) => one.path)).toContain("/test")
+    })
+  })
+
+  describe("a header contribution", () => {
+    const header = () => kernel.ctx.extensions.contributions("header")
+
+    it("is there, and belongs to the extension that made it", () => {
+      expect(header().map((one) => one.id)).toContain("test.header")
+      expect(entryOf(kernel, "test.contributor")?.points).toContain("header")
+    })
+
+    it("goes out with its extension when it is disabled", async () => {
+      await kernel.ctx.extensions.disable("test.contributor")
+      expect(header().map((one) => one.id)).not.toContain("test.header")
+    })
+
+    it("comes back when the extension is enabled again", async () => {
+      await kernel.ctx.extensions.enable("test.contributor")
+      expect(header().map((one) => one.id)).toContain("test.header")
     })
   })
 })

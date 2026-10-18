@@ -94,9 +94,26 @@ export interface NavContribution {
   group: NavGroupId
   /**
    * Sort rank inside the group; the shell leaves gaps between its own entries
-   * (10, 20, 30 …) so a contributed entry can be inserted between them.
+   * (20, 30 …) so a contributed entry can be inserted between them.
    */
   order: number
+}
+
+/** One control contributed to the shell's header row. */
+export interface HeaderContribution {
+  /** The contributor's own id for this control; may repeat across plugins. */
+  id: string
+  /**
+   * Sort rank inside the header; smaller comes first. Equal ranks keep the
+   * catalog order `useContributions` returns.
+   */
+  order: number
+  /**
+   * Rendered with no props as a direct child of the header's flex row. The
+   * component owns its size and spacing, including `shrink-0` when it must
+   * not be squeezed by the breadcrumb.
+   */
+  Component: ComponentType
 }
 
 /**
@@ -118,6 +135,8 @@ export interface ContributionMap {
   skillRegistry: SkillRegistry
   /** A sidebar entry. */
   nav: NavContribution
+  /** One control in the shell's header row. */
+  header: HeaderContribution
   /** A page. */
   route: RouteContribution
 }
