@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "node dev.ts",
     "build": "tsc -b && vite build",
+    "build:cli": "node build-cli.ts",
     "start": "node server.ts --static dist",
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",

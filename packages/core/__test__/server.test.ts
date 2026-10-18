@@ -57,9 +57,10 @@ async function withServer(
 
 const base = await fs.mkdtemp(path.join(tmpdir(), "context-hub-server-"))
 const dist = path.join(base, "dist")
+const appJs = "export default 1\n"
 await fs.mkdir(path.join(dist, "assets"), { recursive: true })
 await fs.writeFile(path.join(dist, "index.html"), "<!doctype html><title>hub</title>", "utf8")
-await fs.writeFile(path.join(dist, "assets", "app.js"), "export default 1\n", "utf8")
+await fs.writeFile(path.join(dist, "assets", "app.js"), appJs, "utf8")
 /* A file beside the root, to be reached for and never served. */
 const secret = "this must never be served"
 await fs.writeFile(path.join(base, "secret.txt"), secret, "utf8")
@@ -132,6 +133,20 @@ describe("the chain", () => {
     const asset = await fetch(at("/assets/app.js"))
     expect(asset.status).toBe(200)
     expect(asset.headers.get("content-type")).toBe("text/javascript; charset=utf-8")
+  })
+
+  it("serves the file's bytes with their length", async () => {
+    const asset = await fetch(at("/assets/app.js"))
+    expect(asset.status).toBe(200)
+    expect(await asset.text()).toBe(appJs)
+    expect(asset.headers.get("content-length")).toBe(String(Buffer.byteLength(appJs)))
+  })
+
+  it("answers HEAD with the same length and no body", async () => {
+    const head = await fetch(at("/assets/app.js"), { method: "HEAD" })
+    expect(head.status).toBe(200)
+    expect(head.headers.get("content-length")).toBe(String(Buffer.byteLength(appJs)))
+    expect(await head.text()).toBe("")
   })
 
   /* The app is served by a client router, so a path with no extension is a route. */

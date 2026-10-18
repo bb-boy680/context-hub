@@ -7,4 +7,5 @@ packages:
 
 allowBuilds:
   esbuild: true
+  electron: true
   msw: false

@@ -63,18 +63,64 @@ export function parsePackageList(output: string): PackageSkill[] {
   return skills
 }
 
+/** How to reach npx: the program to spawn and the arguments it takes. */
+export interface NpxInvocation {
+  file: string
+  argv: string[]
+}
+
 /** The npm CLI that ships with Node, wherever that installation put it. */
-function npxCli(): string {
-  const dir = path.dirname(process.execPath)
+function npxCli(execPath: string, exists: (file: string) => boolean): string | null {
+  const dir = path.dirname(execPath)
   const candidates = [
     path.join(dir, "node_modules", "npm", "bin", "npx-cli.js"),
     path.resolve(dir, "..", "lib", "node_modules", "npm", "bin", "npx-cli.js"),
   ]
-  const found = candidates.find((file) => existsSync(file))
-  if (found === undefined) {
-    throw new Error("npm's npx CLI is missing next to node, so nothing can be downloaded")
+  return candidates.find((file) => exists(file)) ?? null
+}
+
+/**
+ * Choose how to start npx.
+ *
+ * Node ships its own `npx-cli.js`, and running that through `process.execPath`
+ * avoids Windows' `.cmd` shim. A compiled hub binary and Electron are not Node,
+ * though — `process.execPath` names the app itself — so the only way left is
+ * the `npx` on PATH. That one is a `.cmd` on Windows, which `execFile` cannot
+ * spawn directly; `cmd.exe /d /s /c` is the standard way in.
+ */
+export function npxInvocation(
+  args: string[],
+  options: {
+    platform?: NodeJS.Platform
+    execPath?: string
+    comspec?: string
+    exists?: (file: string) => boolean
+  } = {}
+): NpxInvocation {
+  const execPath = options.execPath ?? process.execPath
+  const cli = npxCli(execPath, options.exists ?? existsSync)
+  if (cli !== null) return { file: execPath, argv: [cli, ...args] }
+  if ((options.platform ?? process.platform) === "win32") {
+    return {
+      file: options.comspec ?? process.env.ComSpec ?? "cmd.exe",
+      argv: ["/d", "/s", "/c", "npx", ...args],
+    }
   }
-  return found
+  return { file: "npx", argv: args }
+}
+
+/**
+ * Remove a throwaway directory.
+ *
+ * Windows can still hold handles on what a just-finished child process wrote,
+ * so the first unlink can answer EBUSY. `maxRetries` retries exactly that case;
+ * a directory still locked after it belongs to the OS, and failing an install
+ * over cleanup would hide whether the install itself worked.
+ */
+export async function dropWork(work: string): Promise<void> {
+  await fs
+    .rm(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 })
+    .catch(() => undefined)
 }
 
 /** Run the CLI and answer with both streams, whatever its exit code. */
@@ -83,10 +129,10 @@ function runCli(
   cwd: string
 ): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolve, reject) => {
+    const invocation = npxInvocation(args)
     execFile(
-      /* npx is invoked through node: on Windows a `.cmd` shim cannot be spawned directly. */
-      process.execPath,
-      [npxCli(), ...args],
+      invocation.file,
+      invocation.argv,
       {
         cwd,
         timeout: TIMEOUT_MS,
@@ -100,6 +146,11 @@ function runCli(
               `the skills CLI did not finish in ${TIMEOUT_MS / 1000}s; check the network and the source`
             )
           )
+          return
+        }
+        /* A missing npx is not the CLI failing; name what has to be installed. */
+        if (error !== null && error.code === "ENOENT") {
+          reject(new Error("npx is not on PATH; install Node.js or add it to PATH"))
           return
         }
         resolve({
@@ -170,7 +221,7 @@ export async function listPackageSkills(source: string): Promise<PackageSkill[]>
     if (skills.length === 0) throw new Error(failureText(code, stderr, stdout))
     return skills
   } finally {
-    await fs.rm(work, { recursive: true, force: true })
+    await dropWork(work)
   }
 }
 
@@ -241,7 +292,7 @@ export async function fetchUpstreamRecords(
     }
     return { records, failed }
   } finally {
-    await fs.rm(work, { recursive: true, force: true })
+    await dropWork(work)
   }
 }
 
@@ -294,6 +345,6 @@ export async function downloadPackageSkills(
     }
     return result
   } finally {
-    await fs.rm(work, { recursive: true, force: true })
+    await dropWork(work)
   }
 }

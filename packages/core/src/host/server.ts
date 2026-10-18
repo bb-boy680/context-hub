@@ -13,7 +13,7 @@
  * processes and write the files the person's own agents read, so the listener
  * is not something to expose.
  */
-import { createReadStream, promises as fs } from "node:fs"
+import { promises as fs } from "node:fs"
 import { createServer } from "node:http"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import path from "node:path"
@@ -160,21 +160,21 @@ async function sendFile(
   request: IncomingMessage,
   response: ServerResponse
 ): Promise<void> {
-  const stat = await fs.stat(file).catch(() => null)
-  if (stat === null || !stat.isFile()) {
+  /* Read the whole file: a compiled Bun binary exposes embedded files through
+     `readFile`, while `createReadStream` on the same path answers ENOENT and
+     its error escapes the response. The length comes from the bytes actually
+     read, because an embedded file's `stat.size` is not part of the contract. */
+  const body = await fs.readFile(file).catch(() => null)
+  if (body === null) {
     response.writeHead(404).end()
     return
   }
   response.writeHead(200, {
     "Content-Type": contentTypeOf(file),
-    "Content-Length": stat.size,
+    "Content-Length": body.byteLength,
     "Cache-Control": "no-store",
   })
-  if (request.method === "HEAD") {
-    response.end()
-    return
-  }
-  createReadStream(file).pipe(response)
+  response.end(request.method === "HEAD" ? undefined : body)
 }
 
 /**

@@ -27,6 +27,7 @@ export default defineConfig({
       "packages/search/skills-sh/vitest.config.ts",
       "packages/search/global-search/vitest.config.ts",
       "apps/web/vitest.config.ts",
+      "apps/desktop/vitest.config.ts",
     ],
   },
 })
