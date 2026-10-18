@@ -42,12 +42,15 @@ pnpm --filter @context-hub/desktop package:win   # or package:mac / package:linu
 The desktop app starts the hub as its own process and shows the page that
 process serves, so it runs the same server and routes as every other form.
 Closing the window hides it to the tray; the hub keeps running until Quit is
-chosen from the tray menu.
+chosen from the tray menu. The sidebar shows the app version, and an available
+release appears there as a one-click update; clicking it downloads and restarts
+into the new version.
 
-`pnpm --filter @context-hub/desktop dev` watches both bundles and restarts
-Electron after a change; the application menu has Reload Page, Restart App and
-Toggle DevTools while it runs. Set `CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271`
-to point the window at the Vite dev server instead of starting its own server.
+`pnpm --filter @context-hub/desktop dev` watches the main, preload and server
+bundles and restarts Electron after a change; the application menu has Reload
+Page, Restart App and Toggle DevTools while it runs. Set
+`CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271` to point the window at the Vite dev
+server instead of starting its own server.
 
 The release version is the root `package.json` version. A packaged app checks
 GitHub Releases for a newer one and installs it in place after the hub server

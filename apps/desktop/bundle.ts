@@ -1,7 +1,8 @@
 /**
- * Bundle the Electron main process and the hub server.
+ * Bundle the Electron main process, its preload and the hub server.
  *
  * The main process is CJS because that is Electron's most predictable entry.
+ * The preload must also be CJS: a sandboxed preload cannot load ES modules.
  * The server keeps its top-level await and is emitted as ESM, which
  * `utilityProcess.fork` loads. Everything except Electron itself is bundled, so
  * the packaged app needs no `node_modules`.
@@ -43,8 +44,22 @@ export const mainBuildOptions: BuildOptions = {
   logLevel: "info",
 }
 
-/** Build both bundles once; the development watcher reuses these options. */
+export const preloadBuildOptions: BuildOptions = {
+  absWorkingDir: here,
+  entryPoints: ["src/preload.ts"],
+  outfile: "dist/preload.cjs",
+  bundle: true,
+  platform: "node",
+  format: "cjs",
+  target: "node20",
+  sourcemap: true,
+  external: ["electron"],
+  logLevel: "info",
+}
+
+/** Build all three bundles once; the development watcher reuses these options. */
 export async function buildBundles(): Promise<void> {
   await build(serverBuildOptions)
   await build(mainBuildOptions)
+  await build(preloadBuildOptions)
 }

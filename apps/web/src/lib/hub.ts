@@ -1,10 +1,11 @@
 /**
- * Web form of the kernel: the host is the hub's own directory, reached over the
- * dev server. Everything the kernel remembers is read from there before it
- * starts and written back on every change, so nothing depends on this browser
- * profile. The browser cannot read the skill library or the installed plugins
- * itself, so `startHub` offers those only when a host answers for them; without
- * a host the skills page has no catalog and says so.
+ * Page form of the kernel: the host is the hub's own directory, reached over
+ * the local server. The same page runs in a browser and in the desktop shell;
+ * only the carrier's name differs. Everything the kernel remembers is read
+ * before it starts and written back on every change, so nothing depends on this
+ * browser profile. The page cannot read the skill library or the installed
+ * plugins itself, so `startHub` offers those only when a host answers for them;
+ * without a host the skills page has no catalog and says so.
  */
 import { claudeCodeExtension } from "@context-hub/claude-code"
 import { STATE_ROUTE } from "@context-hub/core/state"
@@ -27,6 +28,7 @@ import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-h
 import { skillsShExtension } from "@context-hub/skills-sh"
 import { createRemoteVariableStore, variablesExtension } from "@context-hub/variables"
 import * as ui from "./ui-kit.ts"
+import { desktopBridge } from "./desktop.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { preloadCatalogs } from "./preload.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
@@ -154,7 +156,7 @@ export async function startHub(): Promise<HubKernel> {
     },
   }
   const webHost: PlatformHost = {
-    form: "Web",
+    form: desktopBridge() === undefined ? "Web" : "Desktop",
     capabilities: { code: true, filesystem: false, network: true },
     storage,
     net: createRemoteNet(),

@@ -57,7 +57,7 @@ export interface NetPort {
 
 /** What every form must provide to compose a kernel. */
 export interface PlatformHost {
-  /** Form name shown in the UI, e.g. "Web". */
+  /** Form name shown in the UI, e.g. "Web" or "Desktop". */
   readonly form: string
   readonly capabilities: PlatformCapabilities
   readonly storage: StoragePort

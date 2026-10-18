@@ -29,7 +29,7 @@ export default {
   /* The packaged Electron comes from the installed dev dependency; this keeps
      packaging offline and pins the exact binary the app was developed against. */
   electronDist: "node_modules/electron/dist",
-  files: ["dist/main.cjs", "assets/*.png"],
+  files: ["dist/main.cjs", "dist/preload.cjs", "assets/*.png"],
   extraResources: [
     { from: "dist/server.mjs", to: "server.mjs" },
     { from: "../web/dist", to: "web" },

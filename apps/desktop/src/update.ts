@@ -2,8 +2,11 @@
  * In-place updates. Only a packaged app with `app-update.yml` has a feed; every
  * other form reports `enabled: false` and the menu omits the action.
  *
- * Downloads are opt-in. Installation first stops the hub server through the
- * caller, so a half-written file cannot be left behind by the restart.
+ * A check on a timer only publishes the offered version, which the sidebar
+ * shows; clicking it downloads and installs without another question. The
+ * menu's manual check keeps its dialogs. Installation first stops the hub
+ * server through the caller, so a half-written file cannot be left behind by
+ * the restart.
  */
 import { existsSync } from "node:fs"
 import path from "node:path"
@@ -17,12 +20,22 @@ import {
 } from "electron"
 import { autoUpdater, type ProgressInfo, type UpdateInfo } from "electron-updater"
 
+import {
+  applyUpdateEvent,
+  initialUpdateState,
+  type UpdateEvent,
+  type UpdateState,
+} from "./update-state.ts"
+
 const CHECK_DELAY_MS = 10_000
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000
 
 export interface Updater {
   readonly enabled: boolean
+  readonly state: UpdateState
   check(manual: boolean): void
+  update(): void
+  subscribe(listener: (state: UpdateState) => void): () => void
   dispose(): void
 }
 
@@ -46,7 +59,14 @@ export function createUpdater(options: UpdaterOptions): Updater {
   const enabled =
     app.isPackaged && existsSync(path.join(process.resourcesPath, "app-update.yml"))
   if (!enabled) {
-    return { enabled: false, check: () => undefined, dispose: () => undefined }
+    return {
+      enabled: false,
+      state: initialUpdateState,
+      check: () => undefined,
+      update: () => undefined,
+      subscribe: () => () => undefined,
+      dispose: () => undefined,
+    }
   }
 
   autoUpdater.autoDownload = false
@@ -58,9 +78,21 @@ export function createUpdater(options: UpdaterOptions): Updater {
   let disposed = false
   let checking = false
   let prompting = false
+  let installing = false
   let manualCheck = false
-  let promptedVersion: string | undefined
+  let silentInstall = false
   let downloadedVersion: string | undefined
+  let state: UpdateState = initialUpdateState
+  const listeners = new Set<(state: UpdateState) => void>()
+
+  const publish = (next: UpdateState): void => {
+    state = next
+    for (const listener of listeners) listener(state)
+  }
+
+  const publishEvent = (event: UpdateEvent): void => {
+    publish(applyUpdateEvent(state, event))
+  }
 
   const progress = (percent: number): void => {
     const window = options.getWindow()
@@ -80,6 +112,19 @@ export function createUpdater(options: UpdaterOptions): Updater {
       })
     } else {
       console.error("desktop update:", error)
+    }
+  }
+
+  /** The sidebar path: no question, restart as soon as the download is done. */
+  const installNow = async (): Promise<void> => {
+    if (installing) return
+    installing = true
+    try {
+      options.markQuitting()
+      await options.stopServer()
+      autoUpdater.quitAndInstall(true, true)
+    } finally {
+      installing = false
     }
   }
 
@@ -124,6 +169,8 @@ export function createUpdater(options: UpdaterOptions): Updater {
       /* The person asked for this download, so report its failure even when the
          check that found it was automatic. */
       manualCheck = true
+      silentInstall = false
+      publishEvent({ type: "downloading" })
       progress(0)
       void autoUpdater.downloadUpdate().catch(() => undefined)
     } finally {
@@ -134,35 +181,49 @@ export function createUpdater(options: UpdaterOptions): Updater {
   const onUpdateAvailable = (info: UpdateInfo): void => {
     checking = false
     if (disposed) return
+    const manual = manualCheck
+    manualCheck = false
     if (downloadedVersion === info.version) {
-      void install(info.version)
+      publishEvent({ type: "downloaded", version: info.version })
+      if (manual) void install(info.version)
       return
     }
-    /* A manual check always answers; automatic checks do not repeat the same
-       prompt for a version the person has already declined. */
-    if (!manualCheck && promptedVersion === info.version) return
-    promptedVersion = info.version
-    void askDownload(info.version)
+    publishEvent({ type: "available", version: info.version })
+    if (manual) void askDownload(info.version)
   }
 
   const onUpdateDownloaded = (info: UpdateInfo): void => {
     manualCheck = false
     progress(-1)
     downloadedVersion = info.version
+    publishEvent({ type: "downloaded", version: info.version })
+    if (silentInstall) {
+      silentInstall = false
+      void installNow()
+      return
+    }
     void install(info.version)
   }
 
   const onError = (error: Error): void => {
     checking = false
+    installing = false
     if (disposed) return
-    reportError(error, manualCheck)
+    const manual = manualCheck
     manualCheck = false
+    silentInstall = false
+    publishEvent({ type: "failed" })
+    reportError(error, manual)
   }
 
   const onNotAvailable = (): void => {
     checking = false
     const manual = manualCheck
     manualCheck = false
+    /* A check must not discard a download that is still running or finished. */
+    if (state.status !== "downloading" && state.status !== "ready") {
+      publishEvent({ type: "none" })
+    }
     if (!manual || disposed) return
     void show(options, {
       type: "info",
@@ -179,14 +240,18 @@ export function createUpdater(options: UpdaterOptions): Updater {
   autoUpdater.on("error", onError)
   autoUpdater.on("download-progress", (event: ProgressInfo) => {
     progress(event.percent / 100)
+    publishEvent({ type: "progress", percent: event.percent })
   })
   autoUpdater.on("update-cancelled", () => {
     manualCheck = false
+    silentInstall = false
     progress(-1)
+    publishEvent({ type: "failed" })
   })
 
   const check = (manual: boolean): void => {
-    if (disposed || checking || prompting) return
+    if (disposed || checking || prompting || installing) return
+    if (state.status === "downloading") return
     if (downloadedVersion !== undefined) {
       if (manual) void install(downloadedVersion)
       return
@@ -196,17 +261,45 @@ export function createUpdater(options: UpdaterOptions): Updater {
     void autoUpdater.checkForUpdates().catch(() => undefined)
   }
 
+  /** The sidebar action: available starts the download, ready installs. */
+  const update = (): void => {
+    if (disposed || checking || prompting || installing) return
+    if (state.status === "downloading") return
+    if (state.status === "ready") {
+      void installNow()
+      return
+    }
+    if (state.status !== "available") return
+    silentInstall = true
+    publishEvent({ type: "downloading" })
+    progress(0)
+    void autoUpdater.downloadUpdate().catch(() => undefined)
+  }
+
+  const subscribe = (listener: (state: UpdateState) => void): (() => void) => {
+    listeners.add(listener)
+    return () => {
+      listeners.delete(listener)
+    }
+  }
+
   const firstTimer = setTimeout(() => check(false), CHECK_DELAY_MS)
   const intervalTimer = setInterval(() => check(false), CHECK_INTERVAL_MS)
 
   return {
     enabled,
+    get state() {
+      return state
+    },
     check,
+    update,
+    subscribe,
     dispose: () => {
       disposed = true
       clearTimeout(firstTimer)
       clearInterval(intervalTimer)
       autoUpdater.removeAllListeners()
+      listeners.clear()
     },
   }
 }

@@ -1,5 +1,5 @@
 /**
- * Development: rebuild both bundles on change and restart Electron.
+ * Development: rebuild all bundles on change and restart Electron.
  *
  * `build.ts` still does one build for packaging. Here the same esbuild options
  * run in watch mode; a successful rebuild is followed by an Electron restart so
@@ -13,7 +13,12 @@ import { fileURLToPath } from "node:url"
 
 import { context, type BuildContext, type Plugin } from "esbuild"
 
-import { buildBundles, mainBuildOptions, serverBuildOptions } from "./bundle.ts"
+import {
+  buildBundles,
+  mainBuildOptions,
+  preloadBuildOptions,
+  serverBuildOptions,
+} from "./bundle.ts"
 import { RESTART_EXIT_CODE } from "./src/restart.ts"
 
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -158,8 +163,16 @@ const mainWatcher = await context({
   ...mainBuildOptions,
   plugins: [restartPlugin("main-watch")],
 })
-watchers.push(serverWatcher, mainWatcher)
+const preloadWatcher = await context({
+  ...preloadBuildOptions,
+  plugins: [restartPlugin("preload-watch")],
+})
+watchers.push(serverWatcher, mainWatcher, preloadWatcher)
 
-console.log("desktop dev: watching main and server bundles")
-await Promise.all([serverWatcher.watch(), mainWatcher.watch()])
+console.log("desktop dev: watching main, preload and server bundles")
+await Promise.all([
+  serverWatcher.watch(),
+  mainWatcher.watch(),
+  preloadWatcher.watch(),
+])
 spawnElectron()

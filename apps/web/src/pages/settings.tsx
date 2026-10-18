@@ -32,6 +32,7 @@ import { SKILL_ROUTE } from "@context-hub/skills"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 import { useTheme } from "@/components/theme-provider"
+import { platformName, useDesktopInfo } from "@/lib/desktop"
 
 type ThemeChoice = "system" | "light" | "dark"
 type LayoutChoice = "grid" | "list"
@@ -352,6 +353,7 @@ export function SettingsPage() {
   const settings = useSettings()
   const ctx = useHub()
   const host = ctx.get("host")
+  const { platform } = useDesktopInfo()
   const search = useSearchPage()
   const needle = search.query.trim()
   const { hash } = useLocation()
@@ -483,12 +485,15 @@ export function SettingsPage() {
     stats === null
       ? t("settings.images.downloadAll").replace("{count}", "—")
       : t("settings.images.downloadAll").replace("{count}", String(stats.remote))
+  const platformLabel = platformName(platform)
   const hostLabel =
     host === undefined
       ? "—"
       : host.form === "Web"
         ? t("settings.about.hostWeb")
-        : host.form
+        : host.form === "Desktop" && platformLabel !== null
+          ? `${platformLabel} · Desktop`
+          : host.form
 
   return (
     <div className="flex w-full flex-col gap-12 font-mono">

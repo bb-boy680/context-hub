@@ -17,6 +17,7 @@ import {
   app,
   BrowserWindow,
   dialog,
+  ipcMain,
   Menu,
   nativeImage,
   shell,
@@ -25,6 +26,12 @@ import {
 } from "electron"
 import type { UtilityProcess } from "electron"
 
+import {
+  DESKTOP_INFO_CHANNEL,
+  UPDATE_CHANGED_CHANNEL,
+  UPDATE_START_CHANNEL,
+  UPDATE_STATE_CHANNEL,
+} from "./bridge.ts"
 import { appendTail, tailOf, writeCrashLog } from "./crash-log.ts"
 import {
   applicationMenuTemplate,
@@ -212,6 +219,7 @@ function createWindow(url: string): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      preload: path.join(__dirname, "preload.cjs"),
     },
   })
   window = created
@@ -398,7 +406,7 @@ if (!locked) {
   app.on("activate", () => showWindow())
 
   void app.whenReady().then(() => {
-    updates = createUpdater({
+    const updater = createUpdater({
       getWindow: () => window,
       stopServer: () => stopServer(),
       markQuitting: () => {
@@ -406,6 +414,19 @@ if (!locked) {
         tray?.destroy()
         tray = null
       },
+    })
+    updates = updater
+    ipcMain.handle(DESKTOP_INFO_CHANNEL, () => ({
+      version: app.getVersion(),
+      platform: process.platform,
+      updatesEnabled: updater.enabled,
+    }))
+    ipcMain.handle(UPDATE_STATE_CHANNEL, () => updater.state)
+    ipcMain.handle(UPDATE_START_CHANNEL, () => updater.update())
+    updater.subscribe((state) => {
+      if (window !== null && !window.isDestroyed()) {
+        window.webContents.send(UPDATE_CHANGED_CHANNEL, state)
+      }
     })
     const actions = menuActions()
     createTray(actions)
