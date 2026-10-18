@@ -505,8 +505,8 @@ export function SettingsPage() {
         : host.form
 
   return (
-    <div className="-mx-6 bg-background">
-      <div className="flex w-full flex-col gap-12 px-16 py-10 font-mono">
+    <div className="flex w-full flex-col gap-12 font-mono">
+      <div className="contents">
         <header className="flex flex-col gap-3">
           <span className="text-[12px] font-semibold tracking-[0.1em] text-ring">
             {t("settings.eyebrow")}
