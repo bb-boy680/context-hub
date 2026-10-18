@@ -63,6 +63,20 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.update.done": "{name} took the revision the source holds.",
   "plugins.update.unchanged": "{name} already held what the source has; nothing was replaced.",
   "plugins.update.overwritten": "The files here had been edited, and the update replaced them.",
+  "plugins.settings.title": "Plugin updates",
+  "plugins.settings.description":
+    "When this hub asks each plugin's source for a newer revision, and what it does when one exists.",
+  "plugins.settings.check": "Check for updates",
+  "plugins.settings.check.description":
+    "Scheduled checks run while the Plugins extension is enabled.",
+  "plugins.settings.check.manual": "Manually",
+  "plugins.settings.check.startup": "At startup",
+  "plugins.settings.check.daily": "Daily",
+  "plugins.settings.dailyAt": "Check time",
+  "plugins.settings.dailyAt.description": "The local time of the daily check.",
+  "plugins.settings.autoDownload": "Download updates automatically",
+  "plugins.settings.autoDownload.description":
+    "After a check finds a newer revision, install it over plugins you have not edited here. Edited copies are left for you to update.",
   "plugins.add.title": "Add a plugin",
   "plugins.add.description":
     "Take a pack from a repository or an archive, or from a folder on this machine.",
@@ -93,7 +107,7 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.notice.restoreFailed": "{names} could not be downloaded again.",
   "plugins.notice.separator": ", ",
   "plugins.notice.checked": "Checked {count} packs: {outdated} have an update, {modified} were edited here.",
-  "plugins.notice.checkFailed": "{count} sources could not be asked.",
+  "plugins.notice.checkFailed": "{count} packs could not be checked or updated.",
   "plugins.tab.all": "All",
   "plugins.tab.library": "Library",
   "plugins.tab.unstored": "Unstored",

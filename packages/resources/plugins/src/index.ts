@@ -14,8 +14,12 @@ import { PlugIcon } from "lucide-react"
 import type { WorkspaceService } from "@context-hub/core/workspace"
 import type { ExtensionModule } from "@context-hub/extensions"
 
+import { PLUGINS_ID } from "./contract.ts"
+import { pluginUpdateSource } from "./library.ts"
 import { pluginsMessages } from "./messages.ts"
 import { PluginsPage } from "./page.tsx"
+import { PluginsSettingsSection } from "./settings-section.tsx"
+import { startUpdateSchedule } from "./update-settings.ts"
 import { PLUGIN_LIBRARY_SERVICE, PluginLibrary } from "./library-store.ts"
 import { PLUGIN_SERVICE, PluginService } from "./provider.ts"
 import { pluginSearch } from "./search.ts"
@@ -43,7 +47,7 @@ export { usePluginLibrary, packFile, packFiles } from "./library.ts"
 export * from "./types.ts"
 
 export const pluginsExtension: ExtensionModule = {
-  name: "hub.plugin.catalog",
+  name: PLUGINS_ID,
   manifest: {
     name: "Plugins",
     version: "0.1.0",
@@ -56,7 +60,7 @@ export const pluginsExtension: ExtensionModule = {
     permissions: ["assets.read", "assets.write"],
     provides: [PLUGIN_SERVICE, PLUGIN_LIBRARY_SERVICE],
   },
-  inject: ["nav", "routes", "locales", "search", "i18n"],
+  inject: ["nav", "routes", "locales", "search", "i18n", "settings", "settingsSections"],
 
   apply(ctx) {
     /* The service carries the registry agent plugins register into and the tools
@@ -72,6 +76,16 @@ export const pluginsExtension: ExtensionModule = {
        which is where it reads the clients from. It reads nothing yet: a module
        enabled is not a module asked to start probing a machine. */
     const library = new PluginLibrary(ctx)
+
+    /* The settings page draws the card; the controls and the schedule belong to
+       this plugin, so disabling it takes both away. */
+    ctx.settingsSections.register({
+      id: "plugins-updates",
+      titleKey: "plugins.settings.title",
+      descriptionKey: "plugins.settings.description",
+      Component: PluginsSettingsSection,
+    })
+    startUpdateSchedule(ctx, PLUGINS_ID, pluginUpdateSource(() => library.reload()))
 
     /* The palette reaches this module through one function rather than by
        knowing how a record and a client's answer fold into a row. */

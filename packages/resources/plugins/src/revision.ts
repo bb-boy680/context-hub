@@ -82,7 +82,10 @@ export interface PluginUpdateSummary {
    * reported on its own.
    */
   modified: number
-  /** Packs whose source could not be read, each with the reason; the rest still ran. */
+  /**
+   * Packs whose source could not be read, or whose automatic update failed,
+   * each with the reason; the rest still ran.
+   */
   failed: { name: string; reason: string }[]
   /**
    * Packs this build cannot ask about at all, so a person is not left waiting

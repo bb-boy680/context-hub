@@ -16,11 +16,12 @@
 import * as React from "react"
 
 import { createCatalog, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
-import { useCatalog, useHub, useI18n, useSettings } from "@context-hub/extensions/react"
+import { useCatalog, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 
 import {
   PLUGIN_NAME_TAKEN,
   PLUGIN_ROUTE,
+  PLUGINS_ID,
   PluginNameTakenError,
   type PackContents,
   type PluginInstallReport,
@@ -36,6 +37,13 @@ import {
   type PluginTools,
 } from "./provider.ts"
 import type { PluginRecord, PluginUpdateCheck, PluginUpdateSummary } from "./revision.ts"
+import {
+  DEFAULT_PLUGIN_UPDATE_SETTINGS,
+  mergeUpdatePass,
+  readPluginUpdateSettings,
+  updateOutdated,
+  type PluginUpdateSource,
+} from "./update-settings.ts"
 import { composeRows } from "./rows.ts"
 import type { PluginFileEntry, PluginRow } from "./types.ts"
 
@@ -385,6 +393,32 @@ export interface PluginUpdateOutcome {
 }
 
 /**
+ * The calls a check pass makes over this route.
+ *
+ * The schedule and the page's own buttons share this, so the action names and
+ * the list shape have one spelling. `reload` is the shared read's, because a
+ * pass ends by refreshing every page watching the library.
+ */
+export function pluginUpdateSource(
+  reload: () => Promise<void>
+): PluginUpdateSource {
+  return {
+    list: async () => {
+      const answer = await call<{ plugins: PluginRecord[] }>(
+        `${ENDPOINT}?action=list`
+      )
+      return answer.plugins
+    },
+    checkUpdates: () =>
+      call<PluginUpdateSummary>(ENDPOINT, { action: "check-updates" }),
+    update: async (name) => {
+      await call<PluginUpdateOutcome>(ENDPOINT, { action: "update", name })
+    },
+    reload,
+  }
+}
+
+/**
  * What a page watches when this module is not loaded: always empty, never
  * reading. It exists so that watching a library is one code path rather than a
  * hook called inside a condition.
@@ -402,6 +436,11 @@ const NO_LIBRARY: Catalog<PluginLibraryValue> = createCatalog({
 export function usePluginLibrary(): PluginLibrary {
   const { t, state } = useI18n()
   const { downloadRemoteImages } = useSettings()
+  const updateSettings = usePluginSettings(
+    PLUGINS_ID,
+    DEFAULT_PLUGIN_UPDATE_SETTINGS
+  )
+  const autoDownload = readPluginUpdateSettings(updateSettings.value).autoDownload
   const ctx = useHub()
   const shared = React.useMemo(() => ctx.get(PLUGIN_LIBRARY_SERVICE) ?? null, [ctx])
   const catalog = shared ?? NO_LIBRARY
@@ -437,6 +476,10 @@ export function usePluginLibrary(): PluginLibrary {
   const reload = React.useCallback(async () => {
     await shared?.reload()
   }, [shared])
+
+  /* The actions a check pass makes, shared with the schedule; its reload is this
+     read's, so a pass refreshes every page watching the library. */
+  const source = React.useMemo(() => pluginUpdateSource(reload), [reload])
 
   /** Run one write, then read everything again: any write can change more than it named. */
   const write = React.useCallback(
@@ -538,6 +581,71 @@ export function usePluginLibrary(): PluginLibrary {
     [scanned]
   )
 
+  /**
+   * Ask every source whether it moved, then apply what the settings allow.
+   *
+   * The pass is written as one busy run rather than as the page's `write`
+   * followed by another: `write` reloads after the check, and reloading again
+   * after every update would ask each client's command line once per pack.
+   */
+  const checkUpdates = React.useCallback(async (): Promise<PluginUpdateSummary> => {
+    setBusy(true)
+    try {
+      const summary = await source.checkUpdates()
+      if (!autoDownload) {
+        await reload()
+        setWriteFailure(null)
+        return summary
+      }
+      const applied = await updateOutdated(source)
+      await reload()
+      setWriteFailure(null)
+      return mergeUpdatePass(summary, applied)
+    } finally {
+      setBusy(false)
+    }
+  }, [autoDownload, reload, source])
+
+  /**
+   * Ask one pack's source whether it moved, and keep the answer.
+   *
+   * With automatic download on, an untouched outdated pack is taken to the
+   * revision the source holds in the same press. A pack edited here is only
+   * checked; the row is what tells the person why it was left alone.
+   */
+  const checkUpdate = React.useCallback(
+    async (name: string): Promise<PluginUpdateCheck> => {
+      setBusy(true)
+      try {
+        const result = await call<PluginUpdateCheck>(ENDPOINT, {
+          action: "check-update",
+          name,
+        })
+        if (autoDownload && result.outdated && !result.modified) {
+          await source.update(name)
+          await reload()
+          setWriteFailure(null)
+          /* The row is re-read from the library; this answer is rewritten so a
+             caller that does read it does not keep offering what is now on
+             disk. `currentHash` stays the pre-update measurement because the
+             update outcome carries no new hash and no caller reads this field. */
+          return {
+            ...result,
+            recordedRevision: result.latestRevision,
+            outdated: false,
+            modified: false,
+          }
+        }
+        await reload()
+        setWriteFailure(null)
+        return result
+      } finally {
+        setBusy(false)
+      }
+    },
+    [autoDownload, reload, source]
+  )
+
   return {
     rows,
     clients: value.clients,
@@ -550,8 +658,8 @@ export function usePluginLibrary(): PluginLibrary {
     failure: writeFailure ?? readFailure,
     missing: value.missing,
     refresh: reload,
-    checkUpdates: () => write<PluginUpdateSummary>({ action: "check-updates" }),
-    checkUpdate: (name) => write<PluginUpdateCheck>({ action: "check-update", name }),
+    checkUpdates,
+    checkUpdate,
     update: (name) => write<PluginUpdateOutcome>({ action: "update", name }),
 
     add: (source) => write<PluginCollected>({ action: "add", source }),

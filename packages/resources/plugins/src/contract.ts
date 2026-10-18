@@ -13,6 +13,9 @@
  * This module imports nothing and runs on both sides of the wire.
  */
 
+/** This module's own id; the kernel matches it against the manifest. */
+export const PLUGINS_ID = "hub.plugin.catalog"
+
 /**
  * Route this library answers on, whichever channel the form carries it over.
  *
