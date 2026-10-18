@@ -167,7 +167,7 @@ vitest.config.ts[FQ3T]: F:中文语言包的 vitest 项目 | R:code:packages/i18
 
 ===D:/work-space/dsh-context-hub/packages/i18n/zh-cn/src/===
 index.ts[CL7T]: F:简体中文语言包声明 | R:code:packages/i18n/zh-cn/src/messages.ts | A:simplifiedChineseLocale,zhCNMessages | S:kind 为 declarative（内核不为它跑代码）、defaultEnabled 为 false；id 用 hub.locale.zh-CN
-messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键对应 extensions 的英文基础表，缺键回退英文；mcp./skills./prompts./plugins./settings./variables./header. 等命名空间全收在这一个文件里；新增英文键必须同步这里
+messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键对应 extensions 的英文基础表，缺键回退英文；各资源命名空间全收在这一个文件里；新增英文键必须同步这里；分组重命名/删除文案用 variables.groupRename.* 与 variables.groupDelete.*
 
 ===D:/work-space/dsh-context-hub/packages/resources/mcp/__test__/===
 fixture-server.mjs[TQ5T]: F:探测用的最小 MCP 服务器 | R:code:packages/resources/mcp/__test__/probe.test.ts | A:- | S:只由 probe.test.ts 拉起，不手工运行；https 图标故意排在 data URI 之前、工具列表分页、写 stderr；CTX_HUB_FIXTURE_FAIL 与 MARK 驱动失败路径与变量展开断言
@@ -422,7 +422,7 @@ theme.css[CU9M]: F:主题颜色 token | R:- | A:- | S:颜色 token 都是 var() 
 
 ===D:/work-space/dsh-context-hub/packages/resources/variables/===
 eslint.config.js[FQ5T]: F:variables 包的 ESLint 配置 | R:- | A:- | S:与其他资源包共用同一份规则：js/tseslint 推荐集 + react-hooks，忽略 dist；不额外增加规则
-handlers.ts[EI8S]: F:变量库的 HTTP 处理器 | R:code:packages/resources/variables/src/host/variables-fs.ts,code:packages/resources/variables/src/store.ts | A:createVariableHandler | S:只挂 /hub/variables；under 要求路由后带分隔符，避免 /hub/variablesX 被读成变量名；POST 动作为 create/update/remove/create-group；校验失败返回 400
+handlers.ts[EI8S]: F:变量库的 HTTP 处理器 | R:code:packages/resources/variables/src/host/variables-fs.ts,code:packages/resources/variables/src/store.ts | A:createVariableHandler | S:只挂 /hub/variables；under 要求路由后带分隔符，避免 /hub/variablesX 被读成变量名；POST 动作为 create/update/remove/create-group/rename-group/remove-group；校验失败返回 400
 package.json[FV7T]: F:variables 模块清单 | R:- | A:- | S:exports 暴露 .、./contract、./host 与 ./handlers；handlers 是 node:http 处理器，单独导出让构建形态不必经 vite 挂接；依赖 @deepseek-ai/cordis 以注册 ctx.variables
 tsconfig.json[FV4T]: F:variables 包的 TypeScript 配置 | R:- | A:- | S:allowImportingTsExtensions + jsx react-jsx + noEmit；include 含 src、handlers.ts 与 __test__
 vitest.config.ts[FQ5T]: F:variables 包的测试项目 | R:- | A:- | S:项目名 variables；include 写死 __test__/**/*.test.ts；根 vitest.config.ts 必须登记本文件才会进整轮
@@ -433,13 +433,13 @@ variable-picker.tsx[CU8M]: F:$ 变量选择面板 | R:code:packages/resources/va
 
 ===D:/work-space/dsh-context-hub/packages/resources/variables/src/host/===
 environment.ts[IG9M]: F:机器环境读写适配层 | R:code:packages/resources/variables/src/host/variables-fs.ts | A:createEnvironment,EnvironmentPort,escapeShell | S:Windows 用 PowerShell 写 HKCU 用户环境，启动时枚举 GetEnvironmentVariables('User') 成快照——只信 process.env 会在旧终端重启后读不到；POSIX 写 ~/.config/context-hub/env（600）并幂等 source 进 shell profile；fish 直接拒绝
-variables-fs.ts[PD9M]: F:变量索引的磁盘存储 | R:code:packages/resources/variables/src/host/environment.ts,code:packages/resources/variables/src/store.ts | A:createFsVariableStore,variablesPath | S:variables.json 只存 name/group/updatedAt，值逐个写进机器环境；名字唯一，批内重复也拒；先写环境再写索引，失败回滚（含恢复被覆盖的旧值）；坏 JSON 拒绝重建；旧 value 字段会被丢弃
+variables-fs.ts[PD9M]: F:变量索引的磁盘存储 | R:code:packages/resources/variables/src/host/environment.ts,code:packages/resources/variables/src/store.ts | A:createFsVariableStore,variablesPath | S:variables.json 只存 name/group/updatedAt，值逐个写进机器环境；名字唯一，批内重复也拒；先写环境再写索引，失败回滚（含恢复被覆盖的旧值）；renameGroup/removeGroup 只改 groups 与行的 group，不调用 environment；改名拒绝默认分组、改成默认分组、未知源与重名；删组把组内变量移到 DEFAULT_GROUP，默认分组拒绝，未知分组 no-op；每次分组操作一次 writeStored；坏 JSON 拒绝重建；旧 value 字段会被丢弃
 
 ===D:/work-space/dsh-context-hub/packages/resources/variables/src/===
 index.ts[EE8T]: F:variables 插件入口 | R:code:packages/resources/variables/src/page.tsx,code:packages/resources/variables/src/service.ts,code:packages/resources/variables/src/messages.ts | A:variablesExtension | S:导航挂 operate 组、路径 /variables；apply 里构造 VariablesService，使 ctx.variables 存在；英文文案随包注册；defaultEnabled 为 true
-messages.ts[CL6S]: F:variables 的英文文案表 | R:- | A:variablesMessages | S:nav.variables 与 variables.* 全在这里；语言包缺键时回退到本表；新增英文键必须同步 zh-cn
-page.tsx[AU8L]: F:环境变量页面 | R:code:packages/resources/variables/src/remote-store.ts,code:packages/resources/variables/src/store.ts,code:packages/resources/variables/src/messages.ts | A:VariablesPage | S:左侧分组栏 + 右侧列表；批量新建为一个分组加多行名字/值；行菜单编辑值、重命名、移动分组、复制 ${NAME}、删除；读 /hub/variables，写操作直接返回新文档；分组计数由变量聚合
-remote-store.ts[ID7T]: F:变量库的 HTTP 客户端 | R:code:packages/resources/variables/src/store.ts | A:createRemoteVariableStore | S:所有动作 POST 到同一路由，action 区分；非 2xx 时解析 {error} 抛出；不缓存，每次返回服务端的完整文档
+messages.ts[CL6S]: F:variables 的英文文案表 | R:- | A:variablesMessages | S:nav.variables 与 variables.* 全在这里；语言包缺键时回退到本表；新增英文键必须同步 zh-cn；分组重命名/删除的 key 以 variables.groupRename.* 与 variables.groupDelete.* 命名
+page.tsx[AU8L]: F:环境变量页面 | R:code:packages/resources/variables/src/remote-store.ts,code:packages/resources/variables/src/store.ts,code:packages/resources/variables/src/messages.ts | A:VariablesPage,GroupMenu,DeleteGroupDialog | S:非默认分组行用 div role=button + 行内 ⋯（无背景），菜单只有重命名/删除且无分割线；全部/通用没有 ⋯；重命名弹窗预填并全选，改名后选中分组跟随；删除有变量分组先确认并迁移到通用，空分组直接删，选中分组删除后回落全部；页面根节点继承 AppLayout 的 p-6；读 /hub/variables，写操作返回完整文档
+remote-store.ts[ID7T]: F:变量库的 HTTP 客户端 | R:code:packages/resources/variables/src/store.ts | A:createRemoteVariableStore | S:所有动作 POST 到同一路由，action 区分；rename-group 发 {from,to}，remove-group 发 {group}，字段必须与 handlers.ts 逐字对齐；非 2xx 时解析 {error} 抛出；不缓存，每次返回服务端的完整文档
 service.ts[CE7T]: F:variables 服务 | R:code:packages/resources/variables/src/components/variable-input.tsx,code:packages/resources/variables/src/components/variable-picker.tsx | A:VariablesService,VARIABLES_SERVICE,VariablesComponents | S:注册名是 variables，消费方写 ctx.variables.components；只暴露 VariableInput 与 VariablePicker；模块禁用时服务不存在，消费方必须退回普通输入框
-store.ts[CD8T]: F:变量库的领域契约 | R:- | A:VariableDocument,VariableStore,VariableDraft,VARIABLE_ROUTE,VARIABLE_NAME,DEFAULT_GROUP | S:name 是唯一身份；文档不含值，读取时从环境回读；create 每行 value 必填；patch 省略即不改；路由常量与名字校验是两端共用的唯一来源
+store.ts[CD8T]: F:变量库的领域契约 | R:- | A:VariableDocument,VariableStore,VariableDraft,VARIABLE_ROUTE,VARIABLE_NAME,DEFAULT_GROUP | S:name 是唯一身份；文档不含值，读取时从环境回读；create 每行 value 必填；patch 省略即不改；renameGroup/removeGroup 是分组索引操作，不改变量名、值与 updatedAt；默认分组「通用」不可改名/删除；路由常量与名字校验是两端共用的唯一来源
 
