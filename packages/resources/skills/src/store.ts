@@ -87,6 +87,28 @@ export interface SkillSummary {
   updatedAt: string
 }
 
+/**
+ * Whether the last check found the skill's source ahead of the files here. Only
+ * a check that recorded an answer says so: a row with no recorded source, or one
+ * nobody has asked about, is not ahead of anything.
+ */
+export function outdated(skill: Pick<SkillSummary, "upstream" | "checked">): boolean {
+  const latest = skill.checked?.latest
+  if (latest === undefined || skill.upstream === undefined) return false
+  return latest !== skill.upstream.hash
+}
+
+/**
+ * Whether the files here differ from the revision they were installed from — a
+ * person's own edit, which an update would overwrite. This holds even when the
+ * source has not moved on, so it is asked apart from `outdated`.
+ */
+export function modified(skill: Pick<SkillSummary, "upstream" | "checked">): boolean {
+  const current = skill.checked?.currentHash
+  if (current === undefined || skill.upstream === undefined) return false
+  return current !== skill.upstream.hash
+}
+
 /** One piece of media a skill references. */
 export interface SkillAsset {
   /** The recorded reference: a remote URL, or a path relative to the hub home. */

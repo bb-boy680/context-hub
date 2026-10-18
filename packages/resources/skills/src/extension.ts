@@ -15,6 +15,7 @@ import { SKILL_LIBRARY_SERVICE, SkillLibrary } from "./library-store.ts"
 import { skillsMessages } from "./messages.ts"
 import { SKILL_SERVICE, SkillService, type SkillPlace } from "./provider.ts"
 import { skillSearch } from "./search.ts"
+import { startUpdateSchedule } from "./update-settings.ts"
 
 /** This module's own id; the kernel matches it against the manifest. */
 export const SKILLS_ID = "hub.skill.catalog"
@@ -30,11 +31,17 @@ const SHARED_PLACE: SkillPlace = {
 }
 
 /**
- * The skills module, with the page to mount at its route.
+ * The skills module, with the page to mount at its route and the settings
+ * section it contributes.
  *
  * @param page — the page a UI shell renders at `/skills`.
+ * @param settingsSection — the controls a UI shell renders inside the settings
+ *   page's section for this plugin.
  */
-export function skillsModuleWith(page: ComponentType): ExtensionModule {
+export function skillsModuleWith(
+  page: ComponentType,
+  settingsSection: ComponentType
+): ExtensionModule {
   return {
     name: SKILLS_ID,
     manifest: {
@@ -49,7 +56,7 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
       permissions: ["assets.read", "assets.write"],
       provides: [SKILL_SERVICE, SKILL_LIBRARY_SERVICE],
     },
-    inject: ["nav", "routes", "locales", "search"],
+    inject: ["nav", "routes", "locales", "search", "settings", "settingsSections"],
 
     apply(ctx) {
       /* The places travel through the registry rather than a contribution point,
@@ -68,6 +75,16 @@ export function skillsModuleWith(page: ComponentType): ExtensionModule {
          the form's own startup, so the rows are already there when a page opens
          rather than being read again on the way in. */
       const library = new SkillLibrary(ctx)
+
+      /* The schedule and the settings controls both belong to this plugin. The
+         schedule is disposed with it; the settings page only draws the card. */
+      ctx.settingsSections.register({
+        id: "skills-updates",
+        titleKey: "skills.settings.title",
+        descriptionKey: "skills.settings.description",
+        Component: settingsSection,
+      })
+      startUpdateSchedule(ctx, SKILLS_ID)
 
       /* The palette reaches this module through one function rather than by
          knowing how a skill row is built. */

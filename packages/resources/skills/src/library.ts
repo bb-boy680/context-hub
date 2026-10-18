@@ -6,13 +6,20 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n, useSettings } from "@context-hub/extensions/react"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
 import { parseSkillFile } from "./frontmatter.ts"
 import { createCatalog, type Catalog } from "@context-hub/extensions"
+import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
+import { modified, outdated } from "./store.ts"
+import {
+  DEFAULT_SKILL_UPDATE_SETTINGS,
+  readSkillUpdateSettings,
+  updateOutdated,
+} from "./update-settings.ts"
 import type {
   PlaceSkill,
   PlaceSkillsView,
@@ -170,22 +177,7 @@ export function unstored(skill: Skill): boolean {
  * a check that recorded an answer says so: a row with no recorded source, or one
  * nobody has asked about, is not ahead of anything.
  */
-export function outdated(skill: Skill): boolean {
-  const latest = skill.checked?.latest
-  if (latest === undefined || skill.upstream === undefined) return false
-  return latest !== skill.upstream.hash
-}
-
-/**
- * Whether the files here differ from the revision they were installed from — a
- * person's own edit, which an update would overwrite. This holds even when the
- * source has not moved on, so it is asked apart from `outdated`.
- */
-export function modified(skill: Skill): boolean {
-  const current = skill.checked?.currentHash
-  if (current === undefined || skill.upstream === undefined) return false
-  return current !== skill.upstream.hash
-}
+export { modified, outdated }
 
 /**
  * How one place's directory reads to a person. A place is a directory inside a
@@ -400,6 +392,11 @@ export function useSkillLibrary(
   const ctx = useHub()
   const { state } = useI18n()
   const { installMode } = useSettings()
+  const updateSettings = usePluginSettings(
+    SKILLS_ID,
+    DEFAULT_SKILL_UPDATE_SETTINGS
+  )
+  const autoDownload = readSkillUpdateSettings(updateSettings.value).autoDownload
   const locale = state.active
   const store = React.useMemo(() => ctx.get("hub.skills") ?? null, [ctx])
   const workspaces = React.useMemo(() => ctx.get("hub.workspaces") ?? null, [ctx])
@@ -604,21 +601,43 @@ export function useSkillLibrary(
     async (id: string) => {
       if (store === null) throw new Error("this form has no skill library")
       const result = await store.checkUpdate(id)
+      if (autoDownload && result.outdated && !result.modified) {
+        /* The settings asked for updates to land, not just to be announced. The
+           answer is rewritten so the dialog does not keep offering what is now
+           on disk. */
+        await store.updateFromUpstream(id)
+        await reload()
+        return {
+          ...result,
+          recordedHash: result.latestHash,
+          currentHash: result.latestHash,
+          outdated: false,
+        }
+      }
       /* The row now carries the answer, so the list's badge agrees with the dialog. */
       await reload()
       return result
     },
-    [store, reload]
+    [store, reload, autoDownload]
   )
 
   const checkAll = React.useCallback(
     async () => {
       if (store === null) throw new Error("this form has no skill library")
       const summary = await store.checkUpdates()
+      if (!autoDownload) {
+        await reload()
+        return summary
+      }
+      const applied = await updateOutdated(store)
       await reload()
-      return summary
+      return {
+        ...summary,
+        outdated: Math.max(0, summary.outdated - applied.updated.length),
+        failed: [...summary.failed, ...applied.failed],
+      }
     },
-    [store, reload]
+    [store, reload, autoDownload]
   )
 
   const update = React.useCallback(

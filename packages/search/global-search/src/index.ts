@@ -47,8 +47,14 @@ export const globalSearchExtension: ExtensionModule = {
 
     /* The two shell pages have no extension to register their own search, so
        this package offers it. Both read at search time: the settings through
-       the active locale, the extensions through the kernel's live catalog. */
-    ctx.search.register(settingsContribution((key) => ctx.i18n.t(key)))
+       the active locale and the plugins' sections, the extensions through the
+       kernel's live catalog. */
+    ctx.search.register(
+      settingsContribution(
+        (key) => ctx.i18n.t(key),
+        () => ctx.extensions.contributions("settingsSection")
+      )
+    )
     ctx.search.register(
       extensionsContribution(() => ctx.extensions.snapshot().entries)
     )

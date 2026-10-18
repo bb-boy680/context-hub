@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "vitest"
 
-import type { ExtensionView } from "@context-hub/extensions"
+import type {
+  ExtensionView,
+  SettingsSectionContribution,
+} from "@context-hub/extensions"
 
 import { searchExtensions, searchSettings } from "../src/search.ts"
 
@@ -21,8 +24,17 @@ const words: Record<string, string> = {
   "settings.about.title": "About",
   "settings.about.description": "Version and where the files live.",
   "settings.about.version": "Version",
+  "skills.settings.title": "Skill updates",
+  "skills.settings.description": "When the hub checks skill sources.",
 }
 const t = (key: string) => words[key] ?? key
+
+const section: SettingsSectionContribution = {
+  id: "skills-updates",
+  titleKey: "skills.settings.title",
+  descriptionKey: "skills.settings.description",
+  Component: () => null,
+}
 
 const extension = (overrides: Partial<ExtensionView["manifest"]> = {}): ExtensionView => ({
   manifest: {
@@ -62,6 +74,21 @@ describe("searching the settings", () => {
 
   it("returns nothing for an empty query", () => {
     expect(searchSettings(t, "")).toEqual([])
+  })
+
+  it("finds a contributed section and opens its anchor", () => {
+    expect(searchSettings(t, "skill updates", [section])).toEqual([
+      {
+        id: "settings-section:skills-updates",
+        title: "Skill updates",
+        description: "When the hub checks skill sources.",
+        path: "/settings?q=skill+updates#skills-updates",
+      },
+    ])
+  })
+
+  it("leaves contributed sections out when none are passed", () => {
+    expect(searchSettings(t, "skill updates")).toEqual([])
   })
 })
 

@@ -126,6 +126,24 @@ export interface RouteContribution {
 }
 
 /**
+ * One section an extension adds to the settings page.
+ *
+ * The shell draws the heading and the card that holds the controls; the
+ * component fills the card. The id is the page anchor a search result scrolls
+ * to, so it has to be unique and must not reuse one of the shell's own anchors.
+ */
+export interface SettingsSectionContribution {
+  /** Anchor the settings page scrolls to; lowercase, hyphenated, unique. */
+  id: string
+  /** Message key for the heading, resolved through `ctx.i18n` where it draws. */
+  titleKey: string
+  /** Message key for the sentence under the heading. */
+  descriptionKey: string
+  /** Rendered inside the section's card, with no props. */
+  Component: ComponentType
+}
+
+/**
  * One row a module offers to the global search.
  *
  * A row is display data and an address, not an action: the palette renders it
@@ -186,6 +204,8 @@ export interface ContributionMap {
   header: HeaderContribution
   /** A page. */
   route: RouteContribution
+  /** One group of settings a plugin adds to the settings page. */
+  settingsSection: SettingsSectionContribution
   /** One module's search function, for the global search palette. */
   search: SearchContribution
 }

@@ -105,6 +105,20 @@ export const skillsMessages: Record<string, string> = {
   "skills.update.badge": "Update available",
   "skills.update.editedBadge": "Edited since install",
   "skills.update.lastChecked": "Last checked {age}",
+  "skills.settings.title": "Skill updates",
+  "skills.settings.description":
+    "When this hub asks each skill's source for a newer revision, and what it does when one exists.",
+  "skills.settings.check": "Check for updates",
+  "skills.settings.check.description":
+    "Scheduled checks run while the Skills extension is enabled.",
+  "skills.settings.check.manual": "Manually",
+  "skills.settings.check.startup": "At startup",
+  "skills.settings.check.daily": "Daily",
+  "skills.settings.dailyAt": "Check time",
+  "skills.settings.dailyAt.description": "The local time of the daily check.",
+  "skills.settings.autoDownload": "Download updates automatically",
+  "skills.settings.autoDownload.description":
+    "After a check finds a newer revision, install it over skills you have not edited here. Edited copies are left for you to update.",
   "skills.footer.count": "Showing {shown} of {total} skills",
   "skills.range": "1–12 of 42 skills",
   "skills.range.long": "1–14 of 42 skills",

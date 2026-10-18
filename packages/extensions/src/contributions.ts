@@ -26,6 +26,7 @@ import type {
   NavContribution,
   RouteContribution,
   SearchContribution,
+  SettingsSectionContribution,
 } from "./types.ts"
 
 /** One contributed value, with the plugin that contributed it. */
@@ -82,6 +83,7 @@ export const POINT_SERVICES: Readonly<Record<ExtensionPointId, string>> = {
   locale: "locales",
   target: "targets",
   skillRegistry: "skillRegistries",
+  settingsSection: "settingsSections",
   search: "search",
 }
 
@@ -93,6 +95,8 @@ declare module "@deepseek-ai/cordis" {
     header: ContributionPoint<HeaderContribution>
     /** Pages the shell mounts at their paths. */
     routes: ContributionPoint<RouteContribution>
+    /** Settings groups plugins add to the settings page. */
+    settingsSections: ContributionPoint<SettingsSectionContribution>
     /** Language packs a person can switch to. */
     locales: ContributionPoint<LocaleContribution>
     /** One coding agent's consumption contract, for the sidebar and the catalog. */
@@ -114,6 +118,7 @@ export function createContributionPoints(ctx: Context): void {
   new ContributionPoint<NavContribution>(ctx, POINT_SERVICES.nav)
   new ContributionPoint<HeaderContribution>(ctx, POINT_SERVICES.header)
   new ContributionPoint<RouteContribution>(ctx, POINT_SERVICES.route)
+  new ContributionPoint<SettingsSectionContribution>(ctx, POINT_SERVICES.settingsSection)
   new ContributionPoint<LocaleContribution>(ctx, POINT_SERVICES.locale)
   new ContributionPoint<AgentTargetDescriptor>(ctx, POINT_SERVICES.target)
   new ContributionPoint<SkillRegistry>(ctx, POINT_SERVICES.skillRegistry)

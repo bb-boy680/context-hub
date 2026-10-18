@@ -2,7 +2,8 @@
  * Hub settings: the preferences that belong to this machine rather than to any
  * one asset. They live in one state document so every page reads the same
  * values, and they are written the moment a control changes — there is no
- * save step anywhere in the UI.
+ * save step anywhere in the UI. Plugins keep their own settings in the same
+ * document, under a namespace the shell never interprets.
  *
  * Theme is deliberately absent: it is a browser preference applied before the
  * kernel starts, and it already lives in `localStorage` under `theme`.
@@ -31,13 +32,28 @@ export interface HubSettings {
   installMode: InstallMode
   /** Download remote images into the hub's own asset directory as they arrive. */
   downloadRemoteImages: boolean
+  /**
+   * Values owned by plugins, keyed by the plugin's id. The shell treats each
+   * value as opaque: whoever wrote it is the one that validates and reads it.
+   */
+  plugins: Record<string, unknown>
 }
+
+/** The fields the shell's own settings controls may replace. */
+export type SettingsPatch = Partial<Omit<HubSettings, "plugins">>
 
 /** What an untouched install behaves like. */
 export const DEFAULT_SETTINGS: HubSettings = {
   layout: "grid",
   installMode: "auto",
   downloadRemoteImages: true,
+  plugins: {},
+}
+
+/** The plugin-owned part of a stored document; anything else is not a namespace. */
+function readPlugins(value: unknown): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return {}
+  return { ...(value as Record<string, unknown>) }
 }
 
 /**
@@ -61,6 +77,7 @@ export function readSettings(value: unknown): HubSettings {
       typeof record.downloadRemoteImages === "boolean"
         ? record.downloadRemoteImages
         : DEFAULT_SETTINGS.downloadRemoteImages,
+    plugins: readPlugins(record.plugins),
   }
 }
 
@@ -99,7 +116,7 @@ export class SettingsService extends Service {
    * announces nothing, so a control can call this from every render without
    * turning into a write loop.
    */
-  set(patch: Partial<HubSettings>): void {
+  set(patch: SettingsPatch): void {
     const next = readSettings({ ...this.current, ...patch })
     if (
       next.layout === this.current.layout &&
@@ -107,6 +124,27 @@ export class SettingsService extends Service {
       next.downloadRemoteImages === this.current.downloadRemoteImages
     ) {
       return
+    }
+    this.current = next
+    this.host.storage.write(SETTINGS_DOCUMENT, next)
+    this.ctx.emit("settings/change", next)
+  }
+
+  /** One plugin's value, or `undefined` when that plugin never wrote one. */
+  plugin(id: string): unknown {
+    return this.current.plugins[id]
+  }
+
+  /**
+   * Replace one plugin's value. Plugins own their namespaces: the shell stores
+   * whatever they hand over and never interprets it. A write that changes
+   * nothing is dropped the same way a no-op `set` is.
+   */
+  setPlugin(id: string, value: unknown): void {
+    if (JSON.stringify(this.current.plugins[id]) === JSON.stringify(value)) return
+    const next: HubSettings = {
+      ...this.current,
+      plugins: { ...this.current.plugins, [id]: value },
     }
     this.current = next
     this.host.storage.write(SETTINGS_DOCUMENT, next)

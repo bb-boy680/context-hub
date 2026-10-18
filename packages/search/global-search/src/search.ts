@@ -3,13 +3,15 @@
  *
  * Settings and the Extensions page are not extension modules, so nobody can
  * register their providers from inside those pages. This package already owns
- * the palette, so it offers both: the settings are a fixed table of the rows
- * the page draws, and the extensions are the kernel's own catalog, read on
- * every query so enabling one shows up without a reload.
+ * the palette, so it offers both: the shell's own settings rows are a fixed
+ * table, while sections a plugin contributes through the kernel's
+ * `settingsSection` point are read on every query — enabling or disabling a
+ * plugin shows up without a reload. The extensions are the kernel's own
+ * catalog, read on every query.
  *
  * The settings table is the one place in this feature that must be kept in
- * step by hand: a new row in `apps/web/src/pages/settings.tsx` needs a line
- * here, or the global search cannot find it.
+ * step by hand: a new shell row in `apps/web/src/pages/settings.tsx` needs a
+ * line here, or the global search cannot find it.
  */
 import { BlocksIcon, SettingsIcon } from "lucide-react"
 
@@ -18,6 +20,7 @@ import type {
   ExtensionView,
   SearchContribution,
   SearchResult,
+  SettingsSectionContribution,
 } from "@context-hub/extensions"
 
 /** One setting row, with the group whose anchor the page scrolls to. */
@@ -105,15 +108,17 @@ const SETTINGS: readonly SettingEntry[] = [
  *
  * @param t — the active locale's lookup, called at search time so a language
  *   switch reaches the next query.
+ * @param sections — the plugin sections to include, read at search time.
  * @returns the provider the palette reads.
  */
 export function settingsContribution(
-  t: (key: string) => string
+  t: (key: string) => string,
+  sections: () => readonly SettingsSectionContribution[] = () => []
 ): SearchContribution {
   return {
     labelKey: "search.group.settings",
     icon: SettingsIcon,
-    search: (query) => searchSettings(t, query),
+    search: (query) => searchSettings(t, query, sections()),
   }
 }
 
@@ -139,17 +144,35 @@ export function extensionsContribution(
  *
  * A row matches on its own title and description as well as its group's, so
  * typing "images" finds the download row even though its own words say nothing
- * about the group it sits in.
+ * about the group it sits in. Plugin sections are searched the same way; they
+ * sit between the shell's last fixed group and About, matching the page.
  *
  * @param t — the active locale's lookup.
  * @param query — what the person typed.
+ * @param sections — the plugin sections to include.
  * @returns the matching rows, each opening the group it belongs to.
  */
 export function searchSettings(
   t: (key: string) => string,
-  query: string
+  query: string,
+  sections: readonly SettingsSectionContribution[] = []
 ): SearchResult[] {
-  return SETTINGS.flatMap((entry) => {
+  const about = SETTINGS.filter((entry) => entry.anchor === "about")
+  const shell = SETTINGS.filter((entry) => entry.anchor !== "about")
+  return [
+    ...searchShellSettings(t, query, shell),
+    ...searchSections(t, query, sections),
+    ...searchShellSettings(t, query, about),
+  ]
+}
+
+/** The shell's own settings rows matching one query. */
+function searchShellSettings(
+  t: (key: string) => string,
+  query: string,
+  entries: readonly SettingEntry[]
+): SearchResult[] {
+  return entries.flatMap((entry) => {
     const title = t(entry.titleKey)
     const description =
       entry.descriptionKey === undefined ? undefined : t(entry.descriptionKey)
@@ -170,6 +193,27 @@ export function searchSettings(
         title,
         ...(description === undefined ? {} : { description }),
         path: `${searchPath("/settings", query)}#${entry.anchor}`,
+      },
+    ]
+  })
+}
+
+/** The sections plugins contributed, matching one query. */
+function searchSections(
+  t: (key: string) => string,
+  query: string,
+  sections: readonly SettingsSectionContribution[]
+): SearchResult[] {
+  return sections.flatMap((section) => {
+    const title = t(section.titleKey)
+    const description = t(section.descriptionKey)
+    if (!matchesQuery(query, title, description)) return []
+    return [
+      {
+        id: `settings-section:${section.id}`,
+        title,
+        description,
+        path: `${searchPath("/settings", query)}#${section.id}`,
       },
     ]
   })

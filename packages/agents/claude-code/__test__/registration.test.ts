@@ -62,7 +62,7 @@ beforeAll(async () => {
   kernel = await createHubKernel({
     host: testHost(),
     services: { prompts: recordedPrompts(), mcp: stubbed(), plugins: stubbed() },
-    extensions: [skillsModuleWith(() => null), claudeCodeModuleWith(() => null)],
+    extensions: [skillsModuleWith(() => null, () => null), claudeCodeModuleWith(() => null)],
   })
   await kernel.start()
 })
@@ -123,7 +123,7 @@ describe("with one of the modules it declares taken away", () => {
     partial = await createHubKernel({
       host: testHost(),
       services: { prompts: stubbed(), plugins: stubbed() },
-      extensions: [skillsModuleWith(() => null), claudeCodeModuleWith(() => null)],
+      extensions: [skillsModuleWith(() => null, () => null), claudeCodeModuleWith(() => null)],
     })
     await partial.start()
   })

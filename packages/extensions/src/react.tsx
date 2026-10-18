@@ -12,7 +12,7 @@ import { chosenAgentsOf } from "./agents.ts"
 import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
-import type { HubSettings } from "./settings.ts"
+import type { HubSettings, SettingsPatch } from "./settings.ts"
 import type { ContributionMap, ExtensionPointId } from "./types.ts"
 
 const HubContext = React.createContext<Context | null>(null)
@@ -115,7 +115,7 @@ export function useI18n(): I18n {
  * Settings and their control returned by {@link useSettings}.
  */
 export interface SettingsControl extends HubSettings {
-  set(patch: Partial<HubSettings>): void
+  set(patch: SettingsPatch): void
 }
 
 /** This machine's hub settings, re-rendering on every change. */
@@ -131,6 +131,36 @@ export function useSettings(): SettingsControl {
       set: (patch) => ctx.settings.set(patch),
     }),
     [ctx, state]
+  )
+}
+
+/** One plugin's stored settings and the only writer that replaces them. */
+export interface PluginSettingsControl<T> {
+  value: T
+  set(value: T): void
+}
+
+/**
+ * Read and replace one plugin's settings namespace.
+ *
+ * The value is whatever the plugin last stored; `fallback` is returned until it
+ * stores anything. It is not validated here — a plugin that owns a shape reads
+ * it through its own parser. `fallback` should be a stable value (a module
+ * constant), because it is the snapshot until the first write.
+ */
+export function usePluginSettings<T>(id: string, fallback: T): PluginSettingsControl<T> {
+  const ctx = useHub()
+  const first = React.useRef(fallback)
+  const value = React.useSyncExternalStore(
+    (onChange) => ctx.on("settings/change", onChange),
+    () => {
+      const stored = ctx.settings.plugin(id)
+      return stored === undefined ? first.current : (stored as T)
+    }
+  )
+  return React.useMemo<PluginSettingsControl<T>>(
+    () => ({ value, set: (next) => ctx.settings.setPlugin(id, next) }),
+    [ctx, id, value]
   )
 }
 

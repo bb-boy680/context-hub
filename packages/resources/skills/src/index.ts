@@ -12,6 +12,7 @@ import type { WorkspaceService } from "@context-hub/core/workspace"
 
 import { skillsModuleWith } from "./extension.ts"
 import { SkillsPage } from "./page.tsx"
+import { SkillSettingsSection } from "./settings-section.tsx"
 
 export { SkillsPage }
 export * from "./store.ts"
@@ -31,4 +32,4 @@ declare module "@deepseek-ai/cordis" {
   }
 }
 
-export const skillsExtension = skillsModuleWith(SkillsPage)
+export const skillsExtension = skillsModuleWith(SkillsPage, SkillSettingsSection)

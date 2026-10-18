@@ -2,19 +2,34 @@
  * Settings: the machine-wide preferences from `designs/settings.pen`. Every
  * control writes as it changes — there is no save button, because each value
  * already has one owner (ThemeProvider, I18nService, SettingsService).
+ *
+ * The groups below are the shell's own. Plugins add their settings through the
+ * `settingsSection` point; this page only draws the heading and card around
+ * what they contribute, so a plugin's section reads like the rest of the page.
  */
 import { CheckIcon, CopyIcon } from "lucide-react"
 import * as React from "react"
 import { useLocation } from "react-router"
 
-import { useHub, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
-import { Highlighted } from "@context-hub/extensions/components"
+import {
+  useContributions,
+  useHub,
+  useI18n,
+  useSearchPage,
+  useSettings,
+} from "@context-hub/extensions/react"
+import {
+  Highlighted,
+  Segmented,
+  SettingRow,
+  SettingSwitch,
+  SettingText,
+} from "@context-hub/extensions/components"
 import type { AssetImageStats, AssetLocalizeSummary } from "@context-hub/core"
 import { ABOUT_ROUTE, type AboutInfo } from "@context-hub/core/about"
 import { PLUGIN_ROUTE } from "@context-hub/plugins"
 import { SKILL_ROUTE } from "@context-hub/skills"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
-import { Switch } from "@context-hub/shadcn-ui/components/switch"
 
 import { useTheme } from "@/components/theme-provider"
 
@@ -206,49 +221,6 @@ function ThumbnailChoice({
   )
 }
 
-/** One setting's title and explanation, for rows whose control sits below. */
-function SettingText({
-  title,
-  description,
-  needle = "",
-}: {
-  title: string
-  description: string
-  /** The query the global search opened this page with, marked where it matched. */
-  needle?: string
-}) {
-  return (
-    <span className="flex flex-col gap-1">
-      <span className="text-[16px] font-semibold text-foreground">
-        <Highlighted text={title} needle={needle} />
-      </span>
-      <span className="text-[14px] leading-relaxed text-copy">
-        <Highlighted text={description} needle={needle} />
-      </span>
-    </span>
-  )
-}
-
-/** One setting's title and explanation, for rows whose control sits at the end. */
-function SettingRow({
-  title,
-  description,
-  needle,
-  children,
-}: {
-  title: string
-  description: string
-  needle?: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-8 py-5">
-      <SettingText title={title} description={description} needle={needle} />
-      <div className="shrink-0">{children}</div>
-    </div>
-  )
-}
-
 /** A section: a heading, one line of context, and the card holding its rows. */
 function Group({
   id,
@@ -276,37 +248,6 @@ function Group({
       </div>
       <div className="rounded-xl border border-border bg-card p-8">{children}</div>
     </section>
-  )
-}
-
-/** The pill-shaped two-or-more choice used by the language row. */
-function Segmented({
-  value,
-  options,
-  onChange,
-}: {
-  value: string
-  options: { id: string; label: string }[]
-  onChange: (id: string) => void
-}) {
-  return (
-    <div className="inline-flex h-11 items-center gap-1 rounded-pill bg-secondary p-1">
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          aria-pressed={option.id === value}
-          onClick={() => onChange(option.id)}
-          className={`h-9 rounded-pill px-4 text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-ring/50 ${
-            option.id === value
-              ? "bg-background font-semibold text-foreground dark:bg-foreground dark:text-background"
-              : "text-copy"
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
   )
 }
 
@@ -414,6 +355,7 @@ export function SettingsPage() {
   const search = useSearchPage()
   const needle = search.query.trim()
   const { hash } = useLocation()
+  const sections = useContributions("settingsSection")
 
   /* The palette opens this page at the group a result belongs to. React Router
      does not scroll to a changed hash on its own, so the page does it. */
@@ -678,12 +620,12 @@ export function SettingsPage() {
                 description={t("settings.images.download.description")}
                 needle={needle}
               />
-              <Switch
+              <SettingSwitch
                 checked={settings.downloadRemoteImages}
                 onCheckedChange={(checked) =>
                   settings.set({ downloadRemoteImages: checked })
                 }
-                className="h-6! w-11! p-[3px] data-checked:bg-ring data-unchecked:bg-secondary [&_[data-slot=switch-thumb]]:size-[18px]! [&_[data-slot=switch-thumb]]:bg-white! data-checked:[&_[data-slot=switch-thumb]]:translate-x-[20px]!"
+                label={t("settings.images.download.title")}
               />
             </div>
             <div className="flex flex-wrap items-center justify-between gap-6 py-[18px]">
@@ -699,6 +641,18 @@ export function SettingsPage() {
             </div>
           </div>
         </Group>
+
+        {sections.map((section) => (
+          <Group
+            key={section.id}
+            id={section.id}
+            title={t(section.titleKey)}
+            description={t(section.descriptionKey)}
+            needle={needle}
+          >
+            <section.Component />
+          </Group>
+        ))}
 
         <Group
           id="about"

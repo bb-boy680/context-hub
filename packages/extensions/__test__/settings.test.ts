@@ -62,6 +62,7 @@ describe("reading a settings document", () => {
       layout: "list",
       installMode: "copy",
       downloadRemoteImages: false,
+      plugins: {},
     })
   })
 
@@ -128,6 +129,82 @@ describe("the settings service", () => {
       layout: "list",
       installMode: "copy",
       downloadRemoteImages: false,
+      plugins: {},
+    })
+  })
+})
+
+describe("plugin settings", () => {
+  it("reads a document without a namespace, or with one that is not an object", () => {
+    expect(readSettings({}).plugins, "absent").toEqual({})
+    expect(readSettings({ plugins: ["not", "an", "object"] }).plugins, "an array").toEqual({})
+    expect(readSettings({ plugins: "nope" }).plugins, "a string").toEqual({})
+  })
+
+  it("stores one plugin's value and announces it once", async () => {
+    const { host, writes } = hostWith()
+    const kernel = await createHubKernel({ host, extensions: builtinExtensions })
+    let announced = 0
+    kernel.ctx.on("settings/change", () => {
+      announced += 1
+    })
+
+    kernel.ctx.settings.setPlugin("hub.skill.catalog", {
+      check: "daily",
+      autoDownload: true,
+    })
+
+    expect(kernel.ctx.settings.plugin("hub.skill.catalog"), "read back").toEqual({
+      check: "daily",
+      autoDownload: true,
+    })
+    expect(writes, "stored document").toEqual([
+      [
+        SETTINGS_DOCUMENT,
+        {
+          ...DEFAULT_SETTINGS,
+          plugins: {
+            "hub.skill.catalog": { check: "daily", autoDownload: true },
+          },
+        },
+      ],
+    ])
+    expect(announced, "announcements").toBe(1)
+  })
+
+  it("keeps plugin values when a shell setting is written afterwards", async () => {
+    const { host, writes } = hostWith()
+    const kernel = await createHubKernel({ host, extensions: builtinExtensions })
+    kernel.ctx.settings.setPlugin("hub.skill.catalog", { check: "daily" })
+    kernel.ctx.settings.set({ layout: "list" })
+
+    expect(writes.at(-1)?.[1], "last write").toEqual({
+      ...DEFAULT_SETTINGS,
+      layout: "list",
+      plugins: { "hub.skill.catalog": { check: "daily" } },
+    })
+  })
+
+  it("does not write a plugin value that did not change", async () => {
+    const { host, writes } = hostWith()
+    const kernel = await createHubKernel({ host, extensions: builtinExtensions })
+    kernel.ctx.settings.setPlugin("hub.skill.catalog", { check: "daily" })
+    writes.length = 0
+
+    kernel.ctx.settings.setPlugin("hub.skill.catalog", { check: "daily" })
+
+    expect(writes, "writes").toEqual([])
+  })
+
+  it("reads plugin values back on the next kernel", async () => {
+    const { host } = hostWith()
+    const first = await createHubKernel({ host, extensions: builtinExtensions })
+    first.ctx.settings.setPlugin("hub.skill.catalog", { check: "hourly" })
+
+    const second = await createHubKernel({ host, extensions: builtinExtensions })
+
+    expect(second.ctx.settings.plugin("hub.skill.catalog"), "restored").toEqual({
+      check: "hourly",
     })
   })
 })
