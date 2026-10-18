@@ -31,11 +31,11 @@ tsconfig.test.json[FQ5T]: F:测试专用编译程序 | R:code:apps/web/tsconfig.
 vitest.config.ts[FQ5T]: F:web 应用的 vitest 项目 | R:code:apps/web/tsconfig.test.json | A:- | S:include 写死 __test__/**/*.test.ts；environment 仍是 node，将来有组件渲染测试时才需要换
 
 ===D:/work-space/dsh-context-hub/apps/web/src/===
-App.tsx[AU8T]: F:路由表与外壳装配 | R:code:apps/web/src/components/app-layout.tsx,code:apps/web/src/lib/navigation.ts,code:apps/web/src/pages/placeholder.tsx,code:apps/web/src/pages/settings.tsx | A:App | S:未设计路径落到 PlaceholderPage；designedPaths 与贡献路由必须先并入 designed，否则占位页会盖掉扩展页；/settings 已在 designedPaths 中；Toaster 只在此挂一次，各页用 toast() 而非自绘提示
+App.tsx[AU8T]: F:路由表与外壳装配 | R:code:apps/web/src/components/app-layout.tsx,code:apps/web/src/lib/navigation.ts,code:apps/web/src/pages/placeholder.tsx,code:apps/web/src/pages/settings.tsx | A:App | S:未设计路径落到 PlaceholderPage；designedPaths 与贡献路由必须先并入 designed，否则占位页会盖掉扩展页；/ 重定向到导航第一项，外壳没有自己的落地页；Toaster 只在此挂一次，各页用 toast() 而非自绘提示
 main.tsx[EU9T]: F:应用启动入口 | R:code:apps/web/src/lib/hub.ts,code:apps/web/src/components/theme-provider.tsx | A:- | S:必须先 await startHub() 拿到 ctx 再渲染；启动失败会把错误文本写进 #root，而不是留一片白屏
 
 ===D:/work-space/dsh-context-hub/apps/web/src/components/===
-app-header.tsx[DU5T]: F:顶栏面包屑与全局动作 | R:code:apps/web/src/lib/navigation.ts,code:apps/web/src/components/app-layout.tsx | A:AppHeader | S:pendingChanges 仍写死为 3，未接真实待同步数；Ctrl+K 的监听在 AppLayout，此处按钮只负责回调；搜索入口在 lg 以下隐藏
+app-header.tsx[DU5T]: F:顶栏面包屑与全局动作 | R:code:apps/web/src/lib/navigation.ts,code:apps/web/src/components/app-layout.tsx | A:AppHeader | S:pendingChanges 仍写死为 3，未接真实待同步数；Ctrl+K 的监听在 AppLayout，此处按钮只负责回调；面包屑没有匹配导航项时留空；搜索入口在 lg 以下隐藏
 app-layout.tsx[AU7T]: F:外壳布局与快捷键 | R:code:apps/web/src/components/app-sidebar.tsx,code:apps/web/src/components/search-palette.tsx,code:apps/web/src/components/app-header.tsx | A:AppLayout | S:侧栏宽度固定 248px，各页面 1192px 内容列据此校准；Ctrl/Cmd+K 的键盘监听在这里，搜索面板按需挂载
 app-sidebar.tsx[AU8S]: F:侧栏分组装配 | R:code:apps/web/src/components/sidebar-rows.tsx,code:apps/web/src/components/workspace-group.tsx,code:apps/web/src/lib/workspaces.ts | A:AppSidebar,AgentGroup | S:AgentGroup 只列 useSkillAgents 报出且已注册 target 的 agent，没注册 skills place 的集成不出现；AGENTS_VISIBLE=8 之后折叠；分组顺序是资产、工作区、Agent、运营
 extension-detail-dialog.tsx[DU5M]: F:扩展详情弹窗 | R:code:apps/web/src/lib/extensions.ts,code:packages/extensions/src/types.ts | A:ExtensionDetailDialog | S:locked 或 incompatible 时不渲染安装按钮；kind=builtin 的条目不显示权限区；无 filesystem 能力时对每个 target 提示需要运行时
@@ -49,7 +49,7 @@ workspace-group.tsx[DU8M]: F:侧栏工作区列表与增删改 | R:code:apps/web
 extensions.ts[CU5T]: F:扩展展示辅助表 | R:- | A:categoryOrder,categoryTile | S:categoryOrder 决定页面分区顺序且空分类会被跳过；categoryTile 借用 skill 标签配色，以保持同一套视觉
 folder-picker.ts[IU5T]: F:浏览器目录选择封装 | R:- | A:pickFolder | S:只在用户手势中可调用；页面只能拿到目录名拿不到路径，host 侧按名字自行定位；无此能力的浏览器返回 unsupported
 hub.ts[AE9M]: F:web 形态内核装配 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/preload.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts | A:startHub | S:无 host 时 files 为 null 且不注册 hub.skills/hub.prompts；两个库各探自己的路由，一个不可用不影响另一个；state 先从 host 读，旧的 localStorage 值搬过去后才从浏览器删除；preload 不 await；当前只启用 claude-code 与 skills-sh 两个 agent 以缩短启动图
-navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:code:packages/extensions/src/types.ts | A:navGroups,useNavGroups,useNavItem | S:内置项 order 留 10/20/30 间隔供扩展插值；useNavItem 取最长匹配路径，嵌套页才不丢标题
+navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:code:packages/extensions/src/types.ts | A:navGroups,useNavGroups,useNavItem | S:assets 组没有内置项，只为资源扩展提供注册位，空组不渲染；内置项 order 留 10/20/30 间隔供扩展插值；useNavItem 取最长匹配路径，嵌套页才不丢标题
 place-files.ts[ID7T]: F:客户端配置文件远端读写 | R:code:apps/web/src/lib/hub.ts | A:placeFilesAvailable,createRemotePlaceFiles | S:无 host 时每个调用都抛错，调用方要如实报失败而不是凭空造出一个文件；可用性探测不带 ref，故拒绝任何 place 的宿主仍会被识别为在线
 ui-kit.ts[CE7T]: F:插件可用的 UI 组件集 | R:code:packages/shadcn-ui/src/components/button.tsx,code:packages/shadcn-ui/src/components/card.tsx | A:Badge,Button,Card,CardContent,Input,Spinner | S:插件模块不能解析包且必须复用同一 React 实例，UI 只能从此处取；新增组件要在此显式导出
 workspaces.ts[ID8S]: F:工作区列表客户端服务 | R:code:apps/web/src/lib/hub.ts,code:packages/core/src/workspace.ts | A:createRemoteWorkspaceService,useWorkspaces | S:服务是单例，侧栏与各页面共享同一份状态才不会各说各话；并发的 refresh 只发一次请求；答案未变时不通知订阅者，否则库的「变了就重读」会成环
@@ -57,8 +57,7 @@ preload.ts[AE7T]: F:启动时并行开始全部共享库读取 | R:code:apps/web
 
 ===D:/work-space/dsh-context-hub/apps/web/src/pages/===
 extensions.tsx[AE8M]: F:扩展目录页 | R:code:apps/web/src/components/extension-detail-dialog.tsx,code:apps/web/src/lib/extensions.ts | A:ExtensionsPage | S:分类无条目时整段不渲染；搜索只匹配 name、id、description 三段；locked 与 incompatible 的行不显示启停按钮；语言选择器已移除，语言只在设置页
-overview.tsx[AU5L]: F:概览页看板 | R:code:packages/extensions/src/components/pagination.tsx | A:OverviewPage | S:KPI、图表、来源表与问题列表全是写死的演示数据，未接任何真实来源；时间范围下拉只改本地状态
-placeholder.tsx[AU3T]: F:未设计路由的占位页 | R:code:apps/web/src/lib/navigation.ts | A:PlaceholderPage | S:标题取最长匹配的导航项；正文文案是硬编码英文，未走 i18n
+placeholder.tsx[AU3T]: F:未设计路由的占位页 | R:code:apps/web/src/lib/navigation.ts | A:PlaceholderPage | S:标题取最长匹配的导航项，没有匹配项时留空；正文文案是硬编码英文，未走 i18n
 repository.tsx[AU5M]: F:仓库同步页 | R:- | A:RepositoryPage | S:仓库、分支、同步记录与连接状态全是演示常量未接 GitHub；断开只停同步，已同步文件保留
 settings.tsx[AU8L]: F:设置页：外观与布局、安装方式、图片下载、关于 | R:code:packages/extensions/src/settings.ts,code:packages/extensions/src/react.tsx,code:apps/web/src/components/theme-provider.tsx,code:packages/resources/skills/src/store.ts,code:packages/resources/plugins/src/library.ts,code:packages/core/src/about.ts | A:SettingsPage,ThemePreview,LayoutPreview,InstallChoiceCard,CopyValue | S:布局只作资源页初值，页内切换不回写；主题走 localStorage，语言与 settings 走 state 文档；统计任一库读失败显示 — 而不是 0；下载失败保留原 link；页面宽度跟随内容区，不再居中限宽；字体沿用全站 --font-mono
 
