@@ -85,8 +85,8 @@ function groupOf(value: unknown): string {
   return group === "" ? DEFAULT_GROUP : group
 }
 
-/** A group a caller asked to create; unlike a row's group, an empty one is a mistake. */
-function createdGroupOf(value: unknown): string {
+/** A group the caller names explicitly; unlike a row's group, an empty one is a mistake. */
+function requiredGroupOf(value: unknown): string {
   if (typeof value !== "string" || value.trim() === "") {
     throw new Error("group name is required")
   }
@@ -349,11 +349,51 @@ export function createFsVariableStore(
 
     async createGroup(group: string) {
       const document = await readStored()
-      const name = createdGroupOf(group)
+      const name = requiredGroupOf(group)
       if (!document.groups.includes(name)) {
         document.groups.push(name)
         await writeStored(document)
       }
+      return read()
+    },
+
+    async renameGroup(from: string, to: string) {
+      const document = await readStored()
+      const source = requiredGroupOf(from)
+      const next = requiredGroupOf(to)
+      if (source === DEFAULT_GROUP) {
+        throw new Error("the default group cannot be renamed")
+      }
+      if (next === DEFAULT_GROUP) {
+        throw new Error("cannot rename a group to the default group")
+      }
+      if (!document.groups.includes(source)) {
+        throw new Error(`unknown group: ${source}`)
+      }
+      if (source === next) return read()
+      if (document.groups.includes(next)) {
+        throw new Error(`group already exists: ${next}`)
+      }
+      document.groups[document.groups.indexOf(source)] = next
+      for (const row of document.variables) {
+        if (row.group === source) row.group = next
+      }
+      await writeStored(document)
+      return read()
+    },
+
+    async removeGroup(group: string) {
+      const document = await readStored()
+      const target = requiredGroupOf(group)
+      if (target === DEFAULT_GROUP) {
+        throw new Error("the default group cannot be removed")
+      }
+      if (!document.groups.includes(target)) return read()
+      document.groups = document.groups.filter((one) => one !== target)
+      for (const row of document.variables) {
+        if (row.group === target) row.group = DEFAULT_GROUP
+      }
+      await writeStored(document)
       return read()
     },
   }

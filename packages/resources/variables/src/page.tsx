@@ -45,7 +45,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
@@ -75,6 +74,13 @@ const CREATE_GRID = "grid-cols-[200px_minmax(0,1fr)_90px_34px]"
 /** The row menu's item styling, matched to the app's other row menus. */
 const MENU_ITEM = "h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
 
+/** One row in the group rail; the filter, the default group, and groups share it. */
+const railRowClass = (active: boolean) =>
+  cn(
+    "flex h-9 items-center justify-between rounded-md px-2.5 text-[13px] transition-colors",
+    active ? "bg-secondary font-semibold text-foreground" : "text-copy hover:bg-secondary/60"
+  )
+
 /** A failure as a sentence a toast can carry. */
 function textOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -101,6 +107,8 @@ function FieldDialog({
   helper,
   warning,
   submit,
+  selectAll,
+  footerHint,
   onOpenChange,
   onSubmit,
 }: {
@@ -114,6 +122,8 @@ function FieldDialog({
   helper?: string
   warning?: string
   submit: string
+  selectAll?: boolean
+  footerHint?: string
   onOpenChange: (open: boolean) => void
   onSubmit: (value: string) => Promise<void>
 }) {
@@ -171,6 +181,9 @@ function FieldDialog({
               placeholder={placeholder}
               className="h-10 font-mono text-[12.5px]"
               onChange={(event) => setDraft(event.target.value)}
+              onFocus={(event) => {
+                if (selectAll) event.currentTarget.select()
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") submitNow()
               }}
@@ -202,21 +215,31 @@ function FieldDialog({
             </span>
           )}
         </div>
-        <div className="flex h-[72px] shrink-0 items-center justify-end gap-2 border-t border-border px-6">
-          <Button
-            variant="ghost"
-            className="h-9 rounded-full px-4 text-[13px] font-medium"
-            onClick={() => onOpenChange(false)}
-          >
-            {t("variables.cancel")}
-          </Button>
-          <Button
-            disabled={busy || draft.trim() === ""}
-            className="h-9 rounded-full px-4 text-[13px] font-medium"
-            onClick={submitNow}
-          >
-            {submit}
-          </Button>
+        <div
+          className={cn(
+            "flex h-[72px] shrink-0 items-center gap-2 border-t border-border px-6",
+            footerHint === undefined ? "justify-end" : "justify-between"
+          )}
+        >
+          {footerHint === undefined ? null : (
+            <span className="text-[11.5px] text-muted-foreground">{footerHint}</span>
+          )}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="h-9 rounded-full px-4 text-[13px] font-medium"
+              onClick={() => onOpenChange(false)}
+            >
+              {t("variables.cancel")}
+            </Button>
+            <Button
+              disabled={busy || draft.trim() === ""}
+              className="h-9 rounded-full px-4 text-[13px] font-medium"
+              onClick={submitNow}
+            >
+              {submit}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -304,6 +327,102 @@ function DeleteDialog({
           >
             {t("variables.delete.confirm")}
           </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** Deleting a group keeps its variables: they move to the default group. */
+function DeleteGroupDialog({
+  group,
+  count,
+  open,
+  onOpenChange,
+  onDelete,
+}: {
+  group: string
+  count: number
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onDelete: (group: string, count: number) => Promise<void>
+}) {
+  const { t } = useI18n()
+  const [pending, setPending] = React.useState(false)
+  const [failure, setFailure] = React.useState<string | null>(null)
+
+  const remove = () => {
+    setPending(true)
+    setFailure(null)
+    void onDelete(group, count)
+      .catch((error: unknown) => setFailure(textOf(error)))
+      .finally(() => setPending(false))
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        showCloseButton={false}
+        style={{ maxWidth: "none" }}
+        className="w-[min(480px,calc(100vw-2rem))] gap-0 overflow-clip rounded-xl border border-border bg-card p-0 ring-0"
+      >
+        <DialogHeader className="relative gap-1.5 border-b border-border px-6 py-5">
+          <DialogTitle className="text-[15px] font-semibold">
+            {t("variables.groupDelete.title").replace("{name}", () => group)}
+          </DialogTitle>
+          <DialogDescription className="pr-10 text-[12.5px] leading-relaxed text-muted-foreground">
+            {t("variables.groupDelete.description")}
+          </DialogDescription>
+          <DialogClose
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 size-8 rounded-full"
+                aria-label={t("variables.action.close")}
+              />
+            }
+          >
+            <XIcon className="size-4 text-copy" />
+          </DialogClose>
+        </DialogHeader>
+        <div className="flex flex-col gap-3 px-6 py-4">
+          <span className="flex items-start gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11.5px] leading-relaxed text-copy">
+            <FolderInputIcon className="mt-0.5 size-3.5 shrink-0 text-ring" />
+            {t("variables.groupDelete.migration")
+              .replace("{count}", String(count))
+              .replace("{group}", DEFAULT_GROUP)}
+          </span>
+          <span className="text-[11.5px] leading-relaxed text-muted-foreground">
+            {t("variables.groupDelete.helper").replace("{group}", DEFAULT_GROUP)}
+          </span>
+          {failure === null ? null : (
+            <span role="alert" className="text-[12px] text-destructive">
+              {failure}
+            </span>
+          )}
+        </div>
+        <div className="flex h-[72px] shrink-0 items-center justify-between gap-2 border-t border-border px-6">
+          <span className="text-[11.5px] text-muted-foreground">
+            {t("variables.groupDelete.footer").replace("{count}", String(count))}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              className="h-9 rounded-full px-4 text-[13px] font-medium"
+              onClick={() => onOpenChange(false)}
+            >
+              {t("variables.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              className="h-9 rounded-full px-4 text-[13px] font-medium"
+              onClick={remove}
+            >
+              {t("variables.group.delete")}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -680,6 +799,46 @@ function ValueCell({
   )
 }
 
+/** The two actions a group row exposes. */
+function GroupMenu({
+  onRename,
+  onDelete,
+}: {
+  onRename: () => void
+  onDelete: () => void
+}) {
+  const { t } = useI18n()
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label={t("variables.group.actions")}
+            className="text-muted-foreground hover:bg-transparent! aria-expanded:bg-transparent! hover:text-foreground dark:hover:bg-transparent!"
+          />
+        }
+      >
+        <EllipsisIcon className="size-3.5" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="flex w-[210px] flex-col gap-0.5 rounded-md p-1.5 ring-1 ring-border shadow-soft"
+      >
+        <DropdownMenuItem className={MENU_ITEM} onClick={onRename}>
+          <PencilIcon />
+          {t("variables.group.rename")}
+        </DropdownMenuItem>
+        <DropdownMenuItem variant="destructive" className={MENU_ITEM} onClick={onDelete}>
+          <Trash2Icon />
+          {t("variables.group.delete")}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 /** One row's menu. */
 function RowMenu({
   variable,
@@ -709,7 +868,7 @@ function RowMenu({
             variant="ghost"
             size="icon-sm"
             aria-label={t("variables.action.more")}
-            className="text-muted-foreground"
+            className="text-muted-foreground hover:bg-transparent! aria-expanded:bg-transparent! hover:text-foreground dark:hover:bg-transparent!"
           />
         }
       >
@@ -739,7 +898,6 @@ function RowMenu({
                 {group === variable.group ? <CheckIcon className="ml-auto" /> : null}
               </DropdownMenuItem>
             ))}
-            <DropdownMenuSeparator />
             <DropdownMenuItem
               className={cn(MENU_ITEM, "text-primary")}
               onClick={onNewGroup}
@@ -753,7 +911,6 @@ function RowMenu({
           <CopyIcon />
           {t("variables.action.copyReference")}
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" className={MENU_ITEM} onClick={onDelete}>
           <Trash2Icon />
           {t("variables.action.delete")}
@@ -777,6 +934,8 @@ export function VariablesPage() {
   const [editing, setEditing] = React.useState<Variable | null>(null)
   const [renaming, setRenaming] = React.useState<Variable | null>(null)
   const [deleting, setDeleting] = React.useState<Variable | null>(null)
+  const [renamingGroup, setRenamingGroup] = React.useState<string | null>(null)
+  const [deletingGroup, setDeletingGroup] = React.useState<string | null>(null)
   /* A new group opened from "move to group" moves the row as soon as it exists. */
   const [moveAfterGroup, setMoveAfterGroup] = React.useState<Variable | null>(null)
 
@@ -850,6 +1009,51 @@ export function VariablesPage() {
     return name
   }
 
+  const renameGroup = async (value: string) => {
+    if (renamingGroup === null) return
+    const nextName = value.trim()
+    if (nextName === "") throw new Error(t("variables.groupRename.required"))
+    if (nextName === DEFAULT_GROUP) throw new Error(t("variables.groupRename.reserved"))
+    if (
+      nextName !== renamingGroup &&
+      (document?.groups ?? []).includes(nextName)
+    ) {
+      throw new Error(t("variables.groupRename.exists"))
+    }
+    const next = await store.renameGroup(renamingGroup, nextName)
+    remember(next)
+    if (group === renamingGroup) setGroup(nextName)
+    setRenamingGroup(null)
+    toast.add({ type: "success", title: t("variables.groupRename.done") })
+  }
+
+  const removeGroupNow = async (target: string, count: number) => {
+    const next = await store.removeGroup(target)
+    remember(next)
+    if (group === target) setGroup(null)
+    setDeletingGroup(null)
+    toast.add({
+      type: "success",
+      title:
+        count === 0
+          ? t("variables.groupDelete.done")
+          : t("variables.groupDelete.doneMigrated")
+              .replace("{count}", String(count))
+              .replace("{group}", DEFAULT_GROUP),
+    })
+  }
+
+  const openGroupDelete = (target: string) => {
+    const count = counts.get(target) ?? 0
+    if (count === 0) {
+      void removeGroupNow(target, 0).catch((error: unknown) => {
+        toast.add({ type: "error", title: textOf(error) })
+      })
+      return
+    }
+    setDeletingGroup(target)
+  }
+
   const saveValue = async (value: string) => {
     if (editing === null) return
     const next = await store.update(editing.name, { value })
@@ -908,8 +1112,8 @@ export function VariablesPage() {
   const groups = document?.groups ?? [DEFAULT_GROUP]
 
   return (
-    <div className="-mx-6 bg-background">
-      <div className="flex w-full flex-col gap-10 px-16 py-10 font-mono">
+    <div className="flex w-full flex-col gap-10 font-mono">
+      <div className="contents">
         <header className="flex flex-col gap-3">
           <span className="text-[12px] font-semibold tracking-[0.1em] text-ring">
             {t("variables.eyebrow")}
@@ -974,36 +1178,67 @@ export function VariablesPage() {
             <button
               type="button"
               onClick={() => setGroup(null)}
-              className={cn(
-                "flex h-9 items-center justify-between rounded-md px-2.5 text-[13px] transition-colors",
-                group === null
-                  ? "bg-secondary font-semibold text-foreground"
-                  : "text-copy hover:bg-secondary/60"
-              )}
+              className={railRowClass(group === null)}
             >
               <span>{t("variables.group.all")}</span>
               <span className="font-mono text-[11px] text-muted-foreground">
                 {document?.variables.length ?? 0}
               </span>
             </button>
-            {groups.map((one) => (
-              <button
-                key={one}
-                type="button"
-                onClick={() => setGroup(one)}
-                className={cn(
-                  "flex h-9 items-center justify-between rounded-md px-2.5 text-[13px] transition-colors",
-                  group === one
-                    ? "bg-secondary font-semibold text-foreground"
-                    : "text-copy hover:bg-secondary/60"
-                )}
-              >
-                <span className="truncate">{one}</span>
-                <span className="font-mono text-[11px] text-muted-foreground">
-                  {counts.get(one) ?? 0}
-                </span>
-              </button>
-            ))}
+            {groups.map((one) => {
+              const active = group === one
+              const count = counts.get(one) ?? 0
+              if (one === DEFAULT_GROUP) {
+                return (
+                  <button
+                    key={one}
+                    type="button"
+                    onClick={() => setGroup(one)}
+                    className={railRowClass(active)}
+                  >
+                    <span className="truncate">{one}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {count}
+                    </span>
+                  </button>
+                )
+              }
+              return (
+                /* The row holds a menu, so it cannot be a button; keys only
+                   belong to the row while focus is on the row itself. */
+                <div
+                  key={one}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={active}
+                  onClick={() => setGroup(one)}
+                  onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return
+                    if (event.key !== "Enter" && event.key !== " ") return
+                    event.preventDefault()
+                    setGroup(one)
+                  }}
+                  className={railRowClass(active)}
+                >
+                  <span className="truncate">{one}</span>
+                  <span className="flex shrink-0 items-center gap-1.5">
+                    <span className="font-mono text-[11px] text-muted-foreground">
+                      {count}
+                    </span>
+                    <span
+                      className="flex items-center"
+                      onClick={(event) => event.stopPropagation()}
+                      onPointerDown={(event) => event.stopPropagation()}
+                    >
+                      <GroupMenu
+                        onRename={() => setRenamingGroup(one)}
+                        onDelete={() => openGroupDelete(one)}
+                      />
+                    </span>
+                  </span>
+                </div>
+              )
+            })}
             <div className="my-1 h-px bg-border" />
             <Button
               variant="ghost"
@@ -1191,6 +1426,43 @@ export function VariablesPage() {
             if (!open) setDeleting(null)
           }}
           onDelete={remove}
+        />
+      )}
+
+      {renamingGroup === null ? null : (
+        <FieldDialog
+          key={renamingGroup}
+          open
+          title={t("variables.groupRename.title")}
+          description={t("variables.groupRename.description").replace(
+            "{count}",
+            String(counts.get(renamingGroup) ?? 0)
+          )}
+          label={t("variables.groupRename.label")}
+          value={renamingGroup}
+          selectAll
+          helper={t("variables.groupRename.helper")}
+          footerHint={t("variables.list.count").replace(
+            "{count}",
+            String(counts.get(renamingGroup) ?? 0)
+          )}
+          submit={t("variables.groupRename.submit")}
+          onOpenChange={(open) => {
+            if (!open) setRenamingGroup(null)
+          }}
+          onSubmit={renameGroup}
+        />
+      )}
+
+      {deletingGroup === null ? null : (
+        <DeleteGroupDialog
+          group={deletingGroup}
+          count={counts.get(deletingGroup) ?? 0}
+          open
+          onOpenChange={(open) => {
+            if (!open) setDeletingGroup(null)
+          }}
+          onDelete={removeGroupNow}
         />
       )}
     </div>

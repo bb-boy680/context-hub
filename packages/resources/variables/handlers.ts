@@ -132,6 +132,19 @@ export function createVariableHandler(
         case "create-group":
           sendJson(response, 200, await store.createGroup(required(body.group, "group name")))
           return
+        case "rename-group":
+          sendJson(
+            response,
+            200,
+            await store.renameGroup(
+              required(body.from, "group name"),
+              required(body.to, "new group name")
+            )
+          )
+          return
+        case "remove-group":
+          sendJson(response, 200, await store.removeGroup(required(body.group, "group name")))
+          return
         default:
           throw new Error(`unknown action: ${String(body.action)}`)
       }

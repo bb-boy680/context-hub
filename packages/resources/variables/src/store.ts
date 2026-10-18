@@ -78,4 +78,19 @@ export interface VariableStore {
   remove(name: string): Promise<VariableDocument>
   /** Add a group, even before a variable uses it. A duplicate is a no-op. */
   createGroup(group: string): Promise<VariableDocument>
+  /**
+   * Rename a group; every variable filed under it follows.
+   *
+   * @throws when either name is empty, the source is the default group, the
+   *   target is the default group, the source is not in the library, or the
+   *   target is already taken. A rename to the same name is a no-op.
+   */
+  renameGroup(from: string, to: string): Promise<VariableDocument>
+  /**
+   * Delete a group; its variables move to the default group.
+   *
+   * @throws when the name is empty or is the default group. A group that is
+   *   not in the library is a no-op.
+   */
+  removeGroup(group: string): Promise<VariableDocument>
 }

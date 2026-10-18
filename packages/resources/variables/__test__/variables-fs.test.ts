@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import type { EnvironmentPort } from "../src/host/environment.ts"
 import { createFsVariableStore, variablesPath } from "../src/host/variables-fs.ts"
+import { DEFAULT_GROUP } from "../src/store.ts"
 
 let home: string
 
@@ -20,17 +21,22 @@ afterEach(async () => {
 /** An environment the tests own, so nothing touches the real machine. */
 interface MemoryEnvironment extends EnvironmentPort {
   values: Map<string, string>
+  writes: string[]
 }
 
 function memoryEnvironment(initial: Record<string, string> = {}): MemoryEnvironment {
   const values = new Map(Object.entries(initial))
+  const writes: string[] = []
   return {
     values,
+    writes,
     get: (name) => values.get(name),
     set: async (name, value) => {
+      writes.push(`set ${name}`)
       values.set(name, value)
     },
     remove: async (name) => {
+      writes.push(`remove ${name}`)
       values.delete(name)
     },
     ready: async () => undefined,
@@ -43,11 +49,17 @@ async function rawDocument(): Promise<{
   groups: string[]
   variables: Record<string, unknown>[]
 }> {
-  return JSON.parse(await fs.readFile(variablesPath(home), "utf8")) as {
+  const text = await fs.readFile(variablesPath(home), "utf8")
+  return JSON.parse(text) as {
     version: number
     groups: string[]
     variables: Record<string, unknown>[]
   }
+}
+
+/** The file exactly as it is written, for "nothing changed" assertions. */
+function rawText(): Promise<string> {
+  return fs.readFile(variablesPath(home), "utf8")
 }
 
 describe("the variable library", () => {
@@ -219,5 +231,178 @@ describe("the variable library", () => {
 
     const store = createFsVariableStore({ home, environment: memoryEnvironment() })
     await expect(store.read()).rejects.toThrow(/duplicate variable name/)
+  })
+})
+
+describe("group management", () => {
+  it("renames a group and carries its variables, names, values and timestamps along", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.create([
+      { name: "A", group: "云服务", value: "a-value" },
+      { name: "B", group: DEFAULT_GROUP, value: "b-value" },
+    ])
+    const before = await store.read()
+    const beforeA = before.variables.find((row) => row.name === "A")
+    const beforeB = before.variables.find((row) => row.name === "B")
+    environment.writes.length = 0
+
+    const next = await store.renameGroup("云服务", "Cloud")
+    expect(next.groups).toEqual([DEFAULT_GROUP, "Cloud"])
+    const afterA = next.variables.find((row) => row.name === "A")
+    const afterB = next.variables.find((row) => row.name === "B")
+    expect(afterA).toMatchObject({ group: "Cloud", value: "a-value" })
+    expect(afterA?.updatedAt).toBe(beforeA?.updatedAt)
+    expect(afterB).toMatchObject({ group: DEFAULT_GROUP, value: "b-value" })
+    expect(afterB?.updatedAt).toBe(beforeB?.updatedAt)
+    expect(
+      (await rawDocument()).variables.find((row) => row.name === "A")
+    ).not.toHaveProperty("value")
+    expect(environment.writes).toEqual([])
+  })
+
+  it("refuses a rename onto an existing group without touching the file", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("A")
+    await store.createGroup("B")
+    const before = await rawText()
+
+    await expect(store.renameGroup("A", "B")).rejects.toThrow(/already exists/)
+    expect(await rawText()).toBe(before)
+  })
+
+  it("refuses to rename the default group or into it", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("X")
+    const before = await rawText()
+
+    await expect(store.renameGroup(DEFAULT_GROUP, "X")).rejects.toThrow(
+      /default group cannot be renamed/
+    )
+    await expect(store.renameGroup("X", DEFAULT_GROUP)).rejects.toThrow(
+      /cannot rename a group to the default group/
+    )
+    expect(await rawText()).toBe(before)
+  })
+
+  it("refuses an empty or unknown source group", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("X")
+    const before = await rawText()
+
+    await expect(store.renameGroup("X", "  ")).rejects.toThrow(/group name is required/)
+    await expect(store.renameGroup("missing", "Y")).rejects.toThrow(/unknown group/)
+    expect(await rawText()).toBe(before)
+  })
+
+  it("treats a rename to the same name as a no-op", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("X")
+    const before = await rawText()
+    environment.writes.length = 0
+
+    await store.renameGroup("X", "X")
+    expect(await rawText()).toBe(before)
+    expect(environment.writes).toEqual([])
+  })
+
+  it("removes an empty group", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("Empty")
+    const beforeVariables = (await rawDocument()).variables
+    environment.writes.length = 0
+
+    const next = await store.removeGroup("Empty")
+    expect(next.groups).not.toContain("Empty")
+    expect((await rawDocument()).groups).not.toContain("Empty")
+    expect((await rawDocument()).variables).toEqual(beforeVariables)
+    expect(environment.writes).toEqual([])
+  })
+
+  it("removes a group with variables and moves them to the default group", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.create([
+      { name: "A", group: "云服务", value: "a-value" },
+      { name: "B", group: DEFAULT_GROUP, value: "b-value" },
+    ])
+    const before = await rawDocument()
+    const beforeA = before.variables.find((row) => row.name === "A")
+    const beforeB = before.variables.find((row) => row.name === "B")
+    const values = new Map(environment.values)
+    environment.writes.length = 0
+
+    const next = await store.removeGroup("云服务")
+    expect(next.groups).not.toContain("云服务")
+    expect(next.groups).toContain(DEFAULT_GROUP)
+    const after = await rawDocument()
+    const afterA = after.variables.find((row) => row.name === "A")
+    const afterB = after.variables.find((row) => row.name === "B")
+    expect(afterA).toMatchObject({ group: DEFAULT_GROUP, updatedAt: beforeA?.updatedAt })
+    expect(afterB).toEqual(beforeB)
+    expect(afterA).not.toHaveProperty("value")
+    expect(environment.values).toEqual(values)
+    expect(environment.writes).toEqual([])
+  })
+
+  it("refuses to remove the default group", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("X")
+    const before = await rawText()
+
+    await expect(store.removeGroup(DEFAULT_GROUP)).rejects.toThrow(
+      /default group cannot be removed/
+    )
+    expect(await rawText()).toBe(before)
+  })
+
+  it("treats removing an unknown group as a no-op", async () => {
+    const environment = memoryEnvironment()
+    const store = createFsVariableStore({ home, environment })
+    await store.createGroup("X")
+    const before = await rawText()
+    environment.writes.length = 0
+
+    await store.removeGroup("missing")
+    expect(await rawText()).toBe(before)
+    expect(environment.writes).toEqual([])
+  })
+
+  it("keeps unknown fields when groups change", async () => {
+    const file = variablesPath(home)
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        groups: [DEFAULT_GROUP, "云服务"],
+        variables: [
+          {
+            name: "KEEP",
+            group: "云服务",
+            updatedAt: "2026-01-01T00:00:00.000Z",
+            note: "keep",
+          },
+        ],
+      })
+    )
+
+    const store = createFsVariableStore({ home, environment: memoryEnvironment() })
+    await store.renameGroup("云服务", "Cloud")
+    expect((await rawDocument()).variables[0]).toMatchObject({
+      group: "Cloud",
+      note: "keep",
+    })
+    await store.removeGroup("Cloud")
+    expect((await rawDocument()).variables[0]).toMatchObject({
+      group: DEFAULT_GROUP,
+      note: "keep",
+    })
   })
 })

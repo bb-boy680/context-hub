@@ -52,5 +52,11 @@ export function createRemoteVariableStore(base = VARIABLE_ROUTE): VariableStore 
 
     createGroup: (group: string) =>
       call<VariableDocument>(base, write("create-group", { group })),
+
+    renameGroup: (from: string, to: string) =>
+      call<VariableDocument>(base, write("rename-group", { from, to })),
+
+    removeGroup: (group: string) =>
+      call<VariableDocument>(base, write("remove-group", { group })),
   }
 }
