@@ -27,7 +27,7 @@ import {
   type HubMiddleware,
 } from "@context-hub/core/host/http"
 
-import { PLUGIN_ROUTE } from "./src/contract.ts"
+import { PLUGIN_ROUTE, PluginNameTakenError } from "./src/contract.ts"
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
 import { readPackContents } from "./src/host/contents.ts"
 import { describePack } from "./src/host/describe.ts"
@@ -359,7 +359,13 @@ export function createPluginHandler(
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      sendJson(response, 400, { error: message })
+      const taken = error instanceof PluginNameTakenError ? error : null
+      sendJson(response, 400, {
+        error: message,
+        ...(taken === null
+          ? {}
+          : { code: taken.code, name: taken.pluginName, from: taken.from }),
+      })
     }
   }
 }

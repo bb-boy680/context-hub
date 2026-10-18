@@ -44,7 +44,7 @@ import {
 import { rowsForTab, SCOPE_LABELS, type PluginTab } from "./rows.ts"
 import { PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
-import type { PluginInstallScope } from "./contract.ts"
+import { PluginNameTakenError, type PluginInstallScope } from "./contract.ts"
 
 import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
 import {
@@ -1015,7 +1015,14 @@ export function PluginsPage() {
       (error: unknown) => {
         toast.add({
           type: "error",
-          title: error instanceof Error ? error.message : String(error),
+          title:
+            error instanceof PluginNameTakenError
+              ? t("plugins.notice.nameTaken")
+                  .replace("{name}", error.pluginName)
+                  .replace("{from}", error.from)
+              : error instanceof Error
+                ? error.message
+                : String(error),
         })
         throw error
       }

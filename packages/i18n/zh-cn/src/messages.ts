@@ -404,6 +404,8 @@ export const messages: Record<string, string> = {
   "plugins.update.overwritten": "本地被改过的文件已被本次更新覆盖。",
   "plugins.notice.added": "{name} 已加入库中。",
   "plugins.notice.already": "{name} 已在库中，无需重复添加。",
+  "plugins.notice.nameTaken":
+    "插件库里已经有「{name}」了（来自 {from}）。想替换的话，请先删除已有插件。",
   "plugins.notice.restoring": "{names} 文件丢失，正在重新下载…",
   "plugins.notice.restoreFailed": "{names} 重新下载失败。",
   "plugins.notice.separator": "、",

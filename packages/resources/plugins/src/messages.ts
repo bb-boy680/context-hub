@@ -86,6 +86,8 @@ export const pluginsMessages: Record<string, string> = {
     "These files were edited here after they were collected. Updating replaces them with what the source holds now, and that cannot be undone.",
   "plugins.notice.added": "{name} is in the library.",
   "plugins.notice.already": "{name} was already in the library.",
+  "plugins.notice.nameTaken":
+    "The plugin library already has \"{name}\" (collected from {from}). Delete the existing plugin first if you want to replace it.",
   "plugins.notice.restoring": "{names} lost their files. Downloading them again…",
   "plugins.notice.restoreFailed": "{names} could not be downloaded again.",
   "plugins.notice.separator": ", ",

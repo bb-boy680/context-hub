@@ -23,7 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 import { createHubServer, type HubListener } from "@context-hub/core/host/server"
 
 import { createPluginHandler } from "../handlers.ts"
-import { PLUGIN_ROUTE } from "../src/contract.ts"
+import { PLUGIN_NAME_TAKEN, PLUGIN_ROUTE } from "../src/contract.ts"
 import { createRemotePluginTools } from "../src/tools.ts"
 
 /** A program no machine has, so the "is it there" question answers no. */
@@ -58,6 +58,9 @@ let base: string
  */
 const folder = mkdtempSync(path.join(tmpdir(), "context-hub-plugin-bridge-folder-"))
 
+/** Another source claiming the same pack name, made to drive the refusal over the wire. */
+const otherFolder = mkdtempSync(path.join(tmpdir(), "context-hub-plugin-bridge-other-"))
+
 /** One call the bridge must answer, and what its answer must carry. */
 interface Call {
   label: string
@@ -77,6 +80,12 @@ const post = (body: unknown): RequestInit => ({
 
 const CALLS: readonly Call[] = [
   { label: "the whole library", path: "?action=list", keys: ["root", "plugins", "missing"] },
+  {
+    label: "a folder a page read",
+    path: "",
+    init: post({ action: "add-folder", name: PACK, files: FILES }),
+    keys: ["record", "already"],
+  },
   {
     label: "how many of its pictures are remote",
     path: "?action=asset-stats",
@@ -157,6 +166,12 @@ beforeAll(async () => {
   await fs.mkdir(path.join(folder, ".claude-plugin"), { recursive: true })
   await fs.writeFile(path.join(folder, "README.md"), README, "utf8")
   await fs.writeFile(path.join(folder, ".claude-plugin", "plugin.json"), MANIFEST, "utf8")
+  await fs.mkdir(path.join(otherFolder, ".claude-plugin"), { recursive: true })
+  await fs.writeFile(
+    path.join(otherFolder, ".claude-plugin", "plugin.json"),
+    JSON.stringify({ name: PACK, version: "9.9.9" }),
+    "utf8"
+  )
   const server = createHubServer({
     middlewares: [createPluginHandler({ home })],
     log: () => undefined,
@@ -164,7 +179,9 @@ beforeAll(async () => {
   listener = await server.listen()
   base = listener.url
 
-  const collected = await ask(post({ action: "add-folder", name: PACK, files: FILES }))
+  /* Collected by address rather than by folder, so the record's source is the
+     absolute directory a second source can be compared against. */
+  const collected = await ask(post({ action: "add", source: folder }))
   expect(collected.status, `the fixture pack could not be collected: ${collected.raw}`).toBe(200)
 })
 
@@ -172,6 +189,7 @@ afterAll(async () => {
   await listener.close()
   await fs.rm(home, { recursive: true, force: true })
   await fs.rm(folder, { recursive: true, force: true })
+  await fs.rm(otherFolder, { recursive: true, force: true })
 })
 
 /** One request, with its body kept for the failure message. */
@@ -190,6 +208,21 @@ async function ask(init?: RequestInit, query = ""): Promise<{
   }
   return { status: response.status, body, raw }
 }
+
+describe("a name another source already holds", () => {
+  it("refuses it with the facts the page words for itself", async () => {
+    const answer = await ask(post({ action: "add", source: otherFolder }))
+    expect(answer.status, "a second source with the same name is refused").toBe(400)
+    expect(answer.body, "the refusal carries what the page translates").toMatchObject({
+      code: PLUGIN_NAME_TAKEN,
+      name: PACK,
+      from: folder,
+    })
+    expect(String((answer.body as { error?: string }).error)).toContain(
+      "already in this library"
+    )
+  })
+})
 
 describe("every call the page makes", () => {
   it.each(CALLS)("$label is answered", async (call) => {

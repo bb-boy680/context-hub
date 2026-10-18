@@ -163,14 +163,26 @@ async function holdsPack(dir: string, fallbackName: string): Promise<boolean> {
 /**
  * Read what a pack says about itself.
  *
+ * A directory with no manifest is still a pack when it carries the component
+ * layout Claude Code discovers on its own; the record then takes the name the
+ * caller already knows it by. A marketplace index that does not name its own
+ * directory is a market of packs rather than one pack, and is refused instead of
+ * being collected whole.
+ *
  * @param dir — the pack directory.
  * @param fallbackName — the name to take when the manifest does not give one.
  * @returns the pack's own name, version, and description.
- * @throws {Error} when the directory carries no manifest at all, because this hub records a pack by the name its manifest gives it and has nothing else to record it under.
+ * @throws {Error} when the directory is a market of several plugins, or carries neither a manifest nor a component layout.
  */
 export async function readPackManifest(dir: string, fallbackName: string): Promise<PackManifest> {
   const fields = await readManifestFields(dir)
   if (fields.name === undefined && fields.version === "") {
+    if (fields.marketplace) {
+      throw new Error("this directory is a marketplace of plugins, not one plugin")
+    }
+    if (fields.components) {
+      return { name: fallbackName, version: "", description: "" }
+    }
     /* A file by that name may still be somebody else's: a repository root carries a
        `plugin.json` for its own tooling often enough that "no manifest" would be
        the wrong thing to say about one. */

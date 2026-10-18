@@ -23,7 +23,14 @@ import { createAssetStore, type AssetSink } from "@context-hub/core"
 import { createFsAssetLibrary } from "@context-hub/core/host"
 import { folderHash } from "@context-hub/core/host/folder-hash"
 
-import { hasUpstream, installedRevision, type PluginOrigin } from "../src/contract.ts"
+import {
+  PluginNameTakenError,
+  hasStandardComponents,
+  hasUpstream,
+  installedRevision,
+  marketplaceManifest,
+  type PluginOrigin,
+} from "../src/contract.ts"
 import { formatPluginSource, parsePluginSource } from "../src/inspect.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../src/records.ts"
 import {
@@ -79,6 +86,16 @@ async function writePack(
   await fs.writeFile(path.join(dir, "commands", "greet.md"), "Say hello.\n", "utf8")
 }
 
+/** Write a marketplace index at a directory's root, the way a plugin-only repository does. */
+async function writeMarketplace(dir: string, manifest: unknown): Promise<void> {
+  await fs.mkdir(path.join(dir, ".claude-plugin"), { recursive: true })
+  await fs.writeFile(
+    path.join(dir, ".claude-plugin", "marketplace.json"),
+    `${JSON.stringify(manifest, null, 2)}\n`,
+    "utf8"
+  )
+}
+
 /** Put one text file into a pack, so the logo walk has something to find. */
 async function writePicture(dir: string, relative: string, text: string): Promise<void> {
   const target = path.join(dir, relative)
@@ -118,6 +135,16 @@ async function refusalOf(run: () => unknown): Promise<string> {
     return ""
   } catch (error) {
     return error instanceof Error ? error.message : String(error)
+  }
+}
+
+/** The refusal itself, for a caller that needs more than its sentence. */
+async function errorOf(run: () => unknown): Promise<unknown> {
+  try {
+    await run()
+    return null
+  } catch (error) {
+    return error
   }
 }
 
@@ -327,6 +354,106 @@ describe("reading an address", () => {
         "plugin source"
       )
     })
+  })
+})
+
+describe("reading a marketplace index", () => {
+  it("names the root from its one entry", () => {
+    expect(
+      marketplaceManifest({
+        name: "superpowers-dev",
+        plugins: [
+          {
+            name: "superpowers",
+            version: "7.0.0",
+            description: "Core skills.",
+            source: "./",
+          },
+        ],
+      }),
+      "a single root entry names the plugin"
+    ).toEqual({ name: "superpowers", version: "7.0.0", description: "Core skills." })
+  })
+
+  it("names the root from the marketplace when every entry points at it", () => {
+    expect(
+      marketplaceManifest({
+        name: "anthropics-skills",
+        metadata: { version: "1.2.3", description: "Skills from Anthropic." },
+        plugins: [
+          { name: "document-skills", source: "./" },
+          { name: "example-skills", source: "." },
+        ],
+      }),
+      "a shared root is named by the marketplace itself"
+    ).toEqual({
+      name: "anthropics-skills",
+      version: "1.2.3",
+      description: "Skills from Anthropic.",
+    })
+  })
+
+  it("refuses a market whose entries point into subdirectories", () => {
+    expect(
+      marketplaceManifest({
+        name: "claude-code-plugins",
+        plugins: [
+          { name: "warp", source: "./plugins/warp" },
+          { name: "oz", source: "./plugins/oz" },
+        ],
+      }),
+      "a collection is not one plugin"
+    ).toBeNull()
+  })
+
+  it("refuses a single entry that points into a subdirectory", () => {
+    expect(
+      marketplaceManifest({ plugins: [{ name: "warp", source: "./plugins/warp" }] }),
+      "one remote pack is still not the root"
+    ).toBeNull()
+  })
+
+  it("ignores fields that are not strings", () => {
+    expect(
+      marketplaceManifest({
+        plugins: [{ name: 3, version: true, description: null, source: "." }],
+      }),
+      "non-string fields read as absent"
+    ).toEqual({ version: "", description: "" })
+  })
+
+  it("refuses a document with no entries", () => {
+    expect(marketplaceManifest({ plugins: [] }), "an empty index names nothing").toBeNull()
+    expect(marketplaceManifest({}), "an index without entries names nothing").toBeNull()
+    expect(marketplaceManifest(null), "a value that is not an index names nothing").toBeNull()
+  })
+})
+
+describe("recognising standard components", () => {
+  it("recognises each layout Claude Code discovers", () => {
+    for (const path of [
+      "skills/hello/SKILL.md",
+      "commands/greet.md",
+      "agents/reviewer.md",
+      "hooks/hooks.json",
+      ".mcp.json",
+    ]) {
+      expect(hasStandardComponents([path]), `${path} is a component`).toBe(true)
+    }
+  })
+
+  it("does not mistake a near miss for a component", () => {
+    for (const path of [
+      "skills/SKILL.md",
+      "skills/a/b/SKILL.md",
+      "commands/sub/x.md",
+      "agents/x.txt",
+      "docs/hooks/hooks.json",
+      "skills/hello/SKILL.MD",
+      "commands/.md",
+    ]) {
+      expect(hasStandardComponents([path]), `${path} is not a component`).toBe(false)
+    }
   })
 })
 
@@ -870,15 +997,34 @@ describe("a pack whose files were deleted", () => {
     ).toEqual(["acme-hello-logo-8da96759.png"])
   })
 
-  /* A folder that is there but holds no manifest is not a pack either. */
-  it("fetches a folder that lost its manifest again too", async () => {
+  /* A folder that lost its manifest but still carries the layout Claude Code
+     discovers is still a pack: the record names it, and the hub's own marketplace
+     entry supplies what the missing manifest would have. */
+  it("keeps counting a folder that lost its manifest but still has a layout", async () => {
     await fs.rm(path.join(orphanHub, "plugins", "acme-hello", ".claude-plugin"), {
       recursive: true,
       force: true,
     })
     expect(
       await orphanLibrary.has("acme-hello"),
-      "a folder that lost its manifest is not a pack that is here"
+      "a folder with only its component layout is still a pack that is here"
+    ).toBe(true)
+    const stillHere = await orphanCollector.add(orphanSource)
+    expect(stillHere.already, "and adding its address finds it").toBe(true)
+  })
+
+  /* Once nothing in the folder says it is a pack, the record is only a memory of
+     one, and the address is worth fetching again. */
+  it("fetches a folder again once nothing in it is a pack", async () => {
+    for (const gone of ["skills", "commands"]) {
+      await fs.rm(path.join(orphanHub, "plugins", "acme-hello", gone), {
+        recursive: true,
+        force: true,
+      })
+    }
+    expect(
+      await orphanLibrary.has("acme-hello"),
+      "a folder with no manifest and no layout is not a pack that is here"
     ).toBe(false)
     const refetchedAgain = await orphanCollector.add(orphanSource)
     expect(refetchedAgain.already, "and that fetches it again too").toBe(false)
@@ -970,17 +1116,212 @@ describe("a pack with no manifest", () => {
   })
 
   /* The same name from somewhere else is a different pack wearing it, which is the
-     person's call rather than this hub's — so it is refused, and the refusal names
-     where the one that is here came from. */
-  it("refuses a second pack wearing a taken name, naming the address it came from", async () => {
+     person's call rather than this hub's — so it is refused, and the refusal says
+     what the page needs to word it in the reader's own language. */
+  it("refuses a second pack wearing a taken name, as an error the page can word", async () => {
     const impostor = path.join(root, "impostor")
     await writePack(impostor, "9.9.9", "acme-hello")
-    const refusal = await refusalOf(() => collector.add(impostor))
-    expect(refusal, "a second pack wearing a taken name is refused").toContain(
+    const failure = await errorOf(() => collector.add(impostor))
+    expect(failure, "a second pack wearing a taken name is refused").toBeInstanceOf(
+      PluginNameTakenError
+    )
+    const taken = failure as PluginNameTakenError
+    expect(taken.pluginName, "the refusal names the pack").toBe("acme-hello")
+    expect(taken.from, "and where the one that is here came from").toContain(root)
+    expect(taken.message, "the fallback sentence still says what happened").toContain(
       "already in this library"
     )
-    expect(refusal, "and the refusal names the address it came from").toContain(root)
     expect(await library.list(), "while the pack that was here is untouched").toHaveLength(2)
+  })
+})
+
+describe("a pack whose manifest is a marketplace entry", () => {
+  const marketHub = path.join(root, "market-hub")
+  const marketLibrary = createFsPluginLibrary(marketHub)
+  const marketCollector = createPluginCollector(marketLibrary)
+  const single = path.join(root, "market-single")
+  let singleRecord: PluginRecord
+
+  beforeAll(async () => {
+    await writeMarketplace(single, {
+      name: "superpowers-dev",
+      description: "Development marketplace.",
+      plugins: [
+        {
+          name: "superpowers",
+          version: "7.0.0",
+          description: "Core skills.",
+          source: "./",
+        },
+      ],
+    })
+  })
+
+  it("collects the root under the entry's name", async () => {
+    singleRecord = (await marketCollector.add(single)).record
+    expect(singleRecord.name, "the entry names the pack").toBe("superpowers")
+    expect(singleRecord.version, "its version comes from the entry").toBe("7.0.0")
+    expect(singleRecord.description, "and so does its description").toBe("Core skills.")
+    expect(await marketLibrary.has("superpowers"), "the files are here").toBe(true)
+    expect(await marketLibrary.missing(), "and the record is not missing them").toEqual([])
+    expect(
+      await fs.readFile(
+        path.join(marketHub, "plugins", "superpowers", ".claude-plugin", "marketplace.json"),
+        "utf8"
+      ),
+      "the index itself was collected with the pack"
+    ).toContain('"superpowers"')
+  })
+
+  it("replaces the pack from a staged directory with the same index", async () => {
+    const staged = path.join(root, "market-staged")
+    await writeMarketplace(staged, {
+      plugins: [
+        { name: "superpowers", version: "8.0.0", description: "Core skills.", source: "." },
+      ],
+    })
+    await fs.mkdir(path.join(staged, "skills", "hello"), { recursive: true })
+    await fs.writeFile(
+      path.join(staged, "skills", "hello", "SKILL.md"),
+      "---\nname: hello\n---\n\nReplaced.\n",
+      "utf8"
+    )
+    const replaced = await marketLibrary.replace(
+      "superpowers",
+      staged,
+      singleRecord.source,
+      await folderHash(staged)
+    )
+    expect(replaced.name, "the name still comes from the index").toBe("superpowers")
+    expect(replaced.version, "and the version is the one that landed").toBe("8.0.0")
+    expect(
+      await fs.readFile(
+        path.join(marketHub, "plugins", "superpowers", "skills", "hello", "SKILL.md"),
+        "utf8"
+      ),
+      "with the files the staged directory holds"
+    ).toContain("Replaced.")
+  })
+
+  it("names a shared root from the marketplace itself", async () => {
+    const shared = path.join(root, "market-shared")
+    await writeMarketplace(shared, {
+      name: "anthropics-skills",
+      metadata: { version: "1.2.3", description: "Skills from Anthropic." },
+      plugins: [
+        { name: "document-skills", source: "./" },
+        { name: "example-skills", source: "." },
+      ],
+    })
+    const record = (await marketCollector.add(shared)).record
+    expect(record.name, "the marketplace names the shared root").toBe("anthropics-skills")
+    expect(record.version, "with the version its metadata gives").toBe("1.2.3")
+    expect(record.description, "and its description").toBe("Skills from Anthropic.")
+  })
+
+  it("refuses a market whose entries point into subdirectories", async () => {
+    const collection = path.join(root, "market-collection")
+    await writeMarketplace(collection, {
+      name: "claude-code-plugins",
+      plugins: [{ name: "warp", source: "./plugins/warp" }],
+    })
+    await expect(
+      marketCollector.add(collection),
+      "a market of packs is not one pack"
+    ).rejects.toThrow(/marketplace of plugins/)
+  })
+
+  it("refuses a single entry that points into a subdirectory", async () => {
+    const one = path.join(root, "market-one-subdir")
+    await writeMarketplace(one, {
+      plugins: [{ name: "warp", source: "./plugins/warp" }],
+    })
+    await expect(
+      marketCollector.add(one),
+      "one entry in a subdirectory is still not the root"
+    ).rejects.toThrow(/marketplace of plugins/)
+  })
+
+  it("takes a marketplace entry when a root manifest names nothing", async () => {
+    const both = path.join(root, "market-and-foreign")
+    await fs.mkdir(both, { recursive: true })
+    await fs.writeFile(
+      path.join(both, "plugin.json"),
+      `${JSON.stringify({ build: { out: "dist" } })}\n`,
+      "utf8"
+    )
+    await writeMarketplace(both, {
+      plugins: [{ name: "both-pack", version: "2.0.0", source: "./" }],
+    })
+    const record = (await marketCollector.add(both)).record
+    expect(record.name, "the marketplace names it").toBe("both-pack")
+    expect(record.version, "and gives its version").toBe("2.0.0")
+  })
+})
+
+describe("a pack with no manifest but standard components", () => {
+  const layoutHub = path.join(root, "layout-hub")
+  const layoutLibrary = createFsPluginLibrary(layoutHub)
+  const layoutCollector = createPluginCollector(layoutLibrary)
+
+  it("collects a skills directory under its own directory name", async () => {
+    const pack = path.join(root, "layout-skills")
+    await fs.mkdir(path.join(pack, "skills", "hello"), { recursive: true })
+    await fs.writeFile(
+      path.join(pack, "skills", "hello", "SKILL.md"),
+      "---\nname: hello\ndescription: Say hello.\n---\n",
+      "utf8"
+    )
+    const record = (await layoutCollector.add(pack)).record
+    expect(record.name, "the directory name is the pack's name").toBe("layout-skills")
+    expect(record.version, "a layout has no version").toBe("")
+    expect(record.description, "and no description").toBe("")
+    expect(await layoutLibrary.has("layout-skills"), "the files are here").toBe(true)
+    expect(await layoutLibrary.missing(), "and it is not reported missing").toEqual([])
+  })
+
+  it("collects a commands directory too", async () => {
+    const pack = path.join(root, "layout-commands")
+    await fs.mkdir(path.join(pack, "commands"), { recursive: true })
+    await fs.writeFile(path.join(pack, "commands", "greet.md"), "Say hello.\n", "utf8")
+    const record = (await layoutCollector.add(pack)).record
+    expect(record.name, "the directory name is the pack's name").toBe("layout-commands")
+  })
+
+  it("collects a hooks directory too", async () => {
+    const pack = path.join(root, "layout-hooks")
+    await fs.mkdir(path.join(pack, "hooks"), { recursive: true })
+    await fs.writeFile(path.join(pack, "hooks", "hooks.json"), "{}\n", "utf8")
+    const record = (await layoutCollector.add(pack)).record
+    expect(record.name, "the directory name is the pack's name").toBe("layout-hooks")
+  })
+
+  it("still refuses a directory with nothing recognisable in it", async () => {
+    const pack = path.join(root, "layout-nothing")
+    await fs.mkdir(path.join(pack, "docs"), { recursive: true })
+    await fs.writeFile(path.join(pack, "README.md"), "nothing here\n", "utf8")
+    await expect(
+      layoutCollector.add(pack),
+      "a directory with no layout and no manifest is refused"
+    ).rejects.toThrow(/no plugin manifest/)
+  })
+
+  it("refuses a market root even when it carries a layout", async () => {
+    const pack = path.join(root, "layout-market")
+    await fs.mkdir(path.join(pack, "skills", "hello"), { recursive: true })
+    await fs.writeFile(
+      path.join(pack, "skills", "hello", "SKILL.md"),
+      "---\nname: hello\n---\n",
+      "utf8"
+    )
+    await writeMarketplace(pack, {
+      name: "market",
+      plugins: [{ name: "one", source: "./plugins/one" }],
+    })
+    await expect(
+      layoutCollector.add(pack),
+      "a market root with a layout is still a market, not a pack"
+    ).rejects.toThrow(/marketplace of plugins/)
   })
 })
 

@@ -37,7 +37,12 @@ import {
 } from "@context-hub/shadcn-ui/components/dialog"
 import { Spinner } from "@context-hub/shadcn-ui/components/spinner"
 
-import { PLUGIN_MANIFESTS } from "./contract.ts"
+import {
+  PLUGIN_MANIFESTS,
+  PLUGIN_MARKETPLACE_MANIFEST,
+  hasStandardComponents,
+  marketplaceManifest,
+} from "./contract.ts"
 import { dataUrlOf } from "./library.ts"
 import type { PackUploadFile, PluginCollected } from "./library.ts"
 import { bestPicture, pictureOf } from "./pictures.ts"
@@ -371,8 +376,13 @@ function fileAt(dir: TreeNode, relative: string): ReadFile | null {
  * own tooling, and reading that as a pack would offer a row the library then
  * refuses.
  *
+ * A root with no `plugin.json` may still name itself in its marketplace index,
+ * and one with neither is still a pack when it carries the component layout
+ * Claude Code discovers. The marketplace wins over the layout: a market whose
+ * entries point into subdirectories is a collection, not one pack.
+ *
  * @param dir — the directory to read in.
- * @returns the manifest that names it, or `null` when none does.
+ * @returns the manifest that names it, an empty object for a layout-only pack, or `null` when it is neither.
  */
 async function manifestOf(dir: TreeNode): Promise<Record<string, unknown> | null> {
   for (const relative of PLUGIN_MANIFESTS) {
@@ -393,7 +403,63 @@ async function manifestOf(dir: TreeNode): Promise<Record<string, unknown> | null
     const named = typeof manifest.name === "string" && manifest.name !== ""
     if (named || typeof manifest.version === "string") return manifest
   }
-  return null
+
+  const market = fileAt(dir, PLUGIN_MARKETPLACE_MANIFEST)
+  if (market !== null) {
+    const raw = await market.file.text().catch(() => null)
+    if (raw === null) return null
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      /* The index is there but unreadable: this directory is a market, not one
+         pack, so the layout fallback below must not claim it. */
+      return null
+    }
+    const root = marketplaceManifest(parsed)
+    if (root === null || (root.name === undefined && root.version === "")) return null
+    return {
+      ...(root.name === undefined ? {} : { name: root.name }),
+      version: root.version,
+      description: root.description,
+    }
+  }
+
+  return hasComponents(dir) ? {} : null
+}
+
+/**
+ * Whether a directory carries a component Claude Code discovers without a manifest.
+ *
+ * Only the paths that convention names are collected, and only from the directory
+ * itself, so scanning a deep folder stays cheap. The paths are handed to the
+ * shared rule, the same one the host applies to the disk.
+ *
+ * @param dir — the directory to look in.
+ * @returns whether the layout alone makes it a pack.
+ */
+function hasComponents(dir: TreeNode): boolean {
+  const found: string[] = []
+  if (fileAt(dir, ".mcp.json") !== null) found.push(".mcp.json")
+  if (fileAt(dir, "hooks/hooks.json") !== null) found.push("hooks/hooks.json")
+
+  const skills = dir.children.get("skills")
+  if (skills !== undefined) {
+    for (const [name, child] of skills.children) {
+      if (fileAt(child, "SKILL.md") !== null) found.push(`skills/${name}/SKILL.md`)
+    }
+  }
+
+  for (const name of ["commands", "agents"]) {
+    const node = dir.children.get(name)
+    if (node === undefined) continue
+    for (const file of node.files) {
+      const base = file.path.split("/").pop() ?? ""
+      found.push(`${name}/${base}`)
+    }
+  }
+
+  return hasStandardComponents(found)
 }
 
 /**

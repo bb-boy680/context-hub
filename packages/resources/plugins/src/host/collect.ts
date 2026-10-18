@@ -19,7 +19,7 @@ import path from "node:path"
 
 import { folderHash } from "@context-hub/core/host/folder-hash"
 
-import type { PluginOrigin } from "../contract.ts"
+import { PluginNameTakenError, type PluginOrigin } from "../contract.ts"
 import {
   isAbsolutePath,
   originToSpec,
@@ -151,7 +151,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
     const name = assertSafeSegment(manifest.name, "plugin name")
     const held = (await library.list()).find((one) => one.name === name)
     if (held !== undefined && !samePack(spec, held.source)) {
-      throw new Error(`${name} is already in this library, from ${whereFrom(held.source)}`)
+      throw new PluginNameTakenError(name, whereFrom(held.source))
     }
     if (held === undefined) {
       return { record: await library.add(name, stage, source, hash), already: false }

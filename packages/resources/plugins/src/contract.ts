@@ -175,6 +175,123 @@ export function hasUpstream(origin: PluginOrigin): boolean {
   return origin.kind === "url" || origin.kind === "archive"
 }
 
+/** Whether one marketplace entry points at the directory its index sits in. */
+function atMarketRoot(source: unknown): boolean {
+  return (
+    source === undefined || source === null || source === "" || source === "." || source === "./"
+  )
+}
+
+/** One field as the string it is, or `""` when it is not a string. */
+function textOf(value: unknown): string {
+  return typeof value === "string" ? value : ""
+}
+
+/**
+ * Read a marketplace index as the plugin its own directory is.
+ *
+ * Claude Code treats an entry as the manifest when the plugin carries no
+ * `plugin.json`, so a directory whose index names that directory is one pack.
+ * Only the root is answered for: an index whose entries point into
+ * subdirectories describes a collection, not one plugin, and this returns null
+ * rather than letting a market root be collected whole.
+ *
+ * @param value — the parsed `marketplace.json`.
+ * @returns the fields the root is named by, or null when the index does not name it.
+ */
+export function marketplaceManifest(
+  value: unknown
+): { name?: string; version: string; description: string } | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null
+  const document = value as Record<string, unknown>
+  const entries = document.plugins
+  if (!Array.isArray(entries) || entries.length === 0) return null
+  if (
+    !entries.every(
+      (entry) => typeof entry === "object" && entry !== null && !Array.isArray(entry)
+    )
+  ) {
+    return null
+  }
+  const plugins = entries as Record<string, unknown>[]
+  if (!plugins.every((entry) => atMarketRoot(entry.source))) return null
+
+  if (plugins.length === 1) {
+    const only = plugins[0] as Record<string, unknown>
+    const name = textOf(only.name)
+    return {
+      ...(name === "" ? {} : { name }),
+      version: textOf(only.version),
+      description: textOf(only.description),
+    }
+  }
+
+  const metadata =
+    typeof document.metadata === "object" &&
+    document.metadata !== null &&
+    !Array.isArray(document.metadata)
+      ? (document.metadata as Record<string, unknown>)
+      : {}
+  const name = textOf(document.name)
+  return {
+    ...(name === "" ? {} : { name }),
+    version: textOf(document.version) || textOf(metadata.version),
+    description: textOf(document.description) || textOf(metadata.description),
+  }
+}
+
+/**
+ * Whether any of these files is one Claude Code discovers without a manifest.
+ *
+ * Callers pass only paths that exist, relative to the plugin root and separated
+ * by `/`. Which paths count is decided here once, so the host and the browser
+ * cannot drift apart on what a manifest-less plugin looks like.
+ *
+ * @param paths — the files a directory holds.
+ * @returns whether the directory is a plugin by its layout alone.
+ */
+export function hasStandardComponents(paths: readonly string[]): boolean {
+  return paths.some((path) => {
+    if (path === ".mcp.json" || path === "hooks/hooks.json") return true
+    const parts = path.split("/")
+    if (parts.length === 3 && parts[0] === "skills" && parts[2] === "SKILL.md") {
+      return parts[1] !== ""
+    }
+    if (parts.length === 2 && (parts[0] === "commands" || parts[0] === "agents")) {
+      return parts[1] !== ".md" && parts[1].endsWith(".md")
+    }
+    return false
+  })
+}
+
+/** The code a page switches on to word a name collision for itself. */
+export const PLUGIN_NAME_TAKEN = "plugin-name-taken"
+
+/**
+ * A refusal the page can word in the reader's own language: another source
+ * already owns this pack's name.
+ *
+ * The bridge flattens an error into a sentence, and a sentence cannot be
+ * translated after the fact. This one carries the code and the two facts the
+ * page needs, so the host keeps an English fallback and the page can render the
+ * same refusal in the current locale.
+ */
+export class PluginNameTakenError extends Error {
+  /** What the page switches on. */
+  readonly code: string = PLUGIN_NAME_TAKEN
+  /** The name both packs claim. */
+  readonly pluginName: string
+  /** Where the pack already in the library came from. */
+  readonly from: string
+
+  constructor(pluginName: string, from: string) {
+    super(`${pluginName} is already in this library, from ${from}`)
+    this.name = "PluginNameTakenError"
+    this.pluginName = pluginName
+    this.from = from
+  }
+}
+
 /** The directory under a hub home that holds collected plugin packs. */
 export const PLUGIN_LIBRARY_DIR = "plugins"
 
@@ -201,6 +318,14 @@ export const PLUGIN_MARKETPLACE_DIR = ".claude-plugin"
 
 /** File name of that index. */
 export const PLUGIN_MARKETPLACE_FILE = "marketplace.json"
+
+/**
+ * The marketplace index as a path inside the directory that carries it.
+ *
+ * One spelling for both sides: the host joins it onto a directory, and the
+ * browser looks a file up by this exact relative path.
+ */
+export const PLUGIN_MARKETPLACE_MANIFEST = `${PLUGIN_MARKETPLACE_DIR}/${PLUGIN_MARKETPLACE_FILE}`
 
 /** The marketplace name a hub library presents itself under. */
 export const PLUGIN_MARKETPLACE_NAME = "context-hub"

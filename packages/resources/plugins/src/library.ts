@@ -19,7 +19,9 @@ import { createCatalog, type Catalog, type ExtensionIcon } from "@context-hub/ex
 import { useCatalog, useHub, useI18n, useSettings } from "@context-hub/extensions/react"
 
 import {
+  PLUGIN_NAME_TAKEN,
   PLUGIN_ROUTE,
+  PluginNameTakenError,
   type PackContents,
   type PluginInstallReport,
   type PluginInstallScope,
@@ -43,6 +45,10 @@ const ENDPOINT = PLUGIN_ROUTE
 /** What one call to the bridge returns when it refuses. */
 interface ErrorBody {
   error?: string
+  /** Set when the page can word the refusal better than the host's sentence. */
+  code?: string
+  name?: string
+  from?: string
 }
 
 /**
@@ -229,6 +235,9 @@ export async function call<T>(path: string, body?: unknown): Promise<T> {
   })
   if (!response.ok) {
     const detail = (await response.json().catch(() => ({}))) as ErrorBody
+    if (detail.code === PLUGIN_NAME_TAKEN) {
+      throw new PluginNameTakenError(detail.name ?? "", detail.from ?? "")
+    }
     throw new Error(detail.error ?? `${String(response.status)} ${response.statusText}`)
   }
   return (await response.json()) as T
