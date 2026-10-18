@@ -17,6 +17,9 @@ dist-ssr
 /apps/desktop/release/
 /apps/desktop/release-*/
 
+# machine-local agent skill links
+/.claude/skills/
+
 # env files (can opt-in for committing if needed)
 .env*
 
