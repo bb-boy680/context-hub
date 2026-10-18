@@ -1,7 +1,6 @@
 import {
   BlocksIcon,
   GitBranchIcon,
-  LayoutDashboardIcon,
   SettingsIcon,
 } from "lucide-react"
 import * as React from "react"
@@ -31,9 +30,11 @@ export type NavGroup = {
 /** Entries the shell ships; extensions add to the same groups through the `nav` point. */
 export const navGroups: NavGroup[] = [
   {
+    /* Kept so asset extensions have a group to register into; it is hidden
+       until one does. */
     id: "assets",
     labelKey: "nav.group.assets",
-    items: [{ labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon, order: 10 }],
+    items: [],
   },
   {
     id: "operate",

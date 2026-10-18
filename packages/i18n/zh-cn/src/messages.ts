@@ -6,7 +6,6 @@
 export const messages: Record<string, string> = {
   "nav.group.assets": "资产",
   "nav.group.operate": "运维",
-  "nav.overview": "概览",
   "nav.skills": "技能",
   "nav.mcpServers": "MCP 服务器",
   "nav.plugins": "插件",

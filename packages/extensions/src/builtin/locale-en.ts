@@ -10,7 +10,6 @@ import type { ExtensionModule } from "../types.ts"
 const en: Record<string, string> = {
   "nav.group.assets": "Assets",
   "nav.group.operate": "Operate",
-  "nav.overview": "Overview",
   "nav.skills": "Skills",
   "nav.mcpServers": "MCP Servers",
   "nav.plugins": "Plugins",

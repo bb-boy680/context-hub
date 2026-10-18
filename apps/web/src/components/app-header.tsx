@@ -35,7 +35,7 @@ export function AppHeader({ onOpenSearch }: { onOpenSearch: () => void }) {
           </BreadcrumbItem>
           <BreadcrumbSeparator />
           <BreadcrumbItem>
-            <BreadcrumbPage>{t(page ?? "nav.overview")}</BreadcrumbPage>
+            <BreadcrumbPage>{page ? t(page) : null}</BreadcrumbPage>
           </BreadcrumbItem>
         </BreadcrumbList>
       </Breadcrumb>
