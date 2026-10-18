@@ -23,6 +23,7 @@ export default defineConfig({
       "packages/resources/plugins/vitest.config.ts",
       "packages/resources/skills/vitest.config.ts",
       "packages/resources/prompts/vitest.config.ts",
+      "packages/resources/variables/vitest.config.ts",
       "packages/search/skills-sh/vitest.config.ts",
       "apps/web/vitest.config.ts",
     ],

@@ -13,6 +13,7 @@
     "@context-hub/core": "workspace:*",
     "@context-hub/extensions": "workspace:*",
     "@context-hub/shadcn-ui": "workspace:*",
+    "@context-hub/variables": "workspace:*",
     "@deepseek-ai/cordis": "^4.0.4",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "cn": "^0.4.0",

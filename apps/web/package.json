@@ -22,6 +22,7 @@
     "@context-hub/prompts": "workspace:*",
     "@context-hub/skills": "workspace:*",
     "@context-hub/skills-sh": "workspace:*",
+    "@context-hub/variables": "workspace:*",
     "@context-hub/shadcn-ui": "workspace:*",
     "cn": "^0.4.0",
     "lucide-react": "^1.48.0",

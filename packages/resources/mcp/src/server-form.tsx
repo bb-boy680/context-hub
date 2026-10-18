@@ -13,10 +13,11 @@ import * as React from "react"
 import { cn } from "cn"
 
 import { splitArguments, type McpDeclaration, type McpTransport } from "./contract.ts"
-import { useI18n } from "@context-hub/extensions/react"
+import { useI18n, useHub } from "@context-hub/extensions/react"
 import { TagEditor } from "@context-hub/extensions/components"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Textarea } from "@context-hub/shadcn-ui/components/textarea"
+import type { VariableInputProps } from "@context-hub/variables"
 
 /** The transports the form picks between. */
 const TRANSPORTS: McpTransport[] = ["stdio", "sse", "http"]
@@ -181,6 +182,34 @@ function Field({
   )
 }
 
+/**
+ * A field backed by the variables module's tag editor.
+ *
+ * The editor comes through the module's service rather than a direct import:
+ * when the variables module is disabled there is no service, and the field is
+ * the plain one. The editor owns the `$` panel and the `${NAME}` tags, so this
+ * form only sees the serialized value it would have written anyway.
+ */
+function VariableField(props: React.ComponentProps<typeof Field>) {
+  const ctx = useHub()
+  const Input = ctx.get("variables")?.components
+    .VariableInput as React.ComponentType<VariableInputProps> | undefined
+
+  if (Input === undefined) return <Field {...props} />
+
+  return (
+    <Input
+      value={props.value}
+      placeholder={props.placeholder}
+      onChange={props.onChange}
+      mono={props.mono}
+      invalid={props.invalid}
+      className={props.className}
+      ariaLabel={props.placeholder}
+    />
+  )
+}
+
 /** The line under a field a submit found empty, absent while the field is filled. */
 function FieldError({ message }: { message: string | undefined }) {
   return message === undefined ? null : <span className={ERROR}>{message}</span>
@@ -217,7 +246,7 @@ function PairRow({
         mono
         className="w-[200px] min-w-[88px] shrink grow-0 basis-[200px]"
       />
-      <Field value={value} placeholder={valueLabel} onChange={onValue} />
+      <VariableField value={value} placeholder={valueLabel} onChange={onValue} />
       <Button
         variant="outline"
         size="icon"
@@ -335,7 +364,7 @@ export function ServerForm({
 
       {remote ? (
         <Section label={t("mcp.add.url")}>
-          <Field
+          <VariableField
             value={values.url}
             placeholder={t("mcp.add.urlPlaceholder")}
             invalid={errors?.url !== undefined}
@@ -347,7 +376,7 @@ export function ServerForm({
       ) : (
         <>
           <Section label={t("mcp.detail.field.command")}>
-            <Field
+            <VariableField
               value={values.command}
               placeholder={t("mcp.add.commandPlaceholder")}
               invalid={errors?.command !== undefined}
@@ -357,7 +386,7 @@ export function ServerForm({
             <FieldError message={errors?.command} />
           </Section>
           <Section label={t("mcp.detail.field.arguments")}>
-            <Field
+            <VariableField
               value={values.args}
               placeholder={t("mcp.add.argumentsPlaceholder")}
               onChange={(args) => onChange({ ...values, args })}

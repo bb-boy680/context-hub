@@ -53,6 +53,9 @@ importers:
       '@context-hub/skills-sh':
         specifier: workspace:*
         version: link:../../packages/search/skills-sh
+      '@context-hub/variables':
+        specifier: workspace:*
+        version: link:../../packages/resources/variables
       '@context-hub/zh-cn':
         specifier: workspace:*
         version: link:../../packages/i18n/zh-cn
@@ -315,6 +318,9 @@ importers:
       '@context-hub/shadcn-ui':
         specifier: workspace:*
         version: link:../../shadcn-ui
+      '@context-hub/variables':
+        specifier: workspace:*
+        version: link:../variables
       '@deepseek-ai/cordis':
         specifier: ^4.0.4
         version: 4.0.4
@@ -507,6 +513,58 @@ importers:
       use-immer:
         specifier: ^0.11.0
         version: 0.11.0(immer@11.1.18)(react@19.2.8)
+    devDependencies:
+      '@eslint/js':
+        specifier: ^10
+        version: 10.0.1(eslint@10.10.0(jiti@2.7.0))
+      '@types/node':
+        specifier: ^24
+        version: 24.13.3
+      '@types/react':
+        specifier: ^19
+        version: 19.2.18
+      eslint:
+        specifier: ^10
+        version: 10.10.0(jiti@2.7.0)
+      eslint-plugin-react-hooks:
+        specifier: ^7.1.1
+        version: 7.1.1(eslint@10.10.0(jiti@2.7.0))
+      globals:
+        specifier: ^17
+        version: 17.12.0
+      typescript:
+        specifier: ~6
+        version: 6.0.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.70.0(eslint@10.10.0(jiti@2.7.0))(typescript@6.0.3)
+      vitest:
+        specifier: ^5.0.5
+        version: 5.0.5(@types/node@24.13.3)(vite@8.2.2(@types/node@24.13.3)(esbuild@0.28.2)(jiti@2.7.0))
+
+  packages/resources/variables:
+    dependencies:
+      '@context-hub/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@context-hub/extensions':
+        specifier: workspace:*
+        version: link:../../extensions
+      '@context-hub/shadcn-ui':
+        specifier: workspace:*
+        version: link:../../shadcn-ui
+      '@deepseek-ai/cordis':
+        specifier: ^4.0.4
+        version: 4.0.4
+      cn:
+        specifier: ^0.4.0
+        version: 0.4.0
+      lucide-react:
+        specifier: ^1.48.0
+        version: 1.48.0(react@19.2.8)
+      react:
+        specifier: ^19.2.8
+        version: 19.2.8
     devDependencies:
       '@eslint/js':
         specifier: ^10

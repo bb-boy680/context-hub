@@ -32,6 +32,7 @@ import { createMcpHandler } from "@context-hub/mcp/handlers"
 import { createPluginHandler } from "@context-hub/plugins/handlers"
 import { createPromptHandler } from "@context-hub/prompts/handlers"
 import { createSkillHandler } from "@context-hub/skills/handlers"
+import { createVariableHandler } from "@context-hub/variables/handlers"
 
 /** One flag and the value it takes, or `true` when it takes none. */
 function flags(argv: readonly string[]): Map<string, string | true> {
@@ -107,6 +108,7 @@ const options: HubServerOptions = {
     createMcpHandler(placed),
     createPluginHandler(placed),
     createPromptHandler(placed),
+    createVariableHandler(placed),
   ],
   ...(portText === undefined ? {} : { port: Number(portText) }),
   ...(pathOf(given, "host") === undefined ? {} : { host: pathOf(given, "host") as string }),

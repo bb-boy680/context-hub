@@ -24,6 +24,7 @@ import { pluginsExtension } from "@context-hub/plugins"
 import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
 import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-hub/skills"
 import { skillsShExtension } from "@context-hub/skills-sh"
+import { variablesExtension } from "@context-hub/variables"
 import * as ui from "./ui-kit.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { preloadCatalogs } from "./preload.ts"
@@ -180,6 +181,7 @@ export async function startHub(): Promise<HubKernel> {
       promptsExtension,
       mcpExtension,
       pluginsExtension,
+      variablesExtension,
       /* Only the agent integrations this build is being tried against. The
          others are still written and still shipped; they are left out here so
          the page's module graph is small enough to boot quickly while the
