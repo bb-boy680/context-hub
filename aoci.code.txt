@@ -35,7 +35,7 @@ App.tsx[AU8T]: F:路由表与外壳装配 | R:code:apps/web/src/components/app-l
 main.tsx[EU9T]: F:应用启动入口 | R:code:apps/web/src/lib/hub.ts,code:apps/web/src/components/theme-provider.tsx | A:- | S:必须先 await startHub() 拿到 ctx 再渲染；启动失败会把错误文本写进 #root，而不是留一片白屏
 
 ===D:/work-space/dsh-context-hub/apps/web/src/components/===
-app-header.tsx[DU5T]: F:顶栏面包屑与全局动作 | R:code:apps/web/src/lib/navigation.ts,code:apps/web/src/components/app-layout.tsx | A:AppHeader | S:pendingChanges 仍写死为 3，未接真实待同步数；Ctrl+K 的监听在 AppLayout，此处按钮只负责回调；面包屑没有匹配导航项时留空；搜索入口在 lg 以下隐藏
+app-header.tsx[DU5T]: F:顶栏面包屑、搜索与插件操作插槽 | R:code:apps/web/src/lib/navigation.ts,code:apps/web/src/components/app-layout.tsx,code:packages/extensions/src/contributions.ts,code:packages/extensions/src/react.tsx | A:AppHeader | S:header 贡献按 order 升序，相同 order 沿用 catalog 顺序；贡献组件无 props、直接作为 flex 子元素，尺寸与 shrink-0 自管；ThemeToggle 在贡献之后；Ctrl+K 监听在 AppLayout
 app-layout.tsx[AU7T]: F:外壳布局与快捷键 | R:code:apps/web/src/components/app-sidebar.tsx,code:apps/web/src/components/search-palette.tsx,code:apps/web/src/components/app-header.tsx | A:AppLayout | S:侧栏宽度固定 248px，各页面 1192px 内容列据此校准；Ctrl/Cmd+K 的键盘监听在这里，搜索面板按需挂载
 app-sidebar.tsx[AU8S]: F:侧栏分组装配 | R:code:apps/web/src/components/sidebar-rows.tsx,code:apps/web/src/components/workspace-group.tsx,code:apps/web/src/lib/workspaces.ts | A:AppSidebar,AgentGroup | S:AgentGroup 只列 useSkillAgents 报出且已注册 target 的 agent，没注册 skills place 的集成不出现；AGENTS_VISIBLE=8 之后折叠；分组顺序是资产、工作区、Agent、运营
 extension-detail-dialog.tsx[DU5M]: F:扩展详情弹窗 | R:code:apps/web/src/lib/extensions.ts,code:packages/extensions/src/types.ts | A:ExtensionDetailDialog | S:locked 或 incompatible 时不渲染安装按钮；kind=builtin 的条目不显示权限区；无 filesystem 能力时对每个 target 提示需要运行时
@@ -49,7 +49,7 @@ workspace-group.tsx[DU8M]: F:侧栏工作区列表与增删改 | R:code:apps/web
 extensions.ts[CU5T]: F:扩展展示辅助表 | R:- | A:categoryOrder,categoryTile | S:categoryOrder 决定页面分区顺序且空分类会被跳过；categoryTile 借用 skill 标签配色，以保持同一套视觉
 folder-picker.ts[IU5T]: F:浏览器目录选择封装 | R:- | A:pickFolder | S:只在用户手势中可调用；页面只能拿到目录名拿不到路径，host 侧按名字自行定位；无此能力的浏览器返回 unsupported
 hub.ts[AE9M]: F:web 形态内核装配 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/preload.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts,code:packages/resources/variables/src/index.ts | A:startHub | S:无 host 时 files 为 null 且不注册 hub.skills/hub.prompts；两个库各探自己的路由，一个不可用不影响另一个；state 先从 host 读，旧的 localStorage 值搬过去后才从浏览器删除；preload 不 await；变量扩展也在 extensions 列表里启用
-navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:code:packages/extensions/src/types.ts | A:navGroups,useNavGroups,useNavItem | S:assets 组没有内置项，只为资源扩展提供注册位，空组不渲染；内置项 order 留 10/20/30 间隔供扩展插值；useNavItem 取最长匹配路径，嵌套页才不丢标题
+navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:code:packages/extensions/src/types.ts | A:navGroups,useNavGroups,useNavItem | S:assets 组没有内置项，只为资源扩展提供注册位，空组不渲染；内置项 order 留 20/30 间隔供扩展插值；useNavItem 取最长匹配路径，嵌套页才不丢标题
 place-files.ts[ID7T]: F:客户端配置文件远端读写 | R:code:apps/web/src/lib/hub.ts | A:placeFilesAvailable,createRemotePlaceFiles | S:无 host 时每个调用都抛错，调用方要如实报失败而不是凭空造出一个文件；可用性探测不带 ref，故拒绝任何 place 的宿主仍会被识别为在线
 ui-kit.ts[CE7T]: F:插件可用的 UI 组件集 | R:code:packages/shadcn-ui/src/components/button.tsx,code:packages/shadcn-ui/src/components/card.tsx | A:Badge,Button,Card,CardContent,Input,Spinner | S:插件模块不能解析包且必须复用同一 React 实例，UI 只能从此处取；新增组件要在此显式导出
 workspaces.ts[ID8S]: F:工作区列表客户端服务 | R:code:apps/web/src/lib/hub.ts,code:packages/core/src/workspace.ts | A:createRemoteWorkspaceService,useWorkspaces | S:服务是单例，侧栏与各页面共享同一份状态才不会各说各话；并发的 refresh 只发一次请求；答案未变时不通知订阅者，否则库的「变了就重读」会成环
@@ -58,7 +58,6 @@ preload.ts[AE7T]: F:启动时并行开始全部共享库读取 | R:code:apps/web
 ===D:/work-space/dsh-context-hub/apps/web/src/pages/===
 extensions.tsx[AE8M]: F:扩展目录页 | R:code:apps/web/src/components/extension-detail-dialog.tsx,code:apps/web/src/lib/extensions.ts | A:ExtensionsPage | S:分类无条目时整段不渲染；搜索只匹配 name、id、description 三段；locked 与 incompatible 的行不显示启停按钮；语言选择器已移除，语言只在设置页
 placeholder.tsx[AU3T]: F:未设计路由的占位页 | R:code:apps/web/src/lib/navigation.ts | A:PlaceholderPage | S:标题取最长匹配的导航项，没有匹配项时留空；正文文案是硬编码英文，未走 i18n
-repository.tsx[AU5M]: F:仓库同步页 | R:- | A:RepositoryPage | S:仓库、分支、同步记录与连接状态全是演示常量未接 GitHub；断开只停同步，已同步文件保留
 settings.tsx[AU8L]: F:设置页：外观与布局、安装方式、图片下载、关于 | R:code:packages/extensions/src/settings.ts,code:packages/extensions/src/react.tsx,code:apps/web/src/components/theme-provider.tsx,code:packages/resources/skills/src/store.ts,code:packages/resources/plugins/src/library.ts,code:packages/core/src/about.ts | A:SettingsPage,ThemePreview,LayoutPreview,InstallChoiceCard,CopyValue | S:布局只作资源页初值，页内切换不回写；主题走 localStorage，语言与 settings 走 state 文档；统计任一库读失败显示 — 而不是 0；下载失败保留原 link；页面宽度跟随内容区，不再居中限宽；字体沿用全站 --font-mono
 
 ===D:/work-space/dsh-context-hub/packages/core/===
@@ -108,7 +107,7 @@ plugin.json[FE5T]: F:Hello 示例扩展清单 | R:- | A:- | S:id 必须等于所
 
 ===D:/work-space/dsh-context-hub/packages/extensions/src/builtin/===
 index.ts[CE7T]: F:内核自带扩展清单 | R:code:packages/extensions/src/builtin/locale-en.ts | A:builtinExtensions | S:目前只含锁定的英文语言包；产品在此数组旁追加自己的包
-locale-en.ts[CL9S]: F:锁定的英文基础语言包 | R:- | A:englishLocale | S:manifest.locked 为 true，必须始终启用且不可卸载，否则回退链会断；i18n 先合并 en 再叠加当前语言，故缺键退回英文而非露出 key；settings.* 键必须与 zh-CN 同步
+locale-en.ts[CL9S]: F:锁定的英文基础语言包 | R:- | A:englishLocale | S:manifest.locked 为 true，必须始终启用且不可卸载，否则回退链会断；i18n 先合并 en 再叠加当前语言，故缺键退回英文而非露出 key；settings./header. 键必须与 zh-CN 同步
 
 ===D:/work-space/dsh-context-hub/packages/extensions/src/components/===
 avatar-stack.tsx[CU5T]: F:重叠图标组 | R:- | A:AvatarStack,AvatarMark | S:ring 颜色由调用方 seam 参数给定（所在表面不同则值不同）；超过 max 时最后一格改画 +N 圆盘
@@ -140,7 +139,7 @@ react.tsx[CU7S]: F:内核的 React 绑定 | R:code:packages/extensions/src/agent
 remote.ts[IN7T]: F:浏览器侧插件空间读取 | R:code:packages/core/src/plugins.ts | A:createRemotePluginSource | S:只读；安装写文件是宿主的事；列表向路由请求 ids 字段；读文件时逐段编码，路径分隔符不能被当成一次编码
 service.ts[CE9M]: F:扩展目录与启停生命周期 | R:code:packages/extensions/src/contributions.ts,code:packages/extensions/src/host.ts,code:packages/extensions/src/types.ts | A:ExtensionService,ExtensionView,ExtensionSnapshot,ExtensionStatus | S:启用是 Cordis 插件加载、停用是 fiber 释放，故所有注册经同一机制回卷；provide 的名字必须先在 manifest.provides 声明，否则激活失败；contributions 按 catalog 顺序而非激活顺序返回；状态文档 extensions 记每 id 一个布尔；构造只装目录不激活，start() 才逐项激活并置 settled——其他服务读贡献前必须先看它，启动前的空集是还没来而非已移除
 skill-registry.ts[CG7T]: F:远端技能目录契约 | R:- | A:SkillRegistry,RemoteSkill,RegistryPage,RegistryQuery | S:只读契约，安装走 hub 库自己的 package 路径；describe 是逐行补全，失败不影响搜索结果
-types.ts[CE9M]: F:扩展契约与兼容判定 | R:code:packages/extensions/src/host.ts | A:ExtensionDefinition,ExtensionManifest,ExtensionScope,ContributionMap,ExtensionServices,isCompatible | S:isCompatible 是范围相等而非 semver 区间；inject 回调里的服务必须从 services 映射取——属性访问沿 fiber 自身链解析，兄弟扩展的服务不在其上；ExtensionServices 由发布方 merge 声明
+types.ts[CE9M]: F:扩展契约与兼容判定 | R:code:packages/extensions/src/host.ts | A:ExtensionDefinition,ExtensionManifest,HeaderContribution,ContributionMap,ExtensionServices,isCompatible | S:isCompatible 是范围相等而非 semver 区间；inject 回调里的服务必须从 services 映射取——属性访问沿 fiber 自身链解析，兄弟扩展的服务不在其上；ExtensionServices 由发布方 merge 声明
 catalog.ts[CD9M]: F:一份库的一次读取与快照 | R:code:packages/extensions/src/react.tsx | A:createCatalog,Catalog,CatalogState,mapLimit | S:并发 load 折叠成一次读取；晚到的读取答案被丢弃而不覆盖更新的答案；失败保留上一份答案并写 failure 而不 reject；produce 未改动时返回同一对象，故空提交不重绘订阅者；mapLimit 限制同时进行的探测数
 contributions.ts[CE9S]: F:贡献点作为服务 | R:code:packages/extensions/src/types.ts,code:packages/extensions/src/service.ts | A:ContributionPoint,POINT_SERVICES,createContributionPoints | S:register 必须是原型方法——箭头属性会闭包住服务自己的 context，结果什么都能注册、却永远不会被收回；贡献的寿命来自调用方的 context，故停用插件时由同一机制回卷
 agents.ts[CG8T]: F:侧栏的 Agent 选择决定哪些 provider 可读 | R:code:packages/extensions/src/react.tsx | A:chosenAgents,chosenProviders,chosenAgentsOf,ChosenProvider | S:shared:true 表示模块自己的位置（.agents/skills 等）而非某 agent 的，恒可读；没有 hub.workspaces 服务等于什么都没选，故无 workspace 服务的宿主不读任何 agent 位置；声明 Context 的文件必须 import ./cordis.ts，否则同一 Context 会有两个身份、整包类型崩
@@ -168,7 +167,7 @@ vitest.config.ts[FQ3T]: F:中文语言包的 vitest 项目 | R:code:packages/i18
 
 ===D:/work-space/dsh-context-hub/packages/i18n/zh-cn/src/===
 index.ts[CL7T]: F:简体中文语言包声明 | R:code:packages/i18n/zh-cn/src/messages.ts | A:simplifiedChineseLocale,zhCNMessages | S:kind 为 declarative（内核不为它跑代码）、defaultEnabled 为 false；id 用 hub.locale.zh-CN
-messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键对应 extensions 的英文基础表，缺键回退英文；mcp./skills./prompts./plugins./settings./variables. 等命名空间全收在这一个文件里；新增英文键必须同步这里
+messages.ts[CL7L]: F:简体中文文案表 | R:- | A:messages | S:键对应 extensions 的英文基础表，缺键回退英文；mcp./skills./prompts./plugins./settings./variables./header. 等命名空间全收在这一个文件里；新增英文键必须同步这里
 
 ===D:/work-space/dsh-context-hub/packages/resources/mcp/__test__/===
 fixture-server.mjs[TQ5T]: F:探测用的最小 MCP 服务器 | R:code:packages/resources/mcp/__test__/probe.test.ts | A:- | S:只由 probe.test.ts 拉起，不手工运行；https 图标故意排在 data URI 之前、工具列表分页、写 stderr；CTX_HUB_FIXTURE_FAIL 与 MARK 驱动失败路径与变量展开断言
