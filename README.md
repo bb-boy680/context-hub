@@ -52,11 +52,11 @@ Page, Restart App and Toggle DevTools while it runs. Set
 `CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271` to point the window at the Vite dev
 server instead of starting its own server.
 
-The release version is the root `package.json` version. A packaged app checks
-GitHub Releases for a newer one and installs it in place after the hub server
-has stopped. Releases are built by `.github/workflows/release.yml`; see
+The release version is the tag (`v1.2.0`). A packaged app checks GitHub
+Releases for a newer one and installs it in place after the hub server has
+stopped. Releases are built by `.github/workflows/release.yml`; see
 [docs/building.md](docs/building.md) for signing, feeds and the limits of what
-can be verified locally.
+can be verified locally. 中文图文步骤见 [docs/releasing.md](docs/releasing.md)。
 
 ## Extensions
 
