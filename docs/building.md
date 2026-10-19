@@ -6,28 +6,26 @@ of them run `apps/web/server.ts`; nothing re-implements a route.
 
 ## Version
 
-The root `package.json` `version` is the release version. Raise it by hand and
-mirror the same number in `apps/desktop/package.json`; the test in
-`apps/desktop/__test__/version.test.ts` fails when the two drift.
-`apps/web/server.ts` imports the root manifest, so the About row, the CLI binary
-and the desktop bundle all carry it at build time.
+The tag is the release version. The root `package.json` version is a
+development copy: each release build job stamps the tag version into the root
+and `apps/desktop/package.json` before packaging, so the About row, the CLI
+binary, `app.getVersion()` and the update feed all agree. `apps/web/server.ts`
+imports the root manifest, so those forms carry it at build time.
 `apps/desktop/electron-builder.config.mjs` copies it into the packaged manifest
-as `extraMetadata.version`, which is what `app.getVersion()` and the update feed
-compare. `apps/web/package.json`'s version is not read.
+as `extraMetadata.version`. `apps/web/package.json`'s version is not read.
 
 Merging to main does not bump the version or create a tag. To release:
 
-1. Change both `version` fields to the release version.
-2. Commit and push.
-3. Push a tag named `v<version>` (`v1.2.0`). That push runs the release
-   workflow.
+1. Push a tag named `v<version>` (`v1.2.0`). The tag is the source of truth; the
+   manifests do not need editing first.
+2. The workflow runs checks, builds, and publishes the Release.
+3. After publishing, the bot opens a `release/version-sync` pull request that
+   sets both manifests to the tag version. Merge it through the protected
+   branch so local builds report the released version.
 
 A version with a prerelease suffix (`1.2.0-beta.1`, tag `v1.2.0-beta.1`) is a
 test release: it becomes a GitHub pre-release and the stable desktop updater
 does not offer it. A major release is just a higher major number (`v2.0.0`).
-
-The release workflow rejects a tag that is not `v` + the root version before
-building anything.
 
 ## Command-line binary
 
@@ -197,17 +195,17 @@ files. `electron-updater` verifies the SHA-512 recorded in the feed.
 
 To publish a stable release:
 
-1. Raise the root `package.json` version and the mirrored
-   `apps/desktop/package.json` version (the test enforces the match).
-2. Commit and push.
-3. Push a tag named `v<version>`. The `version` job rejects a tag that does not
-   match; the `checks` job runs lint, typecheck, tests and the build; the
-   desktop jobs build on their own runners; the `publish` job attaches every
-   artifact to the GitHub Release.
+1. Push a tag named `v<version>`. The tag is the release version; no manifest
+   edit is needed first.
+2. The `version` job parses the tag, `checks` runs lint, typecheck, tests and
+   the build, the desktop jobs build on their own runners, and `publish`
+   attaches every artifact to the GitHub Release.
+3. After publishing, merge the `release/version-sync` pull request the bot
+   opens. It updates both manifests to the tag version.
 
-For a test release, use a prerelease version in both manifests and the tag
-(`1.2.0-beta.1` / `v1.2.0-beta.1`). The Release is marked as a GitHub
-pre-release, so `electron-updater` keeps offering only stable releases.
+For a test release, push a prerelease tag (`v1.2.0-beta.1`). The Release is
+marked as a GitHub pre-release, so `electron-updater` keeps offering only stable
+releases.
 
 Real download and installation are not verified on a development machine: that
 needs an installed older NSIS build and a published newer release. The
@@ -232,37 +230,50 @@ pnpm build
 `build` runs only after lint, typecheck and tests pass. A newer push to the
 same pull request cancels the previous run.
 
-A failing check does not block the Merge button by itself. Enable branch
-protection and require the `checks` job:
+`main` is protected: every change, including the automated version sync, must
+arrive as a pull request. Require the `checks` job on `main`:
 
 ```text
 Settings → Branches → Branch protection rules → main
+→ Require a pull request before merging
 → Require status checks to pass before merging
 → checks
+→ Do not allow force pushes or deletions
 ```
+
+The bot opens the version-sync pull request after a release, so
+`Settings → Actions → General → Allow GitHub Actions to create and approve pull
+requests` must stay enabled.
 
 ## Release
 
 `.github/workflows/release.yml` runs on a `v*` tag or by manual dispatch.
 Merging to main does not trigger it.
 
-- `version` checks that the tag is `v` + the root `package.json` version and
-  reports whether the version is a prerelease.
+- `version` parses the tag (`v1.2.0`, `v1.2.0-beta.1`) and reports whether the
+  version is a prerelease. The tag does not have to match the manifests.
 - `checks` runs `pnpm lint`, `typecheck`, `test` and `build`; nothing is
   packaged if any of them fails.
+- the CLI and desktop jobs stamp the tag version into both manifests before
+  building.
 - one Linux runner cross-compiles the five CLI binaries and smoke-tests the
-  Linux x64 one (page, `/hub/about`, root version);
+  Linux x64 one (page, `/hub/about`, tag version);
 - Windows, macOS and Ubuntu runners each build their desktop installer,
   `latest*.yml` and `.blockmap`;
 - on a tag, the `publish` job creates or updates the GitHub Release and uploads
   every artifact. A prerelease version creates the Release with
   `--prerelease`.
+- after publishing, `publish` opens or updates `release/version-sync`, a pull
+  request that sets both manifests to the tag version. It is never pushed to
+  main directly.
 
-A manual dispatch stops after the artifacts; it does not publish.
+A manual dispatch stops after the artifacts; it does not publish or open a
+sync pull request.
 
 The repository settings must allow workflow writes: `Settings → Actions →
-General → Workflow permissions` set to Read and write, and any tag protection
-must let Actions publish the Release.
+General → Workflow permissions` set to Read and write and "Allow GitHub Actions
+to create and approve pull requests" enabled. Any tag protection must let
+Actions publish the Release.
 
 ## Known limits
 
@@ -275,8 +286,13 @@ must let Actions publish the Release.
 - The tag is pushed before the build. If a CLI or desktop job fails, the tag
   exists without a Release; re-run the failed jobs for the same tag rather than
   deleting or moving it.
-- Pull request checks only block a merge after branch protection requires the
-  `checks` job.
+- Pull request checks block a merge only while branch protection keeps
+  requiring the `checks` job.
+- The version-sync pull request changes only the two `version` fields. If it is
+  still open when another tag is pushed, the workflow force-pushes the same
+  `release/version-sync` branch and retitles the pull request to the newest tag.
+- A failed release does not open the version-sync pull request; the manifests
+  keep the previous version until a release succeeds.
 - A prerelease version is published as a GitHub pre-release and never becomes
   the latest release. Installing a test build by hand and later switching to a
   higher stable version upgrades normally.
