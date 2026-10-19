@@ -19,17 +19,31 @@ tag 规则：
 - `v1.2`、`vfoo` 会被 workflow 拒绝
 - tag 就是发布版本，**不需要先改 `package.json`**；构建时会把 tag 版本注入两处 manifest
 
-## 2. 打 tag 并推送
+## 2. 在 GitHub 上创建 Release 并打 tag
+
+1. 打开仓库的 **Releases → Draft a new release**（`/releases/new`）
+2. 在 **Choose a tag** 里输入新 tag，例如 `v0.2.0-beta.1`，选择 **Create new tag on publish**
+3. **Target** 选择 `main`，确认 tag 指向要发布的 commit
+4. **Release title** 填 tag 名（可选）
+5. 测试版勾选 **Pre-release**
+6. 点 **Publish release**
+
+![创建 Release](images/releasing/create-release.png)
+
+GitHub 在发布 Release 时会同时创建 tag，并产生一个 tag 的 `push` 事件，release workflow 由此触发。构建完成后，workflow 会用生成的 changelog 覆盖 Release notes，并上传所有安装包。
+
+> 不要在 Release notes 里写重要内容：workflow 会用 `gh release edit --notes-file` 覆盖它。需要补充说明时，等发布完成后再编辑。
+
+如果不想用网页，也可以在本地推 tag（效果相同）：
 
 ```sh
 git switch main
 git pull
-
 git tag -a v0.2.0-beta.1 -m "v0.2.0-beta.1"
 git push origin v0.2.0-beta.1
 ```
 
-只需要推 tag。不要尝试直接 push main，main 受保护会拒绝。
+不要尝试直接 push main，main 受保护会拒绝。
 
 ## 3. 看 Actions 运行
 
@@ -124,7 +138,11 @@ GitHub 对 `GITHUB_TOKEN` 创建的 PR 有安全限制，所以这一步需要�
 
 删除 tag 或 Release 属于破坏性操作。先确认没有用户安装该版本，再手动处理；不要在 workflow 里自动删除或移动 tag。
 
-## 命令速查
+### 在网页发布 Release 后 Actions 没运行？
+
+确认 tag 以 `v` 开头。通过网页发布 Release 会同时创建 tag 并产生 tag 的 `push` 事件；如果 Actions 仍没有运行，检查 `Settings → Actions` 是否启用，以及 tag 是否匹配 `v*`。
+
+## 备选：命令行打 tag
 
 ```sh
 # 测试版
