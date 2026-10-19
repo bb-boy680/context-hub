@@ -13,7 +13,11 @@
  * module switched off) is its own module's answer to give, and is not a reason
  * to keep the hub from starting.
  */
-import type { HubKernel } from "@context-hub/extensions"
+import {
+  createRemoteExtensionMarket,
+  OFFICIAL_MARKET_URL,
+  type HubKernel,
+} from "@context-hub/extensions"
 
 /**
  * The reads a startup starts, by the name each module publishes them under.
@@ -43,4 +47,17 @@ export const PRELOADED = [
 export function preloadCatalogs(kernel: HubKernel): Promise<void> {
   const started = PRELOADED.map((name) => kernel.ctx.get(name)?.load())
   return Promise.allSettled(started).then(() => undefined)
+}
+
+/**
+ * Read the built-in market index at startup.
+ *
+ * Only the metadata is fetched: the page can list and search a plugin from
+ * this answer, and choosing Install is what clones its files. A failed read is
+ * quiet here; the Extensions page reports a failure when it has one to show.
+ */
+export function preloadMarket(): void {
+  void createRemoteExtensionMarket()
+    .list(OFFICIAL_MARKET_URL)
+    .catch(() => undefined)
 }

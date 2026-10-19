@@ -1,0 +1,9 @@
+id: acme.mcp
+name: Acme Code
+apiVersion: "^0.1"
+description: "Read and write Acme Code's own MCP config file. A worked example of a client extension that imports nothing."
+icon: server
+category: integration
+permissions: [assets.read, filesystem]
+inject: [mcp, locales]
+defaultEnabled: false

@@ -11,13 +11,16 @@ import {
   EXTENSION_CATEGORIES,
   EXTENSION_PERMISSIONS,
   isCompatible,
+  isLocaleId,
+  localized,
   type ExtensionCategoryId,
   type ExtensionPermission,
+  type LocalizedText,
 } from "./extension-manifest.ts"
 import { assertPluginId } from "./plugins.ts"
 
-/** Text shown in one or more languages; an object must include `en`. */
-export type LocalizedText = string | Record<string, string>
+export { localized }
+export type { LocalizedText }
 
 /** Where one version's files come from: a git repository. */
 export interface MarketSource {
@@ -90,7 +93,6 @@ export function isMarketSource(value: string): string {
   return isMarketIndexUrl(trimmed)
 }
 
-const LOCALE = /^[a-z]{2,8}(-[a-z0-9]{1,8})*$/
 const DATA_ICON = /^data:(image\/(?:svg\+xml|png|jpeg|webp));base64,([\s\S]+)$/i
 const ICON_LIMIT = 32 * 1024
 
@@ -120,7 +122,7 @@ function localizedText(value: unknown, path: string): LocalizedText {
   const object = record(value, path)
   let english = false
   for (const [locale, message] of Object.entries(object)) {
-    if (!LOCALE.test(locale)) fail(`${path}.${locale}`, "is not a locale id")
+    if (!isLocaleId(locale)) fail(`${path}.${locale}`, "is not a locale id")
     if (typeof message !== "string" || message.trim() === "") {
       fail(`${path}.${locale}`, "must be a non-empty string")
     }
@@ -323,6 +325,10 @@ export function readMarketIndex(
 /**
  * Validate and normalize a market index URL.
  *
+ * A GitHub repository URL is accepted as a convenience and mapped to the raw
+ * `marketplace.json` on its `main` branch, which is where this market keeps the
+ * index. Any other GitHub page is refused with that shape named.
+ *
  * @param value — what the user typed.
  * @returns the canonical URL.
  * @throws {Error} when the URL is not usable as an index source.
@@ -339,29 +345,33 @@ export function isMarketIndexUrl(value: string): string {
   if (url.username !== "" || url.password !== "" || url.hash !== "") {
     throw new Error("market index: the address must not carry credentials or a fragment")
   }
+  if (url.hostname === "github.com" || url.hostname === "www.github.com") {
+    return githubRawIndex(url)
+  }
   return url.href
+}
+
+/** `/<owner>/<repo>` is the only GitHub path this shortcut understands. */
+const GITHUB_REPO_PATH = /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+
+/**
+ * Map a GitHub repository URL to the raw index on its default branch.
+ *
+ * The market repository keeps `marketplace.json` at its root on `main`; a
+ * repository that does otherwise can still enter the raw index URL directly.
+ */
+function githubRawIndex(url: URL): string {
+  if (!GITHUB_REPO_PATH.test(url.pathname)) {
+    throw new Error(
+      "market index: use a repository URL like https://github.com/<owner>/<repo> or its raw marketplace.json URL"
+    )
+  }
+  const [owner, repo] = url.pathname.split("/").filter((segment) => segment !== "")
+  return `https://raw.githubusercontent.com/${owner}/${repo!.replace(/\.git$/i, "")}/main/marketplace.json`
 }
 
 /**
  * Pick the text for one locale: exact match, then language, then `en`.
- *
- * @param value — a string or a table of localized strings.
- * @param locale — the reader's locale, e.g. `zh-CN`.
- * @returns the text to display.
- */
-export function localized(value: LocalizedText, locale: string): string {
-  if (typeof value === "string") return value
-  const wanted = locale.toLowerCase()
-  const exact = value[wanted]
-  if (exact !== undefined) return exact
-  const language = wanted.split("-")[0]!
-  const prefix = value[language]
-  if (prefix !== undefined) return prefix
-  return value.en ?? ""
-}
-
-/**
- * The version a market recommends: the one listed first.
  *
  * @param plugin — one validated market entry.
  * @returns its first version.

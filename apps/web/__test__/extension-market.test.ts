@@ -7,7 +7,7 @@
  */
 import { describe, expect, it } from "vitest"
 
-import type { ExtensionMarketIndex } from "@context-hub/core/extension-market"
+import { localized, type ExtensionMarketIndex } from "@context-hub/core/extension-market"
 import type { ExtensionView } from "@context-hub/extensions"
 
 import { marketEntriesFor } from "../src/lib/extension-market"
@@ -76,15 +76,15 @@ const INDEX: ExtensionMarketIndex = {
 
 describe("marketEntriesFor", () => {
   it("shapes an uninstalled entry like a catalog row", () => {
-    const [one] = marketEntriesFor([], INDEX, "en")
+    const [one] = marketEntriesFor([], INDEX)
     expect(one?.view.manifest).toMatchObject({
       id: "demo.one",
-      name: "One",
+      name: { en: "One", "zh-cn": "一号" },
       version: "2.0.0",
       apiVersion: "^0.1",
       kind: "code",
       category: "agent",
-      description: "First",
+      description: { en: "First", "zh-cn": "第一" },
     })
     expect(one?.view.enabled).toBe(false)
     expect(one?.view.status).toBe("inactive")
@@ -93,20 +93,20 @@ describe("marketEntriesFor", () => {
 
   it("does not duplicate an id the kernel already has", () => {
     expect(
-      marketEntriesFor([entry("demo.one", "1.0.0")], INDEX, "en").map(
+      marketEntriesFor([entry("demo.one", "1.0.0")], INDEX).map(
         (item) => item.plugin.id
       )
     ).toEqual(["demo.two"])
   })
 
-  it("localizes the title and description", () => {
-    const [one] = marketEntriesFor([], INDEX, "zh-CN")
-    expect(one?.view.manifest.name).toBe("一号")
-    expect(one?.view.manifest.description).toBe("第一")
+  it("keeps the localized title and description for the page to resolve", () => {
+    const [one] = marketEntriesFor([], INDEX)
+    expect(localized(one!.view.manifest.name, "zh-CN")).toBe("一号")
+    expect(localized(one!.view.manifest.description, "zh-CN")).toBe("第一")
   })
 
   it("keeps the index order", () => {
-    expect(marketEntriesFor([], INDEX, "en").map((item) => item.plugin.id)).toEqual([
+    expect(marketEntriesFor([], INDEX).map((item) => item.plugin.id)).toEqual([
       "demo.one",
       "demo.two",
     ])

@@ -70,12 +70,11 @@ beforeAll(async () => {
   files = path.join(workspace, ".acme", "mcp.json")
   for (const dir of [home, workspace, userHome]) await fs.mkdir(dir, { recursive: true })
 
-  /* The extension space as a download leaves it: a directory of files. The only
-     thing this check adds is the npm shim Node needs to import ESM from a
-     folder; the browser reads the entry over the hub's own route. */
+  /* The extension space as a download leaves it: a directory of files. The
+     example ships its own package.json, which also tells Node to read the
+     entry as ESM; the browser reads it over the hub's own route. */
   installed = path.join(home, EXTENSION_DIR, "acme.mcp")
   await fs.cp(EXAMPLE, installed, { recursive: true })
-  await fs.writeFile(path.join(installed, "package.json"), `{ "type": "module" }\n`, "utf8")
 
   const store = createFsPluginStore(home)
   const found = await discoverPlugins({
@@ -119,6 +118,7 @@ describe("the downloaded folder", () => {
   it("loads, and its manifest reaches the catalog", () => {
     expect(definition, "the plugin loads").toBeDefined()
     expect(definition?.manifest.name, "its manifest reaches the catalog").toBe("Acme Code")
+    expect(definition?.manifest.version, "its version comes from package.json").toBe("1.0.0")
   })
 
   it("declares no import it cannot make", async () => {

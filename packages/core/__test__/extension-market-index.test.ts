@@ -305,6 +305,21 @@ describe("isMarketIndexUrl", () => {
     )
   })
 
+  it("maps a GitHub repository URL to the raw default-branch index", () => {
+    expect(isMarketIndexUrl("https://github.com/bb-boy680/context-hub-extensions")).toBe(
+      "https://raw.githubusercontent.com/bb-boy680/context-hub-extensions/main/marketplace.json"
+    )
+    expect(isMarketIndexUrl("https://github.com/acme/plugins.git")).toBe(
+      "https://raw.githubusercontent.com/acme/plugins/main/marketplace.json"
+    )
+  })
+
+  it("refuses a GitHub page that is not a repository root", () => {
+    expect(() => isMarketIndexUrl("https://github.com/acme/plugins/tree/main")).toThrow(
+      /repository URL/
+    )
+  })
+
   it("refuses http, credentials, fragments and non-URLs", () => {
     for (const value of [
       "http://example.test/marketplace.json",
@@ -321,6 +336,9 @@ describe("isMarketSource", () => {
   it("accepts an https URL or an absolute local path", () => {
     expect(isMarketSource("https://example.test/marketplace.json")).toBe(
       "https://example.test/marketplace.json"
+    )
+    expect(isMarketSource("https://github.com/acme/plugins")).toBe(
+      "https://raw.githubusercontent.com/acme/plugins/main/marketplace.json"
     )
     expect(isMarketSource("D:\\work\\extensions")).toBe("D:\\work\\extensions")
     expect(isMarketSource("/home/me/extensions")).toBe("/home/me/extensions")

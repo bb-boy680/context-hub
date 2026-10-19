@@ -10,7 +10,6 @@
 import * as React from "react"
 
 import {
-  localized,
   recommendedVersion,
   type ExtensionMarketIndex,
   type ExtensionMarketPlugin,
@@ -44,15 +43,17 @@ function marketIcon(src: string): ExtensionIcon {
 /**
  * Shape the index entries this machine does not have into catalog rows.
  *
+ * The index's localized title and description are carried as they are; the
+ * page resolves them against the active locale, the same way it resolves an
+ * installed manifest.
+ *
  * @param installed — the kernel snapshot's entries.
  * @param index — the validated market document.
- * @param locale — the reader's locale id.
  * @returns one row per listed plugin that is not installed.
  */
 export function marketEntriesFor(
   installed: readonly ExtensionView[],
-  index: ExtensionMarketIndex,
-  locale: string
+  index: ExtensionMarketIndex
 ): MarketEntry[] {
   const held = new Set(installed.map((entry) => entry.manifest.id))
   return index.plugins
@@ -65,12 +66,12 @@ export function marketEntriesFor(
         view: {
           manifest: {
             id: plugin.id,
-            name: localized(plugin.title, locale),
+            name: plugin.title,
             version: version.version,
             apiVersion: version.apiVersion,
             kind: "code",
             category: plugin.category ?? "source",
-            description: localized(plugin.description, locale),
+            description: plugin.description,
             icon: marketIcon(plugin.icon),
             defaultEnabled: false,
             permissions: plugin.permissions,

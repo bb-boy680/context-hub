@@ -1,0 +1,8 @@
+id: demo.counter
+name: Demo Counter
+apiVersion: "^0.1"
+description: Adds a counter to the header.
+icon: sparkles
+category: integration
+permissions: [storage.self]
+inject: [header]

@@ -1277,16 +1277,20 @@ Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间�
 
 **规则**：
 - 每个 `plugins/<id>` 是完整 pnpm workspace 包：`package.json`、`build.mjs`、
-  `tsconfig.json`、`src/`、`plugin.json`、`README.md`；产物默认 `lib/index.js`。
-- `package.json` 的 `main` 必须与 `plugin.json` 的 `entry` 相同（默认
-  `lib/index.js`），`version` 必须与 `plugin.json` 和索引三处一致。hub 安装器
-  校验这些声明，旧插件没有 `package.json` 时保持原行为。
+  `tsconfig.json`、`src/`、`plugin.yaml`、`README.md`；产物默认 `lib/index.js`。
+- `version` 只写在 `package.json`；入口只取 `package.json` 的 `main`（缺省
+  `index.js`）。`plugin.yaml` 出现 `version` 或 `entry` 会被安装器和 loader 拒绝。
+- `marketplace.json` 由 `scripts/build-marketplace.mjs` 从根 `marketplace.yaml`
+  与每个插件的 `plugin.yaml` / `package.json` 生成，禁止手改；`source.url` 来自
+  `marketplace.yaml.repository`，图标在生成时内联成 `data:` URL。
+- 安装器校验索引 `version` 等于 `package.json.version`，permissions 仍必须与
+  manifest 一致；市场安装要求 `package.json` 存在。
 - `lib/` 要提交：Context Hub 没有 npm 发布层，安装器 clone 后直接加载。不要照搬
   deepseek-harness 把 `lib/` 放进 `.gitignore` 的做法——它的产物在 npm tarball 里。
 - 构建用 esbuild 并把 `absWorkingDir` 固定在插件目录，否则产物首行的路径注释随
   cwd 漂移，同一份源码会在不同机器上产出不同字节。
-- 判据：`pnpm build` 两次的 `sha256sum lib/index.js` 相同；`package.json`、
-  `plugin.json` 与 `marketplace.json` 的版本一致。
+- 判据：`pnpm build` 两次的 `sha256sum marketplace.json plugins/*/lib/index.js`
+  相同；索引 `versions[0].version` 等于对应 `package.json.version`。
 
 
 ## 桌面 UI 验收必须在 Electron 窗口里做（2026-10-19）

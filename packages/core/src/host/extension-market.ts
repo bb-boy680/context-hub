@@ -25,10 +25,11 @@ import {
   type ExtensionMarketVersion,
   type MarketSource,
 } from "../extension-market.ts"
-import { parsePluginManifest, type ExtensionPermission } from "../extension-manifest.ts"
-import { assertPluginId } from "../plugins.ts"
+import { parsePluginManifestYaml, parsePluginPackage, type ExtensionPermission, type PluginPackageFile } from "../extension-manifest.ts"
+import { assertPluginId, EXTENSION_MARKET_CACHE, PLUGIN_MANIFEST } from "../plugins.ts"
 import type { PluginRecord, PluginStore } from "../plugins.ts"
 import type { StateStore } from "../state.ts"
+import { writeFileAtomic } from "./atomic.ts"
 import { isPublicHostname } from "./remote-image.ts"
 
 /** How long one index fetch may take before it is abandoned. */
@@ -93,7 +94,14 @@ export interface InstallDependencies {
 type Rename = (from: string, to: string) => Promise<void>
 
 function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  if (!(error instanceof Error)) return String(error)
+  const cause = (error as { cause?: unknown }).cause
+  if (cause instanceof Error) return `${error.message}: ${cause.message}`
+  if (typeof cause === "string") return `${error.message}: ${cause}`
+  if (typeof cause === "object" && cause !== null && "code" in cause) {
+    return `${error.message}: ${String((cause as { code?: unknown }).code)}`
+  }
+  return error.message
 }
 
 /** Normalize an index source: an HTTPS URL, or an absolute local path. */
@@ -138,7 +146,61 @@ async function readLocalIndex(
   }
   /* The index is local, so a version may name this checkout directly. Icons
      still have to be data or HTTPS URLs: the page cannot read a local file. */
-  return readMarketIndex(document, pathToFileURL(file).href, { allowLocalGit: true })
+  const index = readMarketIndex(document, pathToFileURL(file).href, { allowLocalGit: true })
+  return localizeSources(index, path.dirname(file))
+}
+
+/**
+ * Point a local index's versions at the checkout they are read from.
+ *
+ * A committed index names the published repository. When the same index is read
+ * from a checkout during development, that URL would clone a repository that is
+ * not there. If the version's `path` exists inside the checkout, the checkout
+ * is the repository it means — which is what makes "point the source at this
+ * folder and install" work without regenerating the index. A remote plugin
+ * whose path is not present keeps its own URL.
+ */
+async function localizeSources(
+  index: ExtensionMarketIndex,
+  root: string
+): Promise<ExtensionMarketIndex> {
+  return {
+    ...index,
+    plugins: await Promise.all(
+      index.plugins.map(async (plugin) => ({
+        ...plugin,
+        versions: await Promise.all(
+          plugin.versions.map(async (version) => {
+            const source = version.source
+            if (isLocalMarketPath(source.url) || source.path === undefined) return version
+            const at = path.resolve(root, ...source.path.split("/"))
+            const inside = path.relative(root, at)
+            if (inside.startsWith("..") || path.isAbsolute(inside)) return version
+            const found = await fs.stat(at).catch(() => null)
+            if (found === null || !found.isDirectory()) return version
+            return { ...version, source: { ...source, url: root } }
+          })
+        ),
+      }))
+    ),
+  }
+}
+
+/**
+ * Write the metadata a market read just returned into the extensions root.
+ *
+ * This is a cache of listings only — no plugin files move. A failed write is
+ * the caller's to ignore: the market answer is already in hand.
+ */
+export async function cacheMarketIndex(
+  root: string,
+  index: ExtensionMarketIndex
+): Promise<void> {
+  await fs.mkdir(root, { recursive: true })
+  await writeFileAtomic(
+    path.join(root, EXTENSION_MARKET_CACHE),
+    `${JSON.stringify(index, null, 2)}\n`
+  )
 }
 
 /**
@@ -344,52 +406,25 @@ async function assertEntry(staging: string, entry: string): Promise<void> {
 }
 
 /**
- * A plugin project declares its built entry and version in `package.json`.
- *
- * The manifest stays the runtime authority: the entry must match `main`, and
- * the version must match the manifest. Older plugins without a package, or
- * without either field, keep their previous behavior.
+ * A market install requires the package declarations: the version and the
+ * entry module have one source, and a package that does not declare them is
+ * not one this installer can verify.
  */
-async function assertPackage(
-  staging: string,
-  entry: string,
-  version: string,
-  id: string
-): Promise<void> {
+async function readPackageAt(staging: string, id: string): Promise<PluginPackageFile> {
   const file = path.join(staging, "package.json")
-  const stat = await fs.stat(file).catch(() => null)
-  if (stat === null || !stat.isFile()) return
+  let raw: string
+  try {
+    raw = await fs.readFile(file, "utf8")
+  } catch {
+    throw new Error(`extension "${id}": package.json is missing`)
+  }
   let parsed: unknown
   try {
-    parsed = JSON.parse(await fs.readFile(file, "utf8")) as unknown
+    parsed = JSON.parse(raw) as unknown
   } catch {
     throw new Error(`extension "${id}": package.json is not JSON`)
   }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-    throw new Error(`extension "${id}": package.json is not an object`)
-  }
-  const main = (parsed as { main?: unknown }).main
-  if (main !== undefined) {
-    if (typeof main !== "string") {
-      throw new Error(`extension "${id}": package.json main must be a string`)
-    }
-    if (main !== entry) {
-      throw new Error(
-        `extension "${id}": package.json main "${main}" does not match the manifest entry "${entry}"`
-      )
-    }
-  }
-  const declared = (parsed as { version?: unknown }).version
-  if (declared !== undefined) {
-    if (typeof declared !== "string") {
-      throw new Error(`extension "${id}": package.json version must be a string`)
-    }
-    if (declared !== version) {
-      throw new Error(
-        `extension "${id}": package.json version "${declared}" does not match the manifest version "${version}"`
-      )
-    }
-  }
+  return parsePluginPackage(parsed, id)
 }
 
 /** Whether the index and the manifest describe the same permissions. */
@@ -405,6 +440,10 @@ function samePermissions(
 
 /** The install record's source string, in the shape the agent plugin library uses. */
 function sourceOf(source: MarketSource): string {
+  if (isLocalMarketPath(source.url)) {
+    const inside = source.path === undefined ? "" : `/${source.path}`
+    return `local:${path.resolve(source.url)}${inside}`
+  }
   const inside = source.path === undefined ? "" : `&path:/${source.path}`
   return `git+${source.url}${inside}`
 }
@@ -482,21 +521,27 @@ export async function installExtensionFromMarket(
   const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-extension-"))
   try {
     await fs.mkdir(staging, { recursive: true })
-    await cloneBranch(work, options.version.source.url)
-    const source = sourceAt(work, options.version.source.path)
+    const origin = options.version.source
+    /* A local index names a checkout, and a checkout is what a developer is
+       editing — including files not committed yet. Copying its working tree is
+       the development path; a remote source is still cloned by default branch. */
+    const local = isLocalMarketPath(origin.url)
+    if (!local) await cloneBranch(work, origin.url)
+    const source = sourceAt(local ? origin.url : work, origin.path)
     await assertRegularTree(source)
     await fs.cp(source, staging, {
       recursive: true,
       dereference: false,
       filter: (entry) => !SKIPPED_PATH.test(entry),
     })
-    const manifest = parsePluginManifest(
-      JSON.parse(await fs.readFile(path.join(staging, "plugin.json"), "utf8")) as unknown,
+    const manifest = parsePluginManifestYaml(
+      await fs.readFile(path.join(staging, PLUGIN_MANIFEST), "utf8"),
       id
     )
-    if (manifest.version !== options.version.version) {
+    const pkg = await readPackageAt(staging, id)
+    if (pkg.version !== options.version.version) {
       throw new Error(
-        `extension "${id}": the index lists ${options.version.version}, the manifest says ${manifest.version}`
+        `extension "${id}": the index lists ${options.version.version}, package.json says ${pkg.version}`
       )
     }
     if (!samePermissions(options.plugin.permissions, manifest.permissions)) {
@@ -504,9 +549,7 @@ export async function installExtensionFromMarket(
         `extension "${id}": the index and the manifest declare different permissions`
       )
     }
-    const entry = manifest.entry ?? "index.js"
-    await assertPackage(staging, entry, manifest.version, id)
-    await assertEntry(staging, entry)
+    await assertEntry(staging, pkg.entry)
 
     const target = path.join(root, id)
     const fresh = (await fs.stat(target).catch(() => null)) === null
@@ -514,7 +557,7 @@ export async function installExtensionFromMarket(
 
     let warning: string | undefined
     const record: PluginRecord = {
-      version: manifest.version,
+      version: pkg.version,
       source: sourceOf(options.version.source),
       installedAt: new Date().toISOString(),
     }
@@ -541,7 +584,7 @@ export async function installExtensionFromMarket(
     }
     return {
       id,
-      version: manifest.version,
+      version: pkg.version,
       enabled,
       fresh,
       ...(warning === undefined ? {} : { warning }),

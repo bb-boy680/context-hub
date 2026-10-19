@@ -1,18 +1,18 @@
 /**
  * The hub's extension space: one directory per installed extension under
- * `<home>/extensions`. An extension package is a directory holding `plugin.json`
- * (the kernel manifest: identity, target API, entry module, declared
- * permissions) plus the files it ships. Media lives in the asset library and
- * kernel state in `state/`; this is where third-party code and its own files
- * live.
+ * `<home>/extensions`. An extension package is a directory holding `plugin.yaml`
+ * (identity, target API, presentation, declared permissions and services) plus
+ * the files it ships; `package.json` supplies the version and the entry module.
+ * Media lives in the asset library and kernel state in `state/`; this is where
+ * third-party code and its own files live.
  *
  * The kernel loads an extension's entry module through whatever channel the form
  * provides, so this file owns only the layout and the names — never a transport.
  *
  * The directory is `extensions`, not `plugins`: agent plugins (the packs this
  * hub collects and delivers to coding agents) are a different thing and own
- * `<home>/plugins`. Both spaces read a file called `plugin.json`, so sharing one
- * directory would have each side reading the other's files.
+ * `<home>/plugins`. Agent packs read their own `plugin.json` files; this space
+ * reads `plugin.yaml` only, so the two never confuse each other's directories.
  */
 
 /** Route a form serves extension files on, for a loader that imports them over HTTP. */
@@ -28,10 +28,19 @@ export const EXTENSION_RUNTIME_DIR = "_runtime"
 export const EXTENSION_DIR = "extensions"
 
 /** Manifest file inside an extension directory; its `id` must match the directory name. */
-export const PLUGIN_MANIFEST = "plugin.json"
+export const PLUGIN_MANIFEST = "plugin.yaml"
 
 /** Bookkeeping file in the extensions root: where each installed extension came from. */
 export const EXTENSION_RECORDS = "index.json"
+
+/**
+ * Cached market metadata in the extensions root: the last index the host read.
+ *
+ * It holds plugin descriptions and versions, never plugin code. A market read
+ * refreshes it, which is what lets the Extensions page list a market at startup
+ * without installing anything.
+ */
+export const EXTENSION_MARKET_CACHE = "marketplace.json"
 
 /** Entry module used when a manifest names none. */
 export const DEFAULT_PLUGIN_ENTRY = "index.js"

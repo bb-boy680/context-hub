@@ -123,6 +123,14 @@ function check(name: string, ok: boolean, detail = ""): void {
 
 await send("Page.enable")
 await send("Runtime.enable")
+/* The sidebar has a desktop and a mobile form; this probe drives the desktop
+   one, which is what the app window shows. */
+await send("Emulation.setDeviceMetricsOverride", {
+  width: 1280,
+  height: 900,
+  deviceScaleFactor: 1,
+  mobile: false,
+})
 await send("Page.navigate", { url: PAGE })
 await waitFor(
   `document.readyState === "complete" && !!document.querySelector('[data-testid="demo-counter"]')`
@@ -148,6 +156,16 @@ check(
   )) === "count: 1"
 )
 
+/* With a market source stored in settings, startup already read the index;
+   the row must be there before anyone types into the source box. */
+if (process.env.EXPECT_PRELOAD === "1") {
+  await waitFor(
+    `!!document.querySelector('[data-testid="extension-demo.other"]')`,
+    15_000
+  )
+  check("the configured market source is read at startup", true)
+}
+
 await evaluate(
   `(() => { const input = document.querySelector('#extension-market-source'); input.value = ${JSON.stringify(MARKET)}; input.closest('form').requestSubmit(); return true })()`
 )
@@ -165,7 +183,7 @@ check("the existing detail dialog opens", dialog.includes("Demo Other"))
 check("the dialog shows the listed version", dialog.includes(expected.version))
 
 await click('[data-testid="extension-action"]')
-await waitForFile(path.join(HOME, "extensions", "demo.other", "plugin.json"))
+await waitForFile(path.join(HOME, "extensions", "demo.other", "plugin.yaml"))
 check("the install wrote the plugin", true)
 await waitFor(
   `/Uninstall|卸载/.test(document.querySelector('[data-testid="extension-action"]')?.innerText ?? "")`
@@ -190,11 +208,91 @@ state = JSON.parse(
 check("uninstall disables the plugin", state["demo.other"] === false)
 check(
   "uninstall keeps the installed files",
-  await fs.stat(path.join(HOME, "extensions", "demo.other", "plugin.json")).then(
+  await fs.stat(path.join(HOME, "extensions", "demo.other", "plugin.yaml")).then(
     () => true,
     () => false
   )
 )
+
+/* Claude Code is a real market plugin: installing it must bring the agent row
+   into the sidebar, which no longer ships with the hub. */
+await evaluate(`document.querySelector('[aria-label="Close"]')?.click()`)
+await waitFor(`!document.querySelector('[data-testid="extension-action"]')`, 5_000)
+
+const sidebar = `(document.querySelector('[data-slot="sidebar"]')?.innerText ?? "")`
+check(
+  "the hub no longer ships the Claude Code integration",
+  !String(await evaluate(sidebar)).includes("Claude Code")
+)
+
+await waitFor(`!!document.querySelector('[data-testid="extension-claude.code"]')`)
+await click('[data-testid="extension-claude.code"] button')
+await waitFor(`!!document.querySelector('[data-testid="extension-action"]')`)
+check(
+  "claude.code offers Install before it is installed",
+  /Install|安装/.test(
+    String(
+      await evaluate(
+        `document.querySelector('[data-testid="extension-action"]')?.innerText ?? ""`
+      )
+    )
+  )
+)
+/* Let the previous row's toast clear so it cannot sit over the footer button. */
+await waitFor(
+  `!document.body.innerText.includes("Demo Other is installed")`,
+  15_000
+).catch(() => undefined)
+await new Promise((resolve) => setTimeout(resolve, 500))
+await click('[data-testid="extension-action"]')
+await waitForFile(path.join(HOME, "extensions", "claude.code", "lib", "index.js")).catch(
+  async (error: unknown) => {
+    console.log(String(await evaluate("document.body.innerText")))
+    throw error
+  }
+)
+state = JSON.parse(
+  await fs.readFile(path.join(HOME, "state", "extensions.json"), "utf8")
+) as Record<string, boolean>
+check("claude.code is enabled", state["claude.code"] === true)
+
+/* The hub's own notice asks for a refresh; startup discovery then builds the
+   catalog from the installed directory and activates the plugin. */
+await send("Page.reload", { ignoreCache: true })
+await waitFor(
+  `document.readyState === "complete" && !!document.querySelector('[data-slot="sidebar"]')`,
+  30_000
+).catch(async (error: unknown) => {
+  console.log("after reload:", await evaluate("document.readyState"), await evaluate("location.href"))
+  console.log("body:\n" + String(await evaluate("document.body.innerText")))
+  console.log("root:\n" + String(await evaluate("document.getElementById('root')?.innerText ?? '<none>'")))
+  throw error
+})
+await waitFor(`${sidebar}.includes("Claude Code")`, 30_000).catch(async (error: unknown) => {
+  console.log(
+    "state:",
+    await fs
+      .readFile(path.join(HOME, "state", "extensions.json"), "utf8")
+      .catch(() => "<none>")
+  )
+  console.log("body:\n" + String(await evaluate("document.body.innerText")))
+  throw error
+})
+check("claude.code registers its places after reload", true)
+check(
+  "claude.code did not report an activation error",
+  !String(
+    await evaluate(
+      `document.querySelector('[data-testid="extension-claude.code"]').innerText`
+    )
+  ).includes("Error")
+)
+
+await click('[data-testid="extension-claude.code"] button')
+await waitFor(`!!document.querySelector('[data-testid="extension-action"]')`)
+await click('[data-testid="extension-action"]')
+await waitFor(`!${sidebar}.includes("Claude Code")`, 30_000)
+check("uninstalling claude.code withdraws its places", true)
 
 await send("Browser.close").catch(() => undefined)
 socket.close()

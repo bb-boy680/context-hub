@@ -12,7 +12,6 @@ import { SearchIcon } from "lucide-react"
 import * as React from "react"
 
 import { ExtensionDetailDialog } from "@/components/extension-detail-dialog"
-import { MarketSourceBar } from "@/components/extension-market"
 import {
   marketEntriesFor,
   useExtensionMarket,
@@ -24,6 +23,8 @@ import {
   createRemoteExtensionMarket,
   createRemotePluginSource,
   discoverPlugins,
+  localized,
+  OFFICIAL_MARKET_URL,
   type ExtensionView,
 } from "@context-hub/extensions"
 import {
@@ -31,7 +32,6 @@ import {
   useHub,
   useI18n,
   useSearchPage,
-  useSettings,
 } from "@context-hub/extensions/react"
 import { Highlighted } from "@context-hub/extensions/components"
 import { Badge } from "@context-hub/shadcn-ui/components/badge"
@@ -43,10 +43,10 @@ const outline = "border-border bg-transparent dark:border-input dark:bg-transpar
 
 const marketClient = createRemoteExtensionMarket()
 
-function matches(entry: ExtensionView, query: string): boolean {
+function matches(entry: ExtensionView, query: string, locale: string): boolean {
   if (query === "") return true
   const haystack =
-    `${entry.manifest.name} ${entry.manifest.id} ${entry.manifest.description}`.toLowerCase()
+    `${localized(entry.manifest.name, locale)} ${entry.manifest.id} ${localized(entry.manifest.description, locale)}`.toLowerCase()
   return haystack.includes(query.toLowerCase())
 }
 
@@ -65,9 +65,11 @@ function ExtensionRow({
   onOpen: () => void
   onAction: () => void
 }) {
-  const { t } = useI18n()
+  const { t, state: i18n } = useI18n()
   const { manifest, status } = entry
   const Icon = manifest.icon
+  const name = localized(manifest.name, i18n.active)
+  const description = localized(manifest.description, i18n.active)
 
   return (
     <div
@@ -86,7 +88,7 @@ function ExtensionRow({
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex items-center gap-2 text-sm leading-5 font-medium">
-            <Highlighted text={manifest.name} needle={needle} />
+            <Highlighted text={name} needle={needle} />
             {manifest.locked === true ? (
               <Badge variant="secondary">{t("extensions.status.builtin")}</Badge>
             ) : null}
@@ -105,7 +107,7 @@ function ExtensionRow({
             ) : null}
           </span>
           <span className="truncate text-[13px] leading-[18px] text-muted-foreground">
-            <Highlighted text={manifest.description} needle={needle} />
+            <Highlighted text={description} needle={needle} />
           </span>
         </span>
       </button>
@@ -153,7 +155,6 @@ function ExtensionActionButton({
 export function ExtensionsPage() {
   const { t, state: i18n } = useI18n()
   const ctx = useHub()
-  const settings = useSettings()
   const snapshot = useExtensionSnapshot()
   const search = useSearchPage()
   const query = search.query
@@ -161,16 +162,18 @@ export function ExtensionsPage() {
   const [detailId, setDetailId] = React.useState<string | null>(null)
   const [installing, setInstalling] = React.useState<string | null>(null)
 
-  const market = useExtensionMarket(settings.extensionMarketUrl)
+  const market = useExtensionMarket(OFFICIAL_MARKET_URL)
   const marketEntries =
     market.index === null
       ? []
-      : marketEntriesFor(snapshot.entries, market.index, i18n.active)
+      : marketEntriesFor(snapshot.entries, market.index)
   const allEntries = [
     ...snapshot.entries,
     ...marketEntries.map((item) => item.view),
   ]
-  const entries = allEntries.filter((entry) => matches(entry, query))
+  const entries = allEntries.filter((entry) =>
+    matches(entry, query, i18n.active)
+  )
   const needle = query.trim()
   const detail =
     allEntries.find((entry) => entry.manifest.id === detailId) ?? null
@@ -188,7 +191,7 @@ export function ExtensionsPage() {
       setInstalling(item.plugin.id)
       try {
         await marketClient.install(
-          settings.extensionMarketUrl,
+          OFFICIAL_MARKET_URL,
           item.plugin.id,
           item.version.version
         )
@@ -211,7 +214,7 @@ export function ExtensionsPage() {
           type: "success",
           title: t("extensions.market.installedNotice").replace(
             "{name}",
-            item.view.manifest.name
+            localized(item.view.manifest.name, i18n.active)
           ),
         })
       } catch (reason) {
@@ -223,7 +226,7 @@ export function ExtensionsPage() {
         setInstalling(null)
       }
     },
-    [ctx, settings.extensionMarketUrl, t]
+    [ctx, t, i18n.active]
   )
 
   return (
@@ -236,22 +239,23 @@ export function ExtensionsPage() {
       </div>
 
       <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-start gap-3">
-          <label className="relative flex w-[320px] items-center">
-            <SearchIcon className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t("extensions.searchPlaceholder")}
-              className="h-9 pl-9"
-            />
-          </label>
-          <MarketSourceBar
-            url={settings.extensionMarketUrl}
-            loading={market.loading}
-            failure={market.failure}
-            onRefresh={market.refresh}
-          />
+        <div className="flex flex-col gap-1">
+          <div className="flex flex-wrap items-start gap-3">
+            <label className="relative flex w-[320px] items-center">
+              <SearchIcon className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={t("extensions.searchPlaceholder")}
+                className="h-9 pl-9"
+              />
+            </label>
+          </div>
+          {market.failure === null ? null : (
+            <p className="text-[12px] text-destructive">
+              {t("extensions.market.failed").replace("{reason}", market.failure)}
+            </p>
+          )}
         </div>
 
         {categoryOrder.map((category) => {

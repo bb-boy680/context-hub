@@ -35,13 +35,18 @@ async function writePlugin(
   root: string,
   id: string,
   manifest: string,
-  entry?: string
+  entry?: string,
+  packageDocument: Record<string, unknown> = {
+    type: "module",
+    version: "1.0.0",
+    main: "index.js",
+  }
 ): Promise<void> {
   const dir = path.join(root, id)
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(path.join(dir, "plugin.json"), manifest, "utf8")
+  await fs.writeFile(path.join(dir, "plugin.yaml"), manifest, "utf8")
   /* A plugin directory is an npm-style package, so Node reads its entry as ESM. */
-  await fs.writeFile(path.join(dir, "package.json"), `{ "type": "module" }\n`, "utf8")
+  await fs.writeFile(path.join(dir, "package.json"), JSON.stringify(packageDocument), "utf8")
   if (entry !== undefined) await fs.writeFile(path.join(dir, "index.js"), entry, "utf8")
 }
 
@@ -58,10 +63,16 @@ beforeAll(async () => {
   await writePlugin(
     legacy,
     "acme.legacy",
-    JSON.stringify({ id: "acme.legacy", name: "Legacy", version: "0.9.0", apiVersion: "^0.1" }),
+    'id: acme.legacy\nname: Legacy\napiVersion: "^0.1"\n',
     "export function apply() {}\n"
   )
-  await writePlugin(legacy, "acme.pack", JSON.stringify({ name: "acme.pack", version: "1.0.0" }))
+  /* An agent pack carries `plugin.json`, not `plugin.yaml`; it must stay put. */
+  await fs.mkdir(path.join(legacy, "acme.pack"), { recursive: true })
+  await fs.writeFile(
+    path.join(legacy, "acme.pack", "plugin.json"),
+    JSON.stringify({ name: "acme.pack", version: "1.0.0" }),
+    "utf8"
+  )
   await fs.writeFile(
     path.join(legacy, EXTENSION_RECORDS),
     JSON.stringify({
@@ -73,15 +84,14 @@ beforeAll(async () => {
   await writePlugin(
     extensions,
     "acme.hello",
-    JSON.stringify({
-      id: "acme.hello",
-      name: "Hello",
-      version: "1.0.0",
-      apiVersion: "^0.1",
-      description: "Adds a page.",
-      icon: "sparkles",
-      permissions: ["storage.self"],
-    }),
+    [
+      "id: acme.hello",
+      "name: Hello",
+      'apiVersion: "^0.1"',
+      "description: Adds a page.",
+      "icon: sparkles",
+      "permissions: [storage.self]",
+    ].join("\n") + "\n",
     `export function apply(ctx) {
        globalThis["${SCOPE_KEY}"] = { react: typeof ctx.react?.createElement === "function", icons: typeof ctx.icons?.sparkles, icon: typeof ctx.icon("server"), ui: ctx.ui !== undefined }
        ctx.nav.register({ path: "/hello", labelKey: "nav.hello", icon: ctx.icon("sparkles"), group: "assets", order: 25 })
@@ -90,19 +100,53 @@ beforeAll(async () => {
   await writePlugin(
     extensions,
     "acme.mismatch",
-    JSON.stringify({ id: "acme.other", name: "Mismatch", version: "1.0.0", apiVersion: "^0.1" }),
+    'id: acme.other\nname: Mismatch\napiVersion: "^0.1"\n',
     "export function apply() {}\n"
   )
   await writePlugin(
     extensions,
     "acme.future",
-    JSON.stringify({ id: "acme.future", name: "Future", version: "1.0.0", apiVersion: "^9.9" })
+    'id: acme.future\nname: Future\napiVersion: "^9.9"\n'
   )
   await writePlugin(
     extensions,
     "acme.empty",
-    JSON.stringify({ id: "acme.empty", name: "Empty", version: "1.0.0", apiVersion: "^0.1" }),
+    'id: acme.empty\nname: Empty\napiVersion: "^0.1"\n',
     "export const nothing = true\n"
+  )
+  /* A plugin with no package.json keeps loading with the 0.0.0 / index.js fallback. */
+  await writePlugin(
+    extensions,
+    "acme.bare",
+    'id: acme.bare\nname: Bare\napiVersion: "^0.1"\n',
+    "export function apply() {}\n",
+    {}
+  )
+  await fs.rm(path.join(extensions, "acme.bare", "package.json"))
+  /* A packed plugin: version and entry come from package.json, and its icon is
+     a file served from the extension space. */
+  await writePlugin(
+    extensions,
+    "acme.packed",
+    [
+      "id: acme.packed",
+      "name:",
+      "  en: Packed",
+      '  "zh-cn": 打包',
+      'apiVersion: "^0.1"',
+      "description:",
+      "  en: A packed plugin.",
+      '  "zh-cn": 一个打包插件。',
+      "icon: assets/icon.svg",
+    ].join("\n") + "\n",
+    undefined,
+    { type: "module", version: "2.0.0", main: "lib/index.js" }
+  )
+  await fs.mkdir(path.join(extensions, "acme.packed", "lib"), { recursive: true })
+  await fs.writeFile(
+    path.join(extensions, "acme.packed", "lib", "index.js"),
+    "export function apply() {}\n",
+    "utf8"
   )
   /* A directory with no manifest at all is not a plugin. */
   await fs.mkdir(path.join(extensions, "acme.notes"), { recursive: true })
@@ -126,11 +170,13 @@ describe("the plugin space", () => {
 
   it("counts only directories with a manifest as plugins", () => {
     expect(ids).toEqual([
+      "acme.bare",
       "acme.empty",
       "acme.future",
       "acme.hello",
       "acme.legacy",
       "acme.mismatch",
+      "acme.packed",
     ])
   })
 
@@ -169,7 +215,7 @@ describe("discovery", () => {
   })
 
   it("reports every plugin", () => {
-    expect(byId.size).toBe(5)
+    expect(byId.size).toBe(7)
   })
 
   it("loads a valid plugin", () => {
@@ -185,6 +231,36 @@ describe("discovery", () => {
       name: "Hello",
       version: "1.0.0",
     })
+  })
+
+  it("falls back to 0.0.0 and index.js when package.json is absent", () => {
+    expect(byId.get("acme.bare")?.module?.manifest.version).toBe("0.0.0")
+  })
+
+  it("reads the version and entry from package.json", () => {
+    expect(byId.get("acme.packed")?.module?.manifest.version).toBe("2.0.0")
+    expect(byId.get("acme.packed")?.problem).toBeUndefined()
+  })
+
+  it("keeps a localized name and description for the UI", () => {
+    expect(byId.get("acme.packed")?.module?.manifest.name).toEqual({
+      en: "Packed",
+      "zh-cn": "打包",
+    })
+    expect(byId.get("acme.packed")?.module?.manifest.description).toEqual({
+      en: "A packed plugin.",
+      "zh-cn": "一个打包插件。",
+    })
+  })
+
+  it("draws a relative image icon from the extension space", () => {
+    const icon = byId.get("acme.packed")?.module?.manifest.icon as unknown as (props: {
+      className?: string
+    }) => { type?: unknown; props?: { src?: string; className?: string } }
+    const element = icon({ className: "size-5" })
+    expect(element.type).toBe("img")
+    expect(element.props?.src).toBe("/hub/extensions/acme.packed/assets/icon.svg")
+    expect(element.props?.className).toBe("size-5")
   })
 
   it("resolves the icon name to a component", () => {
@@ -316,10 +392,12 @@ describe("removing a plugin", () => {
 
   it("leaves the other plugins", async () => {
     expect(await store.list()).toEqual([
+      "acme.bare",
       "acme.empty",
       "acme.future",
       "acme.legacy",
       "acme.mismatch",
+      "acme.packed",
     ])
   })
 })

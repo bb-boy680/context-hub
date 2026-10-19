@@ -1,0 +1,9 @@
+id: acme.hello
+name: Hello Plugin
+apiVersion: "^0.1"
+description: "A hand-written plugin: proves a folder under ~/.context-hub/extensions adds a page without touching the app."
+icon: sparkles
+category: source
+permissions: [storage.self]
+inject: [i18n]
+defaultEnabled: true

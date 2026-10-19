@@ -20,11 +20,13 @@ import { ASSET_ROUTE } from "./src/assets.ts"
 import { ABOUT_ROUTE } from "./src/about.ts"
 import { NET_ROUTE } from "./src/net.ts"
 import { PLACE_FILES_ROUTE, readPlaceCall } from "./src/place-files.ts"
+import { parsePluginManifestYaml } from "./src/extension-manifest.ts"
 import { runtimeSource } from "./src/host/extension-runtime.ts"
 import {
   EXTENSION_MARKET_ROUTE,
   EXTENSION_ROUTE,
   EXTENSION_RUNTIME_DIR,
+  PLUGIN_MANIFEST,
   assertPluginId,
 } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
@@ -42,6 +44,7 @@ import {
   type HubMiddleware,
 } from "./src/host/http.ts"
 import {
+  cacheMarketIndex,
   createMarketReader,
   installExtensionFromMarket,
   removeInstalledExtension,
@@ -333,7 +336,11 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
       const id = decodeURIComponent(slash === -1 ? rest : rest.slice(0, slash))
       assertPluginId(id)
       if (slash === -1) {
-        sendJson(response, 200, JSON.parse(await store.read(id, "plugin.json")) as unknown)
+        sendJson(
+          response,
+          200,
+          parsePluginManifestYaml(await store.read(id, PLUGIN_MANIFEST), id)
+        )
         return
       }
       await sendExtensionFile(store.root, id, rest.slice(slash + 1), response)
@@ -384,6 +391,9 @@ export function createExtensionMarketHandler(
       const action = required(body.action, "missing action")
       if (action === "list") {
         const index = await reader.read(required(body.url, "missing url"), body.refresh === true)
+        /* Keep the listing beside the installed extensions. Metadata only: the
+           page can draw the market from this file, and install still clones. */
+        await cacheMarketIndex(store.root, index).catch(() => undefined)
         sendJson(response, 200, { index })
         return
       }

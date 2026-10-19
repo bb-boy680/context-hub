@@ -22,13 +22,7 @@ import { createFsPluginStore } from "../src/host/plugins-fs.ts"
 import { createFsStateStore } from "../src/host/state-fs.ts"
 
 const ID = "demo.counter"
-const MANIFEST = {
-  id: ID,
-  name: "Demo",
-  version: "1.0.0",
-  apiVersion: "^0.1",
-  entry: "index.js",
-}
+const MANIFEST = `id: ${ID}\nname: Demo\napiVersion: "^0.1"\n`
 
 const temporary: string[] = []
 
@@ -55,7 +49,11 @@ async function repository(): Promise<{ repo: string; dir: string }> {
   temporary.push(repo)
   const dir = path.join(repo, "plugins", ID)
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(path.join(dir, "plugin.json"), JSON.stringify(MANIFEST))
+  await fs.writeFile(path.join(dir, "plugin.yaml"), MANIFEST)
+  await fs.writeFile(
+    path.join(dir, "package.json"),
+    JSON.stringify({ name: ID, version: "1.0.0", type: "module", main: "index.js" })
+  )
   await fs.writeFile(path.join(dir, "index.js"), "export function apply() {}\n")
   await git(["init", "--quiet"], repo)
   await git(["add", "."], repo)
@@ -74,12 +72,10 @@ async function packagedRepository(
   const repo = await fs.mkdtemp(path.join(tmpdir(), "hub-market-repo-"))
   temporary.push(repo)
   const dir = path.join(repo, "plugins", ID)
-  await fs.mkdir(path.join(dir, "lib"), { recursive: true })
-  await fs.writeFile(
-    path.join(dir, "plugin.json"),
-    JSON.stringify({ ...MANIFEST, entry: "lib/index.js" })
-  )
-  await fs.writeFile(path.join(dir, "lib", "index.js"), "export function apply() {}\n")
+  const entry = typeof main === "string" ? main : "index.js"
+  await fs.mkdir(path.dirname(path.join(dir, entry)), { recursive: true })
+  await fs.writeFile(path.join(dir, "plugin.yaml"), MANIFEST)
+  await fs.writeFile(path.join(dir, entry), "export function apply() {}\n")
   const packageDocument: Record<string, unknown> = {
     name: ID,
     version: packageVersion,
@@ -87,6 +83,23 @@ async function packagedRepository(
   }
   if (main !== undefined) packageDocument.main = main
   await fs.writeFile(path.join(dir, "package.json"), JSON.stringify(packageDocument))
+  await git(["init", "--quiet"], repo)
+  await git(["add", "."], repo)
+  await git(
+    ["-c", "user.name=Test", "-c", "user.email=test@example.test", "commit", "--quiet", "-m", "one"],
+    repo
+  )
+  return { repo, dir }
+}
+
+/** A plugin with no package.json: a market install must refuse it. */
+async function bareRepository(): Promise<{ repo: string; dir: string }> {
+  const repo = await fs.mkdtemp(path.join(tmpdir(), "hub-market-repo-"))
+  temporary.push(repo)
+  const dir = path.join(repo, "plugins", ID)
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(path.join(dir, "plugin.yaml"), MANIFEST)
+  await fs.writeFile(path.join(dir, "index.js"), "export function apply() {}\n")
   await git(["init", "--quiet"], repo)
   await git(["add", "."], repo)
   await git(
@@ -156,7 +169,7 @@ describe("installing a market version", () => {
     expect(await state.read("extensions")).toEqual({ [ID]: true })
   })
 
-  it("installs a packed plugin whose package main matches the manifest entry", async () => {
+  it("installs a packed plugin whose package declares its entry", async () => {
     const source = await packagedRepository("lib/index.js")
     const { home, store, state } = await newHome()
     const version = await versionOf(source)
@@ -188,18 +201,43 @@ describe("installing a market version", () => {
 
     expect(result.id).toBe(ID)
     expect(
-      await fs.readFile(path.join(home, "extensions", ID, "lib", "index.js"), "utf8")
+      await fs.readFile(path.join(home, "extensions", ID, "index.js"), "utf8")
     ).toContain("apply")
   })
 
-  it("refuses a package main that disagrees with the manifest entry", async () => {
-    const source = await packagedRepository("index.js")
+  it("refuses a package main whose entry file is missing", async () => {
+    const source = await packagedRepository("lib/index.js")
+    await fs.rm(path.join(source.dir, "lib", "index.js"))
+    await git(["add", "-A"], source.repo)
+    await git(
+      [
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.test",
+        "commit",
+        "--quiet",
+        "-m",
+        "missing entry",
+      ],
+      source.repo
+    )
     const { store, state } = await newHome()
     const version = await versionOf(source)
 
     await expect(
       installExtensionFromMarket({ store, state, plugin: pluginOf(version), version })
-    ).rejects.toThrow(/does not match the manifest entry/)
+    ).rejects.toThrow(/is missing/)
+  })
+
+  it("refuses a package with no package.json", async () => {
+    const source = await bareRepository()
+    const { store, state } = await newHome()
+    const version = await versionOf(source)
+
+    await expect(
+      installExtensionFromMarket({ store, state, plugin: pluginOf(version), version })
+    ).rejects.toThrow(/package\.json is missing/)
   })
 
   it("refuses a package main that is not a string", async () => {
@@ -209,7 +247,7 @@ describe("installing a market version", () => {
 
     await expect(
       installExtensionFromMarket({ store, state, plugin: pluginOf(version), version })
-    ).rejects.toThrow(/main must be a string/)
+    ).rejects.toThrow(/main must be a non-empty string/)
   })
 
   it("replaces an installed version and keeps the user's enablement choice", async () => {
@@ -220,8 +258,8 @@ describe("installing a market version", () => {
     await state.write("extensions", { [ID]: false })
 
     await fs.writeFile(
-      path.join(source.dir, "plugin.json"),
-      JSON.stringify({ ...MANIFEST, version: "1.1.0" })
+      path.join(source.dir, "package.json"),
+      JSON.stringify({ name: ID, version: "1.1.0", type: "module", main: "index.js" })
     )
     await fs.writeFile(path.join(source.dir, "index.js"), "export function apply() { return 2 }\n")
     await git(["add", "."], source.repo)
@@ -254,14 +292,14 @@ describe("installing a market version", () => {
     expect(await state.read("extensions")).toEqual({ [ID]: false })
   })
 
-  it("refuses a package version that disagrees with the manifest", async () => {
+  it("refuses a package version that disagrees with the index", async () => {
     const source = await packagedRepository(undefined, "1.0.1")
     const { store, state } = await newHome()
     const version = await versionOf(source)
 
     await expect(
       installExtensionFromMarket({ store, state, plugin: pluginOf(version), version })
-    ).rejects.toThrow(/does not match the manifest version/)
+    ).rejects.toThrow(/package\.json says/)
   })
 
   it("refuses a package version that is not a string", async () => {
@@ -271,7 +309,7 @@ describe("installing a market version", () => {
 
     await expect(
       installExtensionFromMarket({ store, state, plugin: pluginOf(version), version })
-    ).rejects.toThrow(/version must be a string/)
+    ).rejects.toThrow(/version must be a non-empty string/)
   })
 
   it("refuses a source path that leaves the repository", async () => {

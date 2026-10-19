@@ -56,7 +56,10 @@ export const globalSearchExtension: ExtensionModule = {
       )
     )
     ctx.search.register(
-      extensionsContribution(() => ctx.extensions.snapshot().entries)
+      extensionsContribution(
+        () => ctx.extensions.snapshot().entries,
+        () => ctx.i18n.state.active
+      )
     )
   },
 }

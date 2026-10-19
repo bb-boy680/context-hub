@@ -95,19 +95,28 @@ describe("searching the settings", () => {
 describe("searching the extensions", () => {
   it("matches the name, id, or description the page's filter reads", () => {
     const entries = [extension(), extension({ id: "acme.other", name: "Other", description: "Different" })]
-    expect(searchExtensions(entries, "hello").map((one) => one.title)).toEqual(["Hello"])
-    expect(searchExtensions(entries, "acme.other").map((one) => one.title)).toEqual(["Other"])
-    expect(searchExtensions(entries, "different").map((one) => one.title)).toEqual(["Other"])
+    expect(searchExtensions(entries, "hello", "en").map((one) => one.title)).toEqual(["Hello"])
+    expect(searchExtensions(entries, "acme.other", "en").map((one) => one.title)).toEqual(["Other"])
+    expect(searchExtensions(entries, "different", "en").map((one) => one.title)).toEqual(["Other"])
+  })
+
+  it("resolves a localized name and description with the active locale", () => {
+    const entry = extension({
+      name: { en: "Hello", "zh-cn": "你好" },
+      description: { en: "Says hello", "zh-cn": "打招呼" },
+    })
+    expect(searchExtensions([entry], "你好", "zh-cn").map((one) => one.title)).toEqual(["你好"])
+    expect(searchExtensions([entry], "hello", "zh-cn").map((one) => one.title)).toEqual(["你好"])
   })
 
   it("keeps the package's own mark and opens the extensions page", () => {
     const icon = () => null
-    const [row] = searchExtensions([extension({ icon })], "hello")
+    const [row] = searchExtensions([extension({ icon })], "hello", "en")
     expect(row?.icon).toBe(icon)
     expect(row?.path).toBe("/extensions?q=hello")
   })
 
   it("returns nothing for an empty query", () => {
-    expect(searchExtensions([extension()], "")).toEqual([])
+    expect(searchExtensions([extension()], "", "en")).toEqual([])
   })
 })

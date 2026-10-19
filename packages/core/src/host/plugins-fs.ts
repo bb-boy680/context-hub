@@ -12,6 +12,8 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
+import { CORE_SCHEMA, load } from "js-yaml"
+
 import {
   assertPluginId,
   EXTENSION_DIR,
@@ -37,11 +39,12 @@ async function looksLikeExtension(dir: string, name: string): Promise<boolean> {
   const raw = await fs.readFile(path.join(dir, PLUGIN_MANIFEST), "utf8").catch(() => null)
   if (raw === null) return false
   try {
-    const manifest = JSON.parse(raw) as Record<string, unknown>
+    const manifest = load(raw, { schema: CORE_SCHEMA }) as Record<string, unknown> | null
     return (
+      typeof manifest === "object" &&
+      manifest !== null &&
       manifest.id === name &&
-      typeof manifest.name === "string" &&
-      typeof manifest.version === "string" &&
+      (typeof manifest.name === "string" || typeof manifest.name === "object") &&
       typeof manifest.apiVersion === "string"
     )
   } catch {

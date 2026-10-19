@@ -8,6 +8,7 @@ import * as React from "react"
 import { categoryTile } from "@/lib/extensions"
 import type { MarketEntry } from "@/lib/extension-market"
 import type { ExtensionView } from "@context-hub/extensions"
+import { localized } from "@context-hub/extensions"
 import {
   useExtensionContributions,
   useHub,
@@ -135,10 +136,12 @@ function ExtensionDetailBody({
   market: MarketEntry | null
   onInstall?: (entry: MarketEntry) => Promise<void>
 }) {
-  const { t } = useI18n()
+  const { t, state: i18n } = useI18n()
   const ctx = useHub()
   const { manifest } = entry
   const Icon = manifest.icon
+  const name = localized(manifest.name, i18n.active)
+  const description = localized(manifest.description, i18n.active)
   const permissions = manifest.permissions ?? []
   const [busy, setBusy] = React.useState(false)
 
@@ -167,7 +170,7 @@ function ExtensionDetailBody({
         </span>
         <div className="flex min-w-0 flex-col gap-1">
           <DialogTitle className="flex items-center gap-2 text-base leading-[21px] font-semibold">
-            {manifest.name}
+            {name}
             <Badge variant="secondary">{t(`extensions.kind.${manifest.kind}`)}</Badge>
           </DialogTitle>
           <DialogDescription className="truncate text-[13px] leading-4">
@@ -195,7 +198,7 @@ function ExtensionDetailBody({
         ) : null}
         <Section title={t("extensions.detail.about")}>
           <p className="text-[13px] leading-[19px] text-muted-foreground">
-            {manifest.description}
+            {description}
           </p>
         </Section>
         {market === null ? null : (

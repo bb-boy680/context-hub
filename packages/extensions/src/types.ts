@@ -6,16 +6,21 @@
 import type { Context } from "@deepseek-ai/cordis"
 import type { ComponentType } from "react"
 
-import { EXTENSION_API_VERSION, isCompatible } from "@context-hub/core/extension-manifest"
+import {
+  EXTENSION_API_VERSION,
+  isCompatible,
+  localized,
+} from "@context-hub/core/extension-manifest"
 import type {
   ExtensionCategoryId,
   ExtensionPermission,
+  LocalizedText,
 } from "@context-hub/core/extension-manifest"
 
 import type { SkillRegistry } from "./skill-registry.ts"
 
-export { EXTENSION_API_VERSION, isCompatible }
-export type { ExtensionCategoryId, ExtensionPermission }
+export { EXTENSION_API_VERSION, isCompatible, localized }
+export type { ExtensionCategoryId, ExtensionPermission, LocalizedText }
 
 /**
  * An icon an extension contributes. It is a component rather than a name, so a
@@ -219,13 +224,13 @@ export interface ExtensionServices {}
 /** Identity and presentation of one extension package, apart from its id. */
 export interface ExtensionManifest {
   /** Catalog name, authored in the language the package chooses. */
-  name: string
+  name: LocalizedText
   version: string
   /** Extension API range this package was built against, e.g. "^0.1". */
   apiVersion: string
   kind: ExtensionKind
   category: ExtensionCategoryId
-  description: string
+  description: LocalizedText
   icon: ExtensionIcon
   /** The kernel enables this extension on first launch. */
   defaultEnabled?: boolean

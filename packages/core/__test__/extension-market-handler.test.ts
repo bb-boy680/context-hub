@@ -25,13 +25,7 @@ import { EXTENSION_MARKET_ROUTE } from "../src/plugins.ts"
 
 const ID = "demo.counter"
 const MARKET = "https://example.test/marketplace.json"
-const MANIFEST = {
-  id: ID,
-  name: "Demo",
-  version: "1.0.0",
-  apiVersion: "^0.1",
-  entry: "index.js",
-}
+const MANIFEST = `id: ${ID}\nname: Demo\napiVersion: "^0.1"\n`
 
 const temporary: string[] = []
 let home = ""
@@ -60,7 +54,11 @@ async function repository(): Promise<{
   temporary.push(repo)
   const dir = path.join(repo, "plugins", ID)
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(path.join(dir, "plugin.json"), JSON.stringify(MANIFEST))
+  await fs.writeFile(path.join(dir, "plugin.yaml"), MANIFEST)
+  await fs.writeFile(
+    path.join(dir, "package.json"),
+    JSON.stringify({ name: ID, version: "1.0.0", type: "module", main: "index.js" })
+  )
   await fs.writeFile(path.join(dir, "index.js"), "export function apply() {}\n")
   await git(["init", "--quiet"], repo)
   await git(["add", "."], repo)
@@ -130,6 +128,10 @@ describe("the market route", () => {
     expect(response.status).toBe(200)
     const body = (await response.json()) as { index?: ExtensionMarketIndex }
     expect(body.index?.plugins[0]?.id).toBe(ID)
+    const cached = JSON.parse(
+      await fs.readFile(path.join(home, "extensions", "marketplace.json"), "utf8")
+    ) as ExtensionMarketIndex
+    expect(cached.plugins[0]?.id).toBe(ID)
   })
 
   it("refuses a method other than POST", async () => {

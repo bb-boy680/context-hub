@@ -18,7 +18,6 @@
     "@context-hub/extensions": "workspace:*",
     "@context-hub/global-search": "workspace:*",
     "@context-hub/zh-cn": "workspace:*",
-    "@context-hub/claude-code": "workspace:*",
     "@context-hub/mcp": "workspace:*",
     "@context-hub/plugins": "workspace:*",
     "@context-hub/prompts": "workspace:*",

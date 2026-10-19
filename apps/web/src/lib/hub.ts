@@ -7,7 +7,6 @@
  * plugins itself, so `startHub` offers those only when a host answers for them;
  * without a host the skills page has no catalog and says so.
  */
-import { claudeCodeExtension } from "@context-hub/claude-code"
 import { STATE_ROUTE } from "@context-hub/core/state"
 import { createRemoteNet } from "@context-hub/core/net"
 import { globalSearchExtension } from "@context-hub/global-search"
@@ -31,7 +30,7 @@ import * as ui from "./ui-kit.ts"
 import { desktopBridge } from "./desktop.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { installExtensionRuntime } from "./extension-runtime.ts"
-import { preloadCatalogs } from "./preload.ts"
+import { preloadCatalogs, preloadMarket } from "./preload.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
 
 /**
@@ -195,11 +194,6 @@ export async function startHub(): Promise<HubKernel> {
       /* The palette last among the shipped modules, so the settings and
          extensions groups follow the asset groups in the result list. */
       globalSearchExtension,
-      /* Only the agent integrations this build is being tried against. The
-         others are still written and still shipped; they are left out here so
-         the page's module graph is small enough to boot quickly while the
-         carrier is worked on. Add them back to the list to bring them in. */
-      claudeCodeExtension,
       skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),
@@ -210,5 +204,6 @@ export async function startHub(): Promise<HubKernel> {
      opened. Not awaited: rendering waits for the kernel, not for the libraries
      — a page draws what it has until an answer lands. */
   void preloadCatalogs(kernel)
+  preloadMarket()
   return kernel
 }
