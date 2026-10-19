@@ -224,12 +224,12 @@ check("the action switches back to install without a reload", true)
 state = JSON.parse(
   await fs.readFile(path.join(HOME, "state", "extensions.json"), "utf8")
 ) as Record<string, boolean>
-check("uninstall disables the plugin", state["skills.sh"] === false)
+check("uninstall removes the state key", state["skills.sh"] === undefined)
 check(
-  "uninstall keeps the installed files",
+  "uninstall removes the installed files",
   await fs.stat(path.join(HOME, "extensions", "skills.sh", "plugin.yaml")).then(
-    () => true,
-    () => false
+    () => false,
+    () => true
   )
 )
 
@@ -275,8 +275,8 @@ state = JSON.parse(
 ) as Record<string, boolean>
 check("claude.code is enabled", state["claude.code"] === true)
 
-/* The hub's own notice asks for a refresh; startup discovery then builds the
-   catalog from the installed directory and activates the plugin. */
+/* The install replaced the module in the running kernel, so the sidebar gains
+   the agent without a reload; reloading then proves the files survive startup. */
 await send("Page.reload", { ignoreCache: true })
 await waitFor(
   `document.readyState === "complete" && !!document.querySelector('[data-slot="sidebar"]')`,

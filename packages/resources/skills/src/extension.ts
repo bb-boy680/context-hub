@@ -47,7 +47,6 @@ export function skillsModuleWith(
     manifest: {
       name: "Skills",
       version: "0.1.0",
-      apiVersion: "^0.1",
       kind: "code",
       category: "asset",
       description: "Browse, import and install skills, and keep them in this workspace.",

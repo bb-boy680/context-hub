@@ -1316,3 +1316,15 @@ Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间�
 **问题模式**：为了实现「安装范围 + 路径」合一的自定义页，`installer.nsh` 直接改 `$INSTDIR`。旧记录里出现相对路径 `23\Context Hub` 后，`initMultiUser` 把它读回 `$INSTDIR`，安装器把文件装到工作目录、注册表和快捷方式写成相对路径；随后默认的运行检查又弹出「Context Hub 无法关闭」，而任务管理器里根本没有该进程。设计稿里的首启向导也反复因为桌面端状态、窗口壳和打包验收而卡住。
 
 **规则**：桌面安装器只保留 electron-builder 自带的 assisted installer：`oneClick: false` 提供当前用户/所有用户，`allowToChangeInstallationDirectory: true` 提供原生目录页；不要再用 `nsis.include` 覆盖路径页，也不要恢复首启 React 向导。安装前若旧记录已有相对 `InstallLocation`，先删除 `HKCU\Software\<APP_GUID>`；原生目录页会把应用名追加到所选路径。
+
+## 扩展兼容性用 engines，不用 apiVersion（2026-10-20）
+
+**问题模式**：扩展清单原先用 `apiVersion: "^0.1"` 与内核 API 版本做精确比较，并且市场索引把“某个版本不兼容”当成整份文档无效。结果是：一个面向未来版本的插件会让整个市场页读不出来；已安装插件也没有更新路径；卸载只停用、不删 clone 下来的文件。用户明确要求改成 npm `engines` 风格，并让卸载真正删除代码。
+
+**规则**：
+- `plugin.yaml` 的 `engines.contextHub` 是必填 npm semver 区间，比较对象是仓库根 `package.json` 的 Context Hub **应用版本**，不是扩展 API 版本；判定用 `semver.satisfies(..., { includePrerelease: true })`，无效版本 fail closed。
+- 市场索引的每个版本都携带 `engines`；读取时只校验语法，不让单个不兼容版本拒绝整份索引。`compatibleVersion` 选第一个满足的版本，`versions[0]` 只用于展示。
+- 磁盘包和市场包必须有 `engines`；编译进构建的模块可省略。旧 `apiVersion` 包不再加载，需要从更新后的市场重装。
+- `state/extensions.json` 只存每个 id 的启用布尔值，不是描述或元数据；描述在 `plugin.yaml`，安装来源在 `index.json`。
+- 卸载磁盘扩展的顺序是「停用 → 删目录与记录 → 从运行中的 catalog 撤下」；失败时保持“已安装但停用”，不能让代码在文件已删后继续跑。内置/编译扩展只能停用。
+- 更新设置的命名空间是 `state/settings.json` 的 `plugins["hub.extensions"]`，与 SKILL 模块同机制；调度只随 hub 页面存活，自动更新会覆盖扩展目录里的本地手改，默认关闭。

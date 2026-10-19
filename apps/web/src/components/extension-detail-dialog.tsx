@@ -2,11 +2,11 @@
  * Detail dialog for one extension: what it is, what it contributes, and which
  * permissions it asks for, with the install or uninstall action in its footer.
  */
-import { DownloadIcon, Trash2Icon, XIcon } from "lucide-react"
+import { DownloadIcon, PowerIcon, Trash2Icon, XIcon } from "lucide-react"
 import * as React from "react"
 
 import { categoryTile } from "@/lib/extensions"
-import type { MarketEntry } from "@/lib/extension-market"
+import type { MarketEntry, MarketUpdateEntry } from "@/lib/extension-market"
 import type { ExtensionView } from "@context-hub/extensions"
 import { localized } from "@context-hub/extensions"
 import {
@@ -129,12 +129,20 @@ function ContributionList({ entry }: { entry: ExtensionView }) {
 function ExtensionDetailBody({
   entry,
   market,
+  installed,
+  update,
   onInstall,
+  onUninstall,
 }: {
   entry: ExtensionView
   /** The index entry behind an installed market plugin, or one not installed yet. */
   market: MarketEntry | null
-  onInstall?: (entry: MarketEntry) => Promise<void>
+  /** Whether the kernel already holds this id. */
+  installed: boolean
+  /** A newer listing for this installed plugin, if the market has one. */
+  update: MarketUpdateEntry | null
+  onInstall?: (plugin: MarketEntry["plugin"], version: NonNullable<MarketEntry["version"]>) => Promise<void>
+  onUninstall?: (entry: ExtensionView) => Promise<void>
 }) {
   const { t, state: i18n } = useI18n()
   const ctx = useHub()
@@ -145,10 +153,14 @@ function ExtensionDetailBody({
   const permissions = manifest.permissions ?? []
   const [busy, setBusy] = React.useState(false)
 
-  const install = () => {
-    if (market === null || onInstall === undefined) return
+  /** What installing or updating would put on this machine. */
+  const target = update?.target ?? market?.version ?? null
+
+  /** Run one footer action, reporting a failure where the user clicked. */
+  const run = (task: () => Promise<void> | void): void => {
     setBusy(true)
-    void onInstall(market)
+    void Promise.resolve()
+      .then(task)
       .catch((reason: unknown) => {
         toast.add({
           type: "error",
@@ -159,6 +171,61 @@ function ExtensionDetailBody({
         setBusy(false)
       })
   }
+
+  type Primary = "update" | "install" | "uninstall" | "disable" | "enable"
+
+  /*
+   * An update wins over every other action; an installed package then offers
+   * removal (stored) or the enablement switch (built in). A package this hub
+   * cannot run offers nothing unless its files can still be removed.
+   */
+  const primary: Primary | null = (() => {
+    if (manifest.locked === true) return null
+    if (update !== null && update.target !== null) return "update"
+    if (!installed) return market?.version == null ? null : "install"
+    if (entry.status === "incompatible" && !entry.stored) return null
+    if (entry.stored) return "uninstall"
+    return entry.enabled ? "disable" : "enable"
+  })()
+
+  const runPrimary = (): void => {
+    if (primary === "update" && update !== null && update.target !== null && onInstall !== undefined) {
+      const { plugin, target: version } = update
+      run(() => onInstall(plugin, version))
+      return
+    }
+    if (primary === "install" && market !== null && market.version !== null && onInstall !== undefined) {
+      const { plugin, version } = market
+      run(() => onInstall(plugin, version))
+      return
+    }
+    if (primary === "uninstall" && onUninstall !== undefined) {
+      run(() => onUninstall(entry))
+      return
+    }
+    if (primary === "disable") {
+      run(() => ctx.extensions.disable(manifest.id))
+      return
+    }
+    if (primary === "enable") {
+      run(() => ctx.extensions.enable(manifest.id))
+    }
+  }
+
+  const actionLabel =
+    primary === null
+      ? ""
+      : t(
+          primary === "update"
+            ? "extensions.market.update"
+            : primary === "install"
+              ? "extensions.action.install"
+              : primary === "uninstall"
+                ? "extensions.action.uninstall"
+                : primary === "disable"
+                  ? "extensions.action.disable"
+                  : "extensions.action.enable"
+        )
 
   return (
     <>
@@ -203,24 +270,40 @@ function ExtensionDetailBody({
         </Section>
         {market === null ? null : (
           <Section title={t("extensions.market.origin")}>
-            <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1.5">
-              <SourceRow
-                label={t("extensions.market.confirmVersion")}
-                value={market.version.version}
-              />
-              <SourceRow
-                label={t("extensions.market.confirmSource")}
-                value={market.version.source.url}
-                mono
-              />
-              {market.version.source.path === undefined ? null : (
+            {target === null ? (
+              <p className="rounded-md bg-destructive/10 px-3 py-2 text-[12.5px] text-destructive">
+                {t("extensions.market.incompatible")
+                  .replace(
+                    "{range}",
+                    market.plugin.versions[0]?.engines.contextHub ?? ""
+                  )
+                  .replace("{version}", ctx.host.version)}
+              </p>
+            ) : (
+              <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1.5">
                 <SourceRow
-                  label={t("extensions.market.confirmPath")}
-                  value={market.version.source.path}
+                  label={t("extensions.market.confirmVersion")}
+                  value={target.version}
+                />
+                <SourceRow
+                  label={t("extensions.market.confirmRequires")}
+                  value={target.engines.contextHub}
                   mono
                 />
-              )}
-            </div>
+                <SourceRow
+                  label={t("extensions.market.confirmSource")}
+                  value={target.source.url}
+                  mono
+                />
+                {target.source.path === undefined ? null : (
+                  <SourceRow
+                    label={t("extensions.market.confirmPath")}
+                    value={target.source.path}
+                    mono
+                  />
+                )}
+              </div>
+            )}
           </Section>
         )}
         {market !== null && !entry.enabled ? null : (
@@ -252,30 +335,37 @@ function ExtensionDetailBody({
         <DialogClose render={<Button variant="ghost" />}>
           {t("extensions.action.close")}
         </DialogClose>
-        {manifest.locked === true || entry.status === "incompatible" ? null : (
+        {primary === "update" && entry.stored && onUninstall !== undefined ? (
+          <Button
+            className={`px-3 text-secondary-foreground hover:bg-muted hover:text-foreground ${outline}`}
+            variant="outline"
+            disabled={busy}
+            onClick={() => run(() => onUninstall(entry))}
+          >
+            <Trash2Icon />
+            {t("extensions.action.uninstall")}
+          </Button>
+        ) : null}
+        {primary === null ? null : (
           <Button
             className={
-              entry.enabled
+              primary === "uninstall" || primary === "disable"
                 ? `px-3 text-secondary-foreground hover:bg-muted hover:text-foreground ${outline}`
                 : "px-3"
             }
-            variant={entry.enabled ? "outline" : "default"}
+            variant={primary === "uninstall" || primary === "disable" ? "outline" : "default"}
             disabled={busy || entry.status === "activating"}
             data-testid="extension-action"
-            onClick={
-              entry.enabled
-                ? () => void ctx.extensions.toggle(manifest.id, false)
-                : market !== null
-                  ? install
-                  : () => void ctx.extensions.toggle(manifest.id, true)
-            }
+            onClick={runPrimary}
           >
-            {entry.enabled ? <Trash2Icon /> : <DownloadIcon />}
-            {t(
-              entry.enabled
-                ? "extensions.action.uninstall"
-                : "extensions.action.install"
+            {primary === "uninstall" ? (
+              <Trash2Icon />
+            ) : primary === "disable" || primary === "enable" ? (
+              <PowerIcon />
+            ) : (
+              <DownloadIcon />
             )}
+            {actionLabel}
           </Button>
         )}
       </div>
@@ -287,13 +377,24 @@ function ExtensionDetailBody({
 export function ExtensionDetailDialog({
   entry,
   market = null,
+  installed = false,
+  update = null,
   onInstall,
+  onUninstall,
   onOpenChange,
 }: {
   entry: ExtensionView | null
   /** The market entry behind this row, when the page merged one in. */
   market?: MarketEntry | null
-  onInstall?: (entry: MarketEntry) => Promise<void>
+  /** Whether the kernel already holds this id. */
+  installed?: boolean
+  /** A newer listing for this installed plugin, if the market has one. */
+  update?: MarketUpdateEntry | null
+  onInstall?: (
+    plugin: MarketEntry["plugin"],
+    version: NonNullable<MarketEntry["version"]>
+  ) => Promise<void>
+  onUninstall?: (entry: ExtensionView) => Promise<void>
   onOpenChange: (open: boolean) => void
 }) {
   return (
@@ -307,7 +408,10 @@ export function ExtensionDetailDialog({
             key={entry.manifest.id}
             entry={entry}
             market={market}
+            installed={installed}
+            update={update}
             onInstall={onInstall}
+            onUninstall={onUninstall}
           />
         ) : null}
       </DialogContent>

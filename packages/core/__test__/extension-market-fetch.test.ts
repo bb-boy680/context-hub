@@ -66,7 +66,7 @@ describe("fetchMarketIndex", () => {
       await fs.mkdir(path.join(dir, "plugins", "demo.one"), { recursive: true })
       const version = (at: string) => ({
         version: "1.0.0",
-        apiVersion: "^0.1",
+        engines: { contextHub: ">=0.0.1 <0.7.0" },
         source: { type: "git", url: "https://github.com/example/repo", path: at },
       })
       await fs.writeFile(
@@ -153,7 +153,7 @@ describe("fetchMarketIndex", () => {
               versions: [
                 {
                   version: "1.0.0",
-                  apiVersion: "^0.1",
+                  engines: { contextHub: ">=0.0.1 <0.7.0" },
                   source: { type: "git", url: dir },
                 },
               ],

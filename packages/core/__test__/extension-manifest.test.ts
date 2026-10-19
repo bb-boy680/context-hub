@@ -8,7 +8,6 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  EXTENSION_API_VERSION,
   isCompatible,
   parsePluginManifest,
   parsePluginManifestYaml,
@@ -16,21 +15,32 @@ import {
   readPluginPackage,
 } from "../src/extension-manifest.ts"
 
+const RANGE = { contextHub: ">=0.0.0 <0.7.0" }
+
 const VALID = {
   id: "acme.hello",
   name: "Hello",
-  apiVersion: "^0.1",
+  engines: RANGE,
 }
 
-describe("the extension API version", () => {
-  it("accepts the exact version, with or without a range marker", () => {
-    expect(isCompatible(EXTENSION_API_VERSION)).toBe(true)
-    expect(isCompatible(`^${EXTENSION_API_VERSION}`)).toBe(true)
-    expect(isCompatible(`~${EXTENSION_API_VERSION}`)).toBe(true)
+describe("compatibility with a hub version", () => {
+  it("lets a prerelease satisfy the range it belongs to", () => {
+    expect(isCompatible(RANGE, "0.0.1-beta.5")).toBe(true)
+    expect(isCompatible(RANGE, "0.5.0")).toBe(true)
+    expect(isCompatible(RANGE, "0.7.0")).toBe(false)
   })
 
-  it("refuses a different version", () => {
-    expect(isCompatible("0.2")).toBe(false)
+  it("compares against the hub version, not an API version", () => {
+    expect(isCompatible({ contextHub: ">=0.1.0 <0.7.0" }, "0.0.1-beta.5")).toBe(false)
+    expect(isCompatible({ contextHub: "^0.0.1" }, "0.0.1")).toBe(true)
+  })
+
+  it("accepts a compiled module that declares no range", () => {
+    expect(isCompatible(undefined, "0.0.1-beta.5")).toBe(true)
+  })
+
+  it("fails closed on an unusable hub version", () => {
+    expect(isCompatible(RANGE, "not-a-version")).toBe(false)
   })
 })
 
@@ -39,7 +49,7 @@ describe("a plugin.yaml manifest", () => {
     expect(parsePluginManifest(VALID, "acme.hello")).toEqual({
       id: "acme.hello",
       name: "Hello",
-      apiVersion: "^0.1",
+      engines: RANGE,
       description: "",
       category: "source",
       defaultEnabled: false,
@@ -78,7 +88,7 @@ describe("a plugin.yaml manifest", () => {
     expect(() => parsePluginManifest(VALID, "acme.other")).toThrow(/does not match/)
   })
 
-  it.each(["id", "name", "apiVersion"])("requires %s", (field) => {
+  it.each(["id", "name", "engines"])("requires %s", (field) => {
     const rest: Record<string, unknown> = { ...VALID }
     delete rest[field]
     expect(() => parsePluginManifest(rest, "acme.hello")).toThrow(new RegExp(`"${field}"`))
@@ -97,10 +107,28 @@ describe("a plugin.yaml manifest", () => {
     )
   })
 
-  it("refuses an incompatible apiVersion", () => {
-    expect(() => parsePluginManifest({ ...VALID, apiVersion: "0.2" }, "acme.hello")).toThrow(
-      /not compatible/
+  it("validates the engines shape and range", () => {
+    expect(() => parsePluginManifest({ ...VALID, engines: "0.1" }, "acme.hello")).toThrow(
+      /"engines" must be an object/
     )
+    expect(() =>
+      parsePluginManifest({ ...VALID, engines: { contextHub: 1 } }, "acme.hello")
+    ).toThrow(/contextHub must be a non-empty string/)
+    expect(() =>
+      parsePluginManifest({ ...VALID, engines: { contextHub: "not a range" } }, "acme.hello")
+    ).toThrow(/not a valid semver range/)
+    expect(
+      parsePluginManifest(
+        { ...VALID, engines: { contextHub: "^0.1 || >=0.3 <0.7" } },
+        "acme.hello"
+      ).engines
+    ).toEqual({ contextHub: "^0.1 || >=0.3 <0.7" })
+  })
+
+  it("ignores the old apiVersion field", () => {
+    expect(
+      parsePluginManifest({ ...VALID, apiVersion: "^0.1" }, "acme.hello")
+    ).not.toHaveProperty("apiVersion")
   })
 
   it("refuses unknown permissions and categories", () => {
@@ -146,7 +174,8 @@ describe("a plugin.yaml document", () => {
         "name:",
         "  en: Hello",
         '  "zh-cn": 你好',
-        'apiVersion: "^0.1"',
+        "engines:",
+        '  contextHub: ">=0.0.1 <0.7.0"',
         "description: |",
         "  Says hello.",
       ].join("\n"),

@@ -9,11 +9,15 @@
  * or a Node API to find out.
  */
 import { CORE_SCHEMA, load } from "js-yaml"
+import { satisfies, valid, validRange } from "semver"
 
 import { DEFAULT_PLUGIN_ENTRY } from "./plugins.ts"
 
-/** Extension API this kernel implements; manifests declare the range they were built for. */
-export const EXTENSION_API_VERSION = "0.1"
+/** Runtime versions a package supports, keyed by runtime name. */
+export interface Engines {
+  /** Context Hub versions this package runs on, as an npm semver range. */
+  contextHub: string
+}
 
 /** Catalog grouping on the Extensions page. */
 export type ExtensionCategoryId =
@@ -41,8 +45,8 @@ export interface PluginManifestSource {
   /** Must equal the directory name; the kernel refuses a mismatch. */
   id: string
   name: LocalizedText
-  /** Kernel API range this plugin was built against, e.g. "^0.1". */
-  apiVersion: string
+  /** Context Hub version range this plugin was built for. */
+  engines: Engines
   description: LocalizedText
   /** Known lucide name, e.g. "sparkles", or a plugin-relative image path. */
   icon?: string
@@ -146,6 +150,29 @@ function requireLocalized(value: unknown, field: string): LocalizedText {
 }
 
 /**
+ * Validate an `engines` declaration.
+ *
+ * @param value — the parsed field.
+ * @param path — where the field sits, for error messages.
+ * @returns the declaration; only `contextHub` is read.
+ * @throws {Error} when the shape or the range is unusable.
+ */
+export function parseEngines(value: unknown, path = "engines"): Engines {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${path} must be an object`)
+  }
+  const engines = value as Record<string, unknown>
+  const range = engines.contextHub
+  if (typeof range !== "string" || range.trim() === "") {
+    throw new Error(`${path}.contextHub must be a non-empty string`)
+  }
+  if (validRange(range) === null) {
+    throw new Error(`${path}.contextHub "${range}" is not a valid semver range`)
+  }
+  return { contextHub: range }
+}
+
+/**
  * Validate one `plugin.yaml` document, already parsed.
  *
  * @param value — the parsed YAML.
@@ -168,12 +195,7 @@ export function parsePluginManifest(value: unknown, id: string): PluginManifestS
   if (file.entry !== undefined) {
     throw new Error('plugin manifest: "entry" belongs in package.json\'s "main"')
   }
-  const apiVersion = requireString(file.apiVersion, "apiVersion")
-  if (!isCompatible(apiVersion)) {
-    throw new Error(
-      `plugin manifest: apiVersion "${apiVersion}" is not compatible with this kernel`
-    )
-  }
+  const engines = parseEngines(file.engines, 'plugin manifest: "engines"')
   const permissions = file.permissions
   if (permissions !== undefined) {
     if (
@@ -193,7 +215,7 @@ export function parsePluginManifest(value: unknown, id: string): PluginManifestS
   return {
     id: manifestId,
     name: requireLocalized(file.name, "name"),
-    apiVersion,
+    engines,
     description:
       file.description === undefined ? "" : requireLocalized(file.description, "description"),
     icon: typeof file.icon === "string" ? file.icon : undefined,
@@ -278,7 +300,20 @@ export function readPluginPackage(value: unknown, id: string): PluginPackageFile
   }
 }
 
-/** Whether this kernel can load a manifest, by API range equality. */
-export function isCompatible(apiVersion: string): boolean {
-  return apiVersion.replace(/^[\^~]/, "") === EXTENSION_API_VERSION
+/**
+ * Whether a hub version satisfies a package's declared range.
+ *
+ * `engines === undefined` only happens for modules compiled into the build;
+ * a package on disk or in the market always declares one. Prereleases are
+ * included so a range reads the way its author meant it: `>=0.0.1` should
+ * accept the running `0.0.1-beta.5`.
+ *
+ * @param engines — the package's declaration.
+ * @param hubVersion — the running Context Hub version.
+ * @returns false when the range is not satisfied or the version is unusable.
+ */
+export function isCompatible(engines: Engines | undefined, hubVersion: string): boolean {
+  if (engines === undefined) return true
+  if (valid(hubVersion) === null) return false
+  return satisfies(hubVersion, engines.contextHub, { includePrerelease: true })
 }

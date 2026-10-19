@@ -16,6 +16,7 @@ import type { ExtensionModule } from "../src/types.ts"
 function testHost(): PlatformHost {
   return {
     form: "Test",
+    version: "0.5.0",
     capabilities: { code: true, filesystem: false, network: false },
     storage: { read: () => null, write: () => undefined },
     net: null,
@@ -29,7 +30,6 @@ const searchable: ExtensionModule = {
   manifest: {
     name: "Search",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Offers one search provider.",

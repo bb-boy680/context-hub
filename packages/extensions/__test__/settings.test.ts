@@ -24,6 +24,7 @@ function hostWith(
     writes,
     host: {
       form: "Test",
+      version: "0.5.0",
       capabilities: { code: true, filesystem: false, network: false },
       storage: {
         read: (key) => state.get(key) ?? null,

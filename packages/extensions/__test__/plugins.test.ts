@@ -63,7 +63,7 @@ beforeAll(async () => {
   await writePlugin(
     legacy,
     "acme.legacy",
-    'id: acme.legacy\nname: Legacy\napiVersion: "^0.1"\n',
+    'id: acme.legacy\nname: Legacy\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n',
     "export function apply() {}\n"
   )
   /* An agent pack carries `plugin.json`, not `plugin.yaml`; it must stay put. */
@@ -87,7 +87,7 @@ beforeAll(async () => {
     [
       "id: acme.hello",
       "name: Hello",
-      'apiVersion: "^0.1"',
+      'engines:\n  contextHub: ">=0.0.1 <0.7.0"',
       "description: Adds a page.",
       "icon: sparkles",
       "permissions: [storage.self]",
@@ -100,25 +100,25 @@ beforeAll(async () => {
   await writePlugin(
     extensions,
     "acme.mismatch",
-    'id: acme.other\nname: Mismatch\napiVersion: "^0.1"\n',
+    'id: acme.other\nname: Mismatch\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n',
     "export function apply() {}\n"
   )
   await writePlugin(
     extensions,
     "acme.future",
-    'id: acme.future\nname: Future\napiVersion: "^9.9"\n'
+    'id: acme.future\nname: Future\nengines:\n  contextHub: ">=9.9.0"\n'
   )
   await writePlugin(
     extensions,
     "acme.empty",
-    'id: acme.empty\nname: Empty\napiVersion: "^0.1"\n',
+    'id: acme.empty\nname: Empty\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n',
     "export const nothing = true\n"
   )
   /* A plugin with no package.json keeps loading with the 0.0.0 / index.js fallback. */
   await writePlugin(
     extensions,
     "acme.bare",
-    'id: acme.bare\nname: Bare\napiVersion: "^0.1"\n',
+    'id: acme.bare\nname: Bare\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n',
     "export function apply() {}\n",
     {}
   )
@@ -133,7 +133,7 @@ beforeAll(async () => {
       "name:",
       "  en: Packed",
       '  "zh-cn": 打包',
-      'apiVersion: "^0.1"',
+      'engines:\n  contextHub: ">=0.0.1 <0.7.0"',
       "description:",
       "  en: A packed plugin.",
       '  "zh-cn": 一个打包插件。',
@@ -203,6 +203,7 @@ describe("discovery", () => {
   beforeAll(async () => {
     const found = await discoverPlugins({
       source: store,
+      hubVersion: "0.5.0",
       /* The loader builds a route; this reads the same file the route would serve. */
       importModule: (url) =>
         import(
@@ -271,8 +272,13 @@ describe("discovery", () => {
     expect(byId.get("acme.mismatch")?.problem).toContain("does not match")
   })
 
-  it("refuses an incompatible apiVersion before its code runs", () => {
-    expect(byId.get("acme.future")?.problem).toContain("not compatible")
+  it("keeps an incompatible plugin's row without importing its code", () => {
+    const future = byId.get("acme.future")
+    expect(future?.problem).toBeUndefined()
+    expect(future?.module?.manifest.engines).toEqual({ contextHub: ">=9.9.0" })
+    /* No entry file exists for this fixture, so a successful read proves no import. */
+    expect(future?.module?.apply).toBeUndefined()
+    expect(future?.module?.stored).toBe(true)
   })
 
   it("refuses an entry module with no apply", () => {

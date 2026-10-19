@@ -124,7 +124,7 @@ const options: HubServerOptions = {
     createStateHandler({ ...placed, log: (message) => console.warn(message) }),
     createAboutHandler({ version, ...placed }),
     createExtensionHandler(placed),
-    createExtensionMarketHandler(placed),
+    createExtensionMarketHandler({ ...placed, version }),
     createWorkspaceHandler(placed),
     createNetHandler(),
     createSkillHandler(placed),

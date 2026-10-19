@@ -8,21 +8,27 @@
  * button. Installing one writes its files, loads the module and registers it in
  * the live kernel, so the row updates without a reload.
  */
-import { SearchIcon } from "lucide-react"
+import { RefreshCwIcon, SearchIcon } from "lucide-react"
 import * as React from "react"
 
 import { ExtensionDetailDialog } from "@/components/extension-detail-dialog"
 import {
+  installMarketExtension,
   marketEntriesFor,
+  marketUpdatesFor,
   useExtensionMarket,
   type MarketEntry,
+  type MarketUpdateEntry,
 } from "@/lib/extension-market"
 import { cardSurface, categoryOrder, categoryTile } from "@/lib/extensions"
-import { recommendedVersion } from "@context-hub/core/extension-market"
+import { runExtensionCheck } from "@/lib/extension-updates"
+import {
+  compatibleVersion,
+  type ExtensionMarketPlugin,
+  type ExtensionMarketVersion,
+} from "@context-hub/core/extension-market"
 import {
   createRemoteExtensionMarket,
-  createRemotePluginSource,
-  discoverPlugins,
   localized,
   OFFICIAL_MARKET_URL,
   type ExtensionView,
@@ -50,17 +56,38 @@ function matches(entry: ExtensionView, query: string, locale: string): boolean {
   return haystack.includes(query.toLowerCase())
 }
 
+/** The one action a catalog row offers, in priority order. */
+type RowAction = "update" | "install" | "uninstall" | "disable" | "enable"
+
+function actionOf(
+  entry: ExtensionView,
+  update: MarketUpdateEntry | null,
+  remote: MarketEntry | undefined
+): RowAction | null {
+  if (update !== null && update.target !== null) return "update"
+  /* A listed plugin this hub cannot run has nothing to offer; an installed one
+     keeps its row so it can still be removed. */
+  if (remote !== undefined) return remote.version === null ? null : "install"
+  if (entry.status === "incompatible" && !entry.stored) return null
+  if (entry.enabled) return entry.stored ? "uninstall" : "disable"
+  return entry.stored ? "uninstall" : "enable"
+}
+
 function ExtensionRow({
   entry,
+  update,
+  action,
   needle,
   busy,
   onOpen,
   onAction,
 }: {
   entry: ExtensionView
+  update: MarketUpdateEntry | null
+  action: RowAction | null
   /** What the filter box holds, marked in the fields it matched. */
   needle: string
-  /** True while this row's install is in flight. */
+  /** True while this row's action is in flight. */
   busy: boolean
   onOpen: () => void
   onAction: () => void
@@ -70,6 +97,8 @@ function ExtensionRow({
   const Icon = manifest.icon
   const name = localized(manifest.name, i18n.active)
   const description = localized(manifest.description, i18n.active)
+  const updateAvailable = update !== null && update.target !== null
+  const updateBlocked = update !== null && update.target === null
 
   return (
     <div
@@ -92,13 +121,16 @@ function ExtensionRow({
             {manifest.locked === true ? (
               <Badge variant="secondary">{t("extensions.status.builtin")}</Badge>
             ) : null}
-            {status === "error" ? (
-              <Badge variant="destructive">{t("extensions.status.error")}</Badge>
+            {updateAvailable ? (
+              <Badge>{t("extensions.market.updateAvailable")}</Badge>
             ) : null}
-            {status === "incompatible" ? (
+            {updateBlocked || (status === "incompatible" && !updateAvailable) ? (
               <Badge variant="destructive">
                 {t("extensions.status.incompatible")}
               </Badge>
+            ) : null}
+            {status === "error" ? (
+              <Badge variant="destructive">{t("extensions.status.error")}</Badge>
             ) : null}
             {status === "waiting" ? (
               <Badge variant="secondary">
@@ -111,43 +143,50 @@ function ExtensionRow({
           </span>
         </span>
       </button>
-      {manifest.locked === true || status === "incompatible" ? null : (
-        <ExtensionActionButton entry={entry} busy={busy} onAction={onAction} />
+      {action === null ? null : (
+        <ExtensionActionButton action={action} busy={busy} onAction={onAction} />
       )}
     </div>
   )
 }
 
-/** Installed extensions offer Uninstall; the rest offer Install. */
+const ACTION_LABEL: Record<RowAction, string> = {
+  update: "extensions.market.update",
+  install: "extensions.action.install",
+  uninstall: "extensions.action.uninstall",
+  disable: "extensions.action.disable",
+  enable: "extensions.action.enable",
+}
+
+/** The row's one button; which action it runs is decided by {@link actionOf}. */
 function ExtensionActionButton({
-  entry,
+  action,
   busy,
   onAction,
 }: {
-  entry: ExtensionView
+  action: RowAction
   busy: boolean
   onAction: () => void
 }) {
   const { t } = useI18n()
-  const { enabled, status } = entry
+  const secondary = action === "uninstall" || action === "disable"
+  const label = t(ACTION_LABEL[action])
 
   return (
     <Button
       type="button"
       size="default"
-      variant={enabled ? "outline" : "default"}
-      disabled={busy || status === "activating"}
-      aria-label={t(
-        enabled ? "extensions.action.uninstall" : "extensions.action.install"
-      )}
+      variant={secondary ? "outline" : "default"}
+      disabled={busy}
+      aria-label={label}
       onClick={onAction}
       className={
-        enabled
+        secondary
           ? `px-3 ${outline} text-secondary-foreground hover:bg-muted hover:text-foreground`
           : "px-3"
       }
     >
-      {t(enabled ? "extensions.action.uninstall" : "extensions.action.install")}
+      {label}
     </Button>
   )
 }
@@ -161,12 +200,17 @@ export function ExtensionsPage() {
   const setQuery = search.setQuery
   const [detailId, setDetailId] = React.useState<string | null>(null)
   const [installing, setInstalling] = React.useState<string | null>(null)
+  const [checking, setChecking] = React.useState(false)
 
   const market = useExtensionMarket(OFFICIAL_MARKET_URL)
+  const updates =
+    market.index === null
+      ? new Map<string, MarketUpdateEntry>()
+      : marketUpdatesFor(snapshot.entries, market.index, ctx.host.version)
   const marketEntries =
     market.index === null
       ? []
-      : marketEntriesFor(snapshot.entries, market.index)
+      : marketEntriesFor(snapshot.entries, market.index, ctx.host.version)
   const allEntries = [
     ...snapshot.entries,
     ...marketEntries.map((item) => item.view),
@@ -178,43 +222,88 @@ export function ExtensionsPage() {
   const detail =
     allEntries.find((entry) => entry.manifest.id === detailId) ?? null
 
+  /* A market read failure is reported once, through the same toast channel as
+     every other failure on this page, rather than as a line above the list. */
+  const lastFailure = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (market.failure === null) {
+      lastFailure.current = null
+      return
+    }
+    if (lastFailure.current === market.failure) return
+    lastFailure.current = market.failure
+    toast.add({
+      type: "error",
+      title: t("extensions.market.failed").replace("{reason}", market.failure),
+    })
+  }, [market.failure, t])
+
   /* Keep the origin block even after the install makes the market row disappear. */
   const detailMarket: MarketEntry | null = (() => {
     if (market.index === null || detailId === null || detail === null) return null
     const plugin = market.index.plugins.find((item) => item.id === detailId)
     if (plugin === undefined) return null
-    return { plugin, version: recommendedVersion(plugin), view: detail }
+    return { plugin, version: compatibleVersion(plugin, ctx.host.version), view: detail }
   })()
+  const detailUpdate = detailId === null ? null : (updates.get(detailId) ?? null)
+  const detailInstalled =
+    detail !== null &&
+    snapshot.entries.some((entry) => entry.manifest.id === detail.manifest.id)
 
   const install = React.useCallback(
-    async (item: MarketEntry): Promise<void> => {
-      setInstalling(item.plugin.id)
+    async (
+      plugin: ExtensionMarketPlugin,
+      version: ExtensionMarketVersion
+    ): Promise<void> => {
+      setInstalling(plugin.id)
       try {
-        await marketClient.install(
-          OFFICIAL_MARKET_URL,
-          item.plugin.id,
-          item.version.version
-        )
-        const found = await discoverPlugins({
-          source: createRemotePluginSource(),
-          /* A fresh URL bypasses the module cache, so a reinstall runs the new file. */
-          importModule: async (url) =>
-            import(/* @vite-ignore */ `${url}?t=${String(Date.now())}`),
-          ids: [item.plugin.id],
+        const result = await installMarketExtension({
+          ctx,
+          plugin,
+          version,
+          hubVersion: ctx.host.version,
         })
-        const loaded = found.find((entry) => entry.id === item.plugin.id)
-        if (loaded?.module === undefined) {
-          throw new Error(
-            loaded?.problem ??
-              `the installed extension "${item.plugin.id}" could not be loaded`
-          )
-        }
-        await ctx.extensions.add(loaded.module)
         toast.add({
           type: "success",
-          title: t("extensions.market.installedNotice").replace(
+          title: t(
+            result.fresh
+              ? "extensions.market.installedNotice"
+              : "extensions.market.updatedNotice"
+          ).replace("{name}", localized(plugin.title, i18n.active)),
+        })
+      } catch (reason) {
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
+      } finally {
+        setInstalling(null)
+      }
+    },
+    [ctx, t, i18n.active]
+  )
+
+  /**
+   * Remove one extension from this machine, or switch a built-in off.
+   *
+   * A stored package stops first, then loses its files, then its catalog row:
+   * a failed deletion leaves it installed and disabled rather than running code
+   * whose files are gone.
+   */
+  const uninstall = React.useCallback(
+    async (entry: ExtensionView): Promise<void> => {
+      const id = entry.manifest.id
+      setInstalling(id)
+      try {
+        if (entry.enabled) await ctx.extensions.disable(id)
+        if (!entry.stored) return
+        await marketClient.remove(id)
+        await ctx.extensions.remove(id)
+        toast.add({
+          type: "success",
+          title: t("extensions.market.removedNotice").replace(
             "{name}",
-            localized(item.view.manifest.name, i18n.active)
+            localized(entry.manifest.name, i18n.active)
           ),
         })
       } catch (reason) {
@@ -228,6 +317,62 @@ export function ExtensionsPage() {
     },
     [ctx, t, i18n.active]
   )
+
+  const runAction = (
+    entry: ExtensionView,
+    action: RowAction | null,
+    update: MarketUpdateEntry | null,
+    remote: MarketEntry | undefined
+  ): void => {
+    if (action === "update" && update !== null && update.target !== null) {
+      void install(update.plugin, update.target)
+      return
+    }
+    if (action === "install" && remote !== undefined && remote.version !== null) {
+      void install(remote.plugin, remote.version)
+      return
+    }
+    if (action === "uninstall" || action === "disable") {
+      void uninstall(entry)
+      return
+    }
+    if (action === "enable") {
+      void ctx.extensions.enable(entry.manifest.id).catch((reason: unknown) => {
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
+      })
+    }
+  }
+
+  /** Read the market now; auto-update, when on, installs what it finds. */
+  const check = async (): Promise<void> => {
+    setChecking(true)
+    try {
+      const outcome = await runExtensionCheck(ctx)
+      toast.add({
+        type: outcome.failed.length > 0 ? "error" : "success",
+        title: t("extensions.market.checked")
+          .replace("{checked}", String(outcome.checked))
+          .replace("{updated}", String(outcome.updated.length))
+          .replace("{failed}", String(outcome.failed.length)),
+      })
+      for (const failure of outcome.failed) {
+        toast.add({ type: "error", title: `${failure.name}: ${failure.reason}` })
+      }
+    } catch (reason) {
+      toast.add({
+        type: "error",
+        title: t("extensions.market.checkFailed").replace(
+          "{reason}",
+          reason instanceof Error ? reason.message : String(reason)
+        ),
+      })
+    } finally {
+      setChecking(false)
+    }
+  }
 
   return (
     <>
@@ -250,12 +395,17 @@ export function ExtensionsPage() {
                 className="h-9 pl-9"
               />
             </label>
+            <Button
+              type="button"
+              variant="outline"
+              className={`h-9 px-3 text-secondary-foreground hover:bg-muted hover:text-foreground ${outline}`}
+              disabled={checking}
+              onClick={() => void check()}
+            >
+              <RefreshCwIcon className={checking ? "animate-spin" : undefined} />
+              {t("extensions.market.check")}
+            </Button>
           </div>
-          {market.failure === null ? null : (
-            <p className="text-[12px] text-destructive">
-              {t("extensions.market.failed").replace("{reason}", market.failure)}
-            </p>
-          )}
         </div>
 
         {categoryOrder.map((category) => {
@@ -281,22 +431,18 @@ export function ExtensionsPage() {
                   const remote = marketEntries.find(
                     (item) => item.plugin.id === entry.manifest.id
                   )
+                  const update = updates.get(entry.manifest.id) ?? null
+                  const action = actionOf(entry, update, remote)
                   return (
                     <ExtensionRow
                       key={entry.manifest.id}
                       entry={entry}
+                      update={update}
+                      action={action}
                       needle={needle}
                       busy={installing === entry.manifest.id}
                       onOpen={() => setDetailId(entry.manifest.id)}
-                      onAction={
-                        remote === undefined
-                          ? () =>
-                              void ctx.extensions.toggle(
-                                entry.manifest.id,
-                                !entry.enabled
-                              )
-                          : () => void install(remote)
-                      }
+                      onAction={() => runAction(entry, action, update, remote)}
                     />
                   )
                 })}
@@ -313,7 +459,10 @@ export function ExtensionsPage() {
       <ExtensionDetailDialog
         entry={detail}
         market={detailMarket}
+        update={detailUpdate}
+        installed={detailInstalled}
         onInstall={install}
+        onUninstall={uninstall}
         onOpenChange={(open) => {
           if (!open) setDetailId(null)
         }}

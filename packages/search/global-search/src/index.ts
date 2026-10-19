@@ -23,7 +23,6 @@ export const globalSearchExtension: ExtensionModule = {
   manifest: {
     name: "Global search",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Search every module from anywhere with Ctrl+K.",

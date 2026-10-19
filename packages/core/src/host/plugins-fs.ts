@@ -45,7 +45,9 @@ async function looksLikeExtension(dir: string, name: string): Promise<boolean> {
       manifest !== null &&
       manifest.id === name &&
       (typeof manifest.name === "string" || typeof manifest.name === "object") &&
-      typeof manifest.apiVersion === "string"
+      /* `apiVersion` was the old marker; a directory carrying it still moves,
+         so an old install is not left behind in the agent plugin space. */
+      (typeof manifest.engines === "object" || typeof manifest.apiVersion === "string")
     )
   } catch {
     /* A manifest this build cannot read is not one it can claim. */

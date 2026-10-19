@@ -12,8 +12,11 @@ import type { ExtensionView } from "@context-hub/extensions"
 
 import {
   marketEntriesFor,
+  marketUpdatesFor,
   refreshExtensionMarket,
 } from "../src/lib/extension-market"
+
+const HUB_VERSION = "0.5.0"
 
 function entry(id: string, version: string): ExtensionView {
   return {
@@ -21,7 +24,6 @@ function entry(id: string, version: string): ExtensionView {
       id,
       name: id,
       version,
-      apiVersion: "^0.1",
       kind: "code",
       category: "integration",
       description: "",
@@ -31,6 +33,7 @@ function entry(id: string, version: string): ExtensionView {
     status: "active",
     points: [],
     provides: [],
+    stored: false,
   }
 }
 
@@ -48,7 +51,7 @@ const INDEX: ExtensionMarketIndex = {
       versions: [
         {
           version: "2.0.0",
-          apiVersion: "^0.1",
+          engines: { contextHub: ">=0.0.1 <0.7.0" },
           source: {
             type: "git",
             url: "https://example.test/repo",
@@ -66,7 +69,7 @@ const INDEX: ExtensionMarketIndex = {
       versions: [
         {
           version: "1.0.0",
-          apiVersion: "^0.1",
+          engines: { contextHub: ">=0.0.1 <0.7.0" },
           source: {
             type: "git",
             url: "https://example.test/repo",
@@ -79,12 +82,12 @@ const INDEX: ExtensionMarketIndex = {
 
 describe("marketEntriesFor", () => {
   it("shapes an uninstalled entry like a catalog row", () => {
-    const [one] = marketEntriesFor([], INDEX)
+    const [one] = marketEntriesFor([], INDEX, HUB_VERSION)
     expect(one?.view.manifest).toMatchObject({
       id: "demo.one",
       name: { en: "One", "zh-cn": "一号" },
       version: "2.0.0",
-      apiVersion: "^0.1",
+      engines: { contextHub: ">=0.0.1 <0.7.0" },
       kind: "code",
       category: "agent",
       description: { en: "First", "zh-cn": "第一" },
@@ -96,23 +99,110 @@ describe("marketEntriesFor", () => {
 
   it("does not duplicate an id the kernel already has", () => {
     expect(
-      marketEntriesFor([entry("demo.one", "1.0.0")], INDEX).map(
+      marketEntriesFor([entry("demo.one", "1.0.0")], INDEX, HUB_VERSION).map(
         (item) => item.plugin.id
       )
     ).toEqual(["demo.two"])
   })
 
   it("keeps the localized title and description for the page to resolve", () => {
-    const [one] = marketEntriesFor([], INDEX)
+    const [one] = marketEntriesFor([], INDEX, HUB_VERSION)
     expect(localized(one!.view.manifest.name, "zh-CN")).toBe("一号")
     expect(localized(one!.view.manifest.description, "zh-CN")).toBe("第一")
   })
 
   it("keeps the index order", () => {
-    expect(marketEntriesFor([], INDEX).map((item) => item.plugin.id)).toEqual([
+    expect(marketEntriesFor([], INDEX, HUB_VERSION).map((item) => item.plugin.id)).toEqual([
       "demo.one",
       "demo.two",
     ])
+  })
+
+  it("marks a plugin with no compatible version instead of hiding it", () => {
+    const future: ExtensionMarketIndex = {
+      ...INDEX,
+      plugins: [
+        {
+          ...INDEX.plugins[0]!,
+          versions: [
+            {
+              version: "9.0.0",
+              engines: { contextHub: ">=9.0.0" },
+              source: INDEX.plugins[0]!.versions[0]!.source,
+            },
+          ],
+        },
+      ],
+    }
+    const [one] = marketEntriesFor([], future, HUB_VERSION)
+    expect(one?.version).toBeNull()
+    expect(one?.view.status).toBe("incompatible")
+    expect(one?.view.manifest.version).toBe("9.0.0")
+    expect(one?.view.manifest.engines).toEqual({ contextHub: ">=9.0.0" })
+  })
+
+  it("picks the first version this hub satisfies", () => {
+    const mixed: ExtensionMarketIndex = {
+      ...INDEX,
+      plugins: [
+        {
+          ...INDEX.plugins[0]!,
+          versions: [
+            {
+              version: "9.0.0",
+              engines: { contextHub: ">=9.0.0" },
+              source: INDEX.plugins[0]!.versions[0]!.source,
+            },
+            {
+              version: "2.0.0",
+              engines: { contextHub: ">=0.1.0 <0.7.0" },
+              source: INDEX.plugins[0]!.versions[0]!.source,
+            },
+          ],
+        },
+      ],
+    }
+    expect(marketEntriesFor([], mixed, HUB_VERSION)[0]?.version?.version).toBe("2.0.0")
+  })
+})
+
+describe("marketUpdatesFor", () => {
+  it("offers a compatible newer version to an installed plugin", () => {
+    const updates = marketUpdatesFor([entry("demo.one", "1.0.0")], INDEX, HUB_VERSION)
+    expect(updates.get("demo.one")?.target?.version).toBe("2.0.0")
+  })
+
+  it("offers nothing when the installed version is the target", () => {
+    expect(
+      marketUpdatesFor([entry("demo.one", "2.0.0")], INDEX, HUB_VERSION).size
+    ).toBe(0)
+  })
+
+  it("reports a listing whose only versions are incompatible", () => {
+    const future: ExtensionMarketIndex = {
+      ...INDEX,
+      plugins: [
+        {
+          ...INDEX.plugins[0]!,
+          versions: [
+            {
+              version: "9.0.0",
+              engines: { contextHub: ">=9.0.0" },
+              source: INDEX.plugins[0]!.versions[0]!.source,
+            },
+          ],
+        },
+      ],
+    }
+    const update = marketUpdatesFor([entry("demo.one", "1.0.0")], future, HUB_VERSION).get(
+      "demo.one"
+    )
+    expect(update?.target).toBeNull()
+    expect(update?.latest.version).toBe("9.0.0")
+  })
+
+  it("ignores a plugin this machine does not have", () => {
+    expect(marketUpdatesFor([], INDEX, HUB_VERSION).size).toBe(0)
   })
 })
 

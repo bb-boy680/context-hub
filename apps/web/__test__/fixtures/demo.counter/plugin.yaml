@@ -1,6 +1,7 @@
 id: demo.counter
 name: Demo Counter
-apiVersion: "^0.1"
+engines:
+  contextHub: ">=0.0.1 <0.7.0"
 description: Adds a counter to the header.
 icon: sparkles
 category: integration

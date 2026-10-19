@@ -13,7 +13,7 @@ names, verifies both declarations, and moves it into place.
 
 ```text
 <id>/
-  plugin.yaml      identity, API version, presentation, permissions, services
+  plugin.yaml      identity, Context Hub version range, presentation, permissions, services
   package.json     project metadata; version and `main` (the entry module)
   lib/index.js     the built entry module; exports apply(scope)
   src/             the source it was built from
@@ -42,7 +42,8 @@ id: skills.sh
 name:
   en: skills.sh
   zh-cn: skills.sh
-apiVersion: "^0.1"
+engines:
+  contextHub: ">=0.0.1 <0.7.0"
 description:
   en: Search the public skills.sh catalog and install a result into this hub.
   zh-cn: 搜索公开的 skills.sh 技能目录，并把结果安装到本 hub。
@@ -56,7 +57,13 @@ Rules:
 
 - `id` must equal the directory name and match
   `^[a-z0-9][A-Za-z0-9-]*(\.[a-z0-9][A-Za-z0-9-]*)*$`.
-- `apiVersion` is checked for equality against `EXTENSION_API_VERSION` (`0.1`).
+- `engines.contextHub` is required and is an npm semver range naming the
+  Context Hub **application** versions the plugin supports, e.g.
+  `">=0.1.0 <0.7.0"`, `"^0.2"`, or `"0.1 || >=0.3 <0.7"`. The hub compares
+  this range with the version in the repository root's `package.json`.
+  Prereleases are included, so `">=0.0.0"` accepts a running
+  `0.0.1-beta.5`; the parser refuses a range `semver.validRange` cannot read.
+  There is no `apiVersion` field any more.
 - `name` and `description` are a string or a `{ "<locale>": "text" }` table.
   A table must include `en`; locale ids are lowercase. The UI resolves the
   active locale, then its language, then `en`.
@@ -138,7 +145,7 @@ never edited by hand:
       "versions": [
         {
           "version": "0.1.0",
-          "apiVersion": "^0.1",
+          "engines": { "contextHub": ">=0.0.1 <0.7.0" },
           "source": {
             "type": "git",
             "url": "https://github.com/you/context-hub-extensions",
@@ -162,15 +169,22 @@ Rules:
 - `source.type` is `git`. For a remote index, `url` must be `https:` without
   credentials, query or fragment. For an index read from disk, `url` may also be
   an absolute local repository path.
-- `apiVersion` is the range the plugin's manifest declares; it must be
-  compatible with this kernel.
+- `engines.contextHub` on every version is the range the plugin's manifest
+  declares. It is validated for syntax when the index is read, but an
+  unsatisfied range does not reject the document: `compatibleVersion()` picks
+  the first version the running hub satisfies, and `versions[0]` is only the
+  newest listing for display. One future-facing version therefore cannot hide
+  the rest of the market.
+- Installing refuses a version whose `engines` this hub does not satisfy,
+  before anything is cloned; after the clone the package's own `plugin.yaml`
+  is checked again, so an index and a package that disagree install nothing.
 - The installer clones the repository's default branch. The version in the
   index must equal the `version` in the plugin's `package.json`; a mismatch
   aborts before anything moves into place.
 - There is no content hash: the market trusts the repository's default branch.
-- `versions[0]` is the recommended version. The kernel does not parse SemVer;
-  "update available" means the installed version string differs from the first
-  listed one.
+- `versions[0]` is the newest listed version, for display. The kernel does not
+  order SemVer strings: "update available" means the first compatible version
+  differs from the installed version string.
 - The index and the plugins live in the same repository; the default branch must
   contain the plugin's path.
 - A market plugin must declare an image `icon` in `plugin.yaml`; the generator
@@ -217,23 +231,69 @@ extensions, and use the same detail dialog and the same action button.
 
 - Files land in `<hub-home>/extensions/<id>`. The header index is
   `<hub-home>/extensions/index.json`.
-- Installing writes the files, imports the entry module, registers it in the
-  running kernel and enables it. It takes effect immediately; there is no page
-  reload.
-- Uninstalling is the kernel's own disable action: the extension is switched
-  off and its contributions are withdrawn, but its files stay in
-  `<hub-home>/extensions/<id>`. Reinstalling from the same row enables it
-  again.
+- Installing writes the files, imports the entry module, replaces the module
+  behind that id in the running kernel and enables it. It takes effect
+  immediately; there is no page reload.
+- An installed plugin whose first compatible market version differs from the
+  installed one shows **Update available**. Update installs that version,
+  replaces the directory, loads the new entry and swaps the running module
+  without a reload; the user's enablement choice is kept. A listing whose only
+  versions are incompatible shows **Incompatible** and offers no install.
+- An installed plugin this hub cannot run stays visible with its manifest row,
+  but its entry module is never imported and it cannot be enabled.
+- **Uninstall** on a stored package disables it first, then deletes
+  `<hub-home>/extensions/<id>`, its `index.json` record and its key in
+  `state/extensions.json`, and finally removes it from the running catalog.
+  A failed deletion leaves the extension installed but disabled, so code is
+  never running after its files are gone.
+- A package compiled into the build has no directory to delete; its action is
+  **Disable** / **Enable**, and it stays in the catalog.
+- `state/extensions.json` holds one boolean per extension and nothing else:
+  descriptions live in `plugin.yaml`, install source/version/time in
+  `index.json`. Removing the key is how an uninstall forgets the user's choice.
 - A first install writes `true` for the id into `<hub-home>/state/extensions.json`;
-  an update keeps the value the user chose; removing deletes the key.
+  an update keeps the value the user chose.
 - A failed clone, a manifest whose id disagrees with the index, a missing or
   unusable `package.json`, a version that disagrees across the index and
-  `package.json`, a permission list that differs from the manifest, or a
-  missing entry file all abort before anything moves into place. The previous
-  version stays installed.
+  `package.json`, a permission list that differs from the manifest, an
+  incompatible `engines` range, or a missing entry file all abort before
+  anything moves into place. The previous version stays installed.
 - Directories beginning with `.staging-` or `.old-` are never read as
   extensions. A failed replacement leaves the old copy at `<id>.old-<uuid>` and
   reports that path.
+
+## Update settings
+
+The settings page's **Extension updates** group controls when the hub reads the
+market again:
+
+- **Check for updates**: Manual (only the button), On startup (every page
+  load), or Daily at a chosen local time.
+- **Install updates automatically**: when on, a check installs every
+  compatible update it finds; when off, it only refreshes the badges.
+
+The values live in `<hub-home>/state/settings.json` under the plugin namespace
+`hub.extensions`, alongside the skills and plugin-pack settings. The schedule
+runs only while the hub page is open; closing it stops the timer. A daily run
+missed while closed catches up once. Automatic updates replace the whole
+extension directory — there is no content hash, so local edits inside that
+directory are overwritten; the switch is off by default.
+
+The Extensions page also has a **Check for updates** button beside the search
+box. It forces a market re-read and, when automatic updates are on, installs
+what it finds and reports the counts.
+
+## Migration
+
+This build reads `engines` and no longer reads `apiVersion`. An extension
+installed from an earlier build has no `engines` in its `plugin.yaml`, so the
+loader refuses it and the page does not list it; its files stay on disk.
+Reinstall it from the updated market, or add
+`engines: { contextHub: "<range>" }` to its `plugin.yaml` by hand.
+
+The remote market must publish the new index before this hub is released: an
+old index has no `engines` in its versions and is rejected as malformed. Merge
+and rebuild the market repository first, then ship the hub.
 
 ## Breaking change: `plugin.json` is no longer read
 
@@ -260,11 +320,13 @@ page reads.
 2. Open **Extensions**. The built-in index lists **skills.sh** in **Sources**
    and **Claude Code** in **Agents**.
 3. Open one and choose **Install** in the dialog's footer; its files are cloned
-   from the first-party repository and the row updates. The same button now
-   reads **Uninstall**; it disables the extension and leaves its files in place.
-   Installing **skills.sh** adds its search source to **Skills → Explore**;
-   installing **Claude Code** adds the agent's sidebar row after the refresh the
-   install notice asks for.
+   from the first-party repository and the row updates without a reload. The
+   same button now reads **Uninstall**; it disables the extension, deletes its
+   files and its state key, and the market row returns. Installing **skills.sh**
+   adds its search source to **Skills → Explore**; installing **Claude Code**
+   adds the agent's sidebar row immediately.
+4. Choose **Check for updates** beside the search box to re-read the market and
+   refresh any **Update available** badges.
 
 The automated version of this flow is
 `apps/web/__test__/e2e-server.ts` plus `apps/web/__test__/e2e-probe.ts`; see the

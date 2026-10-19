@@ -25,7 +25,7 @@ import {
   type ExtensionMarketVersion,
   type MarketSource,
 } from "../extension-market.ts"
-import { parsePluginManifestYaml, parsePluginPackage, type ExtensionPermission, type PluginPackageFile } from "../extension-manifest.ts"
+import { isCompatible, parsePluginManifestYaml, parsePluginPackage, type ExtensionPermission, type PluginPackageFile } from "../extension-manifest.ts"
 import { assertPluginId, EXTENSION_MARKET_CACHE, PLUGIN_MANIFEST } from "../plugins.ts"
 import type { PluginRecord, PluginStore } from "../plugins.ts"
 import type { StateStore } from "../state.ts"
@@ -87,6 +87,8 @@ export interface InstallDependencies {
   state: Pick<StateStore, "read" | "write">
   plugin: ExtensionMarketPlugin
   version: ExtensionMarketVersion
+  /** The running Context Hub version, checked against both declarations. */
+  hubVersion: string
   /** Test seam for the two-step directory replacement. */
   rename?: Rename
 }
@@ -516,6 +518,11 @@ export async function installExtensionFromMarket(
   options: InstallDependencies
 ): Promise<InstallResult> {
   const id = assertPluginId(options.plugin.id)
+  if (!isCompatible(options.version.engines, options.hubVersion)) {
+    throw new Error(
+      `extension "${id}" ${options.version.version} requires a different Context Hub version`
+    )
+  }
   const root = options.store.root
   const staging = path.join(root, `.staging-${randomUUID()}`)
   const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-extension-"))
@@ -538,6 +545,11 @@ export async function installExtensionFromMarket(
       await fs.readFile(path.join(staging, PLUGIN_MANIFEST), "utf8"),
       id
     )
+    if (!isCompatible(manifest.engines, options.hubVersion)) {
+      throw new Error(
+        `extension "${id}": plugin.yaml does not support Context Hub ${options.hubVersion}`
+      )
+    }
     const pkg = await readPackageAt(staging, id)
     if (pkg.version !== options.version.version) {
       throw new Error(

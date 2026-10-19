@@ -7,11 +7,11 @@ import type { Context } from "@deepseek-ai/cordis"
 import type { ComponentType } from "react"
 
 import {
-  EXTENSION_API_VERSION,
   isCompatible,
   localized,
 } from "@context-hub/core/extension-manifest"
 import type {
+  Engines,
   ExtensionCategoryId,
   ExtensionPermission,
   LocalizedText,
@@ -19,8 +19,8 @@ import type {
 
 import type { SkillRegistry } from "./skill-registry.ts"
 
-export { EXTENSION_API_VERSION, isCompatible, localized }
-export type { ExtensionCategoryId, ExtensionPermission, LocalizedText }
+export { isCompatible, localized }
+export type { Engines, ExtensionCategoryId, ExtensionPermission, LocalizedText }
 
 /**
  * An icon an extension contributes. It is a component rather than a name, so a
@@ -226,8 +226,8 @@ export interface ExtensionManifest {
   /** Catalog name, authored in the language the package chooses. */
   name: LocalizedText
   version: string
-  /** Extension API range this package was built against, e.g. "^0.1". */
-  apiVersion: string
+  /** Context Hub versions this package supports; absent on modules compiled into the build. */
+  engines?: Engines
   kind: ExtensionKind
   category: ExtensionCategoryId
   description: LocalizedText
@@ -264,6 +264,8 @@ export interface ExtensionModule {
   declarative?: DeclarativeContributions
   /** Register what this package contributes, for as long as it is enabled. */
   apply?: (ctx: Context) => void
+  /** The package lives under the hub home's extension space, so it can be removed. */
+  stored?: boolean
 }
 
 /** One package as the kernel holds it: the module, with its id resolved. */

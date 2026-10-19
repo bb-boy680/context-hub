@@ -44,6 +44,8 @@ export interface ExtensionView {
   points: ExtensionPointId[]
   /** Service names this extension declares it publishes. */
   provides: string[]
+  /** The package lives under the hub home's extension space; built-ins cannot be removed. */
+  stored: boolean
 }
 
 /** Immutable catalog state published on every change. */
@@ -118,7 +120,7 @@ export class ExtensionService extends Service {
       if (this.entries.has(id)) throw new Error(`extensions: duplicate extension id "${id}"`)
       const entry: Entry = { module, manifest, enabled: false, status: "inactive" }
       this.entries.set(id, entry)
-      if (!isCompatible(manifest.apiVersion)) {
+      if (!isCompatible(manifest.engines, this.host.version)) {
         entry.status = "incompatible"
         continue
       }
@@ -185,13 +187,72 @@ export class ExtensionService extends Service {
     }
     const entry: Entry = { module, manifest, enabled: false, status: "inactive" }
     this.entries.set(id, entry)
-    if (!isCompatible(manifest.apiVersion)) {
+    if (!isCompatible(manifest.engines, this.host.version)) {
       entry.status = "incompatible"
       this.publish()
       return
     }
     entry.enabled = true
     await this.activate(entry)
+    this.persist()
+    this.publish()
+  }
+
+  /**
+   * Replace the module behind one id, keeping the user's enablement choice.
+   *
+   * A market update writes new files; the page imports them and hands the new
+   * module here. The old fiber is disposed before the new code mounts, so no
+   * registration from the previous version survives. An id the catalog does
+   * not have is simply added. An incompatible module is refused before the old
+   * entry is touched, so a bad download never costs a working extension.
+   */
+  replace(module: ExtensionModule): Promise<void> {
+    return this.run(() => this.replaceNow(module))
+  }
+
+  private async replaceNow(module: ExtensionModule): Promise<void> {
+    const manifest = catalogManifest(module)
+    const { id } = manifest
+    const existing = this.entries.get(id)
+    if (existing === undefined) {
+      await this.addNow(module)
+      return
+    }
+    if (existing.manifest.locked === true) {
+      throw new Error(`extensions: "${id}" is required and cannot be replaced`)
+    }
+    if (!isCompatible(manifest.engines, this.host.version)) {
+      throw new Error(`extensions: "${id}" requires a different Context Hub version`)
+    }
+    const enabled = existing.enabled
+    await this.deactivate(existing)
+    const entry: Entry = { module, manifest, enabled, status: "inactive" }
+    this.entries.set(id, entry)
+    if (enabled) await this.activate(entry)
+    this.persist()
+    this.publish()
+  }
+
+  /**
+   * Take one extension out of the running catalog.
+   *
+   * The files under the hub home are the installer's business; this only
+   * disposes the code and drops the row together with its recorded choice.
+   * A package compiled into the build cannot be removed.
+   */
+  remove(id: string): Promise<void> {
+    return this.run(() => this.removeNow(id))
+  }
+
+  private async removeNow(id: string): Promise<void> {
+    const entry = this.entries.get(id)
+    if (entry === undefined) throw new Error(`extensions: unknown extension "${id}"`)
+    if (entry.manifest.locked === true) {
+      throw new Error(`extensions: "${id}" is required and cannot be removed`)
+    }
+    await this.deactivate(entry)
+    this.entries.delete(id)
     this.persist()
     this.publish()
   }
@@ -249,7 +310,7 @@ export class ExtensionService extends Service {
     const entry = this.entries.get(id)
     if (entry === undefined) throw new Error(`extensions: unknown extension "${id}"`)
     if (entry.status === "incompatible") {
-      throw new Error(`extensions: "${id}" targets an incompatible extension API`)
+      throw new Error(`extensions: "${id}" requires a different Context Hub version`)
     }
     if (enabled && entry.manifest.locked === true) {
       throw new Error(`extensions: "${id}" is required and cannot be disabled`)
@@ -389,6 +450,7 @@ export class ExtensionService extends Service {
            provides, because once a registry publishes itself the kernel is not
            the one registering it and so is not the one that knows. */
         provides: entry.manifest.provides ?? [],
+        stored: entry.module.stored === true,
       })
     }
     return { entries, revision: this.revision }

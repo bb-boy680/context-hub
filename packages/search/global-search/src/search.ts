@@ -25,7 +25,7 @@ import type {
 
 /** One setting row, with the group whose anchor the page scrolls to. */
 interface SettingEntry {
-  anchor: "appearance" | "install" | "images" | "about"
+  anchor: "appearance" | "install" | "images" | "extensions" | "about"
   titleKey: string
   descriptionKey?: string
   groupTitleKey: string
@@ -82,6 +82,27 @@ const SETTINGS: readonly SettingEntry[] = [
     descriptionKey: "settings.images.download.description",
     groupTitleKey: "settings.images.title",
     groupDescriptionKey: "settings.images.description",
+  },
+  {
+    anchor: "extensions",
+    titleKey: "settings.extensions.check",
+    descriptionKey: "settings.extensions.check.description",
+    groupTitleKey: "settings.extensions.title",
+    groupDescriptionKey: "settings.extensions.description",
+  },
+  {
+    anchor: "extensions",
+    titleKey: "settings.extensions.dailyAt",
+    descriptionKey: "settings.extensions.dailyAt.description",
+    groupTitleKey: "settings.extensions.title",
+    groupDescriptionKey: "settings.extensions.description",
+  },
+  {
+    anchor: "extensions",
+    titleKey: "settings.extensions.autoUpdate",
+    descriptionKey: "settings.extensions.autoUpdate.description",
+    groupTitleKey: "settings.extensions.title",
+    groupDescriptionKey: "settings.extensions.description",
   },
   {
     anchor: "about",

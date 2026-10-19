@@ -39,7 +39,7 @@ import { resolveStoredFile } from "../src/host/assets-fs.ts"
 import { displayPath } from "../src/host/home.ts"
 
 const PACK_ID = "check.plugin"
-const MANIFEST = `id: ${PACK_ID}\nname: Check\napiVersion: "^0.1"\n`
+const MANIFEST = `id: ${PACK_ID}\nname: Check\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n`
 const BYTES = "the bytes this route serves\n"
 
 let home: string

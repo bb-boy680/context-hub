@@ -19,6 +19,14 @@ const words: Record<string, string> = {
   "settings.images.description": "Covers can stay remote or be downloaded.",
   "settings.images.download.title": "Download remote cover images",
   "settings.images.download.description": "Save http(s) images locally.",
+  "settings.extensions.title": "Extension updates",
+  "settings.extensions.description": "When the hub reads the extension market again.",
+  "settings.extensions.check": "Check for updates",
+  "settings.extensions.check.description": "Manual, startup, or daily.",
+  "settings.extensions.dailyAt": "Time of day",
+  "settings.extensions.dailyAt.description": "Local time the daily check runs.",
+  "settings.extensions.autoUpdate": "Install updates automatically",
+  "settings.extensions.autoUpdate.description": "Install a compatible newer version.",
   "settings.appearance.title": "Appearance & layout",
   "settings.appearance.description": "Theme, language, and the default view.",
   "settings.about.title": "About",
@@ -41,7 +49,6 @@ const extension = (overrides: Partial<ExtensionView["manifest"]> = {}): Extensio
     id: "acme.hello",
     name: "Hello",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Says hello",
@@ -52,6 +59,7 @@ const extension = (overrides: Partial<ExtensionView["manifest"]> = {}): Extensio
   status: "active",
   points: [],
   provides: [],
+  stored: false,
 })
 
 describe("searching the settings", () => {
@@ -70,6 +78,17 @@ describe("searching the settings", () => {
     const [row] = searchSettings(t, "images")
     expect(row?.title).toBe("Download remote cover images")
     expect(row?.path).toBe("/settings?q=images#images")
+  })
+
+  it("finds the extension update rows under their own anchor", () => {
+    expect(searchSettings(t, "time of day")).toEqual([
+      {
+        id: "extensions:settings.extensions.dailyAt",
+        title: "Time of day",
+        description: "Local time the daily check runs.",
+        path: "/settings?q=time+of+day#extensions",
+      },
+    ])
   })
 
   it("returns nothing for an empty query", () => {

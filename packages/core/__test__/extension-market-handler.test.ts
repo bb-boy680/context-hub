@@ -25,7 +25,7 @@ import { EXTENSION_MARKET_ROUTE } from "../src/plugins.ts"
 
 const ID = "demo.counter"
 const MARKET = "https://example.test/marketplace.json"
-const MANIFEST = `id: ${ID}\nname: Demo\napiVersion: "^0.1"\n`
+const MANIFEST = `id: ${ID}\nname: Demo\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n`
 
 const temporary: string[] = []
 let home = ""
@@ -71,7 +71,7 @@ async function repository(): Promise<{
     dir,
     version: {
       version: "1.0.0",
-      apiVersion: "^0.1",
+      engines: { contextHub: ">=0.0.1 <0.7.0" },
       source: { type: "git", url: repo, path: `plugins/${ID}` },
     },
   }
@@ -99,6 +99,7 @@ beforeAll(async () => {
       createExtensionMarketHandler({
         home,
         reader: { read: async () => index },
+        version: "0.5.0",
       }),
     ],
     log: () => undefined,

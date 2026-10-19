@@ -98,7 +98,6 @@ export const promptsExtension: ExtensionModule = {
   manifest: {
     name: "Prompts",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "asset",
     description:

@@ -14,6 +14,7 @@ import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import {
+  createAboutHandler,
   createExtensionHandler,
   createExtensionMarketHandler,
   createStateHandler,
@@ -42,12 +43,16 @@ if (home === undefined) {
    that URL and reads the checkout instead, so the probe needs no network. */
 const marketReader = market === undefined ? null : createMarketReader()
 const marketIndex = market === undefined ? null : path.resolve(market)
+/* The page reads this at startup and compares every package's engines to it. */
+const version = "0.1.0"
 const server = createHubServer({
   middlewares: [
     createStateHandler({ home, log: () => undefined }),
+    createAboutHandler({ version, home }),
     createExtensionHandler({ home }),
     createExtensionMarketHandler({
       home,
+      version,
       ...(marketReader === null || marketIndex === null
         ? {}
         : { reader: { read: () => marketReader.read(marketIndex) } }),

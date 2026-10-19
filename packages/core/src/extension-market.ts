@@ -13,6 +13,8 @@ import {
   isCompatible,
   isLocaleId,
   localized,
+  parseEngines,
+  type Engines,
   type ExtensionCategoryId,
   type ExtensionPermission,
   type LocalizedText,
@@ -34,8 +36,8 @@ export interface MarketSource {
 /** One installable version of an extension. */
 export interface ExtensionMarketVersion {
   version: string
-  /** Kernel API range the plugin's manifest declares. */
-  apiVersion: string
+  /** Context Hub versions the plugin's manifest supports. */
+  engines: Engines
   source: MarketSource
 }
 
@@ -218,13 +220,9 @@ function version(value: unknown, path: string, allowLocal: boolean): ExtensionMa
   if (tag.length > 64 || /\s/.test(tag)) {
     fail(`${path}.version`, "must be at most 64 characters without whitespace")
   }
-  const apiVersion = text(object.apiVersion, `${path}.apiVersion`)
-  if (!isCompatible(apiVersion)) {
-    fail(`${path}.apiVersion`, "is not compatible with this kernel")
-  }
   return {
     version: tag,
-    apiVersion,
+    engines: parseEngines(object.engines, `${path}.engines`),
     source: source(object.source, `${path}.source`, allowLocal),
   }
 }
@@ -380,4 +378,50 @@ export function recommendedVersion(plugin: ExtensionMarketPlugin): ExtensionMark
   const first = plugin.versions[0]
   if (first === undefined) throw new Error(`market index: "${plugin.id}" lists no versions`)
   return first
+}
+
+/**
+ * Pick the first version this hub can run.
+ *
+ * @param plugin — one validated market entry.
+ * @param hubVersion — the running Context Hub version.
+ * @returns the first compatible version, or null when none is.
+ */
+export function compatibleVersion(
+  plugin: ExtensionMarketPlugin,
+  hubVersion: string
+): ExtensionMarketVersion | null {
+  return plugin.versions.find((item) => isCompatible(item.engines, hubVersion)) ?? null
+}
+
+/** A newer listing for an installed plugin. */
+export interface MarketUpdate {
+  /** The first listed version, for display; it may be the incompatible one. */
+  latest: ExtensionMarketVersion
+  /** The version to install, or null when only incompatible versions exist. */
+  target: ExtensionMarketVersion | null
+}
+
+/**
+ * Whether an installed plugin has something to update to.
+ *
+ * Version strings are compared for equality, not ordered: the market's first
+ * compatible version is the target, and "different" is enough to offer it.
+ *
+ * @param plugin — the market entry for an installed plugin.
+ * @param installedVersion — the version on disk.
+ * @param hubVersion — the running Context Hub version.
+ * @returns the update to offer, or null when there is nothing to do.
+ */
+export function updateFor(
+  plugin: ExtensionMarketPlugin,
+  installedVersion: string,
+  hubVersion: string
+): MarketUpdate | null {
+  const latest = recommendedVersion(plugin)
+  const target = compatibleVersion(plugin, hubVersion)
+  if (target !== null) {
+    return target.version === installedVersion ? null : { latest, target }
+  }
+  return latest.version === installedVersion ? null : { latest, target: null }
 }

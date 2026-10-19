@@ -1,6 +1,7 @@
 id: acme.mcp
 name: Acme Code
-apiVersion: "^0.1"
+engines:
+  contextHub: ">=0.0.1 <0.7.0"
 description: "Read and write Acme Code's own MCP config file. A worked example of a client extension that imports nothing."
 icon: server
 category: integration

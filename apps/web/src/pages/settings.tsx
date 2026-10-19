@@ -32,6 +32,7 @@ import { SKILL_ROUTE } from "@context-hub/skills"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 import { useTheme } from "@/components/theme-provider"
+import { ExtensionUpdateSettings } from "@/components/extension-update-settings"
 import { platformName, useDesktopInfo } from "@/lib/desktop"
 
 type ThemeChoice = "system" | "light" | "dark"
@@ -645,6 +646,15 @@ export function SettingsPage() {
               </button>
             </div>
           </div>
+        </Group>
+
+        <Group
+          id="extensions"
+          title={t("settings.extensions.title")}
+          description={t("settings.extensions.description")}
+          needle={needle}
+        >
+          <ExtensionUpdateSettings needle={needle} />
         </Group>
 
         {sections.map((section) => (

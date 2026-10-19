@@ -79,6 +79,7 @@ beforeAll(async () => {
   const store = createFsPluginStore(home)
   const found = await discoverPlugins({
     source: store,
+    hubVersion: "0.5.0",
     importModule: (url) =>
       import(
         pathToFileURL(
@@ -92,6 +93,7 @@ beforeAll(async () => {
   kernel = await createHubKernel({
     host: {
       form: "Test",
+      version: "0.5.0",
       capabilities: { code: true, filesystem: true, network: false },
       storage: { read: () => null, write: () => undefined },
       net: null,

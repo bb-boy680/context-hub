@@ -359,12 +359,13 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
  * did not publish.
  */
 export function createExtensionMarketHandler(
-  options: { home?: string; reader?: MarketReader } = {}
+  options: { home?: string; reader?: MarketReader; version?: string } = {}
 ): HubMiddleware {
   const home = resolveHubHome(options.home)
   const store = createFsPluginStore(home)
   const state = createFsStateStore(home)
   const reader = options.reader ?? createMarketReader()
+  const hubVersion = options.version ?? "0.0.0"
   let tail: Promise<void> = Promise.resolve()
 
   const run = <T>(task: () => Promise<T>): Promise<T> => {
@@ -409,7 +410,13 @@ export function createExtensionMarketHandler(
           if (chosen === undefined) {
             throw new Error(`the market does not list "${id}" version "${version}"`)
           }
-          return installExtensionFromMarket({ store, state, plugin, version: chosen })
+          return installExtensionFromMarket({
+            store,
+            state,
+            plugin,
+            version: chosen,
+            hubVersion,
+          })
         })
         sendJson(response, 200, result)
         return

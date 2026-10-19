@@ -12,6 +12,7 @@
   "devDependencies": {
     "@eslint/js": "^10",
     "@types/node": "^24",
+    "@types/semver": "^7.8.0",
     "eslint": "^10",
     "globals": "^17",
     "typescript": "~6",
@@ -19,7 +20,8 @@
     "vitest": "^5.0.5"
   },
   "dependencies": {
-    "js-yaml": "^5.5.0"
+    "js-yaml": "^5.5.0",
+    "semver": "^7.8.5"
   },
   "exports": {
     ".": "./src/assets.ts",
