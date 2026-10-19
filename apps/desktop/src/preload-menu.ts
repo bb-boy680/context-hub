@@ -36,6 +36,11 @@ const STYLE = `
     -webkit-app-region: drag;
     font-family: var(--font-sans, system-ui, sans-serif);
   }
+  /* --muted is translucent in dark mode; the bar must hide content scrolling
+     under it, so dark mode takes the opaque raised surface instead. */
+  :host-context(.dark) {
+    background: var(--card, #16181c);
+  }
   .cluster {
     display: flex;
     align-items: center;
