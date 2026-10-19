@@ -1,0 +1,37 @@
+# Checks every pull request into main before it can merge.
+#
+# A failing run alone does not block the Merge button: branch protection must
+# require the `checks` job (Settings -> Branches -> main -> Require status
+# checks to pass before merging). Keep this job name stable.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# A newer push to the same PR makes the previous run obsolete.
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # lint, typecheck and tests must pass before the build runs.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
