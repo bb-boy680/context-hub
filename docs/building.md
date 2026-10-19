@@ -20,8 +20,9 @@ Merging to main does not bump the version or create a tag. To release:
    manifests do not need editing first.
 2. The workflow runs checks, builds, and publishes the Release.
 3. After publishing, the bot opens a `release/version-sync` pull request that
-   sets both manifests to the tag version. Merge it through the protected
-   branch so local builds report the released version.
+   sets both manifests to the tag version and prepends the changelog section to
+   `CHANGELOG.md`. Merge it through the protected branch so local builds report
+   the released version.
 
 A version with a prerelease suffix (`1.2.0-beta.1`, tag `v1.2.0-beta.1`) is a
 test release: it becomes a GitHub pre-release and the stable desktop updater
@@ -260,12 +261,18 @@ Merging to main does not trigger it.
   Linux x64 one (page, `/hub/about`, tag version);
 - Windows, macOS and Ubuntu runners each build their desktop installer,
   `latest*.yml` and `.blockmap`;
-- on a tag, the `publish` job creates or updates the GitHub Release and uploads
-  every artifact. A prerelease version creates the Release with
-  `--prerelease`.
+- on a tag, the `publish` job generates the Release notes from the commits
+  between the previous tag and this one, groups them by Conventional Commit
+  type, and uploads every artifact. A prerelease version creates the Release
+  with `--prerelease`.
 - after publishing, `publish` opens or updates `release/version-sync`, a pull
-  request that sets both manifests to the tag version. It is never pushed to
-  main directly.
+  request that sets both manifests to the tag version and prepends the same
+  changelog section to `CHANGELOG.md`. It is never pushed to main directly.
+
+`scripts/changelog.mjs` builds the section: `feat` under Features, `fix` under
+Bug Fixes, a `!` or `BREAKING CHANGE:` under Breaking Changes, and so on. It
+skips `Merge ...` and `chore(release): ...` commits, links each short hash, and
+ends with a Full Changelog compare link.
 
 A manual dispatch stops after the artifacts; it does not publish or open a
 sync pull request.
@@ -288,9 +295,10 @@ Actions publish the Release.
   deleting or moving it.
 - Pull request checks block a merge only while branch protection keeps
   requiring the `checks` job.
-- The version-sync pull request changes only the two `version` fields. If it is
-  still open when another tag is pushed, the workflow force-pushes the same
-  `release/version-sync` branch and retitles the pull request to the newest tag.
+- The version-sync pull request changes the two `version` fields and
+  `CHANGELOG.md`. If it is still open when another tag is pushed, the workflow
+  force-pushes the same `release/version-sync` branch and retitles the pull
+  request to the newest tag.
 - A failed release does not open the version-sync pull request; the manifests
   keep the previous version until a release succeeds.
 - A prerelease version is published as a GitHub pre-release and never becomes

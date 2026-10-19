@@ -28,6 +28,8 @@ export default defineConfig({
       "packages/search/global-search/vitest.config.ts",
       "apps/web/vitest.config.ts",
       "apps/desktop/vitest.config.ts",
+      // Not a workspace package: the release helper scripts.
+      "scripts/vitest.config.ts",
     ],
   },
 })
