@@ -7,19 +7,19 @@
 .prettierrc[FV5T]: F:统一格式化规则 | R:code:.gitattributes | A:- | S:endOfLine=lf 与 .gitattributes 保持一致；tailwindStylesheet 指向 packages/shadcn-ui/src/styles/globals.css，组件迁包后这里不同步会让 Tailwind 类名排序失效
 AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:执行任务前用 create-plan 子智能体写计划并自审，用户明确批准前不动源码，获批后用 TaskCreate/TaskUpdate 逐阶段推进；指令优先级中最新明确请求高于仓库级说明；涉及安全、数据丢失、凭证、部署或重大架构决策必须停下询问；浏览器自动化用 ego-browser skill；末尾 AOCI 受管区块由工具维护不可手改
 DESIGN.md[SU7M]: F:设计 token 与组件规范 | R:- | A:- | S:唯一强调色 Coinbase Blue #0052ff 且克制使用；display 字重固定 400 不得加粗；圆角只有 pill 100px、xl 24px、full 9999px；交易绿红 #05b169 与 #cf202f 只作文本色不作背景
-README.md[SG8S]: F:运行方式、桌面安装、扩展市场入口、测试布局和发布形态 | R:code:apps/web/hub-port.ts,code:apps/web/server.ts,code:apps/desktop/src/main.ts,code:apps/desktop/bundle.ts,code:apps/desktop/electron-builder.config.mjs,code:docs/extensions.md | A:- | S:开发是 server 5270 + Vite 5271；桌面 dev watch 三个 bundle 并重启 Electron，托盘 Quit 才停 hub；桌面启动直接进入主界面，没有首启向导；扩展市场细节只链向 docs/extensions.md
+README.md[SG8S]: F:运行方式、桌面安装、扩展市场入口、测试布局和发布形态 | R:code:apps/web/hub-port.ts,code:apps/web/server.ts,code:apps/desktop/src/main.ts,code:apps/desktop/bundle.ts,code:apps/desktop/electron-builder.config.mjs,code:docs/extensions.md | A:- | S:开发是 server 5270 + Vite 5271；桌面 dev watch 三个 bundle 并重启 Electron，托盘 Quit 才停 hub；扩展市场源内置、细节只链 docs/extensions.md；测试按包分 project 且写真实文件
 package.json[FV8T]: F:monorepo 根脚本与工具链 | R:- | A:- | S:pnpm@10.33.4 且 node>=20；test 直接跑根 vitest，不经 turbo；build 经 turbo，build:cli 先构建 web 再调 web build:cli，build:desktop 只 bundle 桌面端
-pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不得手改；已含 js-yaml 5.5；随内置 claude-code 移除 @lobehub/icons、@lobehub/ui、antd；仍含 electron 44.9 与 esbuild 0.28
+pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不得手改；已含 js-yaml 5.5；随内置 claude-code 移除 @lobehub/icons、@lobehub/ui、antd；@context-hub/skills-sh 已随内置 skills.sh 下线；仍含 electron 44.9 与 esbuild 0.28
 pnpm-workspace.yaml[FV7T]: F:工作区与构建白名单 | R:- | A:- | S:packages 覆盖 apps/*、packages/* 与 packages/*/*；allowBuilds 控制安装脚本，electron 必须 true，否则不下载运行时且 dist 为空；msw 为 false
 tsconfig.json[FV5T]: F:仓库级编译基线 | R:- | A:- | S:只给 target/module/strict 等公共项，各包自己的 tsconfig 在此基础上加 include 与 jsx
 turbo.json[FV7T]: F:任务图与缓存 | R:- | A:- | S:dev 不缓存且 persistent；build 依赖 ^build 且输出 dist/**；lint/format/typecheck 都先跑依赖包的同名任务
-vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob；新增包必须在此登记；已移除 packages/agents/claude-code；scripts、desktop、global-search 等已登记
+vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob；新增包必须在此登记；已移除 packages/agents/claude-code；skills.sh 测试已迁到市场插件、不再登记；scripts、desktop、global-search 等已登记
 
 ===D:/work-space/dsh-context-hub/apps/web/===
 components.json[FU5T]: F:shadcn 生成配置 | R:code:packages/shadcn-ui/src/styles/globals.css | A:- | S:aliases.utils 与 aliases.ui 指向 @context-hub/shadcn-ui，css 指向 packages/shadcn-ui/src/styles/globals.css；组件包改名后两处不同步会把 utils 重复内联进应用
 eslint.config.js[FQ3T]: F:web 应用 lint 规则 | R:- | A:- | S:忽略必须用 globalIgnores 而非 ignorePatterns
 index.html[EU5T]: F:页面宿主骨架与插件运行时的 import map | R:code:apps/web/src/main.tsx,code:packages/core/src/host/extension-runtime.ts | A:- | S:import map 必须在模块脚本之前；映射 react/react-dom/jsx-runtime/jsx-dev-runtime 到 /hub/extensions/_runtime/*.js；Vite 构建保留；<title> 必须是 Context Hub，Electron 标题栏取它，留模板名显示 vite-monorepo
-package.json[FV7T]: F:web 应用依赖与脚本 | R:code:apps/web/build-cli.ts | A:- | S:build 先 tsc -b 再 vite build；start 是 server.ts --static dist；不再依赖 @context-hub/claude-code，claude.code 改由市场安装
+package.json[FV7T]: F:web 应用依赖与脚本 | R:code:apps/web/build-cli.ts | A:- | S:build 先 tsc -b 再 vite build；start 是 server.ts --static dist；claude.code 与内置 skills.sh 都已移出依赖，改由市场安装
 tsconfig.app.json[FV7T]: F:应用编译选项 | R:code:apps/web/tsconfig.json | A:- | S:paths 必须同时映射 @/* 与 @context-hub/shadcn-ui/*，并与 vite alias 和 tsconfig.json 保持一致；types 只有 vite/client，浏览器代码不得混入 node 类型
 tsconfig.json[FV5T]: F:引用式工程根 | R:code:apps/web/tsconfig.app.json,code:apps/web/tsconfig.node.json,code:apps/web/tsconfig.test.json | A:- | S:files 为空靠 references 组合；paths 需与子配置重复声明，三处必须同步
 tsconfig.node.json[FV3T]: F:构建与宿主脚本编译选项 | R:code:apps/web/tsconfig.json | A:- | S:include 含 build-cli.ts 与 shutdown.ts；types=node
@@ -49,7 +49,7 @@ workspace-group.tsx[DU8M]: F:侧栏工作区列表与增删改 | R:code:apps/web
 ===D:/work-space/dsh-context-hub/apps/web/src/lib/===
 extensions.ts[CU5T]: F:扩展展示辅助表与共享卡片表面 | R:- | A:cardSurface,categoryOrder,categoryTile | S:cardSurface 同时服务页面和市场区块；categoryOrder 决定分区顺序且空分类会被跳过
 folder-picker.ts[IU5T]: F:浏览器目录选择封装 | R:- | A:pickFolder | S:只在用户手势中可调用；页面只能拿到目录名拿不到路径，host 侧按名字自行定位；无此能力的浏览器返回 unsupported
-hub.ts[AE9M]: F:页面形态内核装配，浏览器与桌面壳共用 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/preload.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts,code:apps/web/src/lib/desktop.ts | A:startHub | S:claude.code 不再内置，改由市场安装；preloadMarket() 在资产预读后读一次内置索引元数据；无 host 时 files 为 null；startHub 首行装 React 运行时
+hub.ts[AE9M]: F:页面形态内核装配，浏览器与桌面壳共用 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/preload.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts,code:apps/web/src/lib/desktop.ts | A:startHub | S:claude.code 与 skills.sh 都不再内置，改由市场安装；preloadMarket() 在资产预读后读一次内置索引元数据；无 host 时 files 为 null；startHub 首行装 React 运行时
 navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:code:packages/extensions/src/types.ts | A:navGroups,useNavGroups,useNavItem | S:assets 组没有内置项，只为资源扩展提供注册位，空组不渲染；内置项 order 留 20/30 间隔供扩展插值；useNavItem 取最长匹配路径，嵌套页才不丢标题
 place-files.ts[ID7T]: F:客户端配置文件远端读写 | R:code:apps/web/src/lib/hub.ts | A:placeFilesAvailable,createRemotePlaceFiles | S:无 host 时每个调用都抛错，调用方要如实报失败而不是凭空造出一个文件；可用性探测不带 ref，故拒绝任何 place 的宿主仍会被识别为在线
 ui-kit.ts[CE7T]: F:插件可用的 UI 组件集 | R:code:packages/shadcn-ui/src/components/button.tsx,code:packages/shadcn-ui/src/components/card.tsx | A:Badge,Button,Card,CardContent,Input,Spinner | S:插件模块不能解析包且必须复用同一 React 实例，UI 只能从此处取；新增组件要在此显式导出
@@ -334,15 +334,6 @@ skills-cli.ts[IE8M]: F:调用 skills CLI 取技能 | R:code:packages/resources/s
 skills-fs.ts[PE9L]: F:磁盘技能库 | R:code:packages/resources/skills/src/frontmatter.ts,code:packages/resources/skills/src/store.ts,code:packages/resources/skills/src/host/names.ts | A:createFsSkillStore,skillsRoot,SkillStoreOptions | S:<root>/skills.json 是唯一记录：数组、以 name（即目录名）为身份，description 与 tags 只写这里，update() 绝不回写 SKILL.md；link 不落盘，每次扫描由 lstat 现读；旧 index.json 首次打开时按 name 合并后删除；addAssetSource 可先下载远程图，localizeAssets 一次写回成功替换
 upstream.ts[PE7T]: F:读技能的上游记录 | R:code:packages/core/src/host/folder-hash.ts | A:readLockedUpstream,skillFolderHash | S:CLI 在它安装进的目录旁写 skills-lock.json；检查比对的一切哈希都是 CLI 自己的；CLI 唯一答不上的是文件装后是否被改过，故 skillFolderHash 复刻同一算法只为这一问
 
-===D:/work-space/dsh-context-hub/packages/search/skills-sh/===
-eslint.config.js[FQ3T]: F:skills.sh 包 lint 规则 | R:- | A:- | S:files 只含 ts（本包无 tsx），且不含 react 插件
-package.json[FV5T]: F:skills.sh 注册表包清单 | R:- | A:- | S:exports 的 . 指向 src/index.ts；只依赖 extensions 与 react
-tsconfig.json[FV3T]: F:skills.sh 包编译选项 | R:- | A:- | S:lib 只有 ES2022；types 用 node；include 含 src/__test__
-vitest.config.ts[FQ3T]: F:skills.sh 包的 vitest 项目 | R:code:packages/search/skills-sh/tsconfig.json | A:- | S:include 写死 __test__/**/*.test.ts，测试放在别处不会收集
-
-===D:/work-space/dsh-context-hub/packages/search/skills-sh/src/===
-index.ts[IN7S]: F:skills.sh 技能注册表 | R:- | A:skillsShExtension | S:/api/v1 需 Vercel OIDC token 而装来的扩展无处持有，故只用免鉴权的 /api/search；描述只在技能自己页面的 meta description 里，由 describe 逐行读取
-
 ===D:/work-space/dsh-context-hub/packages/shadcn-ui/===
 components.json[FU5T]: F:shadcn-ui 包生成配置 | R:code:packages/shadcn-ui/src/styles/globals.css | A:- | S:aliases 全部指向本包（@context-hub/shadcn-ui/...），css 为 src/styles/globals.css；改包名时这五处必须同步
 eslint.config.js[FQ5T]: F:shadcn-ui 包 lint 规则 | R:- | A:- | S:对 src/components 与 src/hooks 关掉 react-refresh 与 set-state-in-effect：shadcn 上游就在组件旁导出变体表与 hook，拆成独立模块等于分叉
@@ -487,8 +478,8 @@ preload.ts[ES8T]: F:沙箱 preload，向页面暴露最小 window.contextHub.des
 update-state.ts[DR7T]: F:把 updater 事件折叠成侧栏可读的更新状态 | R:code:apps/desktop/src/update.ts,code:apps/desktop/src/bridge.ts,code:apps/web/src/lib/desktop.ts | A:UpdateStatus,UpdateState,initialUpdateState,UpdateEvent,applyUpdateEvent | S:纯逻辑不依赖 Electron 才能被 vitest 单测；失败事件在已知版本时回到 available 以便重试，未知版本回 idle；progress 夹到 0-100 并四舍五入
 
 ===D:/work-space/dsh-context-hub/apps/web/__test__/===
-e2e-probe.ts[TE7M]: F:CDP 端到端探针：市场条目、真实插件与 claude.code 注册 | R:code:apps/web/__test__/e2e-server.ts,code:apps/web/src/pages/extensions.tsx | A:- | S:桌面视口；seed 市场源后不输入也应出现市场行；安装 claude.code 后刷新，侧栏出现 Claude Code，卸载后消失；等待文件用 plugin.yaml；收尾按 PID 杀进程
-e2e-server.ts[TE6T]: F:扩展市场端到端测试服务器 | R:code:packages/core/handlers.ts,code:packages/core/src/host/server.ts | A:- | S:只挂 state/extensions/extension-market/workspace；/hub/ 未识别路由返回 JSON 404，避免静态回退把 index.html 当成 /hub/skills；--home 必填
+e2e-probe.ts[TE7M]: F:CDP 端到端探针：市场条目、skills.sh 激活与 claude.code 注册 | R:code:apps/web/__test__/e2e-server.ts,code:apps/web/src/pages/extensions.tsx,code:packages/resources/skills/src/page.tsx,code:packages/resources/skills/src/search-dialog.tsx | A:- | S:桌面视口；市场预读后直接出现 skills.sh 行；安装后到 Skills→Explore，Search skills.sh 输入框证明注册表已激活；claude.code 刷新后侧栏出现；等待 plugin.yaml；收尾按 PID 杀进程
+e2e-server.ts[TE6T]: F:扩展市场端到端测试服务器，支持本地索引注入 | R:code:packages/core/handlers.ts,code:packages/core/src/host/server.ts,code:packages/core/src/host/extension-market.ts | A:- | S:只挂 state/extensions/extension-market/workspace；/hub/ 未识别路由返回 JSON 404，避免静态回退把 index.html 当成 /hub/skills；--home 必填；--market 注入本地 reader，页面固定 URL 也读测试索引
 
 ===D:/work-space/dsh-context-hub/scripts/__test__/===
 changelog.test.mjs[TV5S]: F:变更日志生成器的单元测试：解析、分组、去重与头部 | R:code:scripts/changelog.mjs | A:- | S:只测纯函数，不跑 git 或网络；断言 Merge 与 chore(release) 被跳过、breaking 排在最前、同一 tag 不重复插入
