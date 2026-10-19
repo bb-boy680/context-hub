@@ -201,16 +201,25 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           PRERELEASE: ${{ needs.version.outputs.prerelease }}
+          REPO: ${{ github.repository }}
         run: |
           TAG="$GITHUB_REF_NAME"
+          PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then
+            node scripts/changelog.mjs --from "$PREV" --to "$TAG" --repo "$REPO" > release-notes.md
+          else
+            node scripts/changelog.mjs --to "$TAG" --repo "$REPO" > release-notes.md
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             if [ "$PRERELEASE" = "true" ]; then
               gh release edit "$TAG" --prerelease
             fi
+            gh release edit "$TAG" --notes-file release-notes.md
           elif [ "$PRERELEASE" = "true" ]; then
-            gh release create "$TAG" --title "$TAG" --generate-notes --prerelease
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md --prerelease
           else
-            gh release create "$TAG" --title "$TAG" --generate-notes
+            gh release create "$TAG" --title "$TAG" --notes-file release-notes.md
           fi
           gh release upload "$TAG" dist-artifacts/* --clobber
       # main is protected: the manifests catch up through a pull request rather
@@ -220,8 +229,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ needs.version.outputs.version }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
         run: |
           BRANCH=release/version-sync
+          PREV=$(git describe --tags --abbrev=0 "$TAG^" 2>/dev/null || true)
+          if [ -n "$PREV" ]; then
+            node scripts/changelog.mjs --from "$PREV" --to "$TAG" --repo "$REPO" --changelog CHANGELOG.md
+          else
+            node scripts/changelog.mjs --to "$TAG" --repo "$REPO" --changelog CHANGELOG.md
+          fi
+
           node -e '
             const fs = require("node:fs")
             for (const file of ["package.json", "apps/desktop/package.json"]) {
@@ -230,14 +248,14 @@ jobs:
               fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n")
             }
           '
-          if git diff --quiet -- package.json apps/desktop/package.json; then
-            echo "manifests already carry $VERSION"
+          if [ -z "$(git status --porcelain -- package.json apps/desktop/package.json CHANGELOG.md)" ]; then
+            echo "manifests and changelog already carry $VERSION"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B "$BRANCH"
-          git add package.json apps/desktop/package.json
+          git add package.json apps/desktop/package.json CHANGELOG.md
           git commit -m "chore(release): v$VERSION"
           git push --force origin "$BRANCH"
 
@@ -245,7 +263,7 @@ jobs:
           if [ -z "$PR" ]; then
             gh pr create --base main --head "$BRANCH" \
               --title "chore(release): v$VERSION" \
-              --body "Sync the root and desktop manifests with tag v$VERSION."
+              --body "Sync the root and desktop manifests and CHANGELOG.md with tag v$VERSION."
           else
             gh pr edit "$PR" --title "chore(release): v$VERSION"
           fi
