@@ -82,9 +82,10 @@ The server's working directory is the person's home, not the install directory:
 without that, a shortcut could make an unrelated folder look like the workspace.
 
 `electron-updater` is a production dependency. The main bundle leaves it
-external and electron-builder copies it into `app.asar/node_modules`, which is
-also why packaging does not download Electron: `electronDist` points at the
-installed `electron` package's `dist`.
+external and electron-builder copies it into `app.asar/node_modules`. Packaging
+downloads the Electron binary for the runner's platform and architecture from
+the version pinned in `apps/desktop/package.json`; a local `electronDist` path
+is not used because a pnpm install does not guarantee that layout on CI.
 
 ### Development
 
@@ -136,10 +137,12 @@ Inside the packaged app, `dist/main.cjs` and `node_modules` are in `app.asar`;
 `server.mjs` and the built page are copied to `resources/` so the utility
 process can fork the server without asar resolution.
 
-Packaging uses the installed Electron distribution instead of downloading one.
-On Windows, running the unpacked app can keep its `app.asar` locked for a while
-after the process exits. If a later package build reports `EBUSY`, build into a
-different output directory or restart.
+`electron-builder` downloads the Electron version pinned in
+`apps/desktop/package.json` for the runner's platform and architecture. The
+first build on a machine needs network access; later builds reuse
+`electron-builder`'s cache. On Windows, running the unpacked app can keep its
+`app.asar` locked for a while after the process exits. If a later package build
+reports `EBUSY`, build into a different output directory or restart.
 
 If GitHub is unreachable while installing dependencies, Electron's postinstall
 honours mirrors:
