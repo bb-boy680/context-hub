@@ -1,6 +1,6 @@
 {
   "name": "@context-hub/desktop",
-  "version": "0.0.1",
+  "version": "0.0.1-beta.1",
   "private": true,
   "description": "Context Hub desktop",
   "author": "Context Hub",
