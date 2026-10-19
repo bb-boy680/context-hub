@@ -239,6 +239,12 @@ export function listDirectory(dir: string): Promise<PackFileEntry[]> {
  * @throws {Error} when the path climbs out of the directory or is absolute.
  */
 function resolveInDirectory(dir: string, file: string): string {
+  /* `path.join` does not reset on an absolute second argument: on POSIX it
+     keeps the directory prefix, so the relative check below never sees the
+     climb. Refuse an absolute path before joining. */
+  if (path.isAbsolute(file)) {
+    throw new Error(`"${file}" escapes the directory`)
+  }
   const target = path.join(dir, file)
   const relative = path.relative(dir, target)
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
