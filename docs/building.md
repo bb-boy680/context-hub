@@ -165,10 +165,13 @@ The macOS job reads these repository secrets when they exist:
 | `APPLE_TEAM_ID` | Apple Developer team |
 
 `electron-builder.config.mjs` enables notarization only when all four Apple
-values and `CSC_LINK` are present; otherwise the build stays unsigned and CI
-does not fail. Signing does not change the update feed. Without a signature,
-macOS cannot install an in-place update reliably, so treat unsigned macOS
-builds as manual-install only.
+values and `CSC_LINK` are present. Otherwise it sets `mac.identity: null`,
+which skips certificate import entirely: the workflow defines `CSC_LINK` as an
+empty string when the secret is absent, and electron-builder would otherwise
+resolve that empty path to the project directory and fail with `not a file`.
+Signing does not change the update feed. Without a signature, macOS cannot
+install an in-place update reliably, so treat unsigned macOS builds as
+manual-install only.
 
 ## Updates
 

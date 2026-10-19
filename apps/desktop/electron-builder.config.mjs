@@ -41,10 +41,17 @@ export default {
   mac: {
     target: ["dmg", "zip"],
     category: "public.app-category.developer-tools",
-    ...(notarize ? { notarize: true } : {}),
+    /* The workflow defines CSC_LINK even when the secret is empty, and
+       importCertificate resolves an empty path to the project directory. Only
+       enable signing/notarization when all credentials are present; otherwise
+       identity: null skips certificate import entirely. */
+    ...(notarize ? { notarize: true } : { identity: null }),
   },
   linux: {
     target: ["AppImage"],
     category: "Development",
+    /* The package name is @context-hub/desktop, and AppImage rejects @ and / in
+       the executable name. */
+    executableName: "context-hub",
   },
 }
