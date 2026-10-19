@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-19T17:02:26Z",
+  "updated_at": "2026-10-19T17:11:52Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "f7f47214ae955297bd581a0eee26301d23d2c92703b27a9e888fc093b1ee535a",
-      "size": 135647,
-      "normalized_sha256": "f7f47214ae955297bd581a0eee26301d23d2c92703b27a9e888fc093b1ee535a"
+      "sha256": "af7e1e0837acbbd669dc667c92fbefa6c88e78a44215d1212a67057b6adadd80",
+      "size": 135666,
+      "normalized_sha256": "af7e1e0837acbbd669dc667c92fbefa6c88e78a44215d1212a67057b6adadd80"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -185,9 +185,9 @@
     },
     "apps/desktop/src/preload-menu.ts": {
       "role": "index",
-      "sha256": "d0b8f03ce89f3815c5f6b798c67c700ed5d314063516b9789b2b8984e7c06703",
-      "size": 9736,
-      "normalized_sha256": "d0b8f03ce89f3815c5f6b798c67c700ed5d314063516b9789b2b8984e7c06703"
+      "sha256": "7f42d0313d9a0384d95ddb613f8024f03c610dfad85bd119f050804e4adddb6d",
+      "size": 9953,
+      "normalized_sha256": "7f42d0313d9a0384d95ddb613f8024f03c610dfad85bd119f050804e4adddb6d"
     },
     "apps/desktop/src/preload.ts": {
       "role": "index",
