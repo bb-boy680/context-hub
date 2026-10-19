@@ -1,6 +1,9 @@
 # Build every distributable form on a tag, and keep them on one Release.
 #
-# Tags are pushed by hand; merging to main never creates one. A version with a
+# Tags are pushed by hand and are the release version: the manifests in the
+# repository may lag behind, and each build job stamps the tag version into
+# both before packaging. After publishing, the bot opens `release/version-sync`
+# so the manifests catch up through the protected main branch. A version with a
 # prerelease suffix (`v0.2.0-beta.1`) is published as a GitHub pre-release, so
 # the desktop updater does not offer it to stable users. The CLI crosses to
 # five targets from one Linux runner; the desktop app has to be built on each
@@ -16,14 +19,17 @@ on:
 
 permissions:
   contents: write
+  # The publish job opens the manifest sync pull request.
+  pull-requests: write
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  # One release version: the root manifest. A tag that names another version
-  # would produce an update feed the installed app does not match.
+  # The tag names the release version. The manifests are only a development
+  # copy; the build jobs stamp this version into them before packaging so the
+  # About row, the CLI and the update feed all agree.
   version:
     runs-on: ubuntu-latest
     outputs:
@@ -37,18 +43,21 @@ jobs:
       - id: read
         shell: bash
         run: |
-          VERSION=$(node -p "require('./package.json').version")
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+            if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+              echo "tag must be vX.Y.Z or vX.Y.Z-suffix, got $GITHUB_REF_NAME" >&2
+              exit 1
+            fi
+          else
+            VERSION=$(node -p "require('./package.json').version")
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
           case "$VERSION" in
             *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;;
             *)   echo "prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
-
-          if [ "$GITHUB_REF_TYPE" = "tag" ] && [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
-            echo "tag $GITHUB_REF_NAME does not match package.json version $VERSION" >&2
-            exit 1
-          fi
 
   # Same gate as the pull request workflow: nothing is packaged until the tree
   # lints, typechecks, tests and builds on one runner.
@@ -83,6 +92,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Use the tag version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("node:fs")
+            for (const file of ["package.json", "apps/desktop/package.json"]) {
+              const data = JSON.parse(fs.readFileSync(file, "utf8"))
+              data.version = process.env.VERSION
+              fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n")
+            }
+          '
       - run: pnpm --filter web build
       - uses: oven-sh/setup-bun@v2
         with:
@@ -124,6 +145,18 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Use the tag version
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          node -e '
+            const fs = require("node:fs")
+            for (const file of ["package.json", "apps/desktop/package.json"]) {
+              const data = JSON.parse(fs.readFileSync(file, "utf8"))
+              data.version = process.env.VERSION
+              fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n")
+            }
+          '
       - run: pnpm build
       - name: Build the desktop installer
         run: pnpm --filter @context-hub/desktop exec electron-builder --config electron-builder.config.mjs --publish never
@@ -153,10 +186,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
-      # `gh release create --generate-notes` runs git to find the previous tag;
-      # download-artifact alone leaves the workspace without a repository.
+      # `gh release create --generate-notes` runs git to find the previous tag,
+      # and the manifest sync below works from main. fetch-depth 0 keeps every
+      # tag available to both.
       - uses: actions/checkout@v4
         with:
+          ref: main
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
@@ -178,3 +213,39 @@ jobs:
             gh release create "$TAG" --title "$TAG" --generate-notes
           fi
           gh release upload "$TAG" dist-artifacts/* --clobber
+      # main is protected: the manifests catch up through a pull request rather
+      # than a direct push. The branch is rebuilt from main on every release so
+      # an unmerged sync PR always names the newest tag.
+      - name: Open the version sync pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          BRANCH=release/version-sync
+          node -e '
+            const fs = require("node:fs")
+            for (const file of ["package.json", "apps/desktop/package.json"]) {
+              const data = JSON.parse(fs.readFileSync(file, "utf8"))
+              data.version = process.env.VERSION
+              fs.writeFileSync(file, JSON.stringify(data, null, 2) + "\n")
+            }
+          '
+          if git diff --quiet -- package.json apps/desktop/package.json; then
+            echo "manifests already carry $VERSION"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH"
+          git add package.json apps/desktop/package.json
+          git commit -m "chore(release): v$VERSION"
+          git push --force origin "$BRANCH"
+
+          PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')
+          if [ -z "$PR" ]; then
+            gh pr create --base main --head "$BRANCH" \
+              --title "chore(release): v$VERSION" \
+              --body "Sync the root and desktop manifests with tag v$VERSION."
+          else
+            gh pr edit "$PR" --title "chore(release): v$VERSION"
+          fi
