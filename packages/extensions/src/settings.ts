@@ -32,6 +32,8 @@ export interface HubSettings {
   installMode: InstallMode
   /** Download remote images into the hub's own asset directory as they arrive. */
   downloadRemoteImages: boolean
+  /** URL of the extension market index; empty when no market is configured. */
+  extensionMarketUrl: string
   /**
    * Values owned by plugins, keyed by the plugin's id. The shell treats each
    * value as opaque: whoever wrote it is the one that validates and reads it.
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: HubSettings = {
   layout: "grid",
   installMode: "auto",
   downloadRemoteImages: true,
+  extensionMarketUrl: "",
   plugins: {},
 }
 
@@ -77,6 +80,10 @@ export function readSettings(value: unknown): HubSettings {
       typeof record.downloadRemoteImages === "boolean"
         ? record.downloadRemoteImages
         : DEFAULT_SETTINGS.downloadRemoteImages,
+    extensionMarketUrl:
+      typeof record.extensionMarketUrl === "string"
+        ? record.extensionMarketUrl
+        : DEFAULT_SETTINGS.extensionMarketUrl,
     plugins: readPlugins(record.plugins),
   }
 }
@@ -121,7 +128,8 @@ export class SettingsService extends Service {
     if (
       next.layout === this.current.layout &&
       next.installMode === this.current.installMode &&
-      next.downloadRemoteImages === this.current.downloadRemoteImages
+      next.downloadRemoteImages === this.current.downloadRemoteImages &&
+      next.extensionMarketUrl === this.current.extensionMarketUrl
     ) {
       return
     }

@@ -6,6 +6,7 @@ import { DownloadIcon, Trash2Icon, XIcon } from "lucide-react"
 import * as React from "react"
 
 import { categoryTile } from "@/lib/extensions"
+import type { MarketEntry } from "@/lib/extension-market"
 import type { ExtensionView } from "@context-hub/extensions"
 import {
   useExtensionContributions,
@@ -21,8 +22,27 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@context-hub/shadcn-ui/components/dialog"
+import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
+
+/** One source fact in the market origin block. */
+function SourceRow({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string
+  value: string
+  mono?: boolean
+}) {
+  return (
+    <>
+      <span className="text-[11.5px] text-muted-foreground">{label}</span>
+      <span className={`break-all text-[12.5px] ${mono ? "font-mono" : ""}`}>{value}</span>
+    </>
+  )
+}
 
 function Section({
   title,
@@ -105,12 +125,37 @@ function ContributionList({ entry }: { entry: ExtensionView }) {
   )
 }
 
-function ExtensionDetailBody({ entry }: { entry: ExtensionView }) {
+function ExtensionDetailBody({
+  entry,
+  market,
+  onInstall,
+}: {
+  entry: ExtensionView
+  /** The index entry behind an installed market plugin, or one not installed yet. */
+  market: MarketEntry | null
+  onInstall?: (entry: MarketEntry) => Promise<void>
+}) {
   const { t } = useI18n()
   const ctx = useHub()
   const { manifest } = entry
   const Icon = manifest.icon
   const permissions = manifest.permissions ?? []
+  const [busy, setBusy] = React.useState(false)
+
+  const install = () => {
+    if (market === null || onInstall === undefined) return
+    setBusy(true)
+    void onInstall(market)
+      .catch((reason: unknown) => {
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
+      })
+      .finally(() => {
+        setBusy(false)
+      })
+  }
 
   return (
     <>
@@ -153,15 +198,39 @@ function ExtensionDetailBody({ entry }: { entry: ExtensionView }) {
             {manifest.description}
           </p>
         </Section>
-        <Section title={t("extensions.detail.contributes")}>
-          {manifest.kind === "builtin" ? (
-            <p className="text-[13px] text-muted-foreground">
-              {t("extensions.detail.noPermissions")}
-            </p>
-          ) : (
-            <ContributionList entry={entry} />
-          )}
-        </Section>
+        {market === null ? null : (
+          <Section title={t("extensions.market.origin")}>
+            <div className="grid grid-cols-[96px_1fr] gap-x-3 gap-y-1.5">
+              <SourceRow
+                label={t("extensions.market.confirmVersion")}
+                value={market.version.version}
+              />
+              <SourceRow
+                label={t("extensions.market.confirmSource")}
+                value={market.version.source.url}
+                mono
+              />
+              {market.version.source.path === undefined ? null : (
+                <SourceRow
+                  label={t("extensions.market.confirmPath")}
+                  value={market.version.source.path}
+                  mono
+                />
+              )}
+            </div>
+          </Section>
+        )}
+        {market !== null && !entry.enabled ? null : (
+          <Section title={t("extensions.detail.contributes")}>
+            {manifest.kind === "builtin" ? (
+              <p className="text-[13px] text-muted-foreground">
+                {t("extensions.detail.noPermissions")}
+              </p>
+            ) : (
+              <ContributionList entry={entry} />
+            )}
+          </Section>
+        )}
         <Section title={t("extensions.detail.permissions")}>
           {permissions.length === 0 ? (
             <p className="text-[13px] text-muted-foreground">
@@ -188,7 +257,15 @@ function ExtensionDetailBody({ entry }: { entry: ExtensionView }) {
                 : "px-3"
             }
             variant={entry.enabled ? "outline" : "default"}
-            onClick={() => void ctx.extensions.toggle(manifest.id, !entry.enabled)}
+            disabled={busy || entry.status === "activating"}
+            data-testid="extension-action"
+            onClick={
+              entry.enabled
+                ? () => void ctx.extensions.toggle(manifest.id, false)
+                : market !== null
+                  ? install
+                  : () => void ctx.extensions.toggle(manifest.id, true)
+            }
           >
             {entry.enabled ? <Trash2Icon /> : <DownloadIcon />}
             {t(
@@ -206,9 +283,14 @@ function ExtensionDetailBody({ entry }: { entry: ExtensionView }) {
 /** Detail dialog for one extension; opens from a catalog row. */
 export function ExtensionDetailDialog({
   entry,
+  market = null,
+  onInstall,
   onOpenChange,
 }: {
   entry: ExtensionView | null
+  /** The market entry behind this row, when the page merged one in. */
+  market?: MarketEntry | null
+  onInstall?: (entry: MarketEntry) => Promise<void>
   onOpenChange: (open: boolean) => void
 }) {
   return (
@@ -217,7 +299,14 @@ export function ExtensionDetailDialog({
         showCloseButton={false}
         className="flex w-[640px] flex-col gap-0 rounded-lg bg-dialog p-0 shadow-[0_24px_56px_#0F172A3D] ring-glass-border backdrop-blur-xl sm:max-w-[640px]"
       >
-        {entry ? <ExtensionDetailBody key={entry.manifest.id} entry={entry} /> : null}
+        {entry ? (
+          <ExtensionDetailBody
+            key={entry.manifest.id}
+            entry={entry}
+            market={market}
+            onInstall={onInstall}
+          />
+        ) : null}
       </DialogContent>
     </Dialog>
   )

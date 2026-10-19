@@ -30,6 +30,7 @@ import { createRemoteVariableStore, variablesExtension } from "@context-hub/vari
 import * as ui from "./ui-kit.ts"
 import { desktopBridge } from "./desktop.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
+import { installExtensionRuntime } from "./extension-runtime.ts"
 import { preloadCatalogs } from "./preload.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
 
@@ -147,6 +148,9 @@ async function installedPlugins() {
 
 /** Compose and activate the kernel; the app renders once this settles. */
 export async function startHub(): Promise<HubKernel> {
+  /* Before any plugin module is imported: its `import React` resolves through
+     the import map to a shim that reads this instance. */
+  installExtensionRuntime()
   const state = await openState()
   const storage: StoragePort = {
     read: (key) => state[key] ?? null,

@@ -62,6 +62,7 @@ describe("reading a settings document", () => {
       layout: "list",
       installMode: "copy",
       downloadRemoteImages: false,
+      extensionMarketUrl: "",
       plugins: {},
     })
   })
@@ -129,6 +130,7 @@ describe("the settings service", () => {
       layout: "list",
       installMode: "copy",
       downloadRemoteImages: false,
+      extensionMarketUrl: "",
       plugins: {},
     })
   })

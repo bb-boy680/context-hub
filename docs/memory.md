@@ -1267,3 +1267,24 @@ Settings、Extensions 四个分组静默消失，**typecheck 和 lint 全绿**�
   `RmRegisterResources` → `RmGetList`）查到，不要只按名字猜进程。本次锁的持有者
   是用户本地的 `Orca.exe`，不是 Electron 或 electron-builder；这类第三方程序
   开着时，任何新造的 `app.asar` 都可能被立刻锁住。
+
+## 远程插件工程：入口必须指向打包产物（2026-10-19）
+
+**问题模式**：远程插件仓库最初只有一个共享 `tools/build-extension.mjs` 和手写的
+`index.js`，插件目录不是完整工程。随后又想照搬 `packages/agents/claude-code` 的
+`src/index.ts` 入口，但那个包能指向源码，是因为它在 workspace 内由 Vite 打包；
+Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间没有打包步骤。
+
+**规则**：
+- 每个 `plugins/<id>` 是完整 pnpm workspace 包：`package.json`、`build.mjs`、
+  `tsconfig.json`、`src/`、`plugin.json`、`README.md`；产物默认 `lib/index.js`。
+- `package.json` 的 `main` 必须与 `plugin.json` 的 `entry` 相同（默认
+  `lib/index.js`），`version` 必须与 `plugin.json` 和索引三处一致。hub 安装器
+  校验这些声明，旧插件没有 `package.json` 时保持原行为。
+- `lib/` 要提交：Context Hub 没有 npm 发布层，安装器 clone 后直接加载。不要照搬
+  deepseek-harness 把 `lib/` 放进 `.gitignore` 的做法——它的产物在 npm tarball 里。
+- 构建用 esbuild 并把 `absWorkingDir` 固定在插件目录，否则产物首行的路径注释随
+  cwd 漂移，同一份源码会在不同机器上产出不同字节。
+- 判据：`pnpm build` 两次的 `sha256sum lib/index.js` 相同；`package.json`、
+  `plugin.json` 与 `marketplace.json` 的版本一致。
+

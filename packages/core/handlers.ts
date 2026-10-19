@@ -14,12 +14,19 @@
  */
 import { createReadStream, promises as fs } from "node:fs"
 import type { ServerResponse } from "node:http"
+import path from "node:path"
 
 import { ASSET_ROUTE } from "./src/assets.ts"
 import { ABOUT_ROUTE } from "./src/about.ts"
 import { NET_ROUTE } from "./src/net.ts"
 import { PLACE_FILES_ROUTE, readPlaceCall } from "./src/place-files.ts"
-import { EXTENSION_ROUTE } from "./src/plugins.ts"
+import { runtimeSource } from "./src/host/extension-runtime.ts"
+import {
+  EXTENSION_MARKET_ROUTE,
+  EXTENSION_ROUTE,
+  EXTENSION_RUNTIME_DIR,
+  assertPluginId,
+} from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
@@ -29,10 +36,17 @@ import { isPublicHostname } from "./src/host/remote-image.ts"
 import {
   contentTypeOf,
   readBody,
+  readJson,
   sendError,
   sendJson,
   type HubMiddleware,
 } from "./src/host/http.ts"
+import {
+  createMarketReader,
+  installExtensionFromMarket,
+  removeInstalledExtension,
+  type MarketReader,
+} from "./src/host/extension-market.ts"
 import { createFsPlaceFiles } from "./src/host/place-files.ts"
 import { createFsPluginStore } from "./src/host/plugins-fs.ts"
 import { createFsStateStore } from "./src/host/state-fs.ts"
@@ -259,7 +273,7 @@ async function sendExtensionFile(
   file: string,
   response: ServerResponse
 ): Promise<void> {
-  const target = resolveStoredFile(root, `${id}/${file}`)
+  const target = resolveStoredFile(path.join(root, id), file)
   const stat = await fs.stat(target).catch(() => null)
   if (stat === null || !stat.isFile()) {
     sendError(response, new Error("no such file"), 404)
@@ -297,8 +311,27 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
         sendJson(response, 200, { ids: await store.list() })
         return
       }
+      /* `_runtime` is not a legal plugin id, so this branch cannot shadow one. */
+      if (rest === EXTENSION_RUNTIME_DIR || rest.startsWith(`${EXTENSION_RUNTIME_DIR}/`)) {
+        const name =
+          rest === EXTENSION_RUNTIME_DIR
+            ? ""
+            : rest.slice(EXTENSION_RUNTIME_DIR.length + 1)
+        const source = runtimeSource(name)
+        if (source === undefined) {
+          sendError(response, new Error("no such runtime file"), 404)
+          return
+        }
+        response.writeHead(200, {
+          "Content-Type": "text/javascript; charset=utf-8",
+          "Cache-Control": "no-store",
+        })
+        response.end(source)
+        return
+      }
       const slash = rest.indexOf("/")
       const id = decodeURIComponent(slash === -1 ? rest : rest.slice(0, slash))
+      assertPluginId(id)
       if (slash === -1) {
         sendJson(response, 200, JSON.parse(await store.read(id, "plugin.json")) as unknown)
         return
@@ -306,6 +339,83 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
       await sendExtensionFile(store.root, id, rest.slice(slash + 1), response)
     } catch {
       sendError(response, new Error("no such file"), 404)
+    }
+  }
+}
+
+/**
+ * The extension market: read one configured index, install one listed version,
+ * or remove one installed extension.
+ *
+ * The page sends the index URL and the plugin id and version. The handler reads
+ * the index itself, so a page cannot point the installer at a source the index
+ * did not publish.
+ */
+export function createExtensionMarketHandler(
+  options: { home?: string; reader?: MarketReader } = {}
+): HubMiddleware {
+  const home = resolveHubHome(options.home)
+  const store = createFsPluginStore(home)
+  const state = createFsStateStore(home)
+  const reader = options.reader ?? createMarketReader()
+  let tail: Promise<void> = Promise.resolve()
+
+  const run = <T>(task: () => Promise<T>): Promise<T> => {
+    const next = tail.then(task, task)
+    tail = next.then(
+      () => undefined,
+      () => undefined
+    )
+    return next
+  }
+
+  return async (request, response, next) => {
+    const url = new URL(request.url ?? "/", "http://localhost")
+    if (under(EXTENSION_MARKET_ROUTE, url.pathname) !== "") {
+      next()
+      return
+    }
+    if ((request.method ?? "GET") !== "POST") {
+      sendError(response, new Error(`unsupported method ${request.method ?? "GET"}`), 405)
+      return
+    }
+    try {
+      const body = (await readJson(request)) as Record<string, unknown>
+      const action = required(body.action, "missing action")
+      if (action === "list") {
+        const index = await reader.read(required(body.url, "missing url"), body.refresh === true)
+        sendJson(response, 200, { index })
+        return
+      }
+      if (action === "install") {
+        const source = required(body.url, "missing url")
+        const id = required(body.id, "missing id")
+        const version = required(body.version, "missing version")
+        const result = await run(async () => {
+          const index = await reader.read(source)
+          const plugin = index.plugins.find((entry) => entry.id === id)
+          if (plugin === undefined) throw new Error(`the market does not list "${id}"`)
+          const chosen = plugin.versions.find((entry) => entry.version === version)
+          if (chosen === undefined) {
+            throw new Error(`the market does not list "${id}" version "${version}"`)
+          }
+          return installExtensionFromMarket({ store, state, plugin, version: chosen })
+        })
+        sendJson(response, 200, result)
+        return
+      }
+      if (action === "remove") {
+        const id = required(body.id, "missing id")
+        await run(async () => {
+          await removeInstalledExtension({ store, state, id })
+        })
+        sendJson(response, 200, { ok: true })
+        return
+      }
+      throw new Error(`unknown action "${action}"`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      sendError(response, new Error(message), 400)
     }
   }
 }

@@ -58,6 +58,14 @@ has stopped. Releases are built by `.github/workflows/release.yml`; see
 [docs/building.md](docs/building.md) for signing, feeds and the limits of what
 can be verified locally.
 
+## Extensions
+
+Context Hub loads extensions from `<hub-home>/extensions` and can install them
+from a remote market index. A plugin may be written as a normal React module
+(`import React from "react"`) and built with React marked external. See
+[docs/extensions.md](docs/extensions.md) for the package layout, the market
+index format, local development sources and the trust model.
+
 ## Tests
 
 Vitest, one project per package, and **a package's tests live in `__test__/`

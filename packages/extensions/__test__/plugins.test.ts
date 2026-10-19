@@ -242,7 +242,7 @@ describe("discovery", () => {
 })
 
 /* Ids become directory names, so separators and reserved names are refused. */
-const UNSAFE_IDS = ["", "..", "a/b", "a\\b", "con", "with space", ".hidden", "Hub", "a".repeat(97)]
+const UNSAFE_IDS = ["", "..", "a/b", "a\\b", "con", "with space", ".hidden", "_runtime", "Hub", "a".repeat(97)]
 
 describe("plugin ids", () => {
   it.each(UNSAFE_IDS)("refuses %j", (id) => {

@@ -122,13 +122,26 @@ function readRecords(value: unknown): Record<string, PluginRecord> {
   return records
 }
 
+/** One migration per home: concurrent stores share it instead of racing. */
+const migrations = new Map<string, Promise<void>>()
+
+function migrationOf(home: string): Promise<void> {
+  const running = migrations.get(home)
+  if (running !== undefined) return running
+  const task = migrateExtensionSpace(home).finally(() => {
+    migrations.delete(home)
+  })
+  migrations.set(home, task)
+  return task
+}
+
 /** Create the extension store that reads and writes under one hub home. */
 export function createFsPluginStore(home: string): PluginStore {
   const root = extensionsRoot(home)
   const recordsPath = path.join(root, EXTENSION_RECORDS)
   /* Every entry point waits on the same migration, so a home that still holds
      the old directory is never read from two places at once. */
-  const migrated = migrateExtensionSpace(home)
+  const migrated = migrationOf(home)
 
   /** The directory of one extension, refusing ids that are not directory names. */
   const pluginDir = (id: string) => path.join(root, assertPluginId(id))

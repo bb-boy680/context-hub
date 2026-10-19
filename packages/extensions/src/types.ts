@@ -6,10 +6,16 @@
 import type { Context } from "@deepseek-ai/cordis"
 import type { ComponentType } from "react"
 
+import { EXTENSION_API_VERSION, isCompatible } from "@context-hub/core/extension-manifest"
+import type {
+  ExtensionCategoryId,
+  ExtensionPermission,
+} from "@context-hub/core/extension-manifest"
+
 import type { SkillRegistry } from "./skill-registry.ts"
 
-/** Extension API this kernel implements; manifests declare the range they were built for. */
-export const EXTENSION_API_VERSION = "0.1"
+export { EXTENSION_API_VERSION, isCompatible }
+export type { ExtensionCategoryId, ExtensionPermission }
 
 /**
  * An icon an extension contributes. It is a component rather than a name, so a
@@ -27,24 +33,6 @@ export type ExtensionIcon = ComponentType<{
 
 /** Whether loading the extension requires running its code. */
 export type ExtensionKind = "builtin" | "declarative" | "code"
-
-/** Catalog grouping on the Extensions page. */
-export type ExtensionCategoryId =
-  | "agent"
-  | "asset"
-  | "integration"
-  | "language"
-  | "appearance"
-  | "source"
-  | "storage"
-
-/** A capability an extension asks for before it is enabled. */
-export type ExtensionPermission =
-  | "storage.self"
-  | "assets.read"
-  | "assets.write"
-  | "filesystem"
-  | "network"
 
 /** One selectable UI language contributed by a language pack. */
 export interface LocaleContribution {
@@ -278,9 +266,4 @@ export interface ExtensionDefinition {
   module: ExtensionModule
   /** The module's manifest with its `name` filled in from the module's id. */
   manifest: ExtensionManifest & { id: string }
-}
-
-/** Whether this kernel can load a manifest, by API range equality. */
-export function isCompatible(apiVersion: string): boolean {
-  return apiVersion.replace(/^[\^~]/, "") === EXTENSION_API_VERSION
 }

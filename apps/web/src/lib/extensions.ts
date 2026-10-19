@@ -1,6 +1,10 @@
 /** Presentation helpers shared by the Extensions page and its detail dialog. */
 import type { ExtensionCategoryId } from "@context-hub/extensions"
 
+/** Glass card surface shared by the Extensions page and the market section. */
+export const cardSurface =
+  "rounded-lg bg-card p-5 ring-1 ring-glass-border shadow-glass backdrop-blur-glass"
+
 /** Catalog order of the sections; a category with no entries is skipped. */
 export const categoryOrder: ExtensionCategoryId[] = [
   "agent",

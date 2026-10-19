@@ -13,35 +13,16 @@
 import * as React from "react"
 import type { LucideIcon } from "lucide-react"
 
-import { PLUGIN_ICONS, resolvePluginIcon } from "./icons.ts"
 import {
-  isCompatible,
-  type ExtensionModule,
-  type ExtensionPermission,
-} from "./types.ts"
+  parsePluginManifest,
+  type PluginManifestFile,
+} from "@context-hub/core/extension-manifest"
 
-/** Manifest fields accepted from `plugin.json`, before the kernel resolves them. */
-export interface PluginManifestFile {
-  /** Must equal the directory name; the kernel refuses a mismatch. */
-  id: string
-  name: string
-  version: string
-  /** Kernel API range this plugin was built against, e.g. "^0.1". */
-  apiVersion: string
-  description?: string
-  /** Kebab-case icon name, e.g. "sparkles"; see `PLUGIN_ICONS`. */
-  icon?: string
-  /** Module file inside the plugin directory that exports `apply`; defaults to index.js. */
-  entry?: string
-  category?: "agent" | "asset" | "integration" | "language" | "appearance" | "source" | "storage"
-  permissions?: ExtensionPermission[]
-  /** Service names this plugin requires; it stays waiting until each is provided. */
-  inject?: string[]
-  /** Service names this plugin provides to others. */
-  provides?: string[]
-  /** Enable on first sight when the hub has no recorded choice for it. */
-  defaultEnabled?: boolean
-}
+import { PLUGIN_ICONS, resolvePluginIcon } from "./icons.ts"
+import type { ExtensionModule } from "./types.ts"
+
+export { parsePluginManifest }
+export type { PluginManifestFile }
 
 /** One plugin found on disk, and whether the kernel can load it. */
 export interface DiscoveredPlugin {
@@ -76,75 +57,6 @@ export interface PluginScope {
   ui: unknown
 }
 
-const PERMISSIONS: readonly ExtensionPermission[] = [
-  "storage.self",
-  "assets.read",
-  "assets.write",
-  "filesystem",
-  "network",
-]
-
-const CATEGORIES = ["agent", "asset", "integration", "language", "appearance", "source", "storage"] as const
-
-function requireString(value: unknown, field: string): string {
-  if (typeof value !== "string" || value.trim() === "") {
-    throw new Error(`plugin manifest: "${field}" must be a non-empty string`)
-  }
-  return value
-}
-
-/**
- * Validate one `plugin.json` document.
- *
- * @param value — the parsed JSON.
- * @param id — the directory name, which the manifest id must equal.
- * @returns the validated manifest.
- * @throws {Error} when a required field is missing, or a value is unusable.
- */
-export function parsePluginManifest(value: unknown, id: string): PluginManifestFile {
-  if (typeof value !== "object" || value === null) {
-    throw new Error("plugin manifest: expected a JSON object")
-  }
-  const file = value as Record<string, unknown>
-  const manifestId = requireString(file.id, "id")
-  if (manifestId !== id) {
-    throw new Error(`plugin manifest: id "${manifestId}" does not match its directory "${id}"`)
-  }
-  const apiVersion = requireString(file.apiVersion, "apiVersion")
-  if (!isCompatible(apiVersion)) {
-    throw new Error(
-      `plugin manifest: apiVersion "${apiVersion}" is not compatible with this kernel`
-    )
-  }
-  const permissions = file.permissions
-  if (permissions !== undefined) {
-    if (!Array.isArray(permissions) || !permissions.every((item) => PERMISSIONS.includes(item as ExtensionPermission))) {
-      throw new Error("plugin manifest: permissions must list known permissions")
-    }
-  }
-  const category = file.category
-  if (category !== undefined && !CATEGORIES.includes(category as (typeof CATEGORIES)[number])) {
-    throw new Error(`plugin manifest: unknown category "${String(category)}"`)
-  }
-  if (file.locked !== undefined) {
-    throw new Error("plugin manifest: an installed plugin cannot lock itself on")
-  }
-  return {
-    id: manifestId,
-    name: requireString(file.name, "name"),
-    version: requireString(file.version, "version"),
-    apiVersion,
-    description: typeof file.description === "string" ? file.description : "",
-    icon: typeof file.icon === "string" ? file.icon : undefined,
-    entry: typeof file.entry === "string" ? file.entry : undefined,
-    category: (category as PluginManifestFile["category"]) ?? "source",
-    permissions: permissions as ExtensionPermission[] | undefined,
-    inject: Array.isArray(file.inject) ? (file.inject as string[]) : undefined,
-    provides: Array.isArray(file.provides) ? (file.provides as string[]) : undefined,
-    defaultEnabled: file.defaultEnabled === true,
-  }
-}
-
 /** Read one plugin directory's manifest, never leaving the directory. */
 async function readManifest(
   source: { read(id: string, file: string): Promise<string> },
@@ -168,10 +80,12 @@ export async function discoverPlugins(options: {
   source: { list(): Promise<string[]>; read(id: string, file: string): Promise<string> }
   importModule(url: string): Promise<unknown>
   route?: string
+  /** When given, only these ids are read; the source can still list all of them. */
+  ids?: readonly string[]
 }): Promise<DiscoveredPlugin[]> {
   const route = options.route ?? "/hub/extensions"
   const found: DiscoveredPlugin[] = []
-  for (const id of await options.source.list()) {
+  for (const id of options.ids ?? (await options.source.list())) {
     try {
       const manifest = await readManifest(options.source, id)
       const entry = manifest.entry ?? "index.js"

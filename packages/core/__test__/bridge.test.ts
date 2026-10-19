@@ -35,6 +35,7 @@ import { ASSET_ROUTE } from "../src/assets.ts"
 import { EXTENSION_ROUTE } from "../src/plugins.ts"
 import { NET_ROUTE, createRemoteNet } from "../src/net.ts"
 import { STATE_ROUTE } from "../src/state.ts"
+import { resolveStoredFile } from "../src/host/assets-fs.ts"
 import { displayPath } from "../src/host/home.ts"
 
 const PACK_ID = "check.plugin"
@@ -144,6 +145,27 @@ describe("the installed extensions", () => {
     const response = await fetch(at(`${EXTENSION_ROUTE}/${PACK_ID}/index.js`))
     expect(response.status).toBe(200)
     expect(await response.text()).toContain("export default")
+  })
+
+  it("refuse a file outside the plugin directory", async () => {
+    /* The route treats one plugin directory as its root, so a path that climbs
+       out of it is missing rather than a read of a sibling. */
+    const response = await fetch(at(`${EXTENSION_ROUTE}/${PACK_ID}/%2e%2e/other/plugin.json`))
+    expect(response.status).toBe(404)
+    expect(() =>
+      resolveStoredFile(path.join(home, "extensions", PACK_ID), "../other/plugin.json")
+    ).toThrow()
+  })
+
+  it("serve the React runtime shims", async () => {
+    const response = await fetch(at(`${EXTENSION_ROUTE}/_runtime/react.js`))
+    expect(response.status).toBe(200)
+    expect(response.headers.get("content-type")).toContain("text/javascript")
+    expect(await response.text()).toContain("__CONTEXT_HUB_REACT__")
+  })
+
+  it("refuse an unknown runtime file", async () => {
+    expect((await fetch(at(`${EXTENSION_ROUTE}/_runtime/nope.js`))).status).toBe(404)
   })
 })
 

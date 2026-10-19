@@ -166,6 +166,36 @@ export class ExtensionService extends Service {
     return this.run(() => this.setEnabled(id, true))
   }
 
+  /**
+   * Add one extension discovered after the kernel started, and enable it.
+   *
+   * A market install writes the directory while the page is open; the page
+   * imports the module and hands it here. The catalog is keyed by id, so a
+   * second copy is refused rather than replacing the one already running.
+   */
+  add(module: ExtensionModule): Promise<void> {
+    return this.run(() => this.addNow(module))
+  }
+
+  private async addNow(module: ExtensionModule): Promise<void> {
+    const manifest = catalogManifest(module)
+    const { id } = manifest
+    if (this.entries.has(id)) {
+      throw new Error(`extensions: "${id}" is already in the catalog`)
+    }
+    const entry: Entry = { module, manifest, enabled: false, status: "inactive" }
+    this.entries.set(id, entry)
+    if (!isCompatible(manifest.apiVersion)) {
+      entry.status = "incompatible"
+      this.publish()
+      return
+    }
+    entry.enabled = true
+    await this.activate(entry)
+    this.persist()
+    this.publish()
+  }
+
   /** Disable, then unwind every registration the extension made. */
   disable(id: string): Promise<void> {
     return this.run(() => this.setEnabled(id, false))
