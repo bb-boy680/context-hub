@@ -20,8 +20,8 @@ const indexPath = /\.json$/i.test(MARKET) ? MARKET : path.join(MARKET, "marketpl
 const index = JSON.parse(await fs.readFile(indexPath, "utf8")) as {
   plugins: { id: string; versions: { version: string }[] }[]
 }
-const entry = index.plugins.find((plugin) => plugin.id === "demo.other")
-if (entry === undefined) throw new Error("the fixture index has no demo.other")
+const entry = index.plugins.find((plugin) => plugin.id === "skills.sh")
+if (entry === undefined) throw new Error("the fixture index has no skills.sh")
 const expected = entry.versions[0]!
 
 const targets = (await (await fetch(`${DEBUG}/json/list`)).json()) as {
@@ -90,15 +90,15 @@ async function waitForFile(file: string, timeoutMs = 30_000): Promise<void> {
   }
 }
 
-async function click(selector: string): Promise<void> {
+async function clickExpression(find: string): Promise<void> {
   await evaluate(
-    `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (el) el.scrollIntoView({ block: "center" }); return true })()`
+    `(() => { const el = ${find}; if (el) el.scrollIntoView({ block: "center" }); return true })()`
   )
   await new Promise((resolve) => setTimeout(resolve, 200))
   const point = (await evaluate(
-    `(() => { const el = document.querySelector(${JSON.stringify(selector)}); if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`
+    `(() => { const el = ${find}; if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 } })()`
   )) as { x: number; y: number } | null
-  if (point === null) throw new Error(`no element ${selector}`)
+  if (point === null) throw new Error(`no element ${find}`)
   await send("Input.dispatchMouseEvent", {
     type: "mousePressed",
     x: point.x,
@@ -113,6 +113,10 @@ async function click(selector: string): Promise<void> {
     button: "left",
     clickCount: 1,
   })
+}
+
+async function click(selector: string): Promise<void> {
+  await clickExpression(`document.querySelector(${JSON.stringify(selector)})`)
 }
 
 const failures: string[] = []
@@ -156,34 +160,27 @@ check(
   )) === "count: 1"
 )
 
-/* With a market source stored in settings, startup already read the index;
-   the row must be there before anyone types into the source box. */
+/* The built-in market is read at startup, before the page is opened. */
+const marketRow = '[data-testid="extension-skills.sh"]'
 if (process.env.EXPECT_PRELOAD === "1") {
-  await waitFor(
-    `!!document.querySelector('[data-testid="extension-demo.other"]')`,
-    15_000
-  )
-  check("the configured market source is read at startup", true)
+  await waitFor(`!!document.querySelector(${JSON.stringify(marketRow)})`, 15_000)
+  check("the built-in market source is read at startup", true)
 }
-
-await evaluate(
-  `(() => { const input = document.querySelector('#extension-market-source'); input.value = ${JSON.stringify(MARKET)}; input.closest('form').requestSubmit(); return true })()`
-)
-await waitFor(`!!document.querySelector('[data-testid="extension-demo.other"]')`)
+await waitFor(`!!document.querySelector(${JSON.stringify(marketRow)})`)
 
 const listed = String(
-  await evaluate(`document.querySelector('[data-testid="extension-demo.other"]').innerText`)
+  await evaluate(`document.querySelector(${JSON.stringify(marketRow)}).innerText`)
 )
-check("the market entry is listed with the catalog", listed.includes("Demo Other"), listed)
+check("the market entry is listed with the catalog", listed.includes("skills.sh"), listed)
 
-await click('[data-testid="extension-demo.other"] button')
+await click(`${marketRow} button`)
 await waitFor(`!!document.querySelector('[data-testid="extension-action"]')`)
 const dialog = String(await evaluate(`document.body.innerText`))
-check("the existing detail dialog opens", dialog.includes("Demo Other"))
+check("the existing detail dialog opens", dialog.includes("skills.sh"))
 check("the dialog shows the listed version", dialog.includes(expected.version))
 
 await click('[data-testid="extension-action"]')
-await waitForFile(path.join(HOME, "extensions", "demo.other", "plugin.yaml"))
+await waitForFile(path.join(HOME, "extensions", "skills.sh", "plugin.yaml"))
 check("the install wrote the plugin", true)
 await waitFor(
   `/Uninstall|卸载/.test(document.querySelector('[data-testid="extension-action"]')?.innerText ?? "")`
@@ -192,8 +189,30 @@ check("the action switches to uninstall without a reload", true)
 let state = JSON.parse(
   await fs.readFile(path.join(HOME, "state", "extensions.json"), "utf8")
 ) as Record<string, boolean>
-check("the install enabled the plugin", state["demo.other"] === true)
+check("the install enabled the plugin", state["skills.sh"] === true)
 
+/* This plugin's contribution is a service, not a visible surface. Installing
+   must have activated it: the Skills page's Explore dialog names it. */
+const origin = new URL(PAGE).origin
+const explore = `Array.from(document.querySelectorAll("button")).find((el) => (el.textContent ?? "").trim() === "Explore")`
+await send("Page.navigate", { url: `${origin}/skills` })
+await waitFor(`!!(${explore})`, 30_000)
+await clickExpression(explore)
+await waitFor(`!!document.querySelector('input[placeholder="Search skills.sh"]')`, 15_000).catch(
+  async (error: unknown) => {
+    console.log("skills page:\n" + String(await evaluate("document.body.innerText")))
+    throw error
+  }
+)
+check("skills.sh activates and registers its search source", true)
+await send("Page.navigate", { url: PAGE })
+await waitFor(
+  `document.readyState === "complete" && !!document.querySelector(${JSON.stringify(marketRow)})`,
+  30_000
+)
+
+await click(`${marketRow} button`)
+await waitFor(`!!document.querySelector('[data-testid="extension-action"]')`)
 await evaluate(
   `document.querySelector('[data-testid="extension-action"]').click()`
 )
@@ -205,10 +224,10 @@ check("the action switches back to install without a reload", true)
 state = JSON.parse(
   await fs.readFile(path.join(HOME, "state", "extensions.json"), "utf8")
 ) as Record<string, boolean>
-check("uninstall disables the plugin", state["demo.other"] === false)
+check("uninstall disables the plugin", state["skills.sh"] === false)
 check(
   "uninstall keeps the installed files",
-  await fs.stat(path.join(HOME, "extensions", "demo.other", "plugin.yaml")).then(
+  await fs.stat(path.join(HOME, "extensions", "skills.sh", "plugin.yaml")).then(
     () => true,
     () => false
   )
@@ -240,7 +259,7 @@ check(
 )
 /* Let the previous row's toast clear so it cannot sit over the footer button. */
 await waitFor(
-  `!document.body.innerText.includes("Demo Other is installed")`,
+  `!document.body.innerText.includes("skills.sh is installed")`,
   15_000
 ).catch(() => undefined)
 await new Promise((resolve) => setTimeout(resolve, 500))

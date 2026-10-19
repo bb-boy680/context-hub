@@ -24,7 +24,6 @@ import { mcpExtension } from "@context-hub/mcp"
 import { pluginsExtension } from "@context-hub/plugins"
 import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
 import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-hub/skills"
-import { skillsShExtension } from "@context-hub/skills-sh"
 import { createRemoteVariableStore, variablesExtension } from "@context-hub/variables"
 import * as ui from "./ui-kit.ts"
 import { desktopBridge } from "./desktop.ts"
@@ -194,7 +193,6 @@ export async function startHub(): Promise<HubKernel> {
       /* The palette last among the shipped modules, so the settings and
          extensions groups follow the asset groups in the result list. */
       globalSearchExtension,
-      skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),
     ],
