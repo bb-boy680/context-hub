@@ -1288,3 +1288,27 @@ Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间�
 - 判据：`pnpm build` 两次的 `sha256sum lib/index.js` 相同；`package.json`、
   `plugin.json` 与 `marketplace.json` 的版本一致。
 
+
+## 桌面 UI 验收必须在 Electron 窗口里做（2026-10-19）
+
+**问题模式**：实现桌面端流程时，我在浏览器里截图并汇报，用户直接问「我们说的是桌面端程序，为什么界面是在 web 里」。代码确实在 `apps/web`，桌面端 Electron 加载的是同一份页面；但**浏览器验收不能证明 preload 桥或打包后的页面加载路径**。用户看到的是测试外壳，不是交付形态。
+
+**规则**：凡是桌面端用户可见的流程，最终验收必须起真实 Electron，确认窗口里的页面和 IPC。浏览器只用于快速迭代，汇报时要明确说「这是 web 形态的临时验收」。桌面端跑法：`CONTEXT_HUB_HOME=<临时目录> pnpm exec electron --remote-debugging-port=9222 --user-data-dir=<临时 profile> .`，再用 CDP 读 `document.body.innerText` 和截图；不要靠浏览器结果替代桌面运行时验证。dev watcher（`node dev.ts`）与打包应用共用 userData 和单实例锁；验收安装包前先停掉它，否则启动安装后的应用只会聚焦已有的 dev 窗口。
+
+## 桌面主题可能不跨启动保留（2026-10-19，已实测确认）
+
+**问题模式**：在设置页选「深色」后，重启桌面应用，`document.documentElement.classList.contains("dark") === false`，`localStorage.theme === null`。原因是桌面 hub server 用 `--port 0`，窗口 origin 的端口每次启动不同，而 `ThemeProvider` 只把主题写进 `localStorage`（按 origin 隔离）。布局、安装方式等写进 `state/settings.json` 的选项会保留。
+
+**规则**：把主题当作「跨 origin 的机器偏好」时，不能只写 localStorage。修复方向是固定 origin（固定端口/自定义 protocol）或把主题落到 hub state 并在启动时作为 `ThemeProvider` 初值；这会改主题所有权，属于单独任务。验收时必须重启一次应用读 theme，而不是只看当前会话的 class。
+
+## Electron 窗口标题与图标不是 productName 自动带来的（2026-10-19）
+
+**问题模式**：桌面窗口截图里，Windows 标题栏显示 `vite-monorepo` 和 Electron 默认图标，用户直接说「怎么还有外面的壳，看着好丑」。`productName` 只决定安装目录、快捷方式和任务栏名称；窗口标题来自页面 `apps/web/index.html` 的 `<title>`，而模板一直留着 Vite 的标题。窗口/任务栏图标来自可执行文件，electron-builder 没有配置 `win.icon` 时嵌入的是 Electron 默认图标。
+
+**规则**：用户可见的桌面窗口标题必须与产品名一致，改 `apps/web/index.html` 的 `<title>`；打包图标用 `win.icon` 指向 `build/installerIcon.ico`（与安装器同一张品牌图）。改完要用真实打包产物看一次 `MainWindowTitle`，并确认 electron-builder 日志里不再出现 `default Electron icon is used`。设计稿的画板不含 OS 标题栏，不要把「有标题栏」本身当成实现偏差；要彻底去掉它属于独立的无边框窗口改造，需要同时设计拖拽区和窗口控制。
+
+## 安装器回归系统自带页面，首启向导已撤回（2026-10-19）
+
+**问题模式**：为了实现「安装范围 + 路径」合一的自定义页，`installer.nsh` 直接改 `$INSTDIR`。旧记录里出现相对路径 `23\Context Hub` 后，`initMultiUser` 把它读回 `$INSTDIR`，安装器把文件装到工作目录、注册表和快捷方式写成相对路径；随后默认的运行检查又弹出「Context Hub 无法关闭」，而任务管理器里根本没有该进程。设计稿里的首启向导也反复因为桌面端状态、窗口壳和打包验收而卡住。
+
+**规则**：桌面安装器只保留 electron-builder 自带的 assisted installer：`oneClick: false` 提供当前用户/所有用户，`allowToChangeInstallationDirectory: true` 提供原生目录页；不要再用 `nsis.include` 覆盖路径页，也不要恢复首启 React 向导。安装前若旧记录已有相对 `InstallLocation`，先删除 `HKCU\Software\<APP_GUID>`；原生目录页会把应用名追加到所选路径。

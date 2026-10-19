@@ -7,18 +7,18 @@
 .prettierrc[FV5T]: F:统一格式化规则 | R:code:.gitattributes | A:- | S:endOfLine=lf 与 .gitattributes 保持一致；tailwindStylesheet 指向 packages/shadcn-ui/src/styles/globals.css，组件迁包后这里不同步会让 Tailwind 类名排序失效
 AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:执行任务前用 create-plan 子智能体写计划并自审，用户明确批准前不动源码，获批后用 TaskCreate/TaskUpdate 逐阶段推进；指令优先级中最新明确请求高于仓库级说明；涉及安全、数据丢失、凭证、部署或重大架构决策必须停下询问；浏览器自动化用 ego-browser skill；末尾 AOCI 受管区块由工具维护不可手改
 DESIGN.md[SU7M]: F:设计 token 与组件规范 | R:- | A:- | S:唯一强调色 Coinbase Blue #0052ff 且克制使用；display 字重固定 400 不得加粗；圆角只有 pill 100px、xl 24px、full 9999px；交易绿红 #05b169 与 #cf202f 只作文本色不作背景
-README.md[SG8S]: F:运行方式、桌面开发与更新、扩展市场入口、测试布局和发布形态 | R:code:apps/web/hub-port.ts,code:apps/web/server.ts,code:apps/desktop/src/main.ts,code:apps/desktop/bundle.ts,code:apps/desktop/electron-builder.config.mjs,code:docs/extensions.md | A:- | S:开发是 server 5270 + Vite 5271；桌面 dev watch 三个 bundle 并重启 Electron，托盘 Quit 才停 hub；扩展市场细节只链向 docs/extensions.md，不在这里重复
+README.md[SG8S]: F:运行方式、桌面安装、扩展市场入口、测试布局和发布形态 | R:code:apps/web/hub-port.ts,code:apps/web/server.ts,code:apps/desktop/src/main.ts,code:apps/desktop/bundle.ts,code:apps/desktop/electron-builder.config.mjs,code:docs/extensions.md | A:- | S:开发是 server 5270 + Vite 5271；桌面 dev watch 三个 bundle 并重启 Electron，托盘 Quit 才停 hub；桌面启动直接进入主界面，没有首启向导；扩展市场细节只链向 docs/extensions.md
 package.json[FV8T]: F:monorepo 根脚本与工具链 | R:- | A:- | S:pnpm@10.33.4 且 node>=20；test 直接跑根 vitest，不经 turbo；build 经 turbo，build:cli 先构建 web 再调 web build:cli，build:desktop 只 bundle 桌面端
 pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不得手改；已含 global-search 的 cmdk、electron 44.9、electron-builder 26.15、electron-updater 6.8.9 与 esbuild 0.28
 pnpm-workspace.yaml[FV7T]: F:工作区与构建白名单 | R:- | A:- | S:packages 覆盖 apps/*、packages/* 与 packages/*/*；allowBuilds 控制安装脚本，electron 必须 true，否则不下载运行时且 dist 为空；msw 为 false
 tsconfig.json[FV5T]: F:仓库级编译基线 | R:- | A:- | S:只给 target/module/strict 等公共项，各包自己的 tsconfig 在此基础上加 include 与 jsx
 turbo.json[FV7T]: F:任务图与缓存 | R:- | A:- | S:dev 不缓存且 persistent；build 依赖 ^build 且输出 dist/**；lint/format/typecheck 都先跑依赖包的同名任务
-vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob——packages/* 会匹到 eslint.config.js；新增包必须在此登记；desktop 与 global-search 已登记；各包自己的 vitest.config.ts 管 include
+vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob；新增包必须在此登记；scripts、desktop 与 global-search 已登记；各包自己的 vitest.config.ts 管 include
 
 ===D:/work-space/dsh-context-hub/apps/web/===
 components.json[FU5T]: F:shadcn 生成配置 | R:code:packages/shadcn-ui/src/styles/globals.css | A:- | S:aliases.utils 与 aliases.ui 指向 @context-hub/shadcn-ui，css 指向 packages/shadcn-ui/src/styles/globals.css；组件包改名后两处不同步会把 utils 重复内联进应用
 eslint.config.js[FQ3T]: F:web 应用 lint 规则 | R:- | A:- | S:忽略必须用 globalIgnores 而非 ignorePatterns
-index.html[EU5T]: F:页面宿主骨架与插件运行时的 import map | R:code:apps/web/src/main.tsx,code:packages/core/src/host/extension-runtime.ts | A:- | S:import map 必须在模块脚本之前；映射 react/react-dom/jsx-runtime/jsx-dev-runtime 到 /hub/extensions/_runtime/*.js；Vite 构建原样保留它
+index.html[EU5T]: F:页面宿主骨架与插件运行时的 import map | R:code:apps/web/src/main.tsx,code:packages/core/src/host/extension-runtime.ts | A:- | S:import map 必须在模块脚本之前；映射 react/react-dom/jsx-runtime/jsx-dev-runtime 到 /hub/extensions/_runtime/*.js；Vite 构建保留；<title> 必须是 Context Hub，Electron 标题栏取它，留模板名显示 vite-monorepo
 package.json[FV7T]: F:web 应用依赖与脚本 | R:code:apps/web/build-cli.ts | A:- | S:build 先 tsc -b 再 vite build；start 是 server.ts --static dist；build:cli 调 build-cli.ts（需先有 dist）；所有 @context-hub/* 用 workspace:*，新增包必须登记
 tsconfig.app.json[FV7T]: F:应用编译选项 | R:code:apps/web/tsconfig.json | A:- | S:paths 必须同时映射 @/* 与 @context-hub/shadcn-ui/*，并与 vite alias 和 tsconfig.json 保持一致；types 只有 vite/client，浏览器代码不得混入 node 类型
 tsconfig.json[FV5T]: F:引用式工程根 | R:code:apps/web/tsconfig.app.json,code:apps/web/tsconfig.node.json,code:apps/web/tsconfig.test.json | A:- | S:files 为空靠 references 组合；paths 需与子配置重复声明，三处必须同步
@@ -178,7 +178,7 @@ tsconfig.json[FV3T]: F:中文语言包编译选项 | R:- | A:- | S:include 含 s
 vitest.config.ts[FQ3T]: F:中文语言包的 vitest 项目 | R:code:packages/i18n/zh-cn/tsconfig.json | A:- | S:include 写死 __test__/**/*.test.ts，测试放在别处不会收集
 
 ===D:/work-space/dsh-context-hub/packages/i18n/zh-cn/src/===
-index.ts[CL7T]: F:简体中文语言包声明 | R:code:packages/i18n/zh-cn/src/messages.ts | A:simplifiedChineseLocale,zhCNMessages | S:kind 为 declarative（内核不为它跑代码）、defaultEnabled 为 false；id 用 hub.locale.zh-CN
+index.ts[CL7T]: F:简体中文语言包声明 | R:code:packages/i18n/zh-cn/src/messages.ts | A:simplifiedChineseLocale,zhCNMessages | S:kind 为 declarative，内核不跑代码；defaultEnabled 为 false，安装后需在语言选择器启用；id 用 hub.locale.zh-CN
 messages.ts[CL7L]: F:简体中文文案表 | R:- | A:- | S:键对应 extensions 的英文基础表，缺键回退英文；新增英文键必须同步这里；已含 extensions.market.*、search.group.*、globalSearch.* 与 skills.settings.*
 
 ===D:/work-space/dsh-context-hub/packages/resources/mcp/__test__/===
@@ -243,7 +243,7 @@ add-plugin-dialog.tsx[DU7L]: F:新增插件对话框：地址与文件夹两种�
 contract.ts[CE9M]: F:插件包契约、清单判定与错误码 | R:code:packages/resources/plugins/src/host/describe.ts,code:packages/resources/plugins/src/add-plugin-dialog.tsx,code:packages/resources/plugins/src/host/collect.ts,code:packages/resources/plugins/src/library.ts | A:PluginOrigin,PluginUpstream,PLUGIN_MANIFESTS,marketplaceManifest/hasStandardComponents,PluginNameTakenError,PLUGINS_ID | S:plugin.json 可选：根市场把根命名成插件时可当清单；市场存在但未命名根时，标准组件回退必须让路，否则多子目录市场会被整仓误收；市场条目指向子目录（哪怕只有一条）不是插件；同名冲突用 PluginNameTakenError 携带 code/name/from，句子可在页面本地化；模块 id 也放在这里，settings-section 与 library 才能引用它而不反向 import index.ts 成环。
 detail-dialog.tsx[DU7L]: F:插件详情弹窗与展示图 | R:code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/rows.ts | A:PluginDetailDialog,PackPane,MediaPane,ContentList,PlacesSection,SourceSection | S:展示图页 keepMounted 且粘贴监听挂在 document 上，故只认 onScreen——不认就会在读其他页签时看不见地改封面；未收录的包上传入口禁用；图写入记录
 file-tree.tsx[DU5S]: F:包文件树 | R:- | A:PluginFileTree,fileTreeKey | S:展开、焦点、方向键与 ARIA 树结构交给 headless-tree，本文件只画行；树在挂载时构建一次项目表，之后列表变化必须换 key 让它重新挂载
-index.ts[EE8S]: F:插件模块定义、设置区块与更新调度 | R:code:packages/resources/plugins/src/library-store.ts,code:packages/resources/plugins/src/provider.ts,code:packages/resources/plugins/src/search.ts,code:packages/resources/plugins/src/settings-section.tsx,code:packages/resources/plugins/src/update-settings.ts | A:pluginsExtension,PluginsPage | S:服务在任何其他事之前发布，故同一轮启用的 agent 插件一激活就能注册；共享读取 PluginLibrary 也在这里构造；本模块不指名任何 agent；inject 含 i18n/search/settings/settingsSections，provider 才能在 apply 后读翻译并交出搜索；apply 注册 plugins-updates 并用 PLUGINS_ID 启动随插件回卷的更新调度。
+index.ts[EE8S]: F:插件模块定义、设置区块与更新调度 | R:code:packages/resources/plugins/src/library-store.ts,code:packages/resources/plugins/src/provider.ts,code:packages/resources/plugins/src/search.ts,code:packages/resources/plugins/src/settings-section.tsx,code:packages/resources/plugins/src/update-settings.ts | A:pluginsExtension,PluginsPage | S:服务在任何其他事之前发布；共享读取 PluginLibrary 也在这里构造；本模块不指名任何 agent；inject 含 i18n/search/settings/settingsSections
 inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/resources/plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 是同一件事的前后，故用同样四个词；本地路径必须绝对——宿主的工作目录对在浏览器里打字的人毫无意义；认不出的形式直接带理由拒绝
 install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/rows.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单是行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判；措辞从 rows.ts 取
 library-store.ts[DD9M]: F:插件库的共享读取，活在页面之外 | R:code:packages/extensions/src/agents.ts,code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/provider.ts,code:packages/resources/plugins/src/rows.ts,code:packages/resources/plugins/src/scan.ts | A:PluginLibrary,PLUGIN_LIBRARY_SERVICE,NOTHING_READ | S:构造即注册为 catalog.plugins 但不读；只在被人问过后才跟随扩展与工作区变化重读；一个客户端的失败只算它自己的答案；probeInstallers 只收被选中的 installer，未选的 agent 不跑它的命令行；订阅键是「文件夹+已选 agent」，比较后必须前移
@@ -487,7 +487,7 @@ tsconfig.json[FV4T]: F:桌面端 TypeScript 编译选项 | R:- | A:- | S:include
 vitest.config.ts[FQ4T]: F:桌面端测试 project 配置 | R:- | A:- | S:project 名 desktop，只收 __test__/**/*.test.ts；窗口与子进程由构建验收覆盖，不在此测
 bundle.ts[XV7T]: F:导出三个 esbuild 配置并一次性构建 main、preload 与 server | R:code:apps/desktop/build.ts,code:apps/desktop/dev.ts,code:apps/desktop/src/main.ts,code:apps/desktop/src/preload.ts,code:apps/web/server.ts | A:- | S:server 用 ESM + createRequire banner；main 与 preload 用 CJS，preload 必须 CJS 才能被 sandbox 加载；main external 为 electron 与 electron-updater，preload 只 external electron；dev 复用同一配置进入 watch
 dev.ts[XW8S]: F:watch main、preload、server 三个 bundle，重建后重启 Electron；菜单重启走退出码 75 | R:code:apps/desktop/bundle.ts,code:apps/desktop/src/restart.ts,code:apps/desktop/src/main.ts,code:apps/desktop/package.json | A:- | S:首次构建后进 watch，首次 onEnd 不重启；250ms 防抖；preload 或 main 变化都只重启 Electron；只按自己 spawn 的 PID 清理；Electron 自行退出即关 watcher；CONTEXT_HUB_DEV_URL 原样透传
-electron-builder.config.mjs[FV8T]: F:桌面打包：版本、更新源、平台目标、asar 文件与签名开关 | R:code:package.json,code:apps/desktop/package.json,code:apps/desktop/build.ts,code:apps/desktop/src/preload.ts | A:- | S:files 必须同时列 dist/main.cjs 与 dist/preload.cjs，否则窗口拿不到桥；version 经 extraMetadata 取自根 package.json；publish 指 GitHub bb-boy680/context-hub；artifactName 不含空格以匹配 latest.yml；electronDist 用本地 electron/dist 离线打包；mac 需齐全凭证才 notarize
+electron-builder.config.mjs[FV8T]: F:桌面打包：版本、更新源、平台目标、asar 文件、安装器配置与签名开关 | R:code:package.json,code:apps/desktop/package.json,code:apps/desktop/build.ts,code:apps/desktop/src/preload.ts | A:- | S:files 必须含 dist/main.cjs 与 preload.cjs，否则无桥；version 由 extraMetadata 取根 package.json；publish 指 bb-boy680/context-hub；artifactName 无空格匹配 latest.yml；不设 electronDist；NSIS assisted 用原生范围页 + allowToChangeInstallationDirectory 目录页，无自定义 include；win.icon 指 build/installerIcon.ico，否则 exe/任务栏用默认图标；mac 凭证齐才 notarize
 
 ===D:/work-space/dsh-context-hub/apps/desktop/src/===
 main.ts[EW8L]: F:Electron 主进程：起 server、窗口与 preload、菜单/托盘、更新 IPC 与退出 | R:code:apps/desktop/src/server-output.ts,code:apps/desktop/src/update.ts,code:apps/desktop/src/menu.ts,code:apps/desktop/src/crash-log.ts,code:apps/desktop/src/bridge.ts,code:apps/desktop/src/preload.ts,code:apps/web/server.ts | A:- | S:cwd 必须是用户 home；端口从 stdout 解析；单实例；关窗只 hide，托盘 Quit 才退出；stopServer 发 shutdown 并 3s 后 kill；安装更新先停 server；窗口 preload 指向 dist/preload.cjs，IPC 在 open 前注册；失败写 crash 日志；CONTEXT_HUB_DEV_URL 跳过 server
@@ -503,4 +503,11 @@ update-state.ts[DR7T]: F:把 updater 事件折叠成侧栏可读的更新状态 
 ===D:/work-space/dsh-context-hub/apps/web/__test__/===
 e2e-probe.ts[TE7M]: F:通过 CDP 驱动扩展页市场条目与标准 React 插件的端到端探针 | R:code:apps/web/__test__/e2e-server.ts,code:apps/web/src/pages/extensions.tsx | A:- | S:市场条目必须与已安装条目同列表、同详情弹窗、同按钮；安装/卸载后断言按钮文本在无刷新下切换；点击前 scrollIntoView；索引只按 version 取条目，不校验内容哈希
 e2e-server.ts[TE6T]: F:扩展市场端到端测试服务器 | R:code:packages/core/handlers.ts,code:packages/core/src/host/server.ts | A:- | S:只挂 state/extensions/extension-market/workspace；/hub/ 未识别路由返回 JSON 404，避免静态回退把 index.html 当成 /hub/skills；--home 必填
+
+===D:/work-space/dsh-context-hub/scripts/__test__/===
+changelog.test.mjs[TV5S]: F:变更日志生成器的单元测试：解析、分组、去重与头部 | R:code:scripts/changelog.mjs | A:- | S:只测纯函数，不跑 git 或网络；断言 Merge 与 chore(release) 被跳过、breaking 排在最前、同一 tag 不重复插入
+
+===D:/work-space/dsh-context-hub/scripts/===
+changelog.mjs[OV7S]: F:把 conventional commits 生成 Markdown 变更日志，供 Release notes 与 CHANGELOG.md | R:code:scripts/__test__/changelog.test.mjs | A:parseCommit,buildSection,parseLog,prependChangelog,main | S:输入是 git log 的 \x1f/\x1e 记录；跳过 Merge 与 chore(release)；breaking 组排最前；同一 tag 不重复插入；--to 与 --repo 必填，--changelog 省略时写 stdout
+vitest.config.ts[FQ5T]: F:scripts 目录的 vitest 项目配置 | R:code:vitest.config.ts | A:- | S:只收 __test__/**/*.test.mjs；项目名 scripts 必须登记在根 vitest.config.ts
 
