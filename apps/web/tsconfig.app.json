@@ -23,7 +23,7 @@
     "noFallthroughCasesInSwitch": true,
     "paths": {
       "@/*": ["./src/*"],
-      "@workspace/ui/*": ["../../packages/ui/src/*"]
+      "@context-hub/shadcn-ui/*": ["../../packages/shadcn-ui/src/*"]
     }
   },
   "include": ["src"]

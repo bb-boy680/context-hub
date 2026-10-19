@@ -18,6 +18,12 @@
 /** Route a form serves extension files on, for a loader that imports them over HTTP. */
 export const EXTENSION_ROUTE = "/hub/extensions"
 
+/** Route a form reads, installs and removes market extensions on. */
+export const EXTENSION_MARKET_ROUTE = "/hub/extension-market"
+
+/** Directory name, under the extension route, that serves the React shims. */
+export const EXTENSION_RUNTIME_DIR = "_runtime"
+
 /** Directory under the hub home that holds one directory per extension. */
 export const EXTENSION_DIR = "extensions"
 

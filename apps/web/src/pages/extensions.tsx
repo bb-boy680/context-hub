@@ -1,35 +1,47 @@
 /**
  * Extensions page: the catalog of packages that extend Context Hub itself —
- * agent integrations and language packs — with install, enablement, and a
- * detail dialog per entry.
+ * installed agent integrations and language packs, plus the ones a configured
+ * market lists but this machine does not have yet.
+ *
+ * Market entries are shaped like catalog rows and take part in the same
+ * categories, the same search, the same detail dialog and the same action
+ * button. Installing one writes its files, loads the module and registers it in
+ * the live kernel, so the row updates without a reload.
  */
 import { SearchIcon } from "lucide-react"
 import * as React from "react"
 
 import { ExtensionDetailDialog } from "@/components/extension-detail-dialog"
-import { categoryOrder, categoryTile } from "@/lib/extensions"
-import type { ExtensionView } from "@workspace/extensions"
+import { MarketSourceBar } from "@/components/extension-market"
+import {
+  marketEntriesFor,
+  useExtensionMarket,
+  type MarketEntry,
+} from "@/lib/extension-market"
+import { cardSurface, categoryOrder, categoryTile } from "@/lib/extensions"
+import { recommendedVersion } from "@context-hub/core/extension-market"
+import {
+  createRemoteExtensionMarket,
+  createRemotePluginSource,
+  discoverPlugins,
+  type ExtensionView,
+} from "@context-hub/extensions"
 import {
   useExtensionSnapshot,
   useHub,
   useI18n,
-} from "@workspace/extensions/react"
-import { Badge } from "@workspace/ui/components/badge"
-import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
+  useSearchPage,
+  useSettings,
+} from "@context-hub/extensions/react"
+import { Highlighted } from "@context-hub/extensions/components"
+import { Badge } from "@context-hub/shadcn-ui/components/badge"
+import { Button } from "@context-hub/shadcn-ui/components/button"
+import { Input } from "@context-hub/shadcn-ui/components/input"
+import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
 
-/* Glass card per section, matching the design's `$card` + `$glass-border` surface. */
-const cardSurface =
-  "rounded-lg bg-card p-5 ring-1 ring-glass-border shadow-glass backdrop-blur-glass"
+const marketClient = createRemoteExtensionMarket()
 
 function matches(entry: ExtensionView, query: string): boolean {
   if (query === "") return true
@@ -40,18 +52,28 @@ function matches(entry: ExtensionView, query: string): boolean {
 
 function ExtensionRow({
   entry,
+  needle,
+  busy,
   onOpen,
+  onAction,
 }: {
   entry: ExtensionView
+  /** What the filter box holds, marked in the fields it matched. */
+  needle: string
+  /** True while this row's install is in flight. */
+  busy: boolean
   onOpen: () => void
+  onAction: () => void
 }) {
   const { t } = useI18n()
-  const ctx = useHub()
-  const { manifest, enabled, status } = entry
+  const { manifest, status } = entry
   const Icon = manifest.icon
 
   return (
-    <div className="flex h-[64px] items-center gap-3 rounded-md px-3 transition-colors hover:bg-accent/40">
+    <div
+      data-testid={`extension-${manifest.id}`}
+      className="flex h-[64px] items-center gap-3 rounded-md px-3 transition-colors hover:bg-accent/40"
+    >
       <button
         type="button"
         onClick={onOpen}
@@ -64,7 +86,7 @@ function ExtensionRow({
         </span>
         <span className="flex min-w-0 flex-col gap-0.5">
           <span className="flex items-center gap-2 text-sm leading-5 font-medium">
-            {manifest.name}
+            <Highlighted text={manifest.name} needle={needle} />
             {manifest.locked === true ? (
               <Badge variant="secondary">{t("extensions.status.builtin")}</Badge>
             ) : null}
@@ -83,15 +105,12 @@ function ExtensionRow({
             ) : null}
           </span>
           <span className="truncate text-[13px] leading-[18px] text-muted-foreground">
-            {manifest.description}
+            <Highlighted text={manifest.description} needle={needle} />
           </span>
         </span>
       </button>
       {manifest.locked === true || status === "incompatible" ? null : (
-        <ExtensionActionButton
-          entry={entry}
-          onAction={() => void ctx.extensions.toggle(manifest.id, !enabled)}
-        />
+        <ExtensionActionButton entry={entry} busy={busy} onAction={onAction} />
       )}
     </div>
   )
@@ -100,9 +119,11 @@ function ExtensionRow({
 /** Installed extensions offer Uninstall; the rest offer Install. */
 function ExtensionActionButton({
   entry,
+  busy,
   onAction,
 }: {
   entry: ExtensionView
+  busy: boolean
   onAction: () => void
 }) {
   const { t } = useI18n()
@@ -113,7 +134,7 @@ function ExtensionActionButton({
       type="button"
       size="default"
       variant={enabled ? "outline" : "default"}
-      disabled={status === "activating"}
+      disabled={busy || status === "activating"}
       aria-label={t(
         enabled ? "extensions.action.uninstall" : "extensions.action.install"
       )}
@@ -130,62 +151,108 @@ function ExtensionActionButton({
 }
 
 export function ExtensionsPage() {
-  const { t, state, setLocale } = useI18n()
+  const { t, state: i18n } = useI18n()
+  const ctx = useHub()
+  const settings = useSettings()
   const snapshot = useExtensionSnapshot()
-  const [query, setQuery] = React.useState("")
+  const search = useSearchPage()
+  const query = search.query
+  const setQuery = search.setQuery
   const [detailId, setDetailId] = React.useState<string | null>(null)
+  const [installing, setInstalling] = React.useState<string | null>(null)
 
-  const entries = snapshot.entries.filter((entry) => matches(entry, query))
+  const market = useExtensionMarket(settings.extensionMarketUrl)
+  const marketEntries =
+    market.index === null
+      ? []
+      : marketEntriesFor(snapshot.entries, market.index, i18n.active)
+  const allEntries = [
+    ...snapshot.entries,
+    ...marketEntries.map((item) => item.view),
+  ]
+  const entries = allEntries.filter((entry) => matches(entry, query))
+  const needle = query.trim()
   const detail =
-    snapshot.entries.find((entry) => entry.manifest.id === detailId) ?? null
+    allEntries.find((entry) => entry.manifest.id === detailId) ?? null
+
+  /* Keep the origin block even after the install makes the market row disappear. */
+  const detailMarket: MarketEntry | null = (() => {
+    if (market.index === null || detailId === null || detail === null) return null
+    const plugin = market.index.plugins.find((item) => item.id === detailId)
+    if (plugin === undefined) return null
+    return { plugin, version: recommendedVersion(plugin), view: detail }
+  })()
+
+  const install = React.useCallback(
+    async (item: MarketEntry): Promise<void> => {
+      setInstalling(item.plugin.id)
+      try {
+        await marketClient.install(
+          settings.extensionMarketUrl,
+          item.plugin.id,
+          item.version.version
+        )
+        const found = await discoverPlugins({
+          source: createRemotePluginSource(),
+          /* A fresh URL bypasses the module cache, so a reinstall runs the new file. */
+          importModule: async (url) =>
+            import(/* @vite-ignore */ `${url}?t=${String(Date.now())}`),
+          ids: [item.plugin.id],
+        })
+        const loaded = found.find((entry) => entry.id === item.plugin.id)
+        if (loaded?.module === undefined) {
+          throw new Error(
+            loaded?.problem ??
+              `the installed extension "${item.plugin.id}" could not be loaded`
+          )
+        }
+        await ctx.extensions.add(loaded.module)
+        toast.add({
+          type: "success",
+          title: t("extensions.market.installedNotice").replace(
+            "{name}",
+            item.view.manifest.name
+          ),
+        })
+      } catch (reason) {
+        toast.add({
+          type: "error",
+          title: reason instanceof Error ? reason.message : String(reason),
+        })
+      } finally {
+        setInstalling(null)
+      }
+    },
+    [ctx, settings.extensionMarketUrl, t]
+  )
 
   return (
     <>
-      <div className="flex items-start justify-between gap-6">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">{t("extensions.title")}</h1>
-          <p className="text-sm text-muted-foreground">
-            {t("extensions.description")}
-          </p>
-        </div>
-        {state.locales.length > 1 ? (
-          <Select
-            value={
-              state.locales.find((locale) => locale.id === state.active)?.label ??
-              state.active
-            }
-            onValueChange={(label) => {
-              const locale = state.locales.find((item) => item.label === label)
-              if (locale !== undefined) setLocale(locale.id)
-            }}
-          >
-            <SelectTrigger
-              className={`w-[150px] data-[size=default]:h-9 ${outline}`}
-              aria-label={t("extensions.language")}
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {state.locales.map((locale) => (
-                <SelectItem key={locale.id} value={locale.label}>
-                  {locale.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        ) : null}
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">{t("extensions.title")}</h1>
+        <p className="text-sm text-muted-foreground">
+          {t("extensions.description")}
+        </p>
       </div>
 
       <div className="flex flex-col gap-6">
-        <label className="relative flex w-[320px] items-center">
-          <SearchIcon className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder={t("extensions.searchPlaceholder")}
-            className="h-9 pl-9"
+        <div className="flex flex-wrap items-start gap-3">
+          <label className="relative flex w-[320px] items-center">
+            <SearchIcon className="pointer-events-none absolute left-3 size-4 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t("extensions.searchPlaceholder")}
+              className="h-9 pl-9"
+            />
+          </label>
+          <MarketSourceBar
+            url={settings.extensionMarketUrl}
+            loading={market.loading}
+            failure={market.failure}
+            onRefresh={market.refresh}
           />
-        </label>
+        </div>
 
         {categoryOrder.map((category) => {
           const items = entries.filter(
@@ -206,13 +273,29 @@ export function ExtensionsPage() {
                 </p>
               </div>
               <div className="grid gap-x-10 gap-y-2 lg:grid-cols-2">
-                {items.map((entry) => (
-                  <ExtensionRow
-                    key={entry.manifest.id}
-                    entry={entry}
-                    onOpen={() => setDetailId(entry.manifest.id)}
-                  />
-                ))}
+                {items.map((entry) => {
+                  const remote = marketEntries.find(
+                    (item) => item.plugin.id === entry.manifest.id
+                  )
+                  return (
+                    <ExtensionRow
+                      key={entry.manifest.id}
+                      entry={entry}
+                      needle={needle}
+                      busy={installing === entry.manifest.id}
+                      onOpen={() => setDetailId(entry.manifest.id)}
+                      onAction={
+                        remote === undefined
+                          ? () =>
+                              void ctx.extensions.toggle(
+                                entry.manifest.id,
+                                !entry.enabled
+                              )
+                          : () => void install(remote)
+                      }
+                    />
+                  )
+                })}
               </div>
             </section>
           )
@@ -225,6 +308,8 @@ export function ExtensionsPage() {
 
       <ExtensionDetailDialog
         entry={detail}
+        market={detailMarket}
+        onInstall={install}
         onOpenChange={(open) => {
           if (!open) setDetailId(null)
         }}

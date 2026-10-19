@@ -124,6 +124,39 @@ export function assetRef(ref: string, base = ""): string {
   return isLink(ref) ? ref : assetUrl(ref, base)
 }
 
+/** How many of a library's pictures are remote addresses and how many it keeps. */
+export interface AssetImageStats {
+  remote: number
+  /** Pictures whose reference points into an asset store, this hub's or a sink's. */
+  localized: number
+}
+
+/** What one localization pass did. */
+export interface AssetLocalizeSummary {
+  downloaded: number
+  /** References that stayed links, each with the reason the download failed. */
+  failed: { ref: string; reason: string }[]
+}
+
+/**
+ * Split recorded references into the two kinds an image count reports. A
+ * reference that is not an image is not counted at all, so a skill holding a
+ * video does not make the picture count wrong.
+ */
+export function imageRefsOf(refs: readonly string[]): {
+  remote: string[]
+  localized: string[]
+} {
+  const remote: string[] = []
+  const localized: string[] = []
+  for (const ref of refs) {
+    if (assetKind(ref) !== "image") continue
+    if (isLink(ref)) remote.push(ref)
+    else localized.push(ref)
+  }
+  return { remote, localized }
+}
+
 /**
  * The library of stored files. Implementations own the directory; callers hold
  * the paths they are given and nothing else.

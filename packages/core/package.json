@@ -1,11 +1,12 @@
 {
-  "name": "@workspace/core",
+  "name": "@context-hub/core",
   "version": "0.0.0",
   "type": "module",
   "private": true,
   "scripts": {
     "lint": "eslint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
@@ -14,25 +15,34 @@
     "eslint": "^10",
     "globals": "^17",
     "typescript": "~6",
-    "typescript-eslint": "^8"
+    "typescript-eslint": "^8",
+    "vitest": "^5.0.5"
   },
   "exports": {
     ".": "./src/assets.ts",
+    "./about": "./src/about.ts",
     "./net": "./src/net.ts",
     "./place-files": "./src/place-files.ts",
     "./plugins": "./src/plugins.ts",
+    "./extension-manifest": "./src/extension-manifest.ts",
+    "./extension-market": "./src/extension-market.ts",
     "./state": "./src/state.ts",
     "./workspace": "./src/workspace.ts",
     "./host": "./src/host/assets-fs.ts",
     "./host/assets-fs": "./src/host/assets-fs.ts",
     "./host/atomic": "./src/host/atomic.ts",
+    "./host/extension-market": "./src/host/extension-market.ts",
+    "./host/extension-runtime": "./src/host/extension-runtime.ts",
     "./host/fs-browse": "./src/host/fs-browse.ts",
     "./host/folder-hash": "./src/host/folder-hash.ts",
     "./host/home": "./src/host/home.ts",
+    "./host/http": "./src/host/http.ts",
+    "./host/server": "./src/host/server.ts",
     "./host/plugins": "./src/host/plugins-fs.ts",
     "./host/place-files": "./src/host/place-files.ts",
+    "./host/remote-image": "./src/host/remote-image.ts",
     "./host/state": "./src/host/state-fs.ts",
     "./host/workspaces": "./src/host/workspaces-fs.ts",
-    "./vite": "./vite.ts"
+    "./handlers": "./handlers.ts"
   }
 }

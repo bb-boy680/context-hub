@@ -28,7 +28,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
+} from "@context-hub/shadcn-ui/components/dropdown-menu"
 
 /**
  * Past this many places a menu searches its own list and caps its height. How

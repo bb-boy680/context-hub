@@ -1,8 +1,8 @@
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
-import "@workspace/ui/globals.css"
-import { HubProvider } from "@workspace/extensions/react"
+import "@context-hub/shadcn-ui/globals.css"
+import { HubProvider } from "@context-hub/extensions/react"
 import { App } from "./App.tsx"
 import { ThemeProvider } from "@/components/theme-provider.tsx"
 import { startHub } from "@/lib/hub.ts"

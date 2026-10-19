@@ -89,7 +89,11 @@ export class I18nService extends Service {
       if (locales.some((locale) => locale.id === pack.id)) continue
       locales.push({ id: pack.id, label: pack.label })
     }
-    if (!locales.some((locale) => locale.id === this.active)) {
+    /* Only after the registry's first activation pass can an absent pack mean
+       the user removed it. Before that nothing has contributed yet, and
+       treating the gap as removal would overwrite the stored choice on every
+       reload — the language pack is still on its way in. */
+    if (this.extensions.settled && !locales.some((locale) => locale.id === this.active)) {
       this.active = FALLBACK_LOCALE
       this.host.storage.write(LOCALE_DOCUMENT, this.active)
     }

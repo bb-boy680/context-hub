@@ -1,13 +1,8 @@
-import {
-  BlocksIcon,
-  GitBranchIcon,
-  LayoutDashboardIcon,
-  SettingsIcon,
-} from "lucide-react"
+import { BlocksIcon, SettingsIcon } from "lucide-react"
 import * as React from "react"
 
-import type { ExtensionIcon, NavGroupId } from "@workspace/extensions"
-import { useContributions } from "@workspace/extensions/react"
+import type { ExtensionIcon, NavGroupId } from "@context-hub/extensions"
+import { useContributions } from "@context-hub/extensions/react"
 
 export type NavItem = {
   /** Message key resolved through `ctx.i18n` where the item renders. */
@@ -16,8 +11,8 @@ export type NavItem = {
   /** The shell's own entries use lucide icons; a contribution may use any. */
   icon: ExtensionIcon
   /**
-   * Sort rank inside the group. Built-in entries keep gaps between them (10,
-   * 20, 30 …), so a contributed entry can be inserted between two of them.
+   * Sort rank inside the group. Built-in entries keep gaps between them (20,
+   * 30 …), so a contributed entry can be inserted between two of them.
    */
   order: number
 }
@@ -31,15 +26,16 @@ export type NavGroup = {
 /** Entries the shell ships; extensions add to the same groups through the `nav` point. */
 export const navGroups: NavGroup[] = [
   {
+    /* Kept so asset extensions have a group to register into; it is hidden
+       until one does. */
     id: "assets",
     labelKey: "nav.group.assets",
-    items: [{ labelKey: "nav.overview", path: "/", icon: LayoutDashboardIcon, order: 10 }],
+    items: [],
   },
   {
     id: "operate",
     labelKey: "nav.group.operate",
     items: [
-      { labelKey: "nav.repository", path: "/repository", icon: GitBranchIcon, order: 10 },
       { labelKey: "nav.settings", path: "/settings", icon: SettingsIcon, order: 20 },
       { labelKey: "nav.extensions", path: "/extensions", icon: BlocksIcon, order: 30 },
     ],

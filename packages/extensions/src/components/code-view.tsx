@@ -13,7 +13,7 @@
 import { CheckIcon, CopyIcon, FileTextIcon } from "lucide-react"
 import * as React from "react"
 
-import { paint } from "@workspace/ui/lib/highlight"
+import { paint } from "@context-hub/shadcn-ui/lib/highlight"
 
 /** Extensions a shown file uses, and the grammar that colours each one. */
 const GRAMMARS: Record<string, string> = {

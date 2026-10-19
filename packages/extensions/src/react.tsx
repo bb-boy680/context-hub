@@ -3,14 +3,22 @@
  * a separate entry so the kernel itself carries no UI framework.
  */
 import * as React from "react"
+import { useSearchParams } from "react-router"
+import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/with-selector"
 
 import type { Context } from "./cordis.ts"
 
+import { chosenAgentsOf } from "./agents.ts"
+import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
+import type { HubSettings, SettingsPatch } from "./settings.ts"
 import type { ContributionMap, ExtensionPointId } from "./types.ts"
 
 const HubContext = React.createContext<Context | null>(null)
+
+/** Nothing to follow when this form provides no workspace list. */
+const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
 
 /** Provide the composed kernel to the component tree. */
 export function HubProvider({
@@ -58,6 +66,27 @@ export function useExtensionContributions<P extends ExtensionPointId>(
   return ctx.extensions.contributionsFrom(id, point)
 }
 
+/**
+ * The agents the sidebar chose, re-rendering when the choice changes.
+ *
+ * Which agents a person works with is one choice, shared by every library: the
+ * modules that read an agent's files filter what they read by this, so a
+ * provider nobody chose is not read at all.
+ *
+ * @returns the chosen integration ids, or an empty list when nothing is chosen
+ *   or this form has no workspace list.
+ */
+export function useChosenAgents(): readonly string[] {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(() => chosenAgentsOf(ctx), [ctx])
+  return React.useSyncExternalStore(subscribe, read)
+}
+
 /** Translation and locale control returned by {@link useI18n}. */
 export interface I18n {
   state: I18nState
@@ -80,4 +109,149 @@ export function useI18n(): I18n {
     }),
     [ctx, state]
   )
+}
+
+/**
+ * Settings and their control returned by {@link useSettings}.
+ */
+export interface SettingsControl extends HubSettings {
+  set(patch: SettingsPatch): void
+}
+
+/** This machine's hub settings, re-rendering on every change. */
+export function useSettings(): SettingsControl {
+  const ctx = useHub()
+  const state = React.useSyncExternalStore(
+    (onChange) => ctx.on("settings/change", onChange),
+    () => ctx.settings.state
+  )
+  return React.useMemo<SettingsControl>(
+    () => ({
+      ...state,
+      set: (patch) => ctx.settings.set(patch),
+    }),
+    [ctx, state]
+  )
+}
+
+/** One plugin's stored settings and the only writer that replaces them. */
+export interface PluginSettingsControl<T> {
+  value: T
+  set(value: T): void
+}
+
+/**
+ * Read and replace one plugin's settings namespace.
+ *
+ * The value is whatever the plugin last stored; `fallback` is returned until it
+ * stores anything. It is not validated here — a plugin that owns a shape reads
+ * it through its own parser. `fallback` should be a stable value (a module
+ * constant), because it is the snapshot until the first write.
+ */
+export function usePluginSettings<T>(id: string, fallback: T): PluginSettingsControl<T> {
+  const ctx = useHub()
+  const first = React.useRef(fallback)
+  const value = React.useSyncExternalStore(
+    (onChange) => ctx.on("settings/change", onChange),
+    () => {
+      const stored = ctx.settings.plugin(id)
+      return stored === undefined ? first.current : (stored as T)
+    }
+  )
+  return React.useMemo<PluginSettingsControl<T>>(
+    () => ({ value, set: (next) => ctx.settings.setPlugin(id, next) }),
+    [ctx, id, value]
+  )
+}
+
+/**
+ * The query string the global search writes into a page.
+ *
+ * A page keeps its filter in the address rather than in a local state so the
+ * palette can open the same page already narrowed, even when that page is the
+ * one on screen: navigating to `/skills?q=pdf` is a render the page can see,
+ * while a local setter in another component is not.
+ */
+export interface SearchPage {
+  /** The text in `?q=`, or an empty string when the page is not searching. */
+  query: string
+  /** Write the query back; clearing it drops the palette's list request too. */
+  setQuery(next: string): void
+  /** The palette asked for the list view, where the matched text is marked. */
+  listView: boolean
+  /** Stop forcing the list view, leaving the page's own choice in charge. */
+  clearListView(): void
+}
+
+/**
+ * Read and write the search parameters a page's filter uses.
+ *
+ * `replace` is deliberate: one keystroke is one narrowing, not one history
+ * entry, and a person pressing Back should leave the page rather than walk
+ * their query backwards.
+ */
+export function useSearchPage(): SearchPage {
+  const [params, setParams] = useSearchParams()
+  const query = params.get("q") ?? ""
+  const listView = params.get("view") === "list"
+
+  const setQuery = React.useCallback(
+    (next: string) => {
+      setParams(
+        (current) => {
+          const updated = new URLSearchParams(current)
+          if (next === "") {
+            updated.delete("q")
+            updated.delete("view")
+          } else {
+            updated.set("q", next)
+          }
+          return updated
+        },
+        { replace: true }
+      )
+    },
+    [setParams]
+  )
+
+  const clearListView = React.useCallback(() => {
+    setParams(
+      (current) => {
+        if (!current.has("view")) return current
+        const updated = new URLSearchParams(current)
+        updated.delete("view")
+        return updated
+      },
+      { replace: true }
+    )
+  }, [setParams])
+
+  return { query, setQuery, listView, clearListView }
+}
+
+/**
+ * One slice of a catalog, re-rendering when that slice changes and not when the
+ * rest of it does.
+ *
+ * A library of servers is drawn a row at a time, and every row is reading the
+ * same catalog: one probe's answer landing must not redraw all of them. So the
+ * caller says what it reads, and `isEqual` decides whether what it read is a new
+ * value — `Object.is` unless the selector builds a fresh object every time.
+ *
+ * @param catalog — the library to watch.
+ * @param select — the slice, read out of the whole snapshot.
+ * @param isEqual — whether two slices are the same; `Object.is` by default.
+ * @returns the selected slice, recomputed only when it changes.
+ */
+export function useCatalog<S, T>(
+  catalog: Catalog<S>,
+  select: (state: CatalogState<S>) => T,
+  isEqual?: (a: T, b: T) => boolean
+): T {
+  const subscribe = React.useCallback(
+    (onChange: () => void) => catalog.subscribe(onChange),
+    [catalog]
+  )
+  const snapshot = React.useCallback(() => catalog.state(), [catalog])
+  return useSyncExternalStoreWithSelector(subscribe, snapshot, undefined, select, isEqual)
 }

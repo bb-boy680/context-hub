@@ -1,25 +1,16 @@
 /**
- * Web form of the kernel: the host is the hub's own directory, reached over the
- * dev server. Everything the kernel remembers is read from there before it
- * starts and written back on every change, so nothing depends on this browser
- * profile. The browser cannot read the skill library or the installed plugins
- * itself, so `startHub` offers those only when a host answers for them; without
- * a host the skills page has no catalog and says so.
+ * Page form of the kernel: the host is the hub's own directory, reached over
+ * the local server. The same page runs in a browser and in the desktop shell;
+ * only the carrier's name differs. Everything the kernel remembers is read
+ * before it starts and written back on every change, so nothing depends on this
+ * browser profile. The page cannot read the skill library or the installed
+ * plugins itself, so `startHub` offers those only when a host answers for them;
+ * without a host the skills page has no catalog and says so.
  */
-import { clineExtension } from "@workspace/agent-cline"
-import { codexExtension } from "@workspace/agent-codex"
-import { commandCodeExtension } from "@workspace/agent-command-code"
-import { copilotExtension } from "@workspace/agent-copilot"
-import { cursorExtension } from "@workspace/agent-cursor"
-import { geminiCliExtension } from "@workspace/agent-gemini-cli"
-import { kiroCliExtension } from "@workspace/agent-kiro-cli"
-import { minimaxCodeExtension } from "@workspace/agent-minimax-code"
-import { qoderExtension } from "@workspace/agent-qoder"
-import { qwenCodeExtension } from "@workspace/agent-qwen-code"
-import { traeExtension } from "@workspace/agent-trae"
-import { windsurfExtension } from "@workspace/agent-windsurf"
-import { STATE_ROUTE } from "@workspace/core/state"
-import { createRemoteNet } from "@workspace/core/net"
+import { claudeCodeExtension } from "@context-hub/claude-code"
+import { STATE_ROUTE } from "@context-hub/core/state"
+import { createRemoteNet } from "@context-hub/core/net"
+import { globalSearchExtension } from "@context-hub/global-search"
 import {
   builtinExtensions,
   createHubKernel,
@@ -28,23 +19,20 @@ import {
   type HubKernel,
   type PlatformHost,
   type StoragePort,
-} from "@workspace/extensions"
-import { simplifiedChineseLocale } from "@workspace/locale-zh-cn"
-import { claudeCodeExtension } from "@workspace/plugin-claude-code"
-import { mcpExtension } from "@workspace/plugin-mcp"
-import { pluginsExtension } from "@workspace/plugin-plugins"
-import { createRemotePromptStore, promptsExtension } from "@workspace/plugin-prompts"
-import { createRemoteSkillStore, skillsExtension } from "@workspace/plugin-skills"
-import { skillsShExtension } from "@workspace/plugin-skills-sh"
+} from "@context-hub/extensions"
+import { simplifiedChineseLocale } from "@context-hub/zh-cn"
+import { mcpExtension } from "@context-hub/mcp"
+import { pluginsExtension } from "@context-hub/plugins"
+import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
+import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-hub/skills"
+import { skillsShExtension } from "@context-hub/skills-sh"
+import { createRemoteVariableStore, variablesExtension } from "@context-hub/variables"
 import * as ui from "./ui-kit.ts"
+import { desktopBridge } from "./desktop.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
+import { installExtensionRuntime } from "./extension-runtime.ts"
+import { preloadCatalogs } from "./preload.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
-
-/** Path the active form serves the skill library on, when it serves one at all. */
-const SKILLS_ENDPOINT = "/hub/skills"
-
-/** The same for the prompt library: it has a route, and no query to narrow it. */
-const PROMPTS_ENDPOINT = "/hub/prompts"
 
 /**
  * Where the build before the host-backed state kept each document, and how it
@@ -112,7 +100,7 @@ async function openState(): Promise<Record<string, unknown>> {
 /** Whether a host answers for the skill library; without one the page has none. */
 async function skillStoreAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(`${SKILLS_ENDPOINT}?limit=0`, { method: "GET" })
+    const response = await fetch(`${SKILL_ROUTE}?limit=0`, { method: "GET" })
     return response.ok
   } catch {
     /* No host behind this origin: the plugin offers no library. */
@@ -123,7 +111,7 @@ async function skillStoreAvailable(): Promise<boolean> {
 /** The same question for the prompt library, asked at its own route. */
 async function promptStoreAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(PROMPTS_ENDPOINT, { method: "GET" })
+    const response = await fetch(PROMPT_ROUTE, { method: "GET" })
     return response.ok
   } catch {
     /* No host behind this origin: the page says it has no library. */
@@ -145,11 +133,11 @@ async function installedPlugins() {
     })
     const extensions = []
     for (const plugin of found) {
-      if (plugin.definition === undefined) {
+      if (plugin.module === undefined) {
         console.warn(`context hub: plugin "${plugin.id}" was not loaded: ${plugin.problem}`)
         continue
       }
-      extensions.push(plugin.definition)
+      extensions.push(plugin.module)
     }
     return extensions
   } catch {
@@ -160,6 +148,9 @@ async function installedPlugins() {
 
 /** Compose and activate the kernel; the app renders once this settles. */
 export async function startHub(): Promise<HubKernel> {
+  /* Before any plugin module is imported: its `import React` resolves through
+     the import map to a shim that reads this instance. */
+  installExtensionRuntime()
   const state = await openState()
   const storage: StoragePort = {
     read: (key) => state[key] ?? null,
@@ -169,7 +160,7 @@ export async function startHub(): Promise<HubKernel> {
     },
   }
   const webHost: PlatformHost = {
-    form: "Web",
+    form: desktopBridge() === undefined ? "Web" : "Desktop",
     capabilities: { code: true, filesystem: false, network: true },
     storage,
     net: createRemoteNet(),
@@ -180,13 +171,16 @@ export async function startHub(): Promise<HubKernel> {
   }
   const services: Record<string, unknown> = { "hub.ui": ui }
   if (await promptStoreAvailable()) {
-    services["hub.prompts"] = createRemotePromptStore(PROMPTS_ENDPOINT)
+    services["hub.prompts"] = createRemotePromptStore(PROMPT_ROUTE)
   }
   if (await skillStoreAvailable()) {
     services["hub.skills"] = createRemoteSkillStore()
   }
   const workspaces = createRemoteWorkspaceService()
   services["hub.workspaces"] = workspaces
+  /* The variable library answers on its own route, which this form always
+     mounts; the module's shared read starts it with the other catalogs. */
+  services["hub.variables"] = createRemoteVariableStore()
   void workspaces.refresh()
   const kernel = await createHubKernel({
     host: webHost,
@@ -197,24 +191,24 @@ export async function startHub(): Promise<HubKernel> {
       promptsExtension,
       mcpExtension,
       pluginsExtension,
+      variablesExtension,
+      /* The palette last among the shipped modules, so the settings and
+         extensions groups follow the asset groups in the result list. */
+      globalSearchExtension,
+      /* Only the agent integrations this build is being tried against. The
+         others are still written and still shipped; they are left out here so
+         the page's module graph is small enough to boot quickly while the
+         carrier is worked on. Add them back to the list to bring them in. */
       claudeCodeExtension,
-      codexExtension,
-      clineExtension,
-      commandCodeExtension,
-      copilotExtension,
-      cursorExtension,
-      geminiCliExtension,
-      kiroCliExtension,
-      minimaxCodeExtension,
-      qoderExtension,
-      qwenCodeExtension,
-      traeExtension,
-      windsurfExtension,
       skillsShExtension,
       simplifiedChineseLocale,
       ...(await installedPlugins()),
     ],
   })
   await kernel.start()
+  /* Every shared read, started now rather than when a page that needs it is
+     opened. Not awaited: rendering waits for the kernel, not for the libraries
+     — a page draws what it has until an answer lands. */
+  void preloadCatalogs(kernel)
   return kernel
 }

@@ -1,8 +1,11 @@
 packages:
   - "apps/*"
+  # A package is either a leaf (core, extensions, shadcn-ui) or one level down
+  # inside a group (resources/skills, agents/claude-code, search/skills-sh).
   - "packages/*"
-  - "packages/agents-extensions/*"
+  - "packages/*/*"
 
 allowBuilds:
   esbuild: true
+  electron: true
   msw: false

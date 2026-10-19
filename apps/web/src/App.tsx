@@ -3,14 +3,13 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router"
 import { AppLayout } from "@/components/app-layout"
 import { useNavGroups } from "@/lib/navigation"
 import { ExtensionsPage } from "@/pages/extensions"
-import { OverviewPage } from "@/pages/overview"
 import { PlaceholderPage } from "@/pages/placeholder"
-import { RepositoryPage } from "@/pages/repository"
-import { useContributions } from "@workspace/extensions/react"
-import { Toaster } from "@workspace/ui/components/toast"
+import { SettingsPage } from "@/pages/settings"
+import { useContributions } from "@context-hub/extensions/react"
+import { Toaster } from "@context-hub/shadcn-ui/components/toast"
 
 /** Pages the shell owns; every other route comes from an extension. */
-const designedPaths = ["/", "/extensions", "/repository"]
+const designedPaths = ["/extensions", "/settings"]
 
 export function App() {
   const contributed = useContributions("route")
@@ -26,9 +25,10 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route element={<AppLayout />}>
-            <Route index element={<OverviewPage />} />
+            {/* The shell has no landing page of its own: / opens the first asset page. */}
+            <Route index element={<Navigate to={paths[0] ?? "/extensions"} replace />} />
             <Route path="/extensions" element={<ExtensionsPage />} />
-            <Route path="/repository" element={<RepositoryPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             {contributed.map((route) => {
               const Page = route.Component
               return (

@@ -8,22 +8,22 @@
 import { CheckIcon, EllipsisIcon, FolderIcon, PenLineIcon, PlusIcon, Trash2Icon } from "lucide-react"
 import * as React from "react"
 
-import { useI18n } from "@workspace/extensions/react"
-import { Button } from "@workspace/ui/components/button"
+import { useI18n } from "@context-hub/extensions/react"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@workspace/ui/components/dialog"
+} from "@context-hub/shadcn-ui/components/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
-import { Input } from "@workspace/ui/components/input"
+} from "@context-hub/shadcn-ui/components/dropdown-menu"
+import { Input } from "@context-hub/shadcn-ui/components/input"
 
 import { SidebarGroup, SidebarRow } from "@/components/sidebar-rows"
 import { pickFolder } from "@/lib/folder-picker"

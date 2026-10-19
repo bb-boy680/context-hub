@@ -1,0 +1,41 @@
+{
+  "name": "@context-hub/claude-code",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@lobehub/icons": "^5.23.0",
+    "@lobehub/ui": "^5.57.1",
+    "@context-hub/extensions": "workspace:*",
+    "@context-hub/mcp": "workspace:*",
+    "@context-hub/plugins": "workspace:*",
+    "@context-hub/prompts": "workspace:*",
+    "@context-hub/skills": "workspace:*",
+    "@context-hub/shadcn-ui": "workspace:*",
+    "antd": "^6.1.1",
+    "lucide-react": "^1.48.0",
+    "react": "^19.2.8"
+  },
+  "devDependencies": {
+    "@context-hub/core": "workspace:*",
+    "@eslint/js": "^10",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "eslint": "^10",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17",
+    "typescript": "~6",
+    "typescript-eslint": "^8",
+    "vitest": "^5.0.5"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./extension": "./src/extension.ts"
+  }
+}

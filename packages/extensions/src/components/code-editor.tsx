@@ -17,7 +17,7 @@
  */
 import * as React from "react"
 
-import { loadHighlighter, paintNow } from "@workspace/ui/lib/highlight"
+import { loadHighlighter, paintNow } from "@context-hub/shadcn-ui/lib/highlight"
 
 /**
  * Where the text starts, in both layers.

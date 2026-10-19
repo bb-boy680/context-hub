@@ -3,8 +3,8 @@
  * service, and the UI kit all arrive through the kernel, so one copy of React
  * runs in the page and Tailwind classes never have to be compiled for it.
  */
-export function activate(scope) {
-  const { react, ui, i18n } = scope
+export function apply(ctx) {
+  const { react, ui, i18n } = ctx
   const { Card, CardHeader, CardTitle, CardDescription, CardContent, Badge, Button } = ui
   const h = react.createElement
 
@@ -50,7 +50,7 @@ export function activate(scope) {
     )
   }
 
-  scope.contribute("locale", {
+  ctx.locales.register({
     id: "en",
     messages: {
       "nav.hello": "Hello Plugin",
@@ -60,7 +60,7 @@ export function activate(scope) {
       "hello.action": "Clicked",
     },
   })
-  scope.contribute("locale", {
+  ctx.locales.register({
     id: "zh-CN",
     messages: {
       "nav.hello": "示例插件",
@@ -69,12 +69,12 @@ export function activate(scope) {
       "hello.action": "点击次数",
     },
   })
-  scope.contribute("nav", {
+  ctx.nav.register({
     path: "/hello",
     labelKey: "nav.hello",
-    icon: scope.icons.sparkles,
+    icon: ctx.icons.sparkles,
     group: "operate",
     order: 15,
   })
-  scope.contribute("route", { path: "/hello", Component: HelloPage })
+  ctx.routes.register({ path: "/hello", Component: HelloPage })
 }

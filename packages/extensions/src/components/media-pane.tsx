@@ -15,13 +15,13 @@
 import { ClipboardPasteIcon, ImagePlusIcon, LinkIcon, PlusIcon, UploadIcon } from "lucide-react"
 import * as React from "react"
 
-import { Button } from "@workspace/ui/components/button"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@workspace/ui/components/popover"
-import { toast } from "@workspace/ui/components/toast"
+} from "@context-hub/shadcn-ui/components/popover"
+import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 import { MediaGallery, type MediaGalleryWords, type MediaItem } from "./media-gallery.tsx"
 

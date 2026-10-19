@@ -19,6 +19,8 @@ export interface NetReply {
 
 /** What a caller asks the route to fetch. */
 export interface NetRequest {
+  /** The one action this route has. */
+  action: "fetch"
   /** Absolute URL to read. */
   url: string
   /** Request headers, when the API needs any. */
@@ -39,7 +41,11 @@ export function createRemoteNet(base = ""): {
       const response = await fetch(`${base}${NET_ROUTE}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url, ...(init?.headers === undefined ? {} : { headers: init.headers }) }),
+        body: JSON.stringify({
+          action: "fetch",
+          url,
+          ...(init?.headers === undefined ? {} : { headers: init.headers }),
+        }),
       })
       if (!response.ok) {
         /* The proxy reports its own refusals as JSON; anything else is the transport. */

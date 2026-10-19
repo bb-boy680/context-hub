@@ -4,18 +4,20 @@
  * {@link PlatformHost} they pass in; the services and catalog above it stay
  * identical across web, desktop, and executable builds.
  */
+import { createContributionPoints } from "./contributions.ts"
 import { Context } from "./cordis.ts"
 
 import { I18nService } from "./i18n.ts"
+import { SettingsService } from "./settings.ts"
 import { ExtensionService } from "./service.ts"
 import type { PlatformHost } from "./host.ts"
-import type { ExtensionDefinition } from "./types.ts"
+import type { ExtensionModule } from "./types.ts"
 
 /** Composition inputs for one running kernel. */
 export interface KernelOptions {
   host: PlatformHost
   /** Packages this build ships; runtime-installed extensions join the catalog later. */
-  extensions: ExtensionDefinition[]
+  extensions: ExtensionModule[]
   /**
    * Values the product provides as services before extensions activate, e.g. a
    * form-owned implementation an extension reads with `ctx.get(name)`. Omitted
@@ -39,9 +41,14 @@ export async function createHubKernel(options: KernelOptions): Promise<HubKernel
   for (const [name, value] of Object.entries(options.services ?? {})) {
     ctx.provide(name, value)
   }
+  /* The points first: a plugin declares them in its own `inject`, so they have
+     to exist before any plugin is mounted. */
+  createContributionPoints(ctx)
   const extensions = ctx.plugin(ExtensionService, { catalog: options.extensions })
   await extensions.await()
   const i18n = ctx.plugin(I18nService)
   await i18n.await()
+  const settings = ctx.plugin(SettingsService)
+  await settings.await()
   return { ctx, start: () => ctx.extensions.start() }
 }

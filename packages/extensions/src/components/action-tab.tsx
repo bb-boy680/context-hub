@@ -24,7 +24,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@workspace/ui/components/dropdown-menu"
+} from "@context-hub/shadcn-ui/components/dropdown-menu"
 
 export function ActionTab({
   icon: Icon,

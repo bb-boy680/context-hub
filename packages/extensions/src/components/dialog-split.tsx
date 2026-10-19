@@ -11,7 +11,7 @@
  */
 import * as React from "react"
 
-import { DialogContent } from "@workspace/ui/components/dialog"
+import { DialogContent } from "@context-hub/shadcn-ui/components/dialog"
 
 /** The panel's width, which the pane's side leaves room for. */
 const PANEL = "w-[360px]"

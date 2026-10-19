@@ -1,10 +1,12 @@
 /**
  * `ctx.extensions` (ExtensionService): the kernel-owned catalog. It holds the
  * persisted enablement state, runs code activation as Cordis plugin loads, and
- * indexes every contribution so consumers read one merged view. Enabling is a
- * plugin load and disabling is fiber disposal, so every registration an
- * extension made unwinds through the same mechanism.
+ * reports what each plugin contributes. Enabling is a plugin load and disabling
+ * is fiber disposal, so every registration an extension made unwinds through
+ * the same mechanism — including the ones it made through a contribution point,
+ * which is a service and takes its lifetime from the same place.
  */
+import { POINT_SERVICES, type ContributionPoint } from "./contributions.ts"
 import { Service } from "./cordis.ts"
 import type { Context, Fiber, Plugin } from "./cordis.ts"
 
@@ -12,17 +14,13 @@ import type { PlatformHost } from "./host.ts"
 import {
   isCompatible,
   type ContributionMap,
-  type ExtensionDefinition,
   type ExtensionManifest,
+  type ExtensionModule,
   type ExtensionPointId,
-  type ExtensionScope,
 } from "./types.ts"
 
 /** State document holding one boolean per extension id, under the hub home's state space. */
 const STATE_DOCUMENT = "extensions"
-
-/** Unregister one contribution. */
-type Disposer = () => void
 
 /** Lifecycle of one entry's code. */
 export type ExtensionStatus =
@@ -36,14 +34,15 @@ export type ExtensionStatus =
 
 /** One catalog row as the UI reads it. */
 export interface ExtensionView {
-  manifest: ExtensionManifest
+  /** The module's manifest, with its id filled in from the module's name. */
+  manifest: ExtensionManifest & { id: string }
   enabled: boolean
   status: ExtensionStatus
   /** Activation failure text; present while `status` is "error". */
   error?: string
-  /** Points this extension currently contributes. */
+  /** Points this extension currently contributes to. */
   points: ExtensionPointId[]
-  /** Service names this extension currently publishes. */
+  /** Service names this extension declares it publishes. */
   provides: string[]
 }
 
@@ -65,57 +64,65 @@ declare module "@deepseek-ai/cordis" {
 
 /** Kernel config: the packages this product ships. */
 export interface ExtensionServiceConfig {
-  catalog: ExtensionDefinition[]
+  catalog: ExtensionModule[]
 }
 
 interface Entry {
-  readonly definition: ExtensionDefinition
+  readonly module: ExtensionModule
+  /** The module's manifest with its id filled in from the module's name. */
+  readonly manifest: ExtensionManifest & { id: string }
   enabled: boolean
   status: ExtensionStatus
   error?: string
-  /** Undoes the declarative (data) contributions of this entry. */
-  readonly disposers: Disposer[]
-  /** Service names this entry published while it is active. */
-  readonly provides: Set<string>
+}
+
+/** The id a module's manifest is completed with. */
+function catalogManifest(module: ExtensionModule): ExtensionManifest & { id: string } {
+  return { id: module.name, ...module.manifest }
 }
 
 export class ExtensionService extends Service {
   static inject = ["host"]
 
   private readonly host: PlatformHost
+  /**
+   * The context this service was composed in.
+   *
+   * Not `this.ctx`: a `Service`'s `ctx` is read through the tracker, which
+   * rebinds it to whichever context is calling. Every extension is mounted
+   * here, so a plugin mounted through that rebound context is not a child of
+   * this one — injected services stop resolving as properties on it, and a
+   * plugin would have to reach for `ctx.get` instead of `ctx.skills`.
+   */
+  private readonly owner: Context
   private readonly entries = new Map<string, Entry>()
   private readonly fibers = new Map<string, Fiber>()
   /** Reverse lookup for `internal/status`, which reports every fiber by identity. */
   private readonly owners = new Map<Fiber, string>()
-  private readonly points = new Map<ExtensionPointId, Map<string, unknown[]>>()
   private tail: Promise<void> = Promise.resolve()
   private revision = 0
   private cached: ExtensionSnapshot
+  private started = false
 
   constructor(ctx: Context, config: ExtensionServiceConfig) {
     super(ctx, "extensions")
+    this.owner = ctx
     const host = ctx.get("host")
     if (host === undefined) throw new Error("extensions: host service unavailable")
     this.host = host
 
     const stored = this.readState()
-    for (const definition of config.catalog) {
-      const { id, locked, defaultEnabled } = definition.manifest
+    for (const module of config.catalog) {
+      const manifest = catalogManifest(module)
+      const { id, locked, defaultEnabled } = manifest
       if (this.entries.has(id)) throw new Error(`extensions: duplicate extension id "${id}"`)
-      const entry: Entry = {
-        definition,
-        enabled: false,
-        status: "inactive",
-        disposers: [],
-        provides: new Set(),
-      }
+      const entry: Entry = { module, manifest, enabled: false, status: "inactive" }
       this.entries.set(id, entry)
-      if (!isCompatible(definition.manifest.apiVersion)) {
+      if (!isCompatible(manifest.apiVersion)) {
         entry.status = "incompatible"
         continue
       }
       entry.enabled = locked === true || (stored[id] ?? defaultEnabled ?? false)
-      if (entry.enabled) this.registerDeclarative(entry)
     }
     // A required service appearing or disappearing re-loads its dependents;
     // this listener keeps each entry's status in step with its fiber.
@@ -132,7 +139,16 @@ export class ExtensionService extends Service {
         await this.run(() => this.activate(entry))
       }
     }
+    this.started = true
     this.publish()
+  }
+
+  /**
+   * Whether the first activation pass has settled. Before that, an extension
+   * that contributes nothing has not loaded yet — not withdrawn its contribution.
+   */
+  get settled(): boolean {
+    return this.started
   }
 
   /** Current catalog state; stable between changes. */
@@ -148,6 +164,36 @@ export class ExtensionService extends Service {
   /** Enable, then activate; resolves once the extension's code finished loading. */
   enable(id: string): Promise<void> {
     return this.run(() => this.setEnabled(id, true))
+  }
+
+  /**
+   * Add one extension discovered after the kernel started, and enable it.
+   *
+   * A market install writes the directory while the page is open; the page
+   * imports the module and hands it here. The catalog is keyed by id, so a
+   * second copy is refused rather than replacing the one already running.
+   */
+  add(module: ExtensionModule): Promise<void> {
+    return this.run(() => this.addNow(module))
+  }
+
+  private async addNow(module: ExtensionModule): Promise<void> {
+    const manifest = catalogManifest(module)
+    const { id } = manifest
+    if (this.entries.has(id)) {
+      throw new Error(`extensions: "${id}" is already in the catalog`)
+    }
+    const entry: Entry = { module, manifest, enabled: false, status: "inactive" }
+    this.entries.set(id, entry)
+    if (!isCompatible(manifest.apiVersion)) {
+      entry.status = "incompatible"
+      this.publish()
+      return
+    }
+    entry.enabled = true
+    await this.activate(entry)
+    this.persist()
+    this.publish()
   }
 
   /** Disable, then unwind every registration the extension made. */
@@ -169,22 +215,27 @@ export class ExtensionService extends Service {
    * toggle would not read as the same list.
    */
   contributions<P extends ExtensionPointId>(point: P): ContributionMap[P][] {
-    const byExtension = this.points.get(point)
-    if (byExtension === undefined) return []
-    const values: ContributionMap[P][] = []
-    for (const id of this.entries.keys()) {
-      const held = byExtension.get(id)
-      if (held !== undefined) values.push(...(held as ContributionMap[P][]))
-    }
-    return values
+    const held = this.placements(point)
+    if (held.length === 0) return []
+    const rank = new Map([...this.entries.keys()].map((id, at) => [id, at]))
+    return [...held]
+      .sort((left, right) => (rank.get(left.owner) ?? Infinity) - (rank.get(right.owner) ?? Infinity))
+      .map((placement) => placement.value as ContributionMap[P])
   }
 
   /** Contributions one extension currently makes at one point. */
-  contributionsFrom<P extends ExtensionPointId>(
-    id: string,
-    point: P
-  ): ContributionMap[P][] {
-    return (this.points.get(point)?.get(id) ?? []) as ContributionMap[P][]
+  contributionsFrom<P extends ExtensionPointId>(id: string, point: P): ContributionMap[P][] {
+    return this.placements(point)
+      .filter((placement) => placement.owner === id)
+      .map((placement) => placement.value as ContributionMap[P])
+  }
+
+  /** Everything one point holds right now, with the plugin that put it there. */
+  private placements(point: ExtensionPointId): readonly { owner: string; value: unknown }[] {
+    const service = this.owner.get(POINT_SERVICES[point]) as
+      | ContributionPoint<unknown>
+      | undefined
+    return service?.placements() ?? []
   }
 
   /** Serialize state changes so rapid toggles cannot interleave. */
@@ -200,37 +251,27 @@ export class ExtensionService extends Service {
     if (entry.status === "incompatible") {
       throw new Error(`extensions: "${id}" targets an incompatible extension API`)
     }
-    if (enabled && entry.definition.manifest.locked === true) {
+    if (enabled && entry.manifest.locked === true) {
       throw new Error(`extensions: "${id}" is required and cannot be disabled`)
     }
     if (entry.enabled === enabled) return
 
-    if (enabled) {
-      entry.enabled = true
-      this.registerDeclarative(entry)
-      await this.activate(entry)
-    } else {
-      entry.enabled = false
-      await this.deactivate(entry)
-    }
+    entry.enabled = enabled
+    if (enabled) await this.activate(entry)
+    else await this.deactivate(entry)
     this.persist()
     this.publish()
   }
 
-  private registerDeclarative(entry: Entry): void {
-    const declarative = entry.definition.declarative
-    if (declarative === undefined) return
-    for (const point of Object.keys(declarative) as ExtensionPointId[]) {
-      for (const value of declarative[point] ?? []) {
-        entry.disposers.push(this.contribute(entry, point, value))
-      }
-    }
-  }
-
   private async activate(entry: Entry): Promise<void> {
-    const { id, inject } = entry.definition.manifest
-    const activate = entry.definition.activate
-    if (activate === undefined) {
+    const { manifest, module } = entry
+    const { id } = manifest
+    const declarative = module.declarative
+
+    /* A package that ships only data still mounts a fiber. Its contributions
+       have to belong to it — a point takes its lifetime from the context that
+       registered — and a fiber is what there is to belong to. */
+    if (module.apply === undefined && declarative === undefined) {
       entry.status = "active"
       return
     }
@@ -238,34 +279,20 @@ export class ExtensionService extends Service {
     entry.status = "activating"
     this.publish()
     const plugin: Plugin.Function = (pluginCtx: Context) => {
-      const scope: ExtensionScope = {
-        ctx: pluginCtx,
-        host: this.host,
-        /* Resolved now: a fiber's injected services do not survive activation. */
-        i18n: this.ctx.get("i18n"),
-        contribute: (point, value) => {
-          pluginCtx.effect(() => this.contribute(entry, point, value))
-        },
-        provide: (name, api) => {
-          pluginCtx.effect(() => this.provide(entry, pluginCtx, name, api))
-        },
-        inject: (names, setup) => {
-          pluginCtx.inject([...names], (inner) => {
-            /* A published service is reached with `get`, not as a property of
-               the callback's context: property access resolves along a fiber's
-               own chain, and a sibling extension's service is not on it. */
-            const services: Record<string, unknown> = {}
-            for (const name of names) services[name] = inner.get(name)
-            setup(inner, services as never)
-          })
-        },
+      if (declarative !== undefined) {
+        for (const point of Object.keys(declarative) as ExtensionPointId[]) {
+          const service = pluginCtx.get(POINT_SERVICES[point]) as
+            | ContributionPoint<unknown>
+            | undefined
+          for (const value of declarative[point] ?? []) service?.register(value)
+        }
       }
-      activate(scope)
+      module.apply?.(pluginCtx)
     }
     Object.defineProperty(plugin, "name", { value: id, configurable: true })
-    if (inject !== undefined) plugin.inject = inject
+    if (module.inject !== undefined) plugin.inject = module.inject
 
-    const fiber = this.ctx.plugin(plugin)
+    const fiber = this.owner.plugin(plugin)
     this.fibers.set(id, fiber)
     this.owners.set(fiber, id)
     if ((await this.sync(entry, fiber)) !== undefined) {
@@ -276,8 +303,7 @@ export class ExtensionService extends Service {
   }
 
   private async deactivate(entry: Entry): Promise<void> {
-    for (const dispose of entry.disposers.splice(0).reverse()) dispose()
-    const { id } = entry.definition.manifest
+    const { id } = entry.manifest
     const fiber = this.fibers.get(id)
     this.fibers.delete(id)
     if (fiber !== undefined) {
@@ -303,7 +329,7 @@ export class ExtensionService extends Service {
       entry.error = message
       this.host.log(
         "error",
-        `extensions: "${entry.definition.manifest.id}" failed to activate: ${message}`
+        `extensions: "${entry.manifest.id}" failed to activate: ${message}`
       )
       return message
     }
@@ -324,49 +350,6 @@ export class ExtensionService extends Service {
     if (entry === undefined || !entry.enabled) return
     await this.sync(entry, fiber)
     this.publish()
-  }
-
-  /**
-   * Publish one service under its name, for as long as this entry is active.
-   *
-   * @throws when the manifest never declared that name — a dependency another
-   * extension could require has to be visible in the catalog, not only at the
-   * point where it happens to be registered.
-   */
-  private provide(entry: Entry, ctx: Context, name: string, api: unknown): Disposer {
-    const { id, provides } = entry.definition.manifest
-    if (provides === undefined || !provides.includes(name)) {
-      throw new Error(`extensions: "${id}" provides "${name}", which its manifest does not declare`)
-    }
-    const dispose = ctx.provide(name, api)
-    entry.provides.add(name)
-    return () => {
-      entry.provides.delete(name)
-      dispose()
-    }
-  }
-
-  private contribute(
-    entry: Entry,
-    point: ExtensionPointId,
-    value: unknown
-  ): Disposer {
-    const { id } = entry.definition.manifest
-    let byExtension = this.points.get(point)
-    if (byExtension === undefined) {
-      byExtension = new Map()
-      this.points.set(point, byExtension)
-    }
-    let values = byExtension.get(id)
-    if (values === undefined) {
-      values = []
-      byExtension.set(id, values)
-    }
-    values.push(value)
-    return () => {
-      const index = values.indexOf(value)
-      if (index >= 0) values.splice(index, 1)
-    }
   }
 
   private persist(): void {
@@ -393,16 +376,19 @@ export class ExtensionService extends Service {
     const entries: ExtensionView[] = []
     for (const [id, entry] of this.entries) {
       const points: ExtensionPointId[] = []
-      for (const [point, byExtension] of this.points) {
-        if (byExtension.has(id)) points.push(point)
+      for (const point of Object.keys(POINT_SERVICES) as ExtensionPointId[]) {
+        if (this.placements(point).some((placement) => placement.owner === id)) points.push(point)
       }
       entries.push({
-        manifest: entry.definition.manifest,
+        manifest: entry.manifest,
         enabled: entry.enabled,
         status: entry.status,
         error: entry.error,
         points,
-        provides: [...entry.provides],
+        /* Declared, not observed: the catalog says what a package says it
+           provides, because once a registry publishes itself the kernel is not
+           the one registering it and so is not the one that knows. */
+        provides: entry.manifest.provides ?? [],
       })
     }
     return { entries, revision: this.revision }
@@ -411,6 +397,6 @@ export class ExtensionService extends Service {
   private publish(): void {
     this.revision += 1
     this.cached = this.buildSnapshot()
-    this.ctx.emit("extensions/changed", this.cached)
+    this.owner.emit("extensions/changed", this.cached)
   }
 }

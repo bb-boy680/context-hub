@@ -10,7 +10,7 @@
  * Nothing here renders. The controls that use it are in `media-gallery.tsx`, and
  * every screen imports both through this package rather than from a plugin.
  */
-import { assetKind } from "@workspace/core"
+import { assetKind } from "@context-hub/core"
 
 /** Cover previews allowed to decode at once; later requests queue for a slot. */
 const MAX_PLAYING = 6

@@ -376,12 +376,25 @@ project 文件 `true`、客户端答案 `true`），断言该行显示 `false`�
 
 - A ≤ 6 项、F ≤ 160 字、R ≤ 8 项（只收精确托管身份 `code:path/to/file.go`）。
 - **S 的 token 上限按 C 分档**（`governance.budget.s`，模式 `enforce`）：
-  C1-4 ≤ 40、C5-7 ≤ 80、C8 ≤ 140、C9 ≤ 200；token 按 UTF-8 字节 / 3 估，一个中文字约 1。
+
+  | C | 上限 | 目标 |
+  |---|---|---|
+  | 1-4 | 40 | 20 |
+  | 5-7 | **80** | 40 |
+  | 8 | 140 | 70 |
+  | 9 | 200 | 100 |
+
+  token 按 UTF-8 字节 / 3 估，一个中文字约 1。
   注意这比 `aoci.meta.txt` 里那行 `#S配额: C7-4≤200` 更紧，以 budget 表为准（它才是被校验的那个）。
   本仓现有的 C7 条目 S 多在 63-77，改动前先量一遍余量。
 - 写之前拿脚本量一遍最省事：
   `node -e 'const S=process.argv[1].split("S:")[1];console.log(Math.round(Buffer.byteLength(S,"utf8")/3))' "<整行条目>"`
 - 被拒后只能改 findings 点名的那个字段，其余候选必须**逐字节**保持原样重提。
+- **这条我犯过一次（2026-10-16）**：上面那张表本来就在本文件里，我却按 `C7 ≤ 200` 写，
+  一次提交 14 条里有 9 条被 `entry_field_budget_exceeded` 拒回（`applied: 0`）。
+  教训不是"再记一遍数字"，而是**别靠记忆填表**——交之前把整批条目的四个字段一起丢给脚本量，
+  脚本打印 `F/R/A/S = x/上限`，超一格就当场改，比事后读 findings 逐个返工便宜得多。
+  返工时要压的是**语义**（合并、删可推导的句子），不是机械砍字；删掉的语义等于没索引过。
 
 **附带一条**：`applied` 之后 audit 会报 `E规模档位错配`（文件长过档位）。那不是失败，
 但下次维护时顺手把 Tag 的 E 位改对。
@@ -482,7 +495,7 @@ EDGE="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 - **不要用「我这里用不上」为理由砍掉一个已经存在的分支**。视频当封面在 skills 里是**支持的**（用播放器画，
   不是 `<img>`），我的「省事」实际上是把能力砍了。看到自己想收窄一个既有行为时，先找出它在别处是怎么实现的。
 - 同一套东西已经在两个包里各抄一份时（`knownAspect`/`rememberAspect` 当时就是两份），**该抽共用而不是再抄第三份**。
-  用户选择了抽到 `@workspace/extensions/components`（`swiper` 依赖也跟着从 skills 挪过去）。
+  用户选择了抽到 `@context-hub/extensions/components`（`swiper` 依赖也跟着从 skills 挪过去）。
 - 手改大段 JSX 用脚本按行号删/缩进**很容易切错块**（这轮把 Popover 切成了半截，只能 `git checkout` 重来）。
   结构化改动优先用 Edit 工具配唯一锚点；真要按行删，先打印边界行确认。
 
@@ -588,7 +601,7 @@ if (place.file.split("/").includes("..")) throw new Error(…)
 只对比 `innerText` 会把"版式全错"当成"内容对了"。
 
 **附带一条**：`FALLBACK_RATIO` 这类常量住在 `plugin-skills/src/page.tsx` 的模块作用域里，
-跨包抄一份时容易连名字一起漏。本仓的共享常量在 `@workspace/extensions/components`
+跨包抄一份时容易连名字一起漏。本仓的共享常量在 `@context-hub/extensions/components`
 （`knownAspect` / `mediaKind` 等），但纯比例常量不在——抄的时候要连值一起搬。
 
 ## 用户说「不需要 X、需要 Y」时，先查 X 是不是已经被我当成了**身份**（2026-10-16）
@@ -745,3 +758,533 @@ rm -f <repo>/.claude/commands/<name>.md  ~/.claude/commands/<name>.md
 ```
 更好的做法是**不要用真实 prompt 名**（用一个一眼能认出来的测试名，如 `zz-probe-*`），
 这样"有没有残留"用 `ls` 就能判断，也不会撞上用户自己的东西。
+
+## `userHome` 的默认值是用户的真实 home，检查脚本写它之前必须换掉（2026-10-16）
+
+**问题模式**：写 `check-prompt-delivery.ts` 时我给自己留了临时 hub home 和临时工作区目录，
+然后加了一段「global 作用域」的用例就直接跑了 —— `createFsPlaceFiles` 的 `userHome`
+默认是 `homedir()`，于是这次运行**真的往 `C:\Users\hl131\.agents\rules\code-review.md`
+写了一个文件**。我在同一轮里刚把「真机验收会写进用户的真实目录」写进本文件，转头又犯。
+
+**规则**：凡是构造 `PlaceFiles` / 任何带 `userHome`(或同类「机器级根」) 选项的东西，
+**三个根都要显式传临时目录**：`home`、`folder`、`userHome`。
+判据：跑之前 `grep -n "userHome\|homedir\|resolveHubHome" <脚本>` ——
+出现任何一个而没在构造时被覆盖，就是会写真实路径。
+跑完再复查一次 `ls -a ~/.agents ~/.claude`，把这一条当成脚本的一部分而不是可选步骤。
+
+## 断言里写死夹具文案，会在夹具被上一轮改过之后假红（2026-10-16）
+
+**问题模式**：UI 检查里断言生成出的文件含 `"changelog line"`。
+但同一轮里前面的用例把那条提示词的正文改成了 `# Rewritten...`，
+于是后面这条断言报 FAIL —— 我第一反应是"生成写错了正文"，
+实际是被测数据的来源（夹具）在同一个脚本里变过两次。
+
+**规则**：跨用例断言"产物含源内容"时，**源要从它此刻真正所在的地方取**
+（`fetch("/hub/prompts")` 或 `readFileSync(<库文件>)`），不要写死字符串。
+写死的常量只在**夹具与断言在同一个脚本并且中间没有写入**时才安全；
+一旦脚本里有任何 `PATCH`/`create`，就当作"这个值是浮动的"。
+
+## 宿主层落盘测试用临时目录，UI 层只碰 gitignore 的路径（2026-10-16）
+
+**问题模式**：新功能要往工作区根写 `AGENTS.md` / `DESIGN.md` ——
+而本仓根**就有这两个被签入的真实文件**。真机测试点一下就改了它们。
+
+**规则**：把验证按"能不能隔离"切成两层：
+- **宿主层**（`createFsPlaceFiles` + 临时目录）：覆盖所有真正写文件的分支，包括危险的落点；
+- **UI 层**（浏览器）：只点那些落进 gitignore 目录的动作（本仓 `.agents/*`），
+  断言行与菜单的形状，**不点会改签入文件的项**。
+
+判据：给 UI 测试选路径时先跑 `git check-ignore -v <路径>`；
+不 ignored 的目标一律留给宿主层。收尾复查用 `git status --short` 而不是只看脚本自己的清理。
+
+## 会打到用户机器的清理命令：先看它匹配的是"我的"还是"所有的"（2026-10-16）
+
+**问题模式**：这轮为了给 headless Chrome 腾出调试端口，我反复跑
+`taskkill //F //IM chrome.exe //T`——`//IM` 是**按镜像名匹配，杀掉机器上所有 chrome.exe**。
+用户正开着的浏览器窗口被我一并杀掉，用户问「你为啥一直 kill 我的 chrome 进程？」。
+
+驱动脚本本身是对的：`spawn` 拿到了句柄，`chrome.kill()` 只收自己那一个。
+可我图省事加了一句"清场"，把"我需要端口空出来"变成了"把所有 Chrome 关掉"。
+
+**规则**：清理/重启类命令写之前先问一句——**这条命令的匹配范围是"我启动的那个"还是"机器上所有的"？**
+- 进程：用 `spawn` 返回的句柄 `.kill()`，或按 PID（`netstat -ano | grep ":<port>" | grep LISTENING`
+  取 pid 再 `taskkill //F //PID <pid>`）。**禁止 `//IM`**，除非用户明确说"把所有 X 关掉"。
+- 端口被占：换一个端口（`--strictPort` 之外还会自动 +1）比清场便宜，绝不为此杀别人的进程。
+- 上一次的收尾残留不值得"顺手清干净"。判断不清就留着，在汇报里说一句。
+
+判据：命令里出现 `//IM`、`pkill -f <宽泛模式>`、`killall`、`rm -rf ~/...` 这类**按名字/模式**匹配的
+目标时，停一下。只有按 PID、按我自己 spawn 的句柄、按我独占的端口做事，才是安全的。
+
+## 手写一个像素之前先 `ls packages/ui/src/components/`（2026-10-16）
+
+**问题模式**：给提示词面板的分组之间加一条分割线，我写了
+`<span className="h-px w-full bg-border" />`，用户指出「分割线应该用 shadcn-ui 的啊」。
+`packages/ui/src/components/separator.tsx` 一直都在（`Separator`，`data-horizontal:h-px`），
+MCP 模块里甚至有一个 `Rule()` 包了 17px 留白可以直接照抄。我照抄了 `Rule()` 的**结构**
+却把里面的 `Separator` 换成了手写 span——离正确只差一步，但那一步是我自己省掉的。
+
+这和本文件「"用某组件"的意思是连它的默认长相一起用」是同一条根因的两种表现：
+那条是**用了组件却改掉外壳**，这条是**根本没查有没有组件**。
+
+**规则**：要写任何 `h-px` / `w-px` / 圆角 / 阴影 / 骨架这类**基础视觉原子**之前，
+先跑一次 `ls packages/ui/src/components/ | grep -i <你要的东西>`（separator / skeleton / badge /
+avatar / spinner…）。命中就直接用，别再手写；没命中才手写，并在注释里说清为什么没有现成的。
+
+跨模块抄一段 UI 时，**整段照抄**，不要"抄结构、换零件"——`Rule()` 里那个 `<span>` 是
+MCP 那个文件自己的旧写法，不代表可以继续扩散。抄之前先看被抄的模块有没有用仓库组件，
+用了就跟上。
+
+**附带**：`react-hooks/set-state-in-effect`、`purity` 之外的"仓库约定"大多是隐性的，
+`AGENTS.md` 只说"引入新模式前，优先使用仓库已有工具链"。所以判据要落到**可执行的搜索**上，
+不要靠"我记得好像没有"。
+
+## AOCI 收尾前先看仓库有没有别人在写（2026-10-16）
+
+**问题模式**：这轮做 AOCI 收尾，`aoci_maintain` 交回来一个我从没创建过的候选
+`packages/core/src/host/http.ts`。查下去发现**同一个仓库里有另一个 agent session 正在写**
+（它建了 `http.ts`、`server.ts` 和一份新计划文档）。`date` 是 20:01:41，
+那两个文件的 mtime 是 20:01；再跑一次 `verify`，`code_source_count` 已经从 404 变成 405——
+我一边读它一边长。
+
+差一步就把一个**正在被写的特性**索引成语义了：`http.ts` 拿到手时只写了三分之一，
+`server.ts` 那一批还没轮到。索引进 aoci.code.txt 的每一句都会留在那里，
+而它的作者下一分钟就会让这些句子过期。
+
+**规则**：跑 `aoci_maintain` 之前先花一条命令确认树是静的——
+
+```
+find packages apps docs -newermt "-20 minutes" -type f -not -path "*/node_modules/*"
+```
+
+出现**不属于本次任务**的文件，就停下问用户，不要继续作者化。判据是 `git status --short`：
+untracked 的文件如果既不是我刚建的、也不在本次改动范围内，那就是别人的活。
+
+更普遍的形态：**"仓库级"操作（AOCI、全仓 lint、大范围重命名）默认假设只有自己在写这个仓库**，
+这个假设在多 session 下不成立。做这类操作前先确认，比事后回滚便宜。
+
+用户当时的选择是「就此收手」——已经写进去的认知保留，剩下的漂移留给下一轮。
+这一条和本文件「受管对象仍在变化时不得反复维护」是同一件事的另一面。
+
+## 收尾杀进程只能杀「自己选的那个端口」，不能按端口猜（2026-10-16）
+
+**问题模式**：这一轮把后端从 Vite 中间件抽成独立的 `createHubServer` 之后，dev 变成两个进程
+（hub server + Vite）。我起了一个 `node dev.ts`，Vite 输出写着
+"Port 5173 is in use… 5174 is in use… Local: **5175**" —— 也就是我的 Vite 在 **5175**，
+而 5174 是**别人的**。收尾时我写了个循环 `for port in 5270 5174 5175; taskkill`，
+**把 5174 那台别人的进程杀了**。本文件已经记过两次同类事（误杀用户 5173），这是第三次。
+
+两次都错在同一个动作：**按一个"看起来像开发端口"的数字去杀**，而没有区分"这个端口是不是我起的"。
+5173/5174 是 Vite 的**默认**端口，谁先起谁占，它从来不表示"这是我的"。
+
+**规则**：给项目拉起多个进程时，**每个进程的端口都要是我自己写下来的常量**，
+而不是落在默认范围内让工具挑；收尾只杀那个常量对应的端口。
+
+本仓现在的做法就是这条规则的落地：`apps/web/hub-port.ts` 里两个常量
+（`DEV_HUB_PORT = 5270`、`DEV_APP_PORT = 5271`）是唯一来源，`dev.ts` 用
+`strictPort: true` 起 Vite（端口被占就**报错**，不再静默换一个），
+`vite.config.ts` 从同一处取代理目标。所以两个端口**按构造都属于我**，杀错的对象不存在。
+
+配套一条：**只需要杀 hub server（5270）**。`dev.ts` 里挂了 `hub.on("exit")` 会把 Vite
+一起关掉（本轮实测：杀 5270 之后 5271 自动释放）。所以"杀 Vite 的端口"这个动作本身就该消失，
+不是小心一点的问题。
+
+## 首次冷启动的白屏不一定是代码坏了（2026-10-16）
+
+**问题模式**：B 方案改完第一次打开页面，看到的是**纯白 + 零报错**。我连查了模块加载
+（`/src/main.tsx`、`/src/lib/hub.ts`、`/src/App.tsx` 都 200）、6 个启动路由（全 200）、
+`index.html`（正常注入）——全部正常，却还在往"某段代码坏了"的方向挖。
+
+真实原因基本可以确定是 **Vite 首次冷启动在预打包依赖**：这个 app 要拉 12 个 agent 包 +
+5 个插件的模块图，第一次 `optimizeDeps` 要跑很久；我那次探针只等了 21 秒。
+后来同一个页面（收窄到只有 claude-code，且依赖缓存已热）**2 秒**就渲染出 61KB 的完整页面。
+
+**规则**：dev server **第一次**起时看到白屏，先分清"模块没加载"和"模块图还在转译"，
+再谈代码。判据很便宜，一次就够：
+
+- 白屏时页内 `fetch` 记录是**空的**（说明 `main.tsx` 根本没执行）→ 指向加载/转译，不是业务代码；
+- 同一个页面**第二次**打开就正常 → 依赖缓存问题，不是代码问题。
+
+不要在冷启动上直接开始读代码找 bug——那是在给一个不存在的问题做诊断。
+本轮真正需要改的（收窄到 claude-code）是用户直接要求的，与这个误判无关。
+
+
+## 基建类决策先把迁移成本量出来，再谈值不值（2026-10-17）
+
+**问题模式**：用户问「我们现在的单元测试是自己写的，应该是不对的吧」。
+我的回答是——**保留那 8,791 行自制 `check-*.ts`，只补一个 20 行的并行 runner**，
+理由写得像一份权衡：「换 vitest 能拿到并行和覆盖率，但要重写 8000 行，不值」。
+
+用户一句话定了：用 vitest，每个项目里放 `__test__/`。
+
+复盘：我护着的东西**一条都不用重写**。27 个脚本里 **26 个的 `check()` 辅助函数逐字节相同**，
+所以 `check("d", a === b, a)` → `expect(a, "d").toBe(b)` 是机械转换；
+真正要动的是**编排**（顶层 await、`process.exitCode`、九个不同写法的文件尾），不是断言。
+我把"重写"这个成本估高了一个量级，于是把标准工具的收益算成负的。
+而自制 runner 给不了的那两样（watch、失败时的断言 diff）恰好是接下来每天要用的：
+旧写法每条比较都写两遍（条件里一次、`detail` 实参里一次），vitest 把这份重复直接消掉。
+
+**规则**：被问到「这块基建该不该换」时，先**量迁移成本**再谈值不值——
+量的是"要改多少行"，不是"这套东西有多大"。
+判据很硬：**转换规则是不是逐条机械可写**（这里 26/27 个文件的辅助函数逐字节相同 → 是）。
+是，成本就是线性的，不是重写；"现在这套已经能跑"不构成保留理由，
+标准工具的默认收益（watch、diff、并行、编辑器集成、新人不需要先读一份自制约定）
+要算在天平的另一边。
+
+**配套一条**：自制检查体系里那些**真正贵的东西**是它的断言，不是它的 runner。
+迁移时保护断言、拆掉 runner——`expect` 数量逐文件对齐旧 `check` 调用点
+（少一条就在 commit message 里说明），是唯一能挡住"悄悄搬少了"的手段。
+
+## 路由的前缀不是身份：`startsWith` 迟早把 `AAAA` 吃成 `A` + 参数（2026-10-17）
+
+**问题模式**：这一轮给五条桥做统一约定之前先写了检查网，网第一次跑就抓到：
+**九条路由全部用 `url.pathname.startsWith(ROUTE)` 派发**，于是
+
+- `/hub/skillsXYZ` 被读成「技能 id = `XYZ`」；
+- `/hub/stateX` 被读成「文档名 = `X`」；
+- `/hub/workspacesX` 被读成「工作区 id = `X`」；
+- **`/hub/pluginsX` 直接答 200，内容是整个插件库** —— 因为那条桥的 action 在 query 里，
+  游荡路径读成了「默认动作」。
+
+同一个洞在 prompts 上的表现是 400 `unknown route`（无害），在 plugins 上却是**泄露式**的。
+换句话说：**同一个写法，几条路由只是答错，有一条是答对了一个没人要的东西。**
+
+修法是五行、线形中性：
+
+```ts
+function under(route: string, pathname: string): string | null {
+  if (pathname === route) return ""
+  if (!pathname.startsWith(`${route}/`)) return null
+  return pathname.slice(route.length + 1)
+}
+```
+
+**规则**：路由派发判「这条路由是不是我的」时，**前缀必须带分隔符**——
+`route` 或 `route/` 开头，不是 `startsWith(route)`。
+判据很简单：`ROUTE + "X"` 是一个**合法但不同**的路径，而前缀匹配看不出区别。
+
+**配套一条（更普适）**：检查网要**专门去试「游荡路径」**。
+没人会随手打 `/hub/skillsXYZ`，所以这类洞不会在正常使用里暴露，
+只会等到某天一个拼错的 URL、一个相对路径、或一个别的模块的旧地址撞上来。
+写检查时把「本路线 + 一个字母」当固定一条断言，成本一行。
+
+## 真实用户目录里出现近期写入：先自证是不是自己写的，再决定修还是报告（2026-10-17）
+
+**问题模式**：这一轮做端到端验收时，看到 `~/.context-hub/skills/ego-browser/` 的 mtime
+是 `00:31:24` —— 正好落在我刚跑过三轮全量测试的时间窗里。本文件已有三条「真机验收会写进
+用户的真实目录」的教训，所以第一反应是「我的某个测试又写进去了」。
+
+**做法**：没有去改代码，也没有放过，而是**取一次对照**：
+
+```bash
+BEFORE=$(stat -c '%Y' <那个文件>)
+npx vitest run --project skills --project core --project web ...   # 只跑我改过的包
+AFTER=$(stat -c '%Y' <那个文件>)
+[ "$BEFORE" = "$AFTER" ] && echo "未改动：不是测试写的"
+```
+
+结论：**不是我的测试写的**（那个文件是别的东西/别的 session 的）。
+于是正确的动作是「不动它」，而不是"顺手清理"或"顺手加个防护"。
+
+**规则**：在一个 session 里看到**真实用户目录有近期写入**时，先分清三件事——
+是不是我这次写的、是不是我一直以来写的、是不是别人写的。
+最便宜的判据是 **mtime 的 before/after 对照**：跑一遍自己的东西，看它变不变。
+- 变了 → 是我的，按 [[真机验收会写进用户的真实目录：先说，再收]] 处理；
+- 没变 → 不是我的，**别动**（"顺手清理别人的东西"和"按端口猜着杀进程"是同一类错误）；
+- 分不清 → 停下来问。
+
+这一条与 [[收尾杀进程只能杀「自己选的那个端口」，不能按端口猜]] 是同一条规则的另一种形态：
+**在共享的机器上，'看起来像我的' 不等于 '是我的'。**
+
+## 订阅者同时是调用者，就会自己把自己叫醒（2026-10-17）
+
+**问题模式**：把四个资产页的读取搬进共享 store，让每个 store 在读到一半时先
+`await workspaces.refresh()`（它要知道当前工作区才能算出 place），同时订阅
+`workspaces` 的变化来触发重读。
+
+于是：`refresh()` 每次调用都无条件 `announce()` → store 的订阅被唤醒 → `reload()` →
+读里又 `refresh()` → 又 `announce()` → **死循环**。构建形态跑一次，
+`POST /hub/place-files` 2065 次、`GET /hub/workspaces` 1091 次、
+skills 目录读了 854 次——**界面看起来完全正常**，因为每一轮的答案都一样。
+
+**规则**：一个服务如果既被 A 调用又要通知 A，那么"调用"和"变化"必须是两件事。
+`announce()` 的语义是**"你要读的东西变了"**，不是**"我又读了一次"**。所以：
+
+- 广播前**比值**：`if (told.failure === failure && samePage(told.page, page)) return`；
+- 这个记录（`told`）要单独存，不能用当前值代替——"和上一次广播的比"才是判据。
+
+**配套一条（更普适）**：这类循环在单测里抓不到，因为单测不会把"读 → 通知 → 读"
+串起来跑很多轮。**数请求数**是唯一便宜的判据：起一台真服务器，开一次页面，
+把每个路由的请求数打出来。正常是 1，两千就是循环。这一轮三个 bug 全是这样抓到的。
+
+## 验收要能区分「对的」和「碰巧对的」（2026-10-17）
+
+**问题模式**：我做完 prompts 的共享读取后，按验收标准测了两条：
+
+1. 不进页面时 `GET /hub/prompts` 已发出 → 实测 **1 次**✅
+2. 进页面不产生第二个请求 → 实测 **没有第二次**✅
+
+两条都"通过"了，但**两条都是巧合**：那唯一的一次请求是 `apps/web` 启动时对路由做的
+**探活**（`promptStoreAvailable()`），不是共享读取发出的；而"进页面没多一次"是因为
+那个 store 压根没注册成功，没有任何东西在读——**没有请求可增加**。
+页面截图也看不出来：那一轮的隔离 home 是空的，页面显示"还没有提示词"，
+和"库是空的"长得一模一样。
+
+真正暴露它的是一次**请求计数对不上**：skills 的列表请求一次都没有。
+修好之后（让两个 store 继承 `Service` 真正注册）重新验，并且**先 seed 一行数据**——
+因为**空页面对空库不是证据，只有"该有行的地方有行"才是**。
+
+**规则**：
+- 做"某某没有发生"这类断言时，先问：**如果它坏了，现象会不会和现在一样？**
+  会，就必须先造一个"它好了就一定会变"的观察点（这里是 seed 一行）。
+- 验收要同时给出**正反两侧**：不是"没有第二次请求"，而是"有且仅有一次，且页面显示了预期的那一行"。
+- **量出来的数字要能解释**：1 次请求如果说不清是谁发的，那就不算验证。
+
+配套：这一条与 [[判断"某段代码有没有生效"，先看它有没有被真实数据走到]] 是同一件事的
+两面——那边要造真实数据，这边要造**能区分对错的数据**。
+
+## 当"重读的判据"用的字段，比完之后必须前移（2026-10-17）
+
+**问题模式**：MCP 的共享读取里，我拿当前工作区当 reload key：
+
+```ts
+ctx.get("hub.workspaces")?.subscribe(() => {
+  const now = this.folder()
+  if (now === this.workspace) return   // ← 和存下来的比
+  void this.catalog.reload()           // ← 但没更新 this.workspace
+})
+```
+
+`this.workspace` 在构造时赋值一次，之后**再也不动**。于是换过一次目录之后，
+这个比较永远不等于，**此后每一条 announce（改名、切 agent、任何无关的变化）都触发一次全量重读**。
+它不会报错、页面也照样对，只是每个无关动作都白读一轮——和上面那条死循环是同一族的病。
+
+**规则**：一个字段如果被当作"和上次比"的基准，那么**在用它做完判断、采取了行动之后，
+必须立刻把它前移到新值**。判据只有在跟着走的时候才叫判据；停在原地它就是"除了第一次，
+永远判为不同"。写下 `if (now === this.stored) return` 的同时就问一句：
+**这次不等、我做了事之后，`this.stored` 会在哪一行被改成 `now`？** 答不上来就是 bug。
+
+配套：这类"多读了但结果一样"的问题，**日志和页面上都看不出来**。它和
+[[同一份状态被两处各读一次，就一定会分家]] 的区别是：那边是两份数据会不一致，
+这边只有一份数据、但被反复重读。判据同样是**数请求**。
+
+## 内核启动时读 contribution 的服务，会把"还没激活"当成"已经没了"（2026-10-17）
+
+**问题模式**：用户报「装好中文语言包、选中文、刷新后又变回英文」。`I18nService`
+在 `createHubKernel` 里**比 `kernel.start()` 更早**构造，构造函数里的 `refresh()`
+读 `contributions("locale")` —— 那时一个语言包都还没激活，列表是空的，
+于是 `active`（从 state 读到的 `"zh-CN"`）被判为"未知 locale"，**回退 `en` 并写回 state**。
+下一次读到的已经是 `"en"`，刷新再多次也回不来。
+
+**规则**：服务如果在构造期读 contribution / 别的插件注册的东西，必须先问一句
+**"这一刻它们注册了吗"**。本仓的顺序是 `createHubKernel`（构造服务）→ `kernel.start()`
+（激活插件、注册 contribution），所以构造期读到的永远是空集。空集在启动前
+表示"还没来"，不表示"被移除了"；把两者的判据分开（这里加了
+`ExtensionService.settled`，只在 `start()` 之后才允许回退），比在 UI 里补一次重读可靠。
+
+**验证方式**：这个 bug 只在"重启一个进程/页面"时出现，单测默认的 host 没有持久 state，
+所以既有的 69 条测试全绿。判据是写一条**带持久 storage 的 kernel 测试**：
+seed `locale = "zh-CN"` → `createHubKernel` + `start()` → 断言 `active` 仍是 `zh-CN`
+且 storage 里没有 `"en"` 写入。真机侧用隔离 hub home（seed `state/locale.json`）
+起 `server.ts --static dist`，改前构建会当场把 state 改成 `"en"`，改后连刷三次仍是中文。
+
+## 在 `packages/extensions` 里新增声明 `Context` 的文件，必须同时从 `./cordis.ts` 引用它（2026-10-17）
+
+**问题模式**：新加 `src/agents.ts`，里面写 `declare module "@deepseek-ai/cordis" { interface Context { … } }`，
+但文件本身**没有 import 这个包**（只 import 了 `@context-hub/core/workspace` 的类型）。结果不是
+这一条声明没生效，而是**整个包的类型全崩**：`i18n.ts`、`service.ts`、`react.tsx`、`kernel.ts`
+一起报 `Property 'get' does not exist on type 'Context'`，外加两个不同的 `Context` 身份
+（`lib/types/index` vs `lib/types/context`）互不兼容。错误全落在我没碰过的文件上，看起来像依赖坏了。
+
+`src/cordis.ts` 的文件头早就写了原因：**只有把包根当值导入，TypeScript 才会把 augmentation
+折进同一个 symbol**。没有导入的那个 `declare module` 被当成一个全新的环境模块，于是同一份
+`Context` 出现两个身份。把 `agents.ts` 删掉，全部报错消失——这才是归属证据。
+
+**规则**：在 `packages/extensions` 里写 `declare module "@deepseek-ai/cordis"` 的文件，
+**必须**从 `./cordis.ts` 导入那个包（哪怕只是 `import type { Context }`），并且让这个导入
+**真的被用到**，否则 `noUnusedLocals` 会再报一次。本轮的用法是把 `Context` 收进一个
+`chosenAgentsOf(ctx)`，顺带省掉调用处的 `ctx.get("hub.workspaces")`。
+
+判据：`tsc` 报大量「同一个类型两个来源路径」时，先看**最近新增的那个 `declare module` 文件**
+有没有导入它声明的包，而不是去查 node_modules。
+
+## "把内容存到文件里"不等于"替换现在的存储文件"（2026-10-17）
+
+**问题模式**：用户说提示词要"创建一个文件来储存，不然审批 prompt 不好审批"。我把这句话
+读成了"库改成一个文件一条、原来的 `prompts.json` 退役并改名成 `.bak`"，计划里还专门设计
+了迁移与备份。用户纠正：**`prompts.json` 还是要保留，只是把 prompt 正文挪到 markdown**。
+差别的不是格式，是**谁是事实来源**：索引仍然是 JSON，md 只承载正文，`prompt` 字段留在
+API 契约里由 store 合并出来，UI/交付/bridge 一行不用改。按我的版本做，不但多写了
+frontmatter 解析器，还会把"元数据在哪"搬走一遍。
+
+**规则**：用户要求拆分存储时，先把问题拆成两问再动手——**哪些内容要换地方**、
+**哪些文件必须继续存在**。第二问不能从第一问推出来，它属于用户的决定，要直接问
+（"`prompts.json` 还留着吗？"）。落到实现上：只搬被点名的字段，其余字段、文件位置、
+公开契约保持原样；如果搬走的字段原本也是 API 的一部分（这里是 `Prompt.prompt`），
+就让 store 在读取时合并回去，而不是把变更扩散到调用方。
+
+判据：动笔前先写一句"改完之后，`<旧文件>` 还在不在、还由谁写"。写不出来就问。
+
+## 同一件事的两个入口，必须长得一样（2026-10-17）
+
+**问题模式**：卡片上的位置菜单和详情弹窗里的位置列表，本来是两个组件各自演化：一行能点
+（点击即安装）、第二行写 `commandDir`、计数数的是位置；另一边行不可点、第二行写根目录、
+计数数的是已安装。用户看到截图后要求"和详情页弹窗的保持一致"。更根本的是，两边都在做
+"把这个提示词写到某个位置"，本来就该是同一个菜单。
+
+**规则**：同一能力出现在两个界面时，**先抽成一个组件再谈两处样式**，而不是各写一份再对齐。
+对齐时逐项检查四件事：菜单项、第二行的文案口径、行的点击语义、标题旁计数的含义——这四项
+只要有一项两边不同，用户就会当成 bug。
+
+判据：新增第二个入口前，先问"这两个入口会不会在同一次会话里被同一个人先后打开"。
+
+## 写同一个文件的两种动作，只留一个入口（2026-10-17）
+
+`install` 与 `commands` 都写 `<commandDir>/<slug>.md`，区别只是 frontmatter。菜单里因此
+出现"安装/移除"和"生成 Commands/移除命令"两套几乎一样的项，扫描也分不清文件是谁写的。
+用户直接要求删掉"安装/移除"那一项。
+
+**规则**：两个动作落点完全相同时，早一点合并成一个；菜单里不要给同一份文件留两个开关。
+删除时把调用链一起删（`Delivery` 成员、`toggle()`、`onToggle` prop、只服务它的文案键），
+不要只藏 UI——否则下一轮扫描还会把这份文件当成第二个动作的产物。
+
+判据：`targetOf(place, prompt, a) === targetOf(place, prompt, b)` 时，`b` 不该存在。
+
+## 页面结构跟着同类页面走，不要少一块（2026-10-17）
+
+**问题模式**：提示词页长期只有一个「全部」标签，而技能页早就有「全部 + 工作区 + 全局」的
+范围标签（每个范围还能下拉收窄到某个位置）。用户发来技能页那两个 scope 按钮，要求"和 SKILL
+一样的 Tab 标签页也需要加上去"。这不是新功能，而是同一组资产页面结构不一致。
+
+**规则**：新增一个资产页面时，先把最完整的同类页面的骨架抄齐——标题、工具栏、筛选行、
+标签行、两种视图、分页——再删掉确实无话可说的部分，并在文件头写明**为什么**少。反过来，
+当某个页面补上一个维度（这里是"投递到哪个范围"）时，先看兄弟页面是不是早就这么做了。
+
+判据：改页面前扫一眼 `packages/resources/*/src/page.tsx`，列出各自 tab 行的构成。差异要么
+是设计选择（写在注释里），要么是遗漏。
+
+## 设计稿被连续打回时，先把"状态"和"存哪"问清（2026-10-18）
+
+**问题模式**：环境变量页的设计稿被连续打回四次：左栏没撑满也没有滚动条、输入框没有插入后的
+回显样式、创建弹窗不能一次加多个、行菜单没写每个操作点开之后是什么。每次都不是配色问题，
+而是**漏了一个状态或一个层级**：左栏漏了"内容溢出时"，输入框漏了"插入之后"，弹窗漏了
+"批量"，菜单漏了"点开之后"。
+
+**规则**：
+- 出稿前按 `默认态 / 有数据态 / 溢出态 / 选中态 / 编辑态 / 空态` 逐项过一遍，不要只画一张
+  默认态就交付。
+- 用户说"某个模块支持 X"时先验证真实实现：这一轮查 `packages/resources/mcp/src/host/probe.ts`
+  才发现 MCP 已经支持 `${VAR}` 与 `${VAR:-default}` 在探测时展开、且不回写，插入语法因此
+  定成 `${NAME}` 而不是 `$NAME`。设计稿里的语法不能凭手感定。
+- "不收集值"和"可以填值"并不冲突：前者说的是**索引**不存值，后者说的是值写入**另一个存储**。
+  先把"这个东西存在哪"问清，再决定表单字段；这一轮最终定成 `variables.json` 只存名字和分组，
+  值写入**机器环境**（Windows 用户注册表 / macOS·Linux 的 `~/.config/context-hub/env`），
+  页面按名字回读。
+- 批量创建的弹窗，分组是**整批共用**的，不是每行一个；行内只留名字和值，否则列宽和交互都会
+  退化成"重复打开单条弹窗"。
+
+## Windows 用户环境变量写注册表，已打开的进程不会自动刷新（2026-10-18）
+
+**问题模式**：环境变量页写入值后，重启 hub 仍然读不到。原因不是写入失败，而是
+`[Environment]::SetEnvironmentVariable(name, value, 'User')` 只改注册表 `HKCU\Environment`：
+**已经打开的终端和它们启动的子进程保留旧环境**。从同一个旧终端重启 hub，hub 继承的仍是旧
+`process.env`，所以按名字回读是空的。用户第一反应是"重启电脑"，因为新会话才会重新读注册表。
+
+**规则**：
+- Windows 的读取端不能只信 `process.env`。hub 启动时直接用 PowerShell 读用户环境：
+  `[Environment]::GetEnvironmentVariables('User') | ConvertTo-Json -Compress`，缓存成快照，
+  `get` 优先查快照；写入/删除时同时更新快照和 `process.env`，这样重启 hub 即可。
+- 给用户的手动刷新方式：`$env:NAME = [Environment]::GetEnvironmentVariable('NAME','User')`，
+  或新开一个终端。没有"刷新所有已打开终端"的全局命令；`WM_SETTINGCHANGE` 只通知监听者。
+- macOS / Linux 的 hub 直接读自己管理的 env 文件，不依赖终端继承；但其他已打开的 shell 仍要
+  `source ~/.zshrc` / `~/.bashrc` 才能看到新 export。
+- 判据：写入环境后，**换一个父进程**重启服务再看值；如果还空，先分清是"没写进系统"还是
+  "读的是旧快照"，不要先去怀疑页面。
+
+## 页面不要自建外层间距（2026-10-18）
+
+**问题模式**：环境变量页和设置页用 `-mx-6 bg-background` 抵消 `AppLayout` 的 `p-6`，再自加
+`px-16 py-10`，于是内容起点是 64px/40px，而其他资源页是 24px。用户指出：容器本来就有间距，
+页面不应该再建一套，否则每个页面的间距都不一样。
+
+**规则**：
+- 页面根节点直接继承 `AppLayout` 的 `p-6`，不要加负边距、外层 padding 或自绘页面背景。
+- `gap-*` 只管页内元素之间的距离，不属于页面外边距。
+- 判据：在浏览器里量内容根节点的 `getBoundingClientRect()`，它应等于容器 rect 再加 24px，
+  并与 `/plugins`、`/skills` 等页面的量值一致。
+
+## 行内 ⋯ 不要背景，菜单不要分割线（2026-10-18）
+
+**问题模式**：分组操作设计稿里，行尾 `⋯` 按钮带了浅色底，菜单项之间用了分割线。用户明确要求：
+`⋯` 按钮不需要背景色，menu 组件不需要分割线。两者都会让菜单显得比应用其他行菜单更重。
+
+**规则**：
+- 行内图标按钮（`⋯` 等）默认、悬停、展开都不画背景；用透明 padding 提供点击区域。
+- 菜单项之间不加分割线；用行距和层级表达分组，只有真正不同的语义分区才考虑线。
+- 判据：触发按钮的 `getComputedStyle(trigger).backgroundColor` 是透明；菜单内
+  `[role="separator"]` 数量为 0。
+
+## 插件里 `ctx.i18n` / `ctx.extensions` 不是想读就能读（2026-10-18）
+
+**问题模式**：全局搜索的 provider 在 `apply` 时注册，之后由弹窗调用；provider 里读
+`ctx.i18n` 和 `ctx.extensions`，但对应插件没有把这两个服务写进 `inject`。运行时抛
+`cannot get property "i18n" without inject`，被弹窗的 try/catch 吞掉，于是 MCP、Plugins、
+Settings、Extensions 四个分组静默消失，**typecheck 和 lint 全绿**。页面上直接看数据又都存在，
+很容易误判成“共享读取还没落地”。
+
+**规则**：
+- `inject` 不是只给等待依赖用的声明；Cordis 在运行时按它给属性访问放行。provider / 回调
+  只要在 `apply` 之后读 `ctx.<service>`，那个服务就必须在 `inject` 里。
+- 这次需要的是 `i18n`（翻译）和 `extensions`（读目录快照）；MCP 的 library 还读 `ctx.i18n`，
+  所以 MCP 模块也补了。
+- 判据：provider 返回空组时，不要让 catch 完全静默——至少 `console.error` 出 provider 名和
+  错误；浏览器里捕获一次 console 就能看到 `without inject`。
+
+## 桌面打包要离线：`electronDist` 指向已安装的 Electron（2026-10-18）
+
+**问题模式**：给桌面端加完 `electron-updater` 后重新打包，`electron-builder` 在
+`packaging ... electron=44.9.0` 之后直接 `connect ETIMEDOUT 20.205.243.166:443`。
+`%LOCALAPPDATA%\electron\Cache` 里明明有完整的 158MB Electron zip，`unzip -t` 也通过；
+它仍然要联网。GitHub 在那段时间不可达，于是同一个配置前一次能打包、后一次不能。
+
+**规则**：
+- 打包配置里显式写 `electronDist: "node_modules/electron/dist"`。它用 `pnpm install`
+  已经下载好的 Electron，打包不再访问 GitHub，也保证打的就是开发时用的那个二进制。
+  判据：日志里应出现 `using custom unpacked Electron distribution`，而不是
+  `unpacking default Electron distribution` 后再下载。
+- `electron-builder` 26 的顶层 schema 不认 `updaterCacheDirName`（会报 unknown property）。
+  不要从旧文档/旧版本抄这个字段；`app-update.yml` 里那个自动生成的名字不影响功能。
+- `electron-updater` 可以作为生产依赖、在 esbuild 里标 external；electron-builder 会把它
+  和传递依赖复制进 `app.asar/node_modules`。验证方式不是看构建日志（依赖树会打印一大串
+  `duplicate dependency references`），而是用
+  `@electron/asar` 的 `listPackage()` 数一下 `node_modules/electron-updater` 的条目。
+- 本地重复打包同一个输出目录时，`release/win-unpacked/resources/app.asar` 可能被某个
+  看不见的进程/扫描器锁住，`package:win` 报 `EBUSY`，`rm` 和 `mv` 都是
+  `Device or resource busy`。这时不要按进程名清场，也不要改配置；用
+  `--config.directories.output` 换一个**仓库外**的临时目录验证（例如
+  `%TEMP%/hub-release-verify`），不要在 `apps/desktop` 下造 `release-verify*`。CI 的
+  工作区本来就是干净的。**这个锁会让“本机 package:win 通过”这句话不成立，汇报时要如实写明。**
+- 锁的持有者可以用 Windows **Restart Manager API**（`RmStartSession` →
+  `RmRegisterResources` → `RmGetList`）查到，不要只按名字猜进程。本次锁的持有者
+  是用户本地的 `Orca.exe`，不是 Electron 或 electron-builder；这类第三方程序
+  开着时，任何新造的 `app.asar` 都可能被立刻锁住。
+
+## 远程插件工程：入口必须指向打包产物（2026-10-19）
+
+**问题模式**：远程插件仓库最初只有一个共享 `tools/build-extension.mjs` 和手写的
+`index.js`，插件目录不是完整工程。随后又想照搬 `packages/agents/claude-code` 的
+`src/index.ts` 入口，但那个包能指向源码，是因为它在 workspace 内由 Vite 打包；
+Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间没有打包步骤。
+
+**规则**：
+- 每个 `plugins/<id>` 是完整 pnpm workspace 包：`package.json`、`build.mjs`、
+  `tsconfig.json`、`src/`、`plugin.json`、`README.md`；产物默认 `lib/index.js`。
+- `package.json` 的 `main` 必须与 `plugin.json` 的 `entry` 相同（默认
+  `lib/index.js`），`version` 必须与 `plugin.json` 和索引三处一致。hub 安装器
+  校验这些声明，旧插件没有 `package.json` 时保持原行为。
+- `lib/` 要提交：Context Hub 没有 npm 发布层，安装器 clone 后直接加载。不要照搬
+  deepseek-harness 把 `lib/` 放进 `.gitignore` 的做法——它的产物在 npm tarball 里。
+- 构建用 esbuild 并把 `absWorkingDir` 固定在插件目录，否则产物首行的路径注释随
+  cwd 漂移，同一份源码会在不同机器上产出不同字节。
+- 判据：`pnpm build` 两次的 `sha256sum lib/index.js` 相同；`package.json`、
+  `plugin.json` 与 `marketplace.json` 的版本一致。
+

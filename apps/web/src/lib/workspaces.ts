@@ -7,13 +7,32 @@
  */
 import * as React from "react"
 
-import { WORKSPACE_ROUTE } from "@workspace/core/workspace"
-import type { WorkspacePage, WorkspaceService } from "@workspace/core/workspace"
-import { useHub } from "@workspace/extensions/react"
+import { WORKSPACE_ROUTE } from "@context-hub/core/workspace"
+import type { WorkspacePage, WorkspaceService } from "@context-hub/core/workspace"
+import { useHub } from "@context-hub/extensions/react"
 
 /** A failure explained for the menu. */
 function reasonOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/** Whether two answers describe the same list, as a watcher would read it. */
+function samePage(left: WorkspacePage | null, right: WorkspacePage | null): boolean {
+  if (left === null || right === null) return left === right
+  if (left.current !== right.current) return false
+  if (left.folders.length !== right.folders.length) return false
+  if (left.agents.length !== right.agents.length) return false
+  if (left.agents.some((agent, at) => agent !== right.agents[at])) return false
+  return left.folders.every((folder, at) => {
+    const other = right.folders[at]
+    return (
+      other !== undefined &&
+      folder.id === other.id &&
+      folder.name === other.name &&
+      folder.path === other.path &&
+      folder.display === other.display
+    )
+  })
 }
 
 async function call<T>(url: string, method: "GET" | "POST", body?: unknown): Promise<T> {
@@ -32,13 +51,28 @@ async function call<T>(url: string, method: "GET" | "POST", body?: unknown): Pro
   return payload as T
 }
 
-/** Create the service the browser form provides on the kernel. */
-export function createRemoteWorkspaceService(): WorkspaceService {
+/**
+ * Create the service the browser form provides on the kernel.
+ *
+ * @param base — origin the route is served on; empty for the current one.
+ */
+export function createRemoteWorkspaceService(base = ""): WorkspaceService {
   let page: WorkspacePage | null = null
   let failure: string | null = null
   const listeners = new Set<() => void>()
+  /* The read in flight, if there is one. Startup asks for this and so does every
+     library that needs to know which folder it is reading in, and those are the
+     same question: one request answers all of them. */
+  let refreshing: Promise<void> | null = null
+  /* What watchers were last told. A read that answered the same thing it did
+     last time tells nobody — which is not politeness: the libraries that ask for
+     this list are the ones watching it, so announcing an unchanged answer is
+     what turned "read again after this changed" into a loop. */
+  let told = { page: null as WorkspacePage | null, failure: null as string | null }
 
   const announce = () => {
+    if (told.failure === failure && samePage(told.page, page)) return
+    told = { page, failure }
     for (const listener of [...listeners]) listener()
   }
 
@@ -66,19 +100,24 @@ export function createRemoteWorkspaceService(): WorkspaceService {
       }
     },
 
-    async refresh() {
-      try {
-        page = await call<WorkspacePage>(WORKSPACE_ROUTE, "GET")
-        failure = null
-      } catch (error) {
-        failure = reasonOf(error)
-      }
-      announce()
+    refresh() {
+      refreshing ??= (async () => {
+        try {
+          page = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "GET")
+          failure = null
+        } catch (error) {
+          failure = reasonOf(error)
+        } finally {
+          refreshing = null
+        }
+        announce()
+      })()
+      return refreshing
     },
 
     async select(id) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/select`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "select", id }))
       } catch (error) {
         return refuse(error)
       }
@@ -86,7 +125,7 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async add(path) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/add`, "POST", { path }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "add", path }))
       } catch (error) {
         return refuse(error)
       }
@@ -94,7 +133,9 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async setAgent(id, on) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/agent`, "POST", { id, on }))
+        return settle(
+          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "agent", id, on })
+        )
       } catch (error) {
         return refuse(error)
       }
@@ -102,7 +143,9 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async rename(id, name) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/rename`, "POST", { id, name }))
+        return settle(
+          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "rename", id, name })
+        )
       } catch (error) {
         return refuse(error)
       }
@@ -110,7 +153,7 @@ export function createRemoteWorkspaceService(): WorkspaceService {
 
     async remove(id) {
       try {
-        return settle(await call<WorkspacePage>(`${WORKSPACE_ROUTE}/remove`, "POST", { id }))
+        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "remove", id }))
       } catch (error) {
         return refuse(error)
       }

@@ -7,6 +7,7 @@
   "icon": "server",
   "category": "integration",
   "entry": "index.js",
+  "inject": ["mcp", "locales"],
   "permissions": ["assets.read", "filesystem"],
   "defaultEnabled": false
 }

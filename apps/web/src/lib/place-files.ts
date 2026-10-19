@@ -6,12 +6,12 @@
  * A page gets no answer at all when that process is not there: every call
  * throws, and the caller reports the failure instead of inventing a file.
  */
-import { PLACE_FILES_ROUTE, type PlaceCall, type PlaceFiles, type PlaceRef } from "@workspace/core/place-files"
+import { PLACE_FILES_ROUTE, type PlaceCall, type PlaceFiles, type PlaceRef } from "@context-hub/core/place-files"
 
 /** Whether the host answers for these files; without one every call fails. */
-export async function placeFilesAvailable(): Promise<boolean> {
+export async function placeFilesAvailable(base = ""): Promise<boolean> {
   try {
-    const response = await fetch(PLACE_FILES_ROUTE, {
+    const response = await fetch(`${base}${PLACE_FILES_ROUTE}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       /* The hub's own workspace: it answers only when a host holds this route,
@@ -24,10 +24,14 @@ export async function placeFilesAvailable(): Promise<boolean> {
   }
 }
 
-/** The reader and writer that reach the host over this origin. */
-export function createRemotePlaceFiles(): PlaceFiles {
+/**
+ * The reader and writer that reach the host over this origin.
+ *
+ * @param base — origin the route is served on; empty for the current one.
+ */
+export function createRemotePlaceFiles(base = ""): PlaceFiles {
   const call = async (body: PlaceCall): Promise<Record<string, unknown>> => {
-    const response = await fetch(PLACE_FILES_ROUTE, {
+    const response = await fetch(`${base}${PLACE_FILES_ROUTE}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

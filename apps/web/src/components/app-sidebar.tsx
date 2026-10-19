@@ -7,12 +7,13 @@ import { CheckIcon, ChevronDownIcon, WaypointsIcon } from "lucide-react"
 import * as React from "react"
 import { useLocation } from "react-router"
 
-import { useContributions, useI18n } from "@workspace/extensions/react"
-import { useSkillAgents } from "@workspace/plugin-skills"
-import { Sidebar, SidebarContent, SidebarHeader } from "@workspace/ui/components/sidebar"
+import { useContributions, useI18n } from "@context-hub/extensions/react"
+import { useSkillAgents } from "@context-hub/skills"
+import { Sidebar, SidebarContent, SidebarHeader } from "@context-hub/shadcn-ui/components/sidebar"
 
 import { SidebarGroup, SidebarRow } from "@/components/sidebar-rows"
 import { WorkspaceGroup } from "@/components/workspace-group"
+import { useDesktopInfo, useDesktopUpdate } from "@/lib/desktop"
 import { useNavGroups } from "@/lib/navigation"
 import type { NavGroup as NavGroupData } from "@/lib/navigation"
 import { useWorkspaces } from "@/lib/workspaces"
@@ -116,19 +117,56 @@ function AgentGroup() {
   )
 }
 
+/** The sidebar's one-line update action; nothing renders without an offer. */
+function UpdateNotice() {
+  const { t } = useI18n()
+  const { state, start } = useDesktopUpdate()
+
+  if (state.status === "idle") return null
+  if (state.status === "downloading") {
+    return (
+      <span className="min-w-0 truncate text-muted-foreground" aria-live="polite">
+        {t("sidebar.update.downloading").replace(
+          "{percent}",
+          String(state.percent ?? 0)
+        )}
+      </span>
+    )
+  }
+  return (
+    <button
+      type="button"
+      onClick={start}
+      className="min-w-0 truncate text-ring hover:underline"
+      aria-live="polite"
+    >
+      {t(state.status === "ready" ? "sidebar.update.ready" : "sidebar.update.available")}
+    </button>
+  )
+}
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navGroups = useNavGroups()
+  const { version, updatesEnabled } = useDesktopInfo()
   const assets = navGroups.find((group) => group.id === "assets")
   const operate = navGroups.find((group) => group.id === "operate")
 
   return (
     <Sidebar className="border-sidebar-border" {...props}>
       <SidebarHeader className="px-4 pt-5 pb-0">
-        <div className="flex h-7 items-center gap-2.5">
-          <span className="flex size-7 items-center justify-center rounded-sm bg-primary text-primary-foreground">
+        <div className="flex items-center gap-2.5">
+          <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-primary text-primary-foreground">
             <WaypointsIcon className="size-4" aria-hidden />
           </span>
-          <span className="text-[15px] leading-[19px] font-semibold">Context Hub</span>
+          <div className="flex min-w-0 flex-col">
+            <span className="text-[15px] leading-[19px] font-semibold">Context Hub</span>
+            {version === null ? null : (
+              <div className="flex items-center gap-2 text-[12px] leading-4">
+                <span className="shrink-0 font-mono text-muted-foreground">v{version}</span>
+                {updatesEnabled ? <UpdateNotice /> : null}
+              </div>
+            )}
+          </div>
         </div>
       </SidebarHeader>
       <SidebarContent className="gap-5 px-4 pt-5 pb-5">

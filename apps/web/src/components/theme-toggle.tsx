@@ -1,6 +1,6 @@
 import { MoonIcon, SunIcon } from "lucide-react"
 
-import { Button } from "@workspace/ui/components/button"
+import { Button } from "@context-hub/shadcn-ui/components/button"
 
 import { useTheme } from "@/components/theme-provider"
 

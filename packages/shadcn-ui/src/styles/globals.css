@@ -1,0 +1,226 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+@import "./theme.css";
+
+/* Sources outside this package; paths are relative to this stylesheet. */
+@source "../../../apps/*/src/**/*.{ts,tsx}";
+@source "../../../*/src/**/*.{ts,tsx}";
+/* Grouped packages sit one level deeper: resources/skills, agents/claude-code.
+   Without this the classes only those pages use are never generated, which
+   reads as a broken layout rather than as a missing stylesheet. */
+@source "../../../*/*/src/**/*.{ts,tsx}";
+
+/* Static scales from the design canvas. */
+@theme {
+    /* The document family, applied to the root in the base layer below. */
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
+
+    /* The canvas's second family, for one role only. The rule that decides who
+       wears it: a value a person has to read verbatim or compare character by
+       character — a command and its arguments, a path, a URL, a version, a
+       transport name, an environment key, a commit, a keyboard key, a
+       standalone count — is monospaced; anything read as a sentence, a title or
+       a label stays in `--font-sans`, numbers inside a sentence included. Keys
+       and code are covered by the element rule in the base layer; a value that
+       is a span or an input takes the `font-mono` utility where it is rendered,
+       which is the only other way this family enters the app. */
+    --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+
+    --radius-xs: 4px;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-2xl: 24px;
+    --radius-3xl: 32px;
+    --radius-4xl: 40px;
+    --radius-pill: 100px;
+
+    --text-caption: 12px;
+    --text-body: 13px;
+    --text-body-lg: 14px;
+    --text-title: 16px;
+    --text-title-lg: 18px;
+    --text-heading: 22px;
+    --text-display: 36px;
+    --text-display--line-height: 1.11;
+    --text-display--letter-spacing: -0.5px;
+
+    --blur-glass: 18px;
+    --blur-header: 12px;
+
+    /* One shadow tier for the whole app. */
+    --shadow-soft: 0 4px 12px rgb(0 0 0 / 0.04);
+    --shadow-glass: 0 4px 12px rgb(0 0 0 / 0.04);
+}
+
+@layer base {
+    * {
+        @apply border-border outline-ring/50;
+    }
+
+    /* The app's baseline family, on the root so every element a module can
+       write — `span`, `button`, `p`, `td`, `input` — inherits it. Stated here
+       rather than left to the preflight's `--default-font-family` mapping, so
+       the document font is this family for the whole app and no element can
+       fall back to a browser default. */
+    html {
+        font-family: var(--font-mono);
+        background-color: var(--background);
+    }
+
+    /* Machine text that is also a semantic element — a key, a code fragment,
+       sample output, a preformatted block — is the HTML spec's own category and
+       never appears as prose, so these are assigned here and no caller has to
+       remember a class. Everything else that carries a machine value is a span
+       or an input, which CSS cannot tell from a label, so those carry
+       `font-mono` (see the `--font-mono` note above). `:where()` keeps the
+       specificity at zero, so a `font-sans` utility can still take one back. */
+    :where(kbd, code, samp, pre) {
+        font-family: var(--font-mono);
+    }
+
+    body {
+        @apply text-foreground;
+    }
+
+    /* Tailwind v4 dropped the preflight cursor for buttons; every enabled control opts in. */
+    button:not(:disabled, [aria-disabled="true"]),
+    [role="button"]:not([aria-disabled="true"]),
+    [role="tab"]:not([aria-disabled="true"]),
+    [role="menuitem"]:not([aria-disabled="true"]),
+    [role="option"]:not([aria-disabled="true"]),
+    [role="switch"]:not([aria-disabled="true"]),
+    [role="checkbox"]:not([aria-disabled="true"]),
+    [role="radio"]:not([aria-disabled="true"]),
+    label,
+    summary,
+    select {
+        cursor: pointer;
+    }
+
+    button:disabled,
+    [aria-disabled="true"] {
+        cursor: not-allowed;
+    }
+
+    /* The design's scrollbar: 5px, pill, a 6% track under an 18% thumb. Every
+       scroll container carries it, so no module has to remember a class. The
+       gutter is not reserved here — `overflow: hidden` boxes are scroll
+       containers too, and reserving one would leave them a band narrower than
+       they were drawn; the panes that scroll while content grows add
+       `scrollbar-gutter-stable` themselves. */
+    * {
+        scrollbar-width: thin;
+        scrollbar-color: rgb(10 11 13 / 0.18) rgb(10 11 13 / 0.06);
+    }
+
+    *::-webkit-scrollbar {
+        width: 5px;
+        height: 5px;
+    }
+
+    *::-webkit-scrollbar-track {
+        background: rgb(10 11 13 / 0.06);
+        border-radius: 999px;
+    }
+
+    *::-webkit-scrollbar-thumb {
+        background: rgb(10 11 13 / 0.18);
+        border-radius: 999px;
+    }
+
+    *::-webkit-scrollbar-thumb:hover {
+        background: rgb(10 11 13 / 0.3);
+    }
+
+    .dark * {
+        scrollbar-color: rgb(255 255 255 / 0.24) rgb(255 255 255 / 0.08);
+    }
+
+    .dark *::-webkit-scrollbar-track {
+        background: rgb(255 255 255 / 0.08);
+    }
+
+    .dark *::-webkit-scrollbar-thumb {
+        background: rgb(255 255 255 / 0.24);
+    }
+
+    .dark *::-webkit-scrollbar-thumb:hover {
+        background: rgb(255 255 255 / 0.36);
+    }
+}
+
+/* Photo covers soften downward. One masked backdrop blur replaces the design's four discrete
+   13px bands, whose radii compound into this same 0 -> 6px ramp, with no seam. */
+@utility cover-fade {
+    &::after {
+        content: "";
+        position: absolute;
+        inset-inline: 0;
+        bottom: 0;
+        height: 52px;
+        pointer-events: none;
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        mask-image: linear-gradient(to bottom, transparent, black);
+        -webkit-mask-image: linear-gradient(to bottom, transparent, black);
+    }
+}
+
+/* A file's text as shiki rendered it. Every line is one `span.line`, so the numbers are a
+   counter and the colours are the per-theme variables the two themes were compiled into.
+   A line wider than the panel keeps its width; the panel scrolls to it. */
+@utility file-code {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    line-height: 20px;
+
+    & .shiki {
+        padding: 12px 14px;
+        background-color: transparent;
+    }
+
+    & code {
+        counter-reset: line;
+    }
+
+    & .line::before {
+        counter-increment: line;
+        content: counter(line);
+        display: inline-block;
+        width: 2rem;
+        margin-right: 12px;
+        text-align: right;
+        color: var(--muted-foreground);
+        opacity: 0.6;
+        user-select: none;
+    }
+
+    & .shiki,
+    & .shiki span {
+        color: var(--shiki-light);
+    }
+
+    .dark & .shiki,
+    .dark & .shiki span {
+        color: var(--shiki-dark);
+    }
+}
+
+/* A fenced block inside a document. The colours are the same per-theme variables
+   `file-code` reads, but this carries no `.shiki` element — the block is shiki's
+   `inline` structure, so the document's own <pre> stays the frame — and no line
+   numbers, which a document's blocks do not wear. */
+@utility doc-code {
+    & span {
+        color: var(--shiki-light);
+    }
+
+    .dark & span {
+        color: var(--shiki-dark);
+    }
+}

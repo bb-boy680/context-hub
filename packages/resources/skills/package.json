@@ -1,0 +1,42 @@
+{
+  "name": "@context-hub/skills",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "lint": "eslint",
+    "format": "prettier --write \"**/*.{ts,tsx}\"",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@context-hub/core": "workspace:*",
+    "@context-hub/extensions": "workspace:*",
+    "@context-hub/shadcn-ui": "workspace:*",
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@headless-tree/core": "^1.7.0",
+    "@headless-tree/react": "^1.7.0",
+    "js-yaml": "^5.5.0",
+    "lucide-react": "^1.48.0",
+    "react": "^19.2.8",
+    "use-immer": "^0.11.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10",
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "eslint": "^10",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17",
+    "typescript": "~6",
+    "typescript-eslint": "^8",
+    "vitest": "^5.0.5"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./contract": "./src/contract.ts",
+    "./host": "./src/host/skills-fs.ts",
+    "./handlers": "./handlers.ts",
+    "./extension": "./src/extension.ts"
+  }
+}
