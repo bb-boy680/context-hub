@@ -153,6 +153,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
+      # `gh release create --generate-notes` runs git to find the previous tag;
+      # download-artifact alone leaves the workspace without a repository.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           path: dist-artifacts
