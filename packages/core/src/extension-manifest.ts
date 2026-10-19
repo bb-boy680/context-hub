@@ -219,7 +219,7 @@ export function parsePluginManifestYaml(text: string, id: string): PluginManifes
   try {
     value = load(text, { schema: CORE_SCHEMA })
   } catch (error) {
-    throw new Error(`plugin manifest: not valid YAML: ${messageOf(error)}`)
+    throw new Error(`plugin manifest: not valid YAML: ${messageOf(error)}`, { cause: error })
   }
   return parsePluginManifest(value, id)
 }
