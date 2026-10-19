@@ -5,12 +5,15 @@
  * an uninstalled entry has a manifest, an icon component, and the same category
  * it will land in after installation.
  */
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import { localized, type ExtensionMarketIndex } from "@context-hub/core/extension-market"
 import type { ExtensionView } from "@context-hub/extensions"
 
-import { marketEntriesFor } from "../src/lib/extension-market"
+import {
+  marketEntriesFor,
+  refreshExtensionMarket,
+} from "../src/lib/extension-market"
 
 function entry(id: string, version: string): ExtensionView {
   return {
@@ -110,5 +113,48 @@ describe("marketEntriesFor", () => {
       "demo.one",
       "demo.two",
     ])
+  })
+})
+
+describe("refreshExtensionMarket", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it("reads past the cache and broadcasts the new index", async () => {
+    const fetchMock = vi.fn<
+      (url: string, init: RequestInit) => Promise<Response>
+    >(
+      async () =>
+        new Response(JSON.stringify({ index: INDEX }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        })
+    )
+    const dispatch = vi.fn()
+    vi.stubGlobal("fetch", fetchMock)
+    vi.stubGlobal("window", { dispatchEvent: dispatch })
+
+    const index = await refreshExtensionMarket(
+      "https://example.test/market.json"
+    )
+
+    expect(index).toEqual(INDEX)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(url).toBe("/hub/extension-market")
+    expect(init.method).toBe("POST")
+    expect(JSON.parse(String(init.body))).toEqual({
+      action: "list",
+      url: "https://example.test/market.json",
+      refresh: true,
+    })
+    expect(dispatch).toHaveBeenCalledTimes(1)
+    const event = dispatch.mock.calls[0]?.[0] as CustomEvent
+    expect(event.type).toBe("context-hub:market-refreshed")
+    expect(event.detail).toEqual({
+      url: "https://example.test/market.json",
+      index: INDEX,
+    })
   })
 })

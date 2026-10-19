@@ -13,6 +13,24 @@ export const DESKTOP_INFO_CHANNEL = "context-hub:desktop-info"
 export const UPDATE_STATE_CHANNEL = "context-hub:update-state"
 export const UPDATE_START_CHANNEL = "context-hub:update-start"
 
+/** Preload → main: open the title-bar menu at a point in the page. */
+export const APP_MENU_CHANNEL = "context-hub:app-menu"
+
+/** Main → renderer: a menu row whose work belongs to the page. */
+export const APP_MENU_ACTION_CHANNEL = "context-hub:app-menu-action"
+
+/** Linux window controls; the other platforms draw their native buttons. */
+export const WINDOW_MINIMIZE_CHANNEL = "context-hub:window-minimize"
+export const WINDOW_MAXIMIZE_CHANNEL = "context-hub:window-maximize"
+export const WINDOW_CLOSE_CHANNEL = "context-hub:window-close"
+export const WINDOW_STATE_CHANNEL = "context-hub:window-state"
+
+/** The height of the shell's own title bar, in CSS pixels. */
+export const TITLEBAR_HEIGHT = 40
+
+/** The menu rows the page has to carry out itself. */
+export type DesktopMenuAction = "about" | "reload-resources" | "refresh-plugins"
+
 /** Main → renderer: the state changed. */
 export const UPDATE_CHANGED_CHANNEL = "context-hub:update-changed"
 
@@ -31,5 +49,7 @@ export interface DesktopBridge {
   updateState(): Promise<UpdateState>
   /** available → start the download; ready → install now. */
   update(): Promise<void>
+  /** Run a menu row that is the page's to carry out. */
+  onMenuAction(listener: (action: DesktopMenuAction) => void): () => void
   subscribe(listener: (state: UpdateState) => void): () => void
 }

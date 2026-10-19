@@ -7,13 +7,16 @@
 import { contextBridge, ipcRenderer } from "electron"
 
 import {
+  APP_MENU_ACTION_CHANNEL,
   DESKTOP_INFO_CHANNEL,
   UPDATE_CHANGED_CHANNEL,
   UPDATE_START_CHANNEL,
   UPDATE_STATE_CHANNEL,
   type DesktopBridge,
   type DesktopInfo,
+  type DesktopMenuAction,
 } from "./bridge.ts"
+import { installTitlebarMenu } from "./preload-menu.ts"
 import type { UpdateState } from "./update-state.ts"
 
 const desktop: DesktopBridge = {
@@ -21,6 +24,14 @@ const desktop: DesktopBridge = {
   updateState: () =>
     ipcRenderer.invoke(UPDATE_STATE_CHANNEL) as Promise<UpdateState>,
   update: () => ipcRenderer.invoke(UPDATE_START_CHANNEL) as Promise<void>,
+  onMenuAction: (listener) => {
+    const handler = (_event: unknown, action: DesktopMenuAction): void =>
+      listener(action)
+    ipcRenderer.on(APP_MENU_ACTION_CHANNEL, handler)
+    return () => {
+      ipcRenderer.removeListener(APP_MENU_ACTION_CHANNEL, handler)
+    }
+  },
   subscribe: (listener) => {
     const handler = (_event: unknown, state: UpdateState): void => listener(state)
     ipcRenderer.on(UPDATE_CHANGED_CHANNEL, handler)
@@ -31,3 +42,5 @@ const desktop: DesktopBridge = {
 }
 
 contextBridge.exposeInMainWorld("contextHub", { desktop })
+
+installTitlebarMenu()

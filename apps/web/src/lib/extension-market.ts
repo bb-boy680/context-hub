@@ -87,6 +87,32 @@ export function marketEntriesFor(
 
 const market = createRemoteExtensionMarket()
 
+/** Fired after a forced re-read, so an open page can take the new index. */
+const MARKET_REFRESHED_EVENT = "context-hub:market-refreshed"
+
+interface MarketRefreshed {
+  url: string
+  index: ExtensionMarketIndex
+}
+
+/**
+ * Read the market again, ignoring the host's cache, and tell an open page.
+ *
+ * The application menu uses this. A page already showing the market takes the
+ * answer from the event instead of reading the same index a second time.
+ */
+export async function refreshExtensionMarket(
+  url: string
+): Promise<ExtensionMarketIndex> {
+  const index = await market.list(url, true)
+  window.dispatchEvent(
+    new CustomEvent<MarketRefreshed>(MARKET_REFRESHED_EVENT, {
+      detail: { url, index },
+    })
+  )
+  return index
+}
+
 interface MarketRead {
   url: string
   nonce: number
@@ -107,16 +133,22 @@ export function useExtensionMarket(url: string): {
 } {
   const [nonce, setNonce] = React.useState(0)
   const [state, setState] = React.useState<MarketRead | null>(null)
+  /* Every read gets a ticket; only the newest may write. A forced read from
+     the application menu bumps it so a slower, older answer cannot win. */
+  const latest = React.useRef(0)
 
   React.useEffect(() => {
     if (url === "") return
+    const ticket = ++latest.current
     let cancelled = false
     void market.list(url, nonce > 0).then(
       (index) => {
-        if (!cancelled) setState({ url, nonce, index, failure: null })
+        if (!cancelled && ticket === latest.current) {
+          setState({ url, nonce, index, failure: null })
+        }
       },
       (error: unknown) => {
-        if (!cancelled) {
+        if (!cancelled && ticket === latest.current) {
           setState({
             url,
             nonce,
@@ -129,6 +161,17 @@ export function useExtensionMarket(url: string): {
     return () => {
       cancelled = true
     }
+  }, [url, nonce])
+
+  React.useEffect(() => {
+    const handle = (event: Event): void => {
+      const detail = (event as CustomEvent<MarketRefreshed>).detail
+      if (detail.url !== url) return
+      latest.current += 1
+      setState({ url, nonce, index: detail.index, failure: null })
+    }
+    window.addEventListener(MARKET_REFRESHED_EVENT, handle)
+    return () => window.removeEventListener(MARKET_REFRESHED_EVENT, handle)
   }, [url, nonce])
 
   const settled = state !== null && state.url === url && state.nonce === nonce

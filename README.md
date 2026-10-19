@@ -46,6 +46,12 @@ chosen from the tray menu. The sidebar shows the app version, and an available
 release appears there as a one-click update; clicking it downloads and restarts
 into the new version.
 
+The window's own title bar carries an **Application** menu, injected by the
+desktop shell rather than drawn by the page: About, Check for Updates, Reload,
+Refresh Plugins, Quit. Reload re-reads the skill and plugin libraries; Refresh
+Plugins fetches the extension market index again. Windows and macOS keep their
+native window buttons; Linux draws its own on the frameless window.
+
 `pnpm --filter @context-hub/desktop dev` watches the main, preload and server
 bundles and restarts Electron after a change; the application menu has Reload
 Page, Restart App and Toggle DevTools while it runs. Set
