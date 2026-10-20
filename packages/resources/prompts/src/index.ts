@@ -16,9 +16,10 @@ import type { ExtensionModule } from "@context-hub/extensions"
 import { promptsMessages } from "./messages.ts"
 import { PromptsPage } from "./page.tsx"
 import { PROMPT_LIBRARY_SERVICE, PromptLibrary } from "./library-store.ts"
-import { PROMPT_SERVICE, PromptService, type PromptPlace } from "./provider.ts"
+import { PROMPT_SERVICE, PromptService } from "./provider.ts"
 import { promptSearch } from "./search.ts"
 import type { PromptStore } from "./store.ts"
+import { workspacePromptProvider } from "./workspace-provider.ts"
 
 export { PromptsPage }
 export * from "./store.ts"
@@ -26,19 +27,7 @@ export * from "./provider.ts"
 export { PromptService } from "./provider.ts"
 export { PromptLibrary, PROMPT_LIBRARY_SERVICE } from "./library-store.ts"
 export { createRemotePromptStore } from "./remote-store.ts"
-export {
-  deliver,
-  delivered,
-  targetOf,
-  undeliver,
-  heldAt,
-  heldMarks,
-  holdsSomething,
-  NOTHING_HELD,
-  type Delivery,
-  type Held,
-  type HeldMark,
-} from "./deliver.ts"
+export { holdsSomething, heldMarks, type HeldMark } from "./held.ts"
 
 declare module "@deepseek-ai/cordis" {
   interface Context {
@@ -49,49 +38,6 @@ declare module "@deepseek-ai/cordis" {
 
 /** This module's own id; the kernel matches it against the manifest. */
 const PROMPTS_ID = "hub.prompt.catalog"
-
-/**
- * The place every workspace has, which no agent owns: where this hub writes the
- * forms it makes out of a prompt.
- *
- * `.agents/` is the directory the agents in this hub already share — the skills
- * module keeps its own `.agents/skills` there — so a command, a rule or an
- * agents file written under it is found by whoever has been taught to look,
- * rather than being put in one agent's own directory. It takes no prompt of its
- * own: there is no file a prompt itself would be written to here, only the
- * forms made from one.
- */
-const WORKSPACE_PLACE: PromptPlace = {
-  id: "workspace",
-  /* No agent owns this one, so it answers to this module. */
-  agent: PROMPTS_ID,
-  labelKey: "prompts.location.workspace",
-  icon: FolderIcon,
-  scope: "workspace",
-  commandDir: ".agents/commands",
-  ruleDir: ".agents/rules",
-  agentDir: ".agents/agents",
-  /* The two files a project keeps its standing conventions in. Both are named
-     by the workspace's own root, and both are written into rather than over. */
-  documents: [
-    {
-      id: "agents",
-      labelKey: "prompts.menu.document.agents",
-      removeLabelKey: "prompts.menu.document.agents.remove",
-      file: "AGENTS.md",
-    },
-    {
-      id: "design",
-      labelKey: "prompts.menu.document.design",
-      removeLabelKey: "prompts.menu.document.design.remove",
-      file: "DESIGN.md",
-    },
-  ],
-  generatedOnly: true,
-  /* Before the agents' own places, which all rank 20: what this hub writes for
-     the workspace is not one agent's business. */
-  order: 0,
-}
 
 export const promptsExtension: ExtensionModule = {
   name: PROMPTS_ID,
@@ -127,7 +73,7 @@ export const promptsExtension: ExtensionModule = {
        agents the sidebar chose — unlike an agent's places, which are offered
        only while that agent is chosen. */
     const service = new PromptService(ctx)
-    service.register({ id: PROMPTS_ID, shared: true, places: [WORKSPACE_PLACE] })
+    service.register(workspacePromptProvider(FolderIcon))
 
     ctx.nav.register({
       path: "/prompts",

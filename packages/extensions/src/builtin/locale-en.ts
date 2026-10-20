@@ -169,6 +169,7 @@ const en: Record<string, string> = {
   "extensions.asset.mcp": "MCP servers",
   "extensions.asset.memory": "Memory",
   "extensions.asset.hook": "Hooks",
+  "extensions.asset.agent": "Agents",
   "extensions.permission.storage.self": "Its own stored state",
   "extensions.permission.assets.read": "Read your assets",
   "extensions.permission.assets.write": "Write your assets",

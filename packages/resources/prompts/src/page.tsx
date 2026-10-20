@@ -48,7 +48,8 @@ import { toast } from "@context-hub/shadcn-ui/components/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui/components/tabs"
 
 import { AddPromptDialog } from "./add-prompt-dialog.tsx"
-import { deliver, generatedUnder, heldMarks, holdsSomething, undeliver, type Delivery } from "./deliver.ts"
+import { failureText, promptFailure, PromptError } from "./failure.ts"
+import { heldMarks, holdsSomething } from "./held.ts"
 import { BatchActions, cardActionShell, PromptActions, usePlaceWords } from "./install-menu.tsx"
 import {
   formatAge,
@@ -57,6 +58,7 @@ import {
   usePlaceFiles,
   usePromptLibrary,
   usePromptPlaces,
+  usePromptService,
   type Holds,
 } from "./library.ts"
 import { PromptMarks, PromptMeta, PromptTile } from "./parts.tsx"
@@ -80,6 +82,14 @@ const FALLBACK_RATIO = 16 / 9
 
 /** How long the copy button wears its confirmation before it offers again. */
 const COPIED_MS = 3000
+
+/** The message key of the file an option names, for the toast that says where. */
+function optionLabel(place: PromptPlace, form: string, option?: string): string | undefined {
+  if (option === undefined) return undefined
+  return place.forms
+    .find((one) => one.id === form)
+    ?.options?.find((one) => one.id === option)?.labelKey
+}
 
 /**
  * What fills a card's cover box: the first picture a person added to the
@@ -283,7 +293,7 @@ interface CardProps {
   /** What each place already holds of this prompt, read once for the page. */
   holds: Holds
   onOpen: () => void
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
+  onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) => void
 }
 
 function PromptCard({ prompt, updated, busy, store, places, holds, onOpen, onGenerate }: CardProps) {
@@ -371,6 +381,7 @@ export function PromptsPage() {
   const library = usePromptLibrary()
   const places = usePromptPlaces()
   const files = usePlaceFiles()
+  const service = usePromptService()
 
   const settings = useSettings()
   const search = useSearchPage()
@@ -452,7 +463,7 @@ export function PromptsPage() {
         id: place.id,
         icon: place.icon,
         label: t(place.labelKey),
-        where: generatedUnder(place),
+        where: place.where ?? "",
         count: library.rows.filter((row) => holdsSomething(holdsMap[row.id]?.[place.id]))
           .length,
       })
@@ -469,8 +480,9 @@ export function PromptsPage() {
 
   const detail = matching.find((row) => row.id === detailId) ?? null
 
-  /* One sentence for every failure: what the port threw is the only thing that
-     knows what actually went wrong. */
+  /* One sentence for every failure that did not name itself: what the port
+     threw is the only thing that knows what actually went wrong, and it goes to
+     the log rather than to a person reading a stack line. */
   const refuse = React.useCallback(
     (failure: unknown) =>
       toast.add({
@@ -480,54 +492,76 @@ export function PromptsPage() {
     []
   )
 
+  /* A delivery's failure is the provider's to name; the page only turns its key
+     into the reader's language. */
+  const refuseDelivery = React.useCallback(
+    (failure: unknown) => {
+      const named = promptFailure(failure, "prompts.error.action")
+      if (named.detail !== undefined) console.error(named.detail)
+      toast.add({ type: "error", title: failureText(t, named) })
+    },
+    [t]
+  )
+
   /** Write one of the forms into one place, or take back what is there. */
   const generate = React.useCallback(
     async (
       prompt: StoredPrompt,
       place: PromptPlace,
-      action: Delivery,
-      document?: string,
+      form: string,
+      option?: string,
       remove?: boolean
     ) => {
       if (files === null) {
-        refuse(new Error(t("prompts.menu.blocked")))
+        refuseDelivery(new PromptError("prompts.error.noFiles"))
         return
       }
+      /* The menu was built from a list that may have changed while it was open:
+         an agent switched off underneath it must not still be written to. */
+      if (!places.some((one) => one.id === place.id)) {
+        refuseDelivery(new PromptError("prompts.error.unknownPlace", { place: place.id }))
+        return
+      }
+      const provider = service?.providerOf(place.id)
+      if (provider === undefined) {
+        refuseDelivery(new PromptError("prompts.error.unknownPlace", { place: place.id }))
+        return
+      }
+      const io = { files, workspace: () => files.workspace() }
+      const file = optionLabel(place, form, option)
       setBusy(true)
       try {
         if (remove === true) {
-          const taken = await undeliver(files, place, prompt, action, document)
+          const taken = await provider.remove(io, place.id, prompt, form, option)
           setStamp((current) => current + 1)
           if (taken) {
-            const where = place.documents?.find((one) => one.id === document)
             toast.add({
               type: "success",
               title:
-                where === undefined
+                file === undefined
                   ? t("prompts.done.remove").replace("{agent}", t(place.labelKey))
-                  : t("prompts.done.document.remove").replace("{file}", t(where.labelKey)),
+                  : t("prompts.done.document.remove").replace("{file}", t(file)),
             })
           }
           return
         }
-        await deliver(files, place, prompt, action, document)
+        await provider.install(io, place.id, prompt, form, option)
         setStamp((current) => current + 1)
         /* A section says which file it went into; a file is its own answer. */
-        const where = place.documents?.find((one) => one.id === document)
         toast.add({
           type: "success",
           title:
-            where === undefined
-              ? t(`prompts.done.${action}`).replace("{agent}", t(place.labelKey))
-              : t("prompts.done.document").replace("{file}", t(where.labelKey)),
+            file === undefined
+              ? t("prompts.done.install").replace("{agent}", t(place.labelKey))
+              : t("prompts.done.document").replace("{file}", t(file)),
         })
       } catch (failure) {
-        refuse(failure)
+        refuseDelivery(failure)
       } finally {
         setBusy(false)
       }
     },
-    [files, refuse, t]
+    [files, places, service, refuseDelivery, t]
   )
 
   const submit = React.useCallback(
@@ -594,8 +628,8 @@ export function PromptsPage() {
     places,
     holds: holdsMap[prompt.id] ?? {},
     onOpen: () => setDetailId(prompt.id),
-    onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) =>
-      void generate(prompt, place, action, document, remove),
+    onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) =>
+      void generate(prompt, place, form, option, remove),
   })
 
   const columns: LedgerColumn<StoredPrompt>[] = [
@@ -982,8 +1016,8 @@ function LedgerAction({
   onGenerate: (
     prompt: StoredPrompt,
     place: PromptPlace,
-    action: Delivery,
-    document?: string,
+    form: string,
+    option?: string,
     remove?: boolean
   ) => Promise<void>
 }) {

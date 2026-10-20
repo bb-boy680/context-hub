@@ -70,7 +70,7 @@ export const promptsMessages: Record<string, string> = {
   "prompts.location.workspace": "Workspace",
   "prompts.location.library": "Prompt library",
   "prompts.place.body": "This hub",
-  "prompts.place.generates": "Commands, rules, and agents files, from the ⋯",
+  "prompts.place.generates": "Delivered with the ⋯ menu",
   "prompts.place.expand": "Show {count} more",
   "prompts.place.collapse": "Show fewer",
   "prompts.location.count": "{count} installed",
@@ -110,11 +110,11 @@ export const promptsMessages: Record<string, string> = {
   "prompts.menu.rule.remove": "Remove the rule",
   "prompts.menu.agent": "Create an agents file",
   "prompts.menu.agent.remove": "Remove the agents file",
+  "prompts.menu.documents": "Add to a project file",
   "prompts.menu.document.agents": "Add to AGENTS.md",
   "prompts.menu.document.agents.remove": "Remove from AGENTS.md",
   "prompts.menu.document.design": "Add to DESIGN.md",
   "prompts.menu.document.design.remove": "Remove from DESIGN.md",
-  "prompts.menu.blocked": "This form cannot reach that file",
 
   "prompts.add.title": "Add a prompt",
   "prompts.add.hint":
@@ -159,10 +159,13 @@ export const promptsMessages: Record<string, string> = {
   "prompts.detail.places.held": "{count} installed",
 
   "prompts.done.remove": "Taken back from {agent}",
-  "prompts.done.commands": "A command was generated for {agent}",
-  "prompts.done.agent": "An agents file was created for {agent}",
-  "prompts.done.rule": "A rule was generated for {agent}",
+  "prompts.done.install": "Delivered to {agent}",
   "prompts.done.document": "Added to {file}",
   "prompts.done.document.remove": "Removed from {file}",
   "prompts.done.deleted": "Deleted “{name}”",
+
+  "prompts.error.action": "That could not be done",
+  "prompts.error.noFiles": "This form cannot reach that file",
+  "prompts.error.unknownPlace": "That place is no longer available",
+  "prompts.error.unknownForm": "There is no action called {form}",
 }

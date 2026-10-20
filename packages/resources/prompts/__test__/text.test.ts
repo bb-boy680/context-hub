@@ -13,8 +13,7 @@
 import { describe, expect, it } from "vitest"
 
 import { commandFile, describeBody } from "../src/command-file.ts"
-import { targetOf } from "../src/deliver.ts"
-import type { PromptPlace } from "../src/provider.ts"
+import { targetOf, type DeliveryPlace } from "../src/deliver.ts"
 import { slugOf } from "../src/slug.ts"
 import { withSection, withoutSection } from "../src/instruction.ts"
 
@@ -268,11 +267,8 @@ describe("withoutSection", () => {
 })
 
 describe("where each action writes", () => {
-  const place: PromptPlace = {
+  const place: DeliveryPlace = {
     id: "workspace",
-    agent: "hub.prompt.catalog",
-    labelKey: "prompts.location.workspace",
-    icon: () => null,
     scope: "workspace",
     commandDir: ".agents/commands",
     ruleDir: ".agents/rules",
@@ -281,8 +277,6 @@ describe("where each action writes", () => {
       { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
       { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
     ],
-    generatedOnly: true,
-    order: 0,
   }
   /* The title, not the description, is what these files are named after: the two
      say different things here so a path built from the wrong one shows up. */
@@ -303,7 +297,7 @@ describe("where each action writes", () => {
 
   /* A place that never declared an agents directory is not asked to write one. */
   it("refuses an agents file where the place has no such directory", () => {
-    const bare: PromptPlace = { ...place, agentDir: undefined }
+    const bare: DeliveryPlace = { ...place, agentDir: undefined }
     expect(() => targetOf(bare, prompt, "agent")).toThrow(/agents directory/)
   })
 
@@ -328,7 +322,7 @@ describe("where each action writes", () => {
   })
 
   it("refuses a place that keeps no documents, while its rules still work", () => {
-    const bare: PromptPlace = { ...place, documents: undefined }
+    const bare: DeliveryPlace = { ...place, documents: undefined }
     expect(() => targetOf(bare, prompt, "instructions", "agents")).toThrow()
     expect(targetOf(bare, prompt, "rule").file).toBe(".agents/rules/code-review.md")
   })

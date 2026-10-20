@@ -32,6 +32,7 @@ import {
   valueAt,
   writeDeclaration,
   writeTomlKey,
+  writeTomlString,
 } from "../src/contract.ts"
 import type { McpRemoteDeclaration, McpStdioDeclaration } from "../src/contract.ts"
 
@@ -306,6 +307,15 @@ keep = "me"
     expect(isBareKey("node-repl"), "a key with a dash stays bare").toBe(true)
     expect(writeTomlKey("node-repl"), "and is written bare").toBe("node-repl")
     expect(writeTomlKey("a b"), "a key with a space is quoted").toBe('"a b"')
+  })
+
+  /* A generated Codex agent writes one paragraph of markdown into a TOML basic
+     string; every character that could end the string or the line is escaped. */
+  it("writes a string that reads back unchanged, escapes and all", () => {
+    const value = 'back\\slash "quote"\nline\rreturn\ttab\u0000nul'
+    const written = writeTomlString(value)
+    expect(written.startsWith('"') && written.endsWith('"')).toBe(true)
+    expect(parse(`value = ${written}`)).toEqual({ value })
   })
 })
 

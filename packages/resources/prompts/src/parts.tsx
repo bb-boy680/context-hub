@@ -10,7 +10,7 @@ import { FileTextIcon, HardDriveIcon } from "lucide-react"
 import { AvatarStack } from "@context-hub/extensions/components"
 import { useI18n } from "@context-hub/extensions/react"
 
-import type { HeldMark } from "./deliver.ts"
+import type { HeldMark } from "./held.ts"
 import { tokenLabel } from "./library.ts"
 
 /**

@@ -15,9 +15,14 @@ import type { PlaceFiles } from "@context-hub/core/place-files"
 import { createCatalog, type Catalog } from "@context-hub/extensions"
 import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
 
-import { heldAt, NOTHING_HELD, type Held } from "./deliver.ts"
 import type { PromptLibraryValue } from "./library-store.ts"
-import { promptPlaces, type PromptPlace } from "./provider.ts"
+import {
+  promptPlaces,
+  type PromptHeld,
+  type PromptIo,
+  type PromptPlace,
+  type PromptService,
+} from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
 
 /**
@@ -67,6 +72,12 @@ export function usePromptPlaces(): readonly PromptPlace[] {
     void revision
     return service === null ? [] : promptPlaces(service.providers(), chosen)
   }, [service, revision, chosen])
+}
+
+/** The prompts service, or `null` when this form does not carry this module. */
+export function usePromptService(): PromptService | null {
+  const ctx = useHub()
+  return React.useMemo(() => ctx.get("prompts") ?? null, [ctx])
 }
 
 /** The form's client-file port, or `null` when this form cannot reach one. */
@@ -181,7 +192,7 @@ export function tokenLabel(body: string): string {
 }
 
 /** What each place already holds of one prompt, keyed by place id. */
-export type Holds = Readonly<Record<string, Held>>
+export type Holds = Readonly<Record<string, PromptHeld>>
 
 /**
  * What every place already holds of this prompt, read from the files.
@@ -202,19 +213,27 @@ export function useHolds(
   files: PlaceFiles | null,
   stamp: number
 ): Holds {
+  const ctx = useHub()
+  const service = usePromptService()
   const [held, setHeld] = React.useState<Holds>({})
 
   React.useEffect(() => {
     if (prompt === null || files === null || places.length === 0) return
+    const io: PromptIo = { files, workspace: () => files.workspace() }
     let live = true
     void (async () => {
       const answers = await Promise.all(
         places.map(async (place) => {
+          const provider = service?.providerOf(place.id)
+          /* A place nobody claims answers nothing: an empty map is the one
+             truthful answer, rather than a row of ticks that would be guessed. */
+          if (provider === undefined) return [place.id, {}] as const
           try {
-            return [place.id, await heldAt(files, place, prompt)] as const
-          } catch {
+            return [place.id, await provider.held(io, place.id, prompt)] as const
+          } catch (failure) {
             /* A place whose files cannot be read holds nothing that is known. */
-            return [place.id, NOTHING_HELD] as const
+            ctx.host.log("warn", `prompts: could not read ${place.id}: ${why(failure)}`)
+            return [place.id, {}] as const
           }
         })
       )
@@ -223,7 +242,7 @@ export function useHolds(
     return () => {
       live = false
     }
-  }, [prompt, places, files, stamp])
+  }, [ctx, service, prompt, places, files, stamp])
 
   return held
 }
@@ -247,22 +266,28 @@ export function useHoldsMap(
   files: PlaceFiles | null,
   stamp: number
 ): Readonly<Record<string, Holds>> {
+  const ctx = useHub()
+  const service = usePromptService()
   const [held, setHeld] = React.useState<Readonly<Record<string, Holds>>>({})
 
   React.useEffect(() => {
     /* Nothing to ask, so nothing is asked: a lookup for a row that is gone finds
        no entry, which reads as "nothing held" without clearing the last answer. */
     if (files === null || places.length === 0 || rows.length === 0) return
+    const io: PromptIo = { files, workspace: () => files.workspace() }
     let live = true
     void (async () => {
       const entries = await Promise.all(
         rows.map(async (row) => {
           const answers = await Promise.all(
             places.map(async (place) => {
+              const provider = service?.providerOf(place.id)
+              if (provider === undefined) return [place.id, {}] as const
               try {
-                return [place.id, await heldAt(files, place, row)] as const
-              } catch {
-                return [place.id, NOTHING_HELD] as const
+                return [place.id, await provider.held(io, place.id, row)] as const
+              } catch (failure) {
+                ctx.host.log("warn", `prompts: could not read ${place.id}: ${why(failure)}`)
+                return [place.id, {}] as const
               }
             })
           )
@@ -274,7 +299,12 @@ export function useHoldsMap(
     return () => {
       live = false
     }
-  }, [rows, places, files, stamp])
+  }, [ctx, service, rows, places, files, stamp])
 
   return held
+}
+
+/** A caught value as one line for the host log. */
+function why(failure: unknown): string {
+  return failure instanceof Error ? failure.message : String(failure)
 }
