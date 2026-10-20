@@ -17,7 +17,6 @@ export const simplifiedChineseLocale: ExtensionModule = {
   manifest: {
     name: "简体中文",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "declarative",
     category: "language",
     description: "Chinese (Simplified) interface language.",

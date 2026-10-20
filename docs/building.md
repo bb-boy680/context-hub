@@ -92,21 +92,23 @@ is not used because a pnpm install does not guarantee that layout on CI.
 pnpm --filter @context-hub/desktop dev
 ```
 
-This watches all three bundles, rebuilds on change, and restarts Electron after
-a successful rebuild. The application menu adds Restart App and Toggle DevTools
-while the watcher runs (Reload Page is always available). Stopping the watcher
-also stops the Electron process it started.
+This starts the web dev server (`apps/web/dev.ts`, pinned to ports 5270/5271)
+unless one is already listening, watches the main and preload bundles,
+rebuilds on change, and restarts Electron after a successful rebuild. Page
+source edits reach the window through Vite's HMR; the hub server is the web
+dev server's child, so `server.ts` changes need a restart of the watcher. The
+application menu adds Restart App and Toggle DevTools while the watcher runs
+(Reload Page is always available). Stopping the watcher also stops the
+Electron process and the web dev server it started.
 
-To use Vite's HMR for the page, run `pnpm dev` in another terminal and start
-the desktop with:
+To point the window at a different dev server, set:
 
 ```bash
-CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271 pnpm --filter @context-hub/desktop exec electron .
+CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271 pnpm --filter @context-hub/desktop dev
 ```
 
-`CONTEXT_HUB_DEV_URL` skips the server entirely; `/hub` requests go through
-Vite's existing proxy. Main-process and server changes still need the watcher
-or a rebuild.
+An explicit `CONTEXT_HUB_DEV_URL` is used as-is and the watcher does not start
+or stop a web dev server of its own.
 
 Crash notes land in `app.getPath("logs")` — on Windows
 `%APPDATA%\@context-hub\desktop\logs` — as `crash-<UTC>-<source>.log`. They
@@ -125,7 +127,12 @@ pnpm --filter @context-hub/desktop package:linux
 Each command builds the page, the bundles, then runs electron-builder with
 `electron-builder.config.mjs`. Output lands in `apps/desktop/release/`:
 
-- Windows: an NSIS installer (`Context-Hub-<version>-win-x64.exe`).
+- Windows: an NSIS installer (`Context-Hub-<version>-win-x64.exe`). It uses
+  electron-builder's stock assisted-installer pages: the install-mode page
+  (current user or all users) and the directory page
+  (`allowToChangeInstallationDirectory`). Installer icon and header come from
+  `apps/desktop/build/`. Silent upgrades (`/S --updated`) reuse the folder
+  recorded by the previous install.
 - macOS: a `.dmg` and the `.zip` payload electron-updater needs.
 - Linux: an `.AppImage`.
 
@@ -135,6 +142,14 @@ name that the release job uploads.
 Inside the packaged app, `dist/main.cjs` and `node_modules` are in `app.asar`;
 `server.mjs` and the built page are copied to `resources/` so the utility
 process can fork the server without asar resolution.
+
+The desktop app opens directly to the sidebar; there is no first-run wizard.
+The theme choice is stored by `ThemeProvider` in `localStorage`; because the
+desktop server binds an ephemeral port, the window origin changes between
+launches and the theme may not survive a restart. Layout, install mode and the
+other settings are written to the hub state and do persist. A real GUI
+install/uninstall and a silent upgrade from a published older build were not
+run during development; verify those on a clean machine before release.
 
 `electron-builder` downloads the Electron version pinned in
 `apps/desktop/package.json` for the runner's platform and architecture. The

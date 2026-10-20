@@ -16,6 +16,12 @@ export interface DesktopInfo {
 
 export type UpdateStatus = "idle" | "available" | "downloading" | "ready"
 
+/** The menu rows the page has to carry out itself. */
+export type DesktopMenuAction =
+  | "about"
+  | "reload-resources"
+  | "refresh-plugins"
+
 export interface UpdateState {
   status: UpdateStatus
   version?: string
@@ -24,8 +30,12 @@ export interface UpdateState {
 
 export interface DesktopBridge {
   info(): Promise<DesktopInfo>
+  /** Ask the carrier for a folder; its absolute path, or null when dismissed. */
+  pickFolder(): Promise<string | null>
   updateState(): Promise<UpdateState>
   update(): Promise<void>
+  /** Run a menu row that is the page's to carry out. */
+  onMenuAction(listener: (action: DesktopMenuAction) => void): () => void
   subscribe(listener: (state: UpdateState) => void): () => void
 }
 

@@ -939,14 +939,7 @@ export function SkillsPage() {
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const settings = useSettings()
   const search = useSearchPage()
-  /* A result from the global search asks for the list view, where the matched
-     text is marked; the page's own choice is what remains once that is cleared. */
-  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
-  const view = search.listView ? "list" : localView
-  const chooseView = (next: "grid" | "list") => {
-    search.clearListView()
-    setLocalView(next)
-  }
+  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
   const [searchOpen, setSearchOpen] = React.useState(false)
   const [tag, setTag] = React.useState("All tags")
@@ -1378,13 +1371,13 @@ export function SkillsPage() {
                 icon={LayoutGridIcon}
                 label={t("skills.view.grid")}
                 active={view === "grid"}
-                onClick={() => chooseView("grid")}
+                onClick={() => setView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("skills.view.list")}
                 active={view === "list"}
-                onClick={() => chooseView("list")}
+                onClick={() => setView("list")}
               />
             </div>
             <Button

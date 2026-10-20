@@ -7,7 +7,7 @@
  * plugins itself, so `startHub` offers those only when a host answers for them;
  * without a host the skills page has no catalog and says so.
  */
-import { claudeCodeExtension } from "@context-hub/claude-code"
+import { ABOUT_ROUTE, type AboutInfo } from "@context-hub/core/about"
 import { STATE_ROUTE } from "@context-hub/core/state"
 import { createRemoteNet } from "@context-hub/core/net"
 import { globalSearchExtension } from "@context-hub/global-search"
@@ -25,14 +25,14 @@ import { mcpExtension } from "@context-hub/mcp"
 import { pluginsExtension } from "@context-hub/plugins"
 import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
 import { SKILL_ROUTE, createRemoteSkillStore, skillsExtension } from "@context-hub/skills"
-import { skillsShExtension } from "@context-hub/skills-sh"
 import { createRemoteVariableStore, variablesExtension } from "@context-hub/variables"
 import * as ui from "./ui-kit.ts"
 import { desktopBridge } from "./desktop.ts"
 import { createRemotePlaceFiles, placeFilesAvailable } from "./place-files.ts"
 import { installExtensionRuntime } from "./extension-runtime.ts"
-import { preloadCatalogs } from "./preload.ts"
+import { preloadCatalogs, preloadMarket } from "./preload.ts"
 import { createRemoteWorkspaceService } from "./workspaces.ts"
+import { startExtensionUpdateSchedule } from "./extension-updates.ts"
 
 /**
  * Where the build before the host-backed state kept each document, and how it
@@ -119,17 +119,34 @@ async function promptStoreAvailable(): Promise<boolean> {
   }
 }
 
+/** The running Context Hub version; without a host, no package can be judged compatible. */
+async function hubVersion(): Promise<string> {
+  try {
+    const response = await fetch(ABOUT_ROUTE)
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
+    const about = (await response.json()) as Partial<AboutInfo>
+    if (typeof about.version !== "string" || about.version.trim() === "") {
+      throw new Error("about: no version")
+    }
+    return about.version
+  } catch (error) {
+    console.warn("context hub: could not read the hub version", error)
+    return "0.0.0"
+  }
+}
+
 /**
  * Every extension installed under `<home>/extensions`. One that cannot be loaded
  * is reported to the console and left out, so a broken download never keeps the
  * hub from starting.
  */
-async function installedPlugins() {
+async function installedPlugins(hubVersion: string) {
   try {
     const found = await discoverPlugins({
       source: createRemotePluginSource(),
       /* The host serves the file; this import is the one the kernel cannot make itself. */
       importModule: async (url) => import(/* @vite-ignore */ url) as Promise<unknown>,
+      hubVersion,
     })
     const extensions = []
     for (const plugin of found) {
@@ -159,8 +176,10 @@ export async function startHub(): Promise<HubKernel> {
       void storeDocument(key, value)
     },
   }
+  const version = await hubVersion()
   const webHost: PlatformHost = {
     form: desktopBridge() === undefined ? "Web" : "Desktop",
+    version,
     capabilities: { code: true, filesystem: false, network: true },
     storage,
     net: createRemoteNet(),
@@ -195,14 +214,8 @@ export async function startHub(): Promise<HubKernel> {
       /* The palette last among the shipped modules, so the settings and
          extensions groups follow the asset groups in the result list. */
       globalSearchExtension,
-      /* Only the agent integrations this build is being tried against. The
-         others are still written and still shipped; they are left out here so
-         the page's module graph is small enough to boot quickly while the
-         carrier is worked on. Add them back to the list to bring them in. */
-      claudeCodeExtension,
-      skillsShExtension,
       simplifiedChineseLocale,
-      ...(await installedPlugins()),
+      ...(await installedPlugins(version)),
     ],
   })
   await kernel.start()
@@ -210,5 +223,7 @@ export async function startHub(): Promise<HubKernel> {
      opened. Not awaited: rendering waits for the kernel, not for the libraries
      — a page draws what it has until an answer lands. */
   void preloadCatalogs(kernel)
+  preloadMarket()
+  startExtensionUpdateSchedule(kernel.ctx)
   return kernel
 }

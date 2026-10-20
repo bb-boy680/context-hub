@@ -16,6 +16,16 @@ import type { PlatformHost } from "./host.ts"
 /** State document holding the preferences, under the hub home's state space. */
 export const SETTINGS_DOCUMENT = "settings"
 
+/**
+ * The built-in market index.
+ *
+ * The Extensions page always reads this source; there is no stored override
+ * and no source box. Metadata is fetched at startup, and a plugin's files are
+ * cloned only when the user chooses Install.
+ */
+export const OFFICIAL_MARKET_URL =
+  "https://raw.githubusercontent.com/bb-boy680/context-hub-extensions/main/marketplace.json"
+
 /** How an asset page opens: the card grid or the list table. */
 export type LayoutMode = "grid" | "list"
 
@@ -32,8 +42,6 @@ export interface HubSettings {
   installMode: InstallMode
   /** Download remote images into the hub's own asset directory as they arrive. */
   downloadRemoteImages: boolean
-  /** URL of the extension market index; empty when no market is configured. */
-  extensionMarketUrl: string
   /**
    * Values owned by plugins, keyed by the plugin's id. The shell treats each
    * value as opaque: whoever wrote it is the one that validates and reads it.
@@ -49,7 +57,6 @@ export const DEFAULT_SETTINGS: HubSettings = {
   layout: "grid",
   installMode: "auto",
   downloadRemoteImages: true,
-  extensionMarketUrl: "",
   plugins: {},
 }
 
@@ -80,10 +87,6 @@ export function readSettings(value: unknown): HubSettings {
       typeof record.downloadRemoteImages === "boolean"
         ? record.downloadRemoteImages
         : DEFAULT_SETTINGS.downloadRemoteImages,
-    extensionMarketUrl:
-      typeof record.extensionMarketUrl === "string"
-        ? record.extensionMarketUrl
-        : DEFAULT_SETTINGS.extensionMarketUrl,
     plugins: readPlugins(record.plugins),
   }
 }
@@ -128,8 +131,7 @@ export class SettingsService extends Service {
     if (
       next.layout === this.current.layout &&
       next.installMode === this.current.installMode &&
-      next.downloadRemoteImages === this.current.downloadRemoteImages &&
-      next.extensionMarketUrl === this.current.extensionMarketUrl
+      next.downloadRemoteImages === this.current.downloadRemoteImages
     ) {
       return
     }

@@ -20,18 +20,20 @@ import { ASSET_ROUTE } from "./src/assets.ts"
 import { ABOUT_ROUTE } from "./src/about.ts"
 import { NET_ROUTE } from "./src/net.ts"
 import { PLACE_FILES_ROUTE, readPlaceCall } from "./src/place-files.ts"
+import { parsePluginManifestYaml } from "./src/extension-manifest.ts"
 import { runtimeSource } from "./src/host/extension-runtime.ts"
 import {
   EXTENSION_MARKET_ROUTE,
   EXTENSION_ROUTE,
   EXTENSION_RUNTIME_DIR,
+  PLUGIN_MANIFEST,
   assertPluginId,
 } from "./src/plugins.ts"
 import { STATE_ROUTE } from "./src/state.ts"
 import { WORKSPACE_ROUTE } from "./src/workspace.ts"
 import { resolveStoredFile } from "./src/host/assets-fs.ts"
 import { hostFolder } from "./src/host/fs-browse.ts"
-import { displayPath, resolveHubHome } from "./src/host/home.ts"
+import { displayPath, resolveHubHome, userHome } from "./src/host/home.ts"
 import { isPublicHostname } from "./src/host/remote-image.ts"
 import {
   contentTypeOf,
@@ -42,6 +44,7 @@ import {
   type HubMiddleware,
 } from "./src/host/http.ts"
 import {
+  cacheMarketIndex,
   createMarketReader,
   installExtensionFromMarket,
   removeInstalledExtension,
@@ -333,7 +336,11 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
       const id = decodeURIComponent(slash === -1 ? rest : rest.slice(0, slash))
       assertPluginId(id)
       if (slash === -1) {
-        sendJson(response, 200, JSON.parse(await store.read(id, "plugin.json")) as unknown)
+        sendJson(
+          response,
+          200,
+          parsePluginManifestYaml(await store.read(id, PLUGIN_MANIFEST), id)
+        )
         return
       }
       await sendExtensionFile(store.root, id, rest.slice(slash + 1), response)
@@ -352,12 +359,13 @@ export function createExtensionHandler(options: { home?: string } = {}): HubMidd
  * did not publish.
  */
 export function createExtensionMarketHandler(
-  options: { home?: string; reader?: MarketReader } = {}
+  options: { home?: string; reader?: MarketReader; version?: string } = {}
 ): HubMiddleware {
   const home = resolveHubHome(options.home)
   const store = createFsPluginStore(home)
   const state = createFsStateStore(home)
   const reader = options.reader ?? createMarketReader()
+  const hubVersion = options.version ?? "0.0.0"
   let tail: Promise<void> = Promise.resolve()
 
   const run = <T>(task: () => Promise<T>): Promise<T> => {
@@ -384,6 +392,9 @@ export function createExtensionMarketHandler(
       const action = required(body.action, "missing action")
       if (action === "list") {
         const index = await reader.read(required(body.url, "missing url"), body.refresh === true)
+        /* Keep the listing beside the installed extensions. Metadata only: the
+           page can draw the market from this file, and install still clones. */
+        await cacheMarketIndex(store.root, index).catch(() => undefined)
         sendJson(response, 200, { index })
         return
       }
@@ -399,7 +410,13 @@ export function createExtensionMarketHandler(
           if (chosen === undefined) {
             throw new Error(`the market does not list "${id}" version "${version}"`)
           }
-          return installExtensionFromMarket({ store, state, plugin, version: chosen })
+          return installExtensionFromMarket({
+            store,
+            state,
+            plugin,
+            version: chosen,
+            hubVersion,
+          })
         })
         sendJson(response, 200, result)
         return
@@ -503,6 +520,35 @@ async function fetchThroughProxy(asked: NetRequest): Promise<NetReply> {
   return { status: upstream.status, body: Buffer.concat(chunks).toString("utf8") }
 }
 
+/** Open the store a workspace route serves from, resolving the host's folder. */
+async function openWorkspaceStore(
+  options: {
+    home?: string
+    folder?: string
+  },
+  defaultFolder?: string
+): Promise<WorkspaceStore> {
+  const folder = options.folder ?? (await hostFolder())
+  return createFsWorkspaceStore(resolveHubHome(options.home), {
+    folder,
+    ...(defaultFolder === undefined ? {} : { defaultFolder }),
+  })
+}
+
+/**
+ * Write the default workspace before the first request. A carrier calls this
+ * once at startup; a form that mounts the handler only still gets it lazily on
+ * its first read. The default is the person's home, not the folder the server
+ * happens to run in: every form shares one document, and the dev server and CLI
+ * run in a project folder.
+ */
+export async function ensureDefaultWorkspace(
+  options: { home?: string; folder?: string } = {}
+): Promise<void> {
+  const store = await openWorkspaceStore(options, userHome())
+  await store.page()
+}
+
 /**
  * Keeps the workspace list. The form
  * reports the folder the person picked through the system's own dialog — its
@@ -513,11 +559,8 @@ export function createWorkspaceHandler(options: { home?: string; folder?: string
   let ready: Promise<WorkspaceStore> | null = null
 
   const getStore = async (): Promise<WorkspaceStore> => {
-    ready ??= (async () => {
-      /* This host's own folder is a workspace by default, with no picking. */
-      const folder = options.folder ?? (await hostFolder())
-      return createFsWorkspaceStore(resolveHubHome(options.home), { folder })
-    })()
+    /* This host's own folder is the default workspace, with no picking. */
+    ready ??= openWorkspaceStore(options)
     return ready
   }
 
@@ -565,8 +608,10 @@ export function createWorkspaceHandler(options: { home?: string; folder?: string
 
         case "rename": {
           const id = required(body.id, "rename needs a workspace id")
-          const name = required(body.name, "rename needs the name to give it")
-          sendJson(response, 200, await store.rename(id, name))
+          /* An empty name is meaningful: the default workspace restores its
+             system name, and any other row drops the name it was given. */
+          if (typeof body.name !== "string") throw new Error("rename needs the name to give it")
+          sendJson(response, 200, await store.rename(id, body.name))
           return
         }
 

@@ -27,7 +27,7 @@ import { Input } from "@context-hub/shadcn-ui/components/input"
 
 import { SidebarGroup, SidebarRow } from "@/components/sidebar-rows"
 import { pickFolder } from "@/lib/folder-picker"
-import { useWorkspaces } from "@/lib/workspaces"
+import { renameSubmission, useWorkspaces, workspaceLabel } from "@/lib/workspaces"
 
 /** The box a row's trailing mark sits in, so ✓ and ⋯ land on the same spot. */
 function TrailBox({ children }: { children: React.ReactNode }) {
@@ -37,10 +37,13 @@ function TrailBox({ children }: { children: React.ReactNode }) {
 /** The rename dialog: one field, the workspace's current name in it. */
 function RenameDialog({
   name,
+  allowEmpty = false,
   onRename,
   onClose,
 }: {
   name: string
+  /** Whether an empty value may be saved, restoring the system name. */
+  allowEmpty?: boolean
   /** Answers why the hub refused the name, or `null` once it took it. */
   onRename: (next: string) => Promise<string | null>
   onClose: () => void
@@ -105,7 +108,7 @@ function RenameDialog({
           <DialogClose render={<Button variant="ghost" />}>
             {t("workspace.rename.cancel")}
           </DialogClose>
-          <Button disabled={busy || value.trim() === ""} onClick={() => void save()}>
+          <Button disabled={busy || (value.trim() === "" && !allowEmpty)} onClick={() => void save()}>
             {t("workspace.rename.save")}
           </Button>
         </div>
@@ -118,16 +121,21 @@ export function WorkspaceGroup() {
   const { t } = useI18n()
   const { page, failure, select, add, rename, remove } = useWorkspaces()
   /** The workspace whose name is being changed, and the name it opened with. */
-  const [editing, setEditing] = React.useState<{ id: string; name: string } | null>(null)
+  const [editing, setEditing] = React.useState<{
+    id: string
+    name: string
+    default: boolean
+  } | null>(null)
   /** Why the last create attempt did not land, ready to show. */
   const [notice, setNotice] = React.useState<string | null>(null)
   const current = page?.current ?? null
 
   /**
    * Ask for a folder through the system's own dialog, which is the one a person
-   * expects and the only one a page may open. It reports the folder's name and
-   * nothing else — a page is never told where a folder is — so the hub places
-   * that name among the folders it knows.
+   * expects and the only one a page may open. The desktop carrier reports the
+   * folder's absolute path; a browser reports its name and nothing else — a
+   * page is never told where a folder is — so there the hub places that name
+   * among the folders it knows.
    */
   const create = async () => {
     const picked = await pickFolder()
@@ -141,7 +149,7 @@ export function WorkspaceGroup() {
       return
     }
     setNotice(null)
-    setNotice(await add(picked.name))
+    setNotice(await add(picked.path ?? picked.name))
   }
 
   /* One line for whichever of the two answers last: the form's own, or the hub's. */
@@ -151,11 +159,12 @@ export function WorkspaceGroup() {
     <SidebarGroup label={t("workspace.group.title")}>
       {(page?.folders ?? []).map((folder) => {
         const active = folder.id === current
+        const label = workspaceLabel(folder, t)
         return (
           <SidebarRow
             key={folder.id}
-            label={folder.name}
-            hint={folder.display}
+            label={label}
+            hint={folder.default ? null : folder.display}
             active={active}
             icon={<FolderIcon className="size-[18px]" aria-hidden />}
             onClick={() => select(folder.id)}
@@ -183,19 +192,23 @@ export function WorkspaceGroup() {
                   >
                     <DropdownMenuItem
                       className="h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
-                      onClick={() => setEditing({ id: folder.id, name: folder.name })}
+                      onClick={() =>
+                        setEditing({ id: folder.id, name: label, default: folder.default })
+                      }
                     >
                       <PenLineIcon className="size-[15px]" aria-hidden />
                       {t("workspace.action.rename")}
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      variant="destructive"
-                      className="h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
-                      onClick={() => void remove(folder.id)}
-                    >
-                      <Trash2Icon className="size-[15px]" aria-hidden />
-                      {t("workspace.action.remove")}
-                    </DropdownMenuItem>
+                    {folder.default ? null : (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        className="h-9 gap-2.5 rounded-sm px-2.5 text-[13px] font-medium"
+                        onClick={() => void remove(folder.id)}
+                      >
+                        <Trash2Icon className="size-[15px]" aria-hidden />
+                        {t("workspace.action.remove")}
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               )
@@ -217,7 +230,10 @@ export function WorkspaceGroup() {
       {editing === null ? null : (
         <RenameDialog
           name={editing.name}
-          onRename={(next) => rename(editing.id, next)}
+          allowEmpty={editing.default}
+          onRename={(next) =>
+            rename(editing.id, renameSubmission(editing.default, next, t))
+          }
           onClose={() => setEditing(null)}
         />
       )}

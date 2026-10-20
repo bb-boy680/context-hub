@@ -15,7 +15,6 @@ const chineseLocale: ExtensionModule = {
   manifest: {
     name: "简体中文",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "declarative",
     category: "language",
     description: "Test language pack.",
@@ -35,6 +34,7 @@ function hostWithLocale(locale: string): { host: PlatformHost; writes: [string, 
     writes,
     host: {
       form: "Test",
+      version: "0.5.0",
       capabilities: { code: true, filesystem: false, network: false },
       storage: {
         read: (key) => state.get(key) ?? null,

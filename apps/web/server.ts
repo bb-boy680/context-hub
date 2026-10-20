@@ -34,6 +34,7 @@ import {
   createPlaceFileHandler,
   createStateHandler,
   createWorkspaceHandler,
+  ensureDefaultWorkspace,
 } from "@context-hub/core/handlers"
 import { createHubServer, type HubServerOptions } from "@context-hub/core/host/server"
 import { createMcpHandler } from "@context-hub/mcp/handlers"
@@ -124,7 +125,7 @@ const options: HubServerOptions = {
     createStateHandler({ ...placed, log: (message) => console.warn(message) }),
     createAboutHandler({ version, ...placed }),
     createExtensionHandler(placed),
-    createExtensionMarketHandler(placed),
+    createExtensionMarketHandler({ ...placed, version }),
     createWorkspaceHandler(placed),
     createNetHandler(),
     createSkillHandler(placed),
@@ -138,6 +139,14 @@ const options: HubServerOptions = {
   ...(pathOf(given, "host") === undefined ? {} : { host: pathOf(given, "host") as string }),
   ...(root === undefined ? {} : { static: { root } }),
 }
+
+/* The host's own folder is written down before the first request, so the
+   default workspace exists from startup rather than from the first page read.
+   A home that cannot be written only warns: the route retries it on its own. */
+await ensureDefaultWorkspace(placed).catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : String(error)
+  console.warn(`hub server: the default workspace was not written: ${message}`)
+})
 
 const listener = await createHubServer(options).listen()
 console.log(`context hub server listening on ${listener.url}`)

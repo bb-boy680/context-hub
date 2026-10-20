@@ -14,14 +14,18 @@ import * as React from "react"
 import type { LucideIcon } from "lucide-react"
 
 import {
+  isCompatible,
   parsePluginManifest,
+  parsePluginManifestYaml,
+  readPluginPackage,
   type PluginManifestFile,
 } from "@context-hub/core/extension-manifest"
+import { DEFAULT_PLUGIN_ENTRY, PLUGIN_MANIFEST } from "@context-hub/core/plugins"
 
 import { PLUGIN_ICONS, resolvePluginIcon } from "./icons.ts"
-import type { ExtensionModule } from "./types.ts"
+import type { ExtensionIcon, ExtensionManifest, ExtensionModule } from "./types.ts"
 
-export { parsePluginManifest }
+export { parsePluginManifest, parsePluginManifestYaml }
 export type { PluginManifestFile }
 
 /** One plugin found on disk, and whether the kernel can load it. */
@@ -62,23 +66,101 @@ async function readManifest(
   source: { read(id: string, file: string): Promise<string> },
   id: string
 ): Promise<PluginManifestFile> {
-  return parsePluginManifest(JSON.parse(await source.read(id, "plugin.json")) as unknown, id)
+  const manifest = parsePluginManifestYaml(
+    await source.read(id, PLUGIN_MANIFEST),
+    id
+  )
+  const raw = await source.read(id, "package.json").catch(() => null)
+  if (raw === null) {
+    return { ...manifest, version: "0.0.0", entry: DEFAULT_PLUGIN_ENTRY }
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(raw) as unknown
+  } catch {
+    throw new Error(`extension "${id}": package.json is not JSON`)
+  }
+  return { ...manifest, ...readPluginPackage(value, id) }
+}
+
+/** Image extensions a manifest may point at, relative to the plugin directory. */
+const IMAGE_ICON = /\.(?:svg|png|jpe?g|webp)$/i
+
+/** Whether a manifest icon is a safe plugin-relative image path. */
+function isImagePath(value: string): boolean {
+  if (value.startsWith("/") || value.includes("\\")) return false
+  const segments = value.split("/")
+  if (segments.some((segment) => segment === "" || segment === "." || segment === "..")) {
+    return false
+  }
+  return segments.length > 1 || IMAGE_ICON.test(value)
+}
+
+/**
+ * Resolve the icon a manifest names.
+ *
+ * A known lucide name is the historical form; a plugin-relative image path is
+ * served from the extension space, the same way its entry module is. Anything
+ * else falls back to the puzzle instead of failing the plugin.
+ */
+function manifestIcon(name: string | undefined, route: string, id: string): ExtensionIcon {
+  if (name !== undefined && Object.hasOwn(PLUGIN_ICONS, name)) {
+    return resolvePluginIcon(name)
+  }
+  if (name !== undefined && isImagePath(name)) {
+    const src = `${route}/${encodeURIComponent(id)}/${name
+      .split("/")
+      .map(encodeURIComponent)
+      .join("/")}`
+    return ({ className, "aria-hidden": ariaHidden }) =>
+      React.createElement("img", {
+        src,
+        alt: "",
+        "aria-hidden": ariaHidden,
+        className,
+      })
+  }
+  return resolvePluginIcon(name)
+}
+
+/** The catalog manifest for one package, before the kernel adds its id. */
+function manifestOf(
+  manifest: PluginManifestFile,
+  route: string,
+  id: string
+): ExtensionManifest {
+  return {
+    name: manifest.name,
+    version: manifest.version,
+    engines: manifest.engines,
+    kind: "code",
+    category: manifest.category ?? "source",
+    description: manifest.description,
+    icon: manifestIcon(manifest.icon, route, id),
+    defaultEnabled: manifest.defaultEnabled,
+    permissions: manifest.permissions,
+    provides: manifest.provides,
+  }
 }
 
 /**
  * Discover every installed plugin and build its kernel definition.
  *
  * A plugin that cannot be loaded is reported with its reason and left out of
- * the catalog, so one broken download never keeps the hub from starting.
+ * the catalog, so one broken download never keeps the hub from starting. A
+ * plugin whose `engines` this build does not satisfy is the exception: its row
+ * stays, marked incompatible, but its entry module is never imported.
  *
  * @param options.source — the plugin space to read.
  * @param options.importModule — loads one entry module by the URL the source implies.
+ * @param options.hubVersion — the running Context Hub version.
  * @param options.route — route the source serves extension files on; defaults to `/hub/extensions`.
  * @returns the loadable extensions, and one entry per plugin that could not be loaded.
  */
 export async function discoverPlugins(options: {
   source: { list(): Promise<string[]>; read(id: string, file: string): Promise<string> }
   importModule(url: string): Promise<unknown>
+  hubVersion: string
   route?: string
   /** When given, only these ids are read; the source can still list all of them. */
   ids?: readonly string[]
@@ -88,7 +170,21 @@ export async function discoverPlugins(options: {
   for (const id of options.ids ?? (await options.source.list())) {
     try {
       const manifest = await readManifest(options.source, id)
-      const entry = manifest.entry ?? "index.js"
+      const catalog = manifestOf(manifest, route, id)
+      if (!isCompatible(manifest.engines, options.hubVersion)) {
+        /* The row has to be visible and removable without running anything. */
+        found.push({
+          id,
+          module: {
+            name: manifest.id,
+            manifest: catalog,
+            inject: manifest.inject,
+            stored: true,
+          },
+        })
+        continue
+      }
+      const entry = manifest.entry
       const module = (await options.importModule(
         `${route}/${encodeURIComponent(id)}/${entry}`
       )) as { apply?: unknown; default?: { apply?: unknown } }
@@ -100,19 +196,9 @@ export async function discoverPlugins(options: {
         id,
         module: {
           name: manifest.id,
-          manifest: {
-            name: manifest.name,
-            version: manifest.version,
-            apiVersion: manifest.apiVersion,
-            kind: "code",
-            category: manifest.category ?? "source",
-            description: manifest.description ?? "",
-            icon: resolvePluginIcon(manifest.icon),
-            defaultEnabled: manifest.defaultEnabled,
-            permissions: manifest.permissions,
-            provides: manifest.provides,
-          },
+          manifest: catalog,
           inject: manifest.inject,
+          stored: true,
           apply: (ctx) => {
             /* React, icons, and the UI kit travel with the context: a plugin
                module imports nothing.

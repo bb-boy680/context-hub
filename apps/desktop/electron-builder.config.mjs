@@ -37,6 +37,20 @@ export default {
   publish: [{ provider: "github", owner: "bb-boy680", repo: "context-hub" }],
   win: {
     target: ["nsis"],
+    /* The window and taskbar use the executable's icon; without this
+       electron-builder embeds the stock Electron icon. */
+    icon: "build/installerIcon.ico",
+  },
+  /* The default one-click installer unpacks straight into
+     %LOCALAPPDATA%\Programs with no questions. The assisted installer uses the
+     stock NSIS pages: install mode (current user or all users) and the
+     directory page. */
+  nsis: {
+    oneClick: false,
+    allowToChangeInstallationDirectory: true,
+    installerIcon: "installerIcon.ico",
+    installerHeader: "installerHeader.bmp",
+    installerLanguages: ["en_US", "zh_CN"],
   },
   mac: {
     target: ["dmg", "zip"],

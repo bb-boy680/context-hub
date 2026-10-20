@@ -11,13 +11,18 @@ import {
   EXTENSION_CATEGORIES,
   EXTENSION_PERMISSIONS,
   isCompatible,
+  isLocaleId,
+  localized,
+  parseEngines,
+  type Engines,
   type ExtensionCategoryId,
   type ExtensionPermission,
+  type LocalizedText,
 } from "./extension-manifest.ts"
 import { assertPluginId } from "./plugins.ts"
 
-/** Text shown in one or more languages; an object must include `en`. */
-export type LocalizedText = string | Record<string, string>
+export { localized }
+export type { LocalizedText }
 
 /** Where one version's files come from: a git repository. */
 export interface MarketSource {
@@ -31,8 +36,8 @@ export interface MarketSource {
 /** One installable version of an extension. */
 export interface ExtensionMarketVersion {
   version: string
-  /** Kernel API range the plugin's manifest declares. */
-  apiVersion: string
+  /** Context Hub versions the plugin's manifest supports. */
+  engines: Engines
   source: MarketSource
 }
 
@@ -90,7 +95,6 @@ export function isMarketSource(value: string): string {
   return isMarketIndexUrl(trimmed)
 }
 
-const LOCALE = /^[a-z]{2,8}(-[a-z0-9]{1,8})*$/
 const DATA_ICON = /^data:(image\/(?:svg\+xml|png|jpeg|webp));base64,([\s\S]+)$/i
 const ICON_LIMIT = 32 * 1024
 
@@ -120,7 +124,7 @@ function localizedText(value: unknown, path: string): LocalizedText {
   const object = record(value, path)
   let english = false
   for (const [locale, message] of Object.entries(object)) {
-    if (!LOCALE.test(locale)) fail(`${path}.${locale}`, "is not a locale id")
+    if (!isLocaleId(locale)) fail(`${path}.${locale}`, "is not a locale id")
     if (typeof message !== "string" || message.trim() === "") {
       fail(`${path}.${locale}`, "must be a non-empty string")
     }
@@ -216,13 +220,9 @@ function version(value: unknown, path: string, allowLocal: boolean): ExtensionMa
   if (tag.length > 64 || /\s/.test(tag)) {
     fail(`${path}.version`, "must be at most 64 characters without whitespace")
   }
-  const apiVersion = text(object.apiVersion, `${path}.apiVersion`)
-  if (!isCompatible(apiVersion)) {
-    fail(`${path}.apiVersion`, "is not compatible with this kernel")
-  }
   return {
     version: tag,
-    apiVersion,
+    engines: parseEngines(object.engines, `${path}.engines`),
     source: source(object.source, `${path}.source`, allowLocal),
   }
 }
@@ -323,6 +323,10 @@ export function readMarketIndex(
 /**
  * Validate and normalize a market index URL.
  *
+ * A GitHub repository URL is accepted as a convenience and mapped to the raw
+ * `marketplace.json` on its `main` branch, which is where this market keeps the
+ * index. Any other GitHub page is refused with that shape named.
+ *
  * @param value — what the user typed.
  * @returns the canonical URL.
  * @throws {Error} when the URL is not usable as an index source.
@@ -339,29 +343,33 @@ export function isMarketIndexUrl(value: string): string {
   if (url.username !== "" || url.password !== "" || url.hash !== "") {
     throw new Error("market index: the address must not carry credentials or a fragment")
   }
+  if (url.hostname === "github.com" || url.hostname === "www.github.com") {
+    return githubRawIndex(url)
+  }
   return url.href
+}
+
+/** `/<owner>/<repo>` is the only GitHub path this shortcut understands. */
+const GITHUB_REPO_PATH = /^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/
+
+/**
+ * Map a GitHub repository URL to the raw index on its default branch.
+ *
+ * The market repository keeps `marketplace.json` at its root on `main`; a
+ * repository that does otherwise can still enter the raw index URL directly.
+ */
+function githubRawIndex(url: URL): string {
+  if (!GITHUB_REPO_PATH.test(url.pathname)) {
+    throw new Error(
+      "market index: use a repository URL like https://github.com/<owner>/<repo> or its raw marketplace.json URL"
+    )
+  }
+  const [owner, repo] = url.pathname.split("/").filter((segment) => segment !== "")
+  return `https://raw.githubusercontent.com/${owner}/${repo!.replace(/\.git$/i, "")}/main/marketplace.json`
 }
 
 /**
  * Pick the text for one locale: exact match, then language, then `en`.
- *
- * @param value — a string or a table of localized strings.
- * @param locale — the reader's locale, e.g. `zh-CN`.
- * @returns the text to display.
- */
-export function localized(value: LocalizedText, locale: string): string {
-  if (typeof value === "string") return value
-  const wanted = locale.toLowerCase()
-  const exact = value[wanted]
-  if (exact !== undefined) return exact
-  const language = wanted.split("-")[0]!
-  const prefix = value[language]
-  if (prefix !== undefined) return prefix
-  return value.en ?? ""
-}
-
-/**
- * The version a market recommends: the one listed first.
  *
  * @param plugin — one validated market entry.
  * @returns its first version.
@@ -370,4 +378,50 @@ export function recommendedVersion(plugin: ExtensionMarketPlugin): ExtensionMark
   const first = plugin.versions[0]
   if (first === undefined) throw new Error(`market index: "${plugin.id}" lists no versions`)
   return first
+}
+
+/**
+ * Pick the first version this hub can run.
+ *
+ * @param plugin — one validated market entry.
+ * @param hubVersion — the running Context Hub version.
+ * @returns the first compatible version, or null when none is.
+ */
+export function compatibleVersion(
+  plugin: ExtensionMarketPlugin,
+  hubVersion: string
+): ExtensionMarketVersion | null {
+  return plugin.versions.find((item) => isCompatible(item.engines, hubVersion)) ?? null
+}
+
+/** A newer listing for an installed plugin. */
+export interface MarketUpdate {
+  /** The first listed version, for display; it may be the incompatible one. */
+  latest: ExtensionMarketVersion
+  /** The version to install, or null when only incompatible versions exist. */
+  target: ExtensionMarketVersion | null
+}
+
+/**
+ * Whether an installed plugin has something to update to.
+ *
+ * Version strings are compared for equality, not ordered: the market's first
+ * compatible version is the target, and "different" is enough to offer it.
+ *
+ * @param plugin — the market entry for an installed plugin.
+ * @param installedVersion — the version on disk.
+ * @param hubVersion — the running Context Hub version.
+ * @returns the update to offer, or null when there is nothing to do.
+ */
+export function updateFor(
+  plugin: ExtensionMarketPlugin,
+  installedVersion: string,
+  hubVersion: string
+): MarketUpdate | null {
+  const latest = recommendedVersion(plugin)
+  const target = compatibleVersion(plugin, hubVersion)
+  if (target !== null) {
+    return target.version === installedVersion ? null : { latest, target }
+  }
+  return latest.version === installedVersion ? null : { latest, target: null }
 }

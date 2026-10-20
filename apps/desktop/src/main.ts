@@ -27,11 +27,20 @@ import {
 import type { UtilityProcess } from "electron"
 
 import {
+  APP_MENU_ACTION_CHANNEL,
+  APP_MENU_CHANNEL,
   DESKTOP_INFO_CHANNEL,
+  PICK_FOLDER_CHANNEL,
+  TITLEBAR_HEIGHT,
   UPDATE_CHANGED_CHANNEL,
   UPDATE_START_CHANNEL,
   UPDATE_STATE_CHANNEL,
+  WINDOW_CLOSE_CHANNEL,
+  WINDOW_MAXIMIZE_CHANNEL,
+  WINDOW_MINIMIZE_CHANNEL,
+  WINDOW_STATE_CHANNEL,
 } from "./bridge.ts"
+import { appMenuTemplate } from "./app-menu.ts"
 import { appendTail, tailOf, writeCrashLog } from "./crash-log.ts"
 import {
   applicationMenuTemplate,
@@ -52,6 +61,8 @@ let serverStopping = false
 let stopping: Promise<void> | null = null
 let stdoutTail = ""
 let stderrTail = ""
+/* The folder dialog in flight, so a second ask joins it instead of opening another. */
+let picking: Promise<string | null> | null = null
 
 const TAIL_BYTES = 64 * 1024
 const DIALOG_TAIL_BYTES = 2 * 1024
@@ -215,6 +226,21 @@ function createWindow(url: string): void {
     height: 820,
     show: false,
     autoHideMenuBar: true,
+    ...(process.platform === "win32"
+      ? {
+          titleBarStyle: "hidden" as const,
+          titleBarOverlay: {
+            height: TITLEBAR_HEIGHT,
+            color: "#00000000",
+            symbolColor: "#7c828a",
+          },
+        }
+      : process.platform === "darwin"
+        ? {
+            titleBarStyle: "hiddenInset" as const,
+            trafficLightPosition: { x: 16, y: 13 },
+          }
+        : { frame: false }),
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
@@ -251,6 +277,22 @@ function createWindow(url: string): void {
   })
 
   created.once("ready-to-show", () => created.show())
+
+  created.on("maximize", () => {
+    if (!created.isDestroyed()) {
+      created.webContents.send(WINDOW_STATE_CHANNEL, true)
+    }
+  })
+  created.on("unmaximize", () => {
+    if (!created.isDestroyed()) {
+      created.webContents.send(WINDOW_STATE_CHANNEL, false)
+    }
+  })
+  created.webContents.on("did-finish-load", () => {
+    if (!created.isDestroyed()) {
+      created.webContents.send(WINDOW_STATE_CHANNEL, created.isMaximized())
+    }
+  })
 
   let handlingRendererGone = false
   created.webContents.on("render-process-gone", (_event, details) => {
@@ -421,8 +463,76 @@ if (!locked) {
       platform: process.platform,
       updatesEnabled: updater.enabled,
     }))
+    ipcMain.handle(PICK_FOLDER_CHANNEL, (event): Promise<string | null> | null => {
+      if (
+        window === null ||
+        window.isDestroyed() ||
+        event.sender !== window.webContents
+      ) {
+        return null
+      }
+      if (picking !== null) return picking
+
+      const target = window
+      picking = dialog
+        .showOpenDialog(target, { properties: ["openDirectory"] })
+        .then(({ canceled, filePaths }) =>
+          canceled ? null : (filePaths[0] ?? null)
+        )
+        .catch(() => null)
+        .finally(() => {
+          picking = null
+        })
+      return picking
+    })
     ipcMain.handle(UPDATE_STATE_CHANNEL, () => updater.state)
     ipcMain.handle(UPDATE_START_CHANNEL, () => updater.update())
+    ipcMain.handle(
+      APP_MENU_CHANNEL,
+      (event, x: unknown, y: unknown, zh: unknown) => {
+        if (
+          window === null ||
+          window.isDestroyed() ||
+          event.sender !== window.webContents ||
+          typeof x !== "number" ||
+          typeof y !== "number" ||
+          !Number.isFinite(x) ||
+          !Number.isFinite(y)
+        ) {
+          return undefined
+        }
+        const target = window
+        const zoom = target.webContents.getZoomFactor()
+        const menu = Menu.buildFromTemplate(
+          appMenuTemplate({
+            zh: zh === true,
+            updatesEnabled: updater.enabled,
+            send: (action) => {
+              if (!target.isDestroyed()) {
+                target.webContents.send(APP_MENU_ACTION_CHANNEL, action)
+              }
+            },
+            checkForUpdates: () => updater.check(true),
+            quit: () => app.quit(),
+          })
+        )
+        return new Promise<void>((resolve) => {
+          menu.popup({
+            window: target,
+            x: Math.round(x * zoom),
+            y: Math.round(y * zoom),
+            callback: resolve,
+          })
+        })
+      }
+    )
+    ipcMain.handle(WINDOW_MINIMIZE_CHANNEL, () => window?.minimize())
+    ipcMain.handle(WINDOW_MAXIMIZE_CHANNEL, () => {
+      if (window === null || window.isDestroyed()) return
+      if (window.isMaximized()) window.unmaximize()
+      else window.maximize()
+    })
+    ipcMain.handle(WINDOW_CLOSE_CHANNEL, () => window?.close())
     updater.subscribe((state) => {
       if (window !== null && !window.isDestroyed()) {
         window.webContents.send(UPDATE_CHANGED_CHANNEL, state)

@@ -10,7 +10,7 @@
  * `packages/resources/mcp/scripts/check-plugin.ts`, which runs it against real
  * files.
  *
- * What it needs, and where each arrives — `plugin.json` declares the services,
+ * What it needs, and where each arrives — `plugin.yaml` declares the services,
  * so this file only reads them:
  *   - the registry (and through it the toolkit): the `mcp` service
  *   - the mark on its place row: `ctx.icons`

@@ -175,12 +175,8 @@ export function usePluginSettings<T>(id: string, fallback: T): PluginSettingsCon
 export interface SearchPage {
   /** The text in `?q=`, or an empty string when the page is not searching. */
   query: string
-  /** Write the query back; clearing it drops the palette's list request too. */
+  /** Write the query back; clearing it drops `q`. */
   setQuery(next: string): void
-  /** The palette asked for the list view, where the matched text is marked. */
-  listView: boolean
-  /** Stop forcing the list view, leaving the page's own choice in charge. */
-  clearListView(): void
 }
 
 /**
@@ -193,7 +189,6 @@ export interface SearchPage {
 export function useSearchPage(): SearchPage {
   const [params, setParams] = useSearchParams()
   const query = params.get("q") ?? ""
-  const listView = params.get("view") === "list"
 
   const setQuery = React.useCallback(
     (next: string) => {
@@ -202,7 +197,6 @@ export function useSearchPage(): SearchPage {
           const updated = new URLSearchParams(current)
           if (next === "") {
             updated.delete("q")
-            updated.delete("view")
           } else {
             updated.set("q", next)
           }
@@ -214,19 +208,7 @@ export function useSearchPage(): SearchPage {
     [setParams]
   )
 
-  const clearListView = React.useCallback(() => {
-    setParams(
-      (current) => {
-        if (!current.has("view")) return current
-        const updated = new URLSearchParams(current)
-        updated.delete("view")
-        return updated
-      },
-      { replace: true }
-    )
-  }, [setParams])
-
-  return { query, setQuery, listView, clearListView }
+  return { query, setQuery }
 }
 
 /**

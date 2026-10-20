@@ -59,6 +59,6 @@ export function searchPlugins(
       title: row.name,
       ...(row.description === "" ? {} : { description: row.description }),
       ...(row.icon === undefined ? {} : { avatar: row.icon }),
-      path: searchPath(PAGE, query, { view: "list" }),
+      path: searchPath(PAGE, row.name),
     }))
 }

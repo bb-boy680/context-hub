@@ -25,6 +25,7 @@ import type { ExtensionModule } from "../src/types.ts"
 function testHost(): PlatformHost {
   return {
     form: "Test",
+    version: "0.5.0",
     capabilities: { code: true, filesystem: false, network: false },
     storage: { read: () => null, write: () => undefined },
     net: null,
@@ -60,7 +61,6 @@ const provider: ExtensionModule = {
   manifest: {
     name: "Provider",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Publishes a service.",
@@ -79,7 +79,6 @@ const consumer: ExtensionModule = {
   manifest: {
     name: "Consumer",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Uses that service.",
@@ -104,7 +103,6 @@ const contributor: ExtensionModule = {
   manifest: {
     name: "Contributor",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Adds one navigation entry, one header control, and one settings section.",
@@ -141,7 +139,6 @@ const waiting: ExtensionModule = {
   manifest: {
     name: "Waiting",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "integration",
     description: "Requires a service no one provides.",
@@ -151,6 +148,23 @@ const waiting: ExtensionModule = {
   inject: ["never-provided"],
   apply() {
     log.push("waiting applied")
+  },
+}
+
+const future: ExtensionModule = {
+  name: "test.future",
+  manifest: {
+    name: "Future",
+    version: "1.0.0",
+    engines: { contextHub: ">=9.0.0" },
+    kind: "code",
+    category: "integration",
+    description: "Needs a newer hub.",
+    icon: () => null,
+    defaultEnabled: true,
+  },
+  apply() {
+    log.push("future applied")
   },
 }
 
@@ -279,5 +293,169 @@ describe("a plugin that declares a service nothing publishes", () => {
 
   it("never ran its apply", () => {
     expect(log).not.toContain("waiting applied")
+  })
+})
+
+describe("a plugin built for another hub version", () => {
+  let kernel: Kernel
+
+  beforeAll(async () => {
+    log.length = 0
+    kernel = await createHubKernel({ host: testHost(), extensions: [future] })
+    await kernel.start()
+  })
+
+  it("keeps its row, marked incompatible and switched off", () => {
+    expect(entryOf(kernel, "test.future")).toMatchObject({
+      status: "incompatible",
+      enabled: false,
+    })
+  })
+
+  it("never ran its apply", () => {
+    expect(log).not.toContain("future applied")
+  })
+
+  it("cannot be switched on", async () => {
+    await expect(kernel.ctx.extensions.enable("test.future")).rejects.toThrow(
+      /different Context Hub version/
+    )
+  })
+})
+
+/** A host that remembers what the kernel persists, for remove/replace checks. */
+function recordingHost(): {
+  host: PlatformHost
+  documents: Map<string, unknown>
+} {
+  const documents = new Map<string, unknown>()
+  return {
+    documents,
+    host: {
+      form: "Test",
+      version: "0.5.0",
+      capabilities: { code: true, filesystem: false, network: false },
+      storage: {
+        read: (key) => documents.get(key) ?? null,
+        write: (key, value) => {
+          documents.set(key, value)
+        },
+      },
+      net: null,
+      files: null,
+      log: () => undefined,
+    },
+  }
+}
+
+/** A one-page plugin, so a replacement can be told apart by its route. */
+function page(id: string, version: string, path: string): ExtensionModule {
+  return {
+    name: id,
+    manifest: {
+      name: id,
+      version,
+      kind: "code",
+      category: "integration",
+      description: "",
+      icon: () => null,
+      defaultEnabled: true,
+    },
+    inject: ["nav"],
+    apply(ctx) {
+      ctx.nav.register({
+        path,
+        labelKey: "test.page",
+        icon: () => null,
+        group: "assets",
+        order: 10,
+      })
+    },
+  }
+}
+
+const locked: ExtensionModule = {
+  name: "test.locked",
+  manifest: {
+    name: "Locked",
+    version: "1.0.0",
+    kind: "builtin",
+    category: "integration",
+    description: "",
+    icon: () => null,
+    defaultEnabled: true,
+    locked: true,
+  },
+}
+
+describe("replacing a running extension", () => {
+  let kernel: Kernel
+  let documents: Map<string, unknown>
+  const navPaths = () => kernel.ctx.extensions.contributions("nav").map((one) => one.path)
+
+  beforeAll(async () => {
+    const recorded = recordingHost()
+    documents = recorded.documents
+    kernel = await createHubKernel({
+      host: recorded.host,
+      extensions: [page("test.page", "1.0.0", "/v1"), locked],
+    })
+    await kernel.start()
+  })
+
+  it("switches the code and its contributions, keeping it enabled", async () => {
+    await kernel.ctx.extensions.replace(page("test.page", "2.0.0", "/v2"))
+
+    expect(entryOf(kernel, "test.page")?.manifest.version).toBe("2.0.0")
+    expect(navPaths()).toContain("/v2")
+    expect(navPaths()).not.toContain("/v1")
+    expect(entryOf(kernel, "test.page")?.enabled).toBe(true)
+    expect(documents.get("extensions")).toMatchObject({ "test.page": true })
+  })
+
+  it("adds an id the catalog does not have", async () => {
+    await kernel.ctx.extensions.replace(page("test.added", "1.0.0", "/added"))
+    expect(entryOf(kernel, "test.added")?.status).toBe("active")
+    expect(navPaths()).toContain("/added")
+  })
+
+  it("refuses to replace a locked extension", async () => {
+    await expect(
+      kernel.ctx.extensions.replace(page("test.locked", "2.0.0", "/locked"))
+    ).rejects.toThrow(/cannot be replaced/)
+    expect(entryOf(kernel, "test.locked")?.manifest.version).toBe("1.0.0")
+  })
+})
+
+describe("removing an extension from the running catalog", () => {
+  let kernel: Kernel
+  let documents: Map<string, unknown>
+  const navPaths = () => kernel.ctx.extensions.contributions("nav").map((one) => one.path)
+
+  beforeAll(async () => {
+    const recorded = recordingHost()
+    documents = recorded.documents
+    kernel = await createHubKernel({
+      host: recorded.host,
+      extensions: [page("test.page", "1.0.0", "/v1"), locked],
+    })
+    await kernel.start()
+  })
+
+  it("withdraws the row and its contributions, and forgets the choice", async () => {
+    await kernel.ctx.extensions.remove("test.page")
+
+    expect(entryOf(kernel, "test.page")).toBeUndefined()
+    expect(navPaths()).not.toContain("/v1")
+    expect(documents.get("extensions")).not.toHaveProperty("test.page")
+  })
+
+  it("refuses an unknown id", async () => {
+    await expect(kernel.ctx.extensions.remove("test.missing")).rejects.toThrow(/unknown extension/)
+  })
+
+  it("refuses a locked extension", async () => {
+    await expect(kernel.ctx.extensions.remove("test.locked")).rejects.toThrow(/cannot be removed/)
+    expect(entryOf(kernel, "test.locked")).toBeDefined()
   })
 })

@@ -8,19 +8,23 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  compatibleVersion,
   isMarketIndexUrl,
   isMarketSource,
   localized,
   readMarketIndex,
   recommendedVersion,
+  updateFor,
   type ExtensionMarketPlugin,
 } from "../src/extension-market.ts"
 
 const INDEX_URL = "https://example.test/marketplace.json"
 
+const ENGINE = { contextHub: ">=0.0.1 <0.7.0" }
+
 const VERSION = {
   version: "1.0.0",
-  apiVersion: "^0.1",
+  engines: ENGINE,
   source: {
     type: "git" as const,
     url: "https://github.com/acme/plugins",
@@ -68,7 +72,7 @@ describe("a market index", () => {
           versions: [
             {
               version: "1.0.0",
-              apiVersion: "^0.1",
+              engines: ENGINE,
               source: {
                 type: "git",
                 url: "https://github.com/acme/plugins",
@@ -260,13 +264,28 @@ describe("a version", () => {
     }
   })
 
-  it("refuses an incompatible apiVersion", () => {
+  it("requires a valid engines range", () => {
     expect(() =>
       readMarketIndex(
-        index([plugin({ versions: [version({ apiVersion: "9.9" })] })]),
+        index([plugin({ versions: [version({ engines: undefined })] })]),
         INDEX_URL
       )
-    ).toThrow(/apiVersion/)
+    ).toThrow(/engines must be an object/)
+    expect(() =>
+      readMarketIndex(
+        index([plugin({ versions: [version({ engines: { contextHub: "nope" } })] })]),
+        INDEX_URL
+      )
+    ).toThrow(/not a valid semver range/)
+  })
+
+  it("keeps a version this hub does not satisfy", () => {
+    const found = readMarketIndex(
+      index([plugin({ versions: [version({ engines: { contextHub: ">=9.0.0" } })] })]),
+      INDEX_URL
+    )
+    expect(found.plugins[0]!.versions[0]!.engines.contextHub).toBe(">=9.0.0")
+    expect(compatibleVersion(found.plugins[0]!, "0.1.0")).toBeNull()
   })
 })
 
@@ -290,11 +309,68 @@ describe("recommendedVersion", () => {
       icon: "https://example.test/hello.svg",
       author: "Acme",
       versions: [
-        { version: "2.0.0", apiVersion: "^0.1", source: VERSION.source },
-        { version: "1.0.0", apiVersion: "^0.1", source: VERSION.source },
+        { version: "2.0.0", engines: ENGINE, source: VERSION.source },
+        { version: "1.0.0", engines: ENGINE, source: VERSION.source },
       ],
     }
     expect(recommendedVersion(entry).version).toBe("2.0.0")
+  })
+})
+
+function entry(versions: { version: string; range: string }[]): ExtensionMarketPlugin {
+  return {
+    id: "acme.hello",
+    title: "Hello",
+    description: "A plugin",
+    icon: "https://example.test/hello.svg",
+    author: "Acme",
+    versions: versions.map((item) => ({
+      version: item.version,
+      engines: { contextHub: item.range },
+      source: VERSION.source,
+    })),
+  }
+}
+
+describe("compatibleVersion", () => {
+  it("picks the first version the hub satisfies", () => {
+    const found = entry([
+      { version: "3.0.0", range: ">=9.0.0" },
+      { version: "2.0.0", range: ">=0.1.0 <0.7.0" },
+      { version: "1.0.0", range: ">=0.0.1" },
+    ])
+    expect(compatibleVersion(found, "0.5.0")?.version).toBe("2.0.0")
+    expect(compatibleVersion(found, "0.0.0")).toBeNull()
+  })
+})
+
+describe("updateFor", () => {
+  it("offers a compatible target that differs from the installed version", () => {
+    const found = entry([
+      { version: "3.0.0", range: ">=9.0.0" },
+      { version: "2.0.0", range: ">=0.1.0 <0.7.0" },
+    ])
+    expect(updateFor(found, "1.0.0", "0.5.0")).toEqual({
+      latest: found.versions[0],
+      target: found.versions[1],
+    })
+  })
+
+  it("offers nothing when the installed version is already the target", () => {
+    const found = entry([
+      { version: "3.0.0", range: ">=9.0.0" },
+      { version: "2.0.0", range: ">=0.1.0 <0.7.0" },
+    ])
+    expect(updateFor(found, "2.0.0", "0.5.0")).toBeNull()
+  })
+
+  it("reports a listing with only incompatible versions", () => {
+    const found = entry([{ version: "3.0.0", range: ">=9.0.0" }])
+    expect(updateFor(found, "2.0.0", "0.5.0")).toEqual({
+      latest: found.versions[0],
+      target: null,
+    })
+    expect(updateFor(found, "3.0.0", "0.5.0")).toBeNull()
   })
 })
 
@@ -302,6 +378,21 @@ describe("isMarketIndexUrl", () => {
   it("returns the canonical https URL", () => {
     expect(isMarketIndexUrl("  https://example.test/marketplace.json  ")).toBe(
       "https://example.test/marketplace.json"
+    )
+  })
+
+  it("maps a GitHub repository URL to the raw default-branch index", () => {
+    expect(isMarketIndexUrl("https://github.com/bb-boy680/context-hub-extensions")).toBe(
+      "https://raw.githubusercontent.com/bb-boy680/context-hub-extensions/main/marketplace.json"
+    )
+    expect(isMarketIndexUrl("https://github.com/acme/plugins.git")).toBe(
+      "https://raw.githubusercontent.com/acme/plugins/main/marketplace.json"
+    )
+  })
+
+  it("refuses a GitHub page that is not a repository root", () => {
+    expect(() => isMarketIndexUrl("https://github.com/acme/plugins/tree/main")).toThrow(
+      /repository URL/
     )
   })
 
@@ -321,6 +412,9 @@ describe("isMarketSource", () => {
   it("accepts an https URL or an absolute local path", () => {
     expect(isMarketSource("https://example.test/marketplace.json")).toBe(
       "https://example.test/marketplace.json"
+    )
+    expect(isMarketSource("https://github.com/acme/plugins")).toBe(
+      "https://raw.githubusercontent.com/acme/plugins/main/marketplace.json"
     )
     expect(isMarketSource("D:\\work\\extensions")).toBe("D:\\work\\extensions")
     expect(isMarketSource("/home/me/extensions")).toBe("/home/me/extensions")

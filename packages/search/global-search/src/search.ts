@@ -15,7 +15,7 @@
  */
 import { BlocksIcon, SettingsIcon } from "lucide-react"
 
-import { matchesQuery, searchPath } from "@context-hub/extensions"
+import { localized, matchesQuery, searchPath } from "@context-hub/extensions"
 import type {
   ExtensionView,
   SearchContribution,
@@ -25,7 +25,7 @@ import type {
 
 /** One setting row, with the group whose anchor the page scrolls to. */
 interface SettingEntry {
-  anchor: "appearance" | "install" | "images" | "about"
+  anchor: "appearance" | "install" | "images" | "extensions" | "about"
   titleKey: string
   descriptionKey?: string
   groupTitleKey: string
@@ -84,6 +84,27 @@ const SETTINGS: readonly SettingEntry[] = [
     groupDescriptionKey: "settings.images.description",
   },
   {
+    anchor: "extensions",
+    titleKey: "settings.extensions.check",
+    descriptionKey: "settings.extensions.check.description",
+    groupTitleKey: "settings.extensions.title",
+    groupDescriptionKey: "settings.extensions.description",
+  },
+  {
+    anchor: "extensions",
+    titleKey: "settings.extensions.dailyAt",
+    descriptionKey: "settings.extensions.dailyAt.description",
+    groupTitleKey: "settings.extensions.title",
+    groupDescriptionKey: "settings.extensions.description",
+  },
+  {
+    anchor: "extensions",
+    titleKey: "settings.extensions.autoUpdate",
+    descriptionKey: "settings.extensions.autoUpdate.description",
+    groupTitleKey: "settings.extensions.title",
+    groupDescriptionKey: "settings.extensions.description",
+  },
+  {
     anchor: "about",
     titleKey: "settings.about.version",
     groupTitleKey: "settings.about.title",
@@ -127,15 +148,18 @@ export function settingsContribution(
  *
  * @param entries — reads the kernel's catalog at search time, so a package
  *   enabled while the palette is open is found by the next query.
+ * @param locale — reads the active locale at search time, so a language switch
+ *   reaches the next query.
  * @returns the provider the palette reads.
  */
 export function extensionsContribution(
-  entries: () => readonly ExtensionView[]
+  entries: () => readonly ExtensionView[],
+  locale: () => string
 ): SearchContribution {
   return {
     labelKey: "search.group.extensions",
     icon: BlocksIcon,
-    search: (query) => searchExtensions(entries(), query),
+    search: (query) => searchExtensions(entries(), query, locale()),
   }
 }
 
@@ -192,7 +216,7 @@ function searchShellSettings(
         id: `${entry.anchor}:${entry.titleKey}`,
         title,
         ...(description === undefined ? {} : { description }),
-        path: `${searchPath("/settings", query)}#${entry.anchor}`,
+        path: `${searchPath("/settings", title)}#${entry.anchor}`,
       },
     ]
   })
@@ -213,7 +237,7 @@ function searchSections(
         id: `settings-section:${section.id}`,
         title,
         description,
-        path: `${searchPath("/settings", query)}#${section.id}`,
+        path: `${searchPath("/settings", title)}#${section.id}`,
       },
     ]
   })
@@ -224,28 +248,26 @@ function searchSections(
  *
  * @param entries — the kernel's catalog.
  * @param query — what the person typed.
+ * @param locale — the active locale id; name and description are resolved with it.
  * @returns the matching packages, in catalog order.
  */
 export function searchExtensions(
   entries: readonly ExtensionView[],
-  query: string
+  query: string,
+  locale: string
 ): SearchResult[] {
-  return entries
-    .filter((entry) =>
-      matchesQuery(
-        query,
-        entry.manifest.name,
-        entry.manifest.id,
-        entry.manifest.description
-      )
-    )
-    .map((entry) => ({
-      id: entry.manifest.id,
-      title: entry.manifest.name,
-      ...(entry.manifest.description === ""
-        ? {}
-        : { description: entry.manifest.description }),
-      icon: entry.manifest.icon,
-      path: searchPath("/extensions", query),
-    }))
+  return entries.flatMap((entry) => {
+    const name = localized(entry.manifest.name, locale)
+    const description = localized(entry.manifest.description, locale)
+    if (!matchesQuery(query, name, entry.manifest.id, description)) return []
+    return [
+      {
+        id: entry.manifest.id,
+        title: name,
+        ...(description === "" ? {} : { description }),
+        icon: entry.manifest.icon,
+        path: searchPath("/extensions", name),
+      },
+    ]
+  })
 }

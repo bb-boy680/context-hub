@@ -34,6 +34,7 @@ import type { McpRecordsPort } from "../src/records.ts"
 function bareHost(): PlatformHost {
   return {
     form: "Test",
+    version: "0.5.0",
     capabilities: { code: true, filesystem: false, network: false },
     storage: { read: () => null, write: () => undefined },
     net: null,
@@ -183,7 +184,6 @@ const latecomer: ExtensionModule = {
   manifest: {
     name: "Latecomer",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "agent",
     description: "A client whose places only exist once it is enabled.",

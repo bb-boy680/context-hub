@@ -51,7 +51,6 @@ export const pluginsExtension: ExtensionModule = {
   manifest: {
     name: "Plugins",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "asset",
     description: "Browse the packs this hub knows, and keep them in the agents that use them.",

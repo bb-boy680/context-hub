@@ -102,6 +102,14 @@ function requiredValueOf(value: unknown): string {
   return value
 }
 
+/** A value a caller asked to write, or undefined when the row only records a name. */
+function optionalValueOf(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined
+  if (typeof value !== "string") throw new Error("variable value must be a string")
+  if (value.includes("\0")) throw new Error("a value cannot contain NUL")
+  return value.trim() === "" ? undefined : value
+}
+
 /** Add a group to the document once. */
 function rememberGroup(document: StoredDocument, group: string): void {
   if (!document.groups.includes(group)) document.groups.push(group)
@@ -225,17 +233,20 @@ export function createFsVariableStore(
         return {
           name,
           group: groupOf(draft.group),
-          value: requiredValueOf(draft.value),
+          value: optionalValueOf(draft.value),
         }
       })
 
       /* The environment is written first: a row that says a value exists must
-         not be recorded before it does. Anything already written is taken back
-         when a later write or the index write fails. */
+         not be recorded before it does. A row without a value writes nothing,
+         so an environment value set outside the hub stays as it is. Anything
+         already written is taken back when a later write or the index write
+         fails. */
       const written: string[] = []
       const previous = new Map<string, string | undefined>()
       try {
         for (const entry of entries) {
+          if (entry.value === undefined) continue
           previous.set(entry.name, environment.get(entry.name))
           await environment.set(entry.name, entry.value)
           written.push(entry.name)

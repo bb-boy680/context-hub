@@ -10,12 +10,14 @@ import { displayPath } from "./home.ts"
 import { isDirectory } from "./fs-browse.ts"
 import { createFsStateStore } from "./state-fs.ts"
 import {
+  DEFAULT_WORKSPACE_NAME,
   folderId,
   readWorkspaceState,
   WORKSPACE_DOCUMENT,
   workspaceName,
 } from "../workspace.ts"
 import type {
+  WorkspaceAlias,
   WorkspaceFolder,
   WorkspacePage,
   WorkspaceStore,
@@ -33,6 +35,13 @@ export interface WorkspaceStoreOptions {
    * so does a row naming a folder beside it.
    */
   folder?: string
+  /**
+   * The folder the default workspace points at, when that is not where this
+   * host happens to run. A desktop host runs in the person's home, but the dev
+   * server and CLI run in a project folder and share the same document: the
+   * default must not follow that cwd. Defaults to `folder`.
+   */
+  defaultFolder?: string
 }
 
 /** Create the workspace store that reads and writes under one hub home. */
@@ -42,41 +51,130 @@ export function createFsWorkspaceStore(
 ): WorkspaceStore {
   const documents = createFsStateStore(home)
 
-  const view = (folder: WorkspaceFolder): WorkspaceView => ({
-    id: folderId(folder),
-    /* A name a person gave the workspace reads in place of the folder's own. */
-    name: folder.alias ?? folder.name,
-    path: folder.path ?? null,
-    display: folder.path === undefined ? null : displayPath(folder.path),
-  })
+  const view = (folder: WorkspaceFolder): WorkspaceView => {
+    const alias = folder.alias
+    return {
+      id: folderId(folder),
+      /* A name a person gave the workspace reads in place of the folder's own. */
+      name: typeof alias === "string" ? alias : folder.name,
+      path: folder.path ?? null,
+      display: folder.path === undefined ? null : displayPath(folder.path),
+      default: folder.default === true,
+      nameKey: typeof alias === "object" && alias !== null ? alias.i18n : null,
+    }
+  }
+
+  const systemAlias = (): WorkspaceAlias => ({ i18n: DEFAULT_WORKSPACE_NAME })
 
   /**
-   * Fold the host's own folder into the list, once. It is a workspace whether
-   * or not anyone picked it, and a name-only row that means it is replaced
-   * rather than left unreadable; nothing else in the list is touched.
+   * The same row without its default mark. The system name goes with the mark;
+   * a name a person chose stays with the row.
    */
-  const adoptHostFolder = async (state: WorkspaceState): Promise<WorkspaceState> => {
-    const folder = options.folder
-    if (folder === undefined || !(await isDirectory(folder))) return state
-    const host: WorkspaceFolder = { name: workspaceName(folder), path: folder }
-    const id = folderId(host)
-    if (state.folders.some((known) => folderId(known) === id)) return state
-    const named = state.folders.find(
-      (known) => known.path === undefined && known.name === host.name
-    )
-    const nameId = named === undefined ? null : folderId(named)
-    const next: WorkspaceState = {
-      /* The name-only row keeps its place in the list as it takes the folder. */
-      folders:
-        named === undefined
-          ? [...state.folders, host]
-          : state.folders.map((known) => (known === named ? host : known)),
-      /* The row that pointed at nothing by name pointed at this folder. */
-      current: state.current === null || state.current === nameId ? id : state.current,
-      agents: state.agents,
-    }
-    await documents.write(WORKSPACE_DOCUMENT, next)
+  const plain = (folder: WorkspaceFolder): WorkspaceFolder => {
+    const next: WorkspaceFolder = { name: folder.name }
+    if (folder.path !== undefined) next.path = folder.path
+    if (typeof folder.alias === "string") next.alias = folder.alias
     return next
+  }
+
+  /** Write only when the scan actually changed something. */
+  const persist = async (
+    before: WorkspaceState,
+    after: WorkspaceState
+  ): Promise<WorkspaceState> => {
+    if (JSON.stringify(before) === JSON.stringify(after)) return before
+    await documents.write(WORKSPACE_DOCUMENT, after)
+    return after
+  }
+
+  /**
+   * Keep the default workspace in the list. Its folder is the explicit default
+   * folder when the host has one — the person's home — else the host's own
+   * folder. The row is created once, named by the system until a person renames
+   * it, kept at the front, and marked so the store can refuse to remove it. A
+   * default row that points elsewhere is stale when an explicit default folder
+   * is given, so it loses the mark and the wanted row takes its place.
+   */
+  const ensureHostWorkspace = async (state: WorkspaceState): Promise<WorkspaceState> => {
+    const wanted = options.defaultFolder
+    const folder = wanted ?? options.folder
+
+    const found = state.folders.findIndex(
+      (known) => known.default === true && (wanted === undefined || known.path === wanted)
+    )
+    if (found !== -1) {
+      const kept = state.folders[found]
+      if (kept === undefined) return state
+      const rest = state.folders
+        .filter((_, at) => at !== found)
+        .map((known) => (known.default === true ? plain(known) : known))
+      return persist(state, {
+        folders: [kept.alias === undefined ? { ...kept, alias: systemAlias() } : kept, ...rest],
+        current: state.current ?? folderId(kept),
+        agents: state.agents,
+      })
+    }
+
+    /* A folder that is not there cannot be the default workspace. */
+    if (folder === undefined || !(await isDirectory(folder))) return state
+
+    /* An explicit default folder makes every other default mark stale: the
+       person's home is the default no matter which form starts first. */
+    const base =
+      wanted === undefined
+        ? state.folders
+        : state.folders.map((known) => (known.default === true ? plain(known) : known))
+
+    const existing = base.findIndex((known) => known.path === folder)
+    if (existing !== -1) {
+      const row = base[existing]
+      if (row === undefined) return state
+      const upgraded: WorkspaceFolder = {
+        ...row,
+        alias: row.alias ?? systemAlias(),
+        default: true,
+      }
+      return persist(state, {
+        folders: [upgraded, ...base.filter((_, at) => at !== existing)],
+        current: state.current ?? folderId(upgraded),
+        agents: state.agents,
+      })
+    }
+
+    const name = workspaceName(folder)
+    const named = base.findIndex(
+      (known) => known.path === undefined && known.name === name
+    )
+    if (named !== -1) {
+      const row = base[named]
+      if (row === undefined) return state
+      const upgraded: WorkspaceFolder = {
+        ...row,
+        path: folder,
+        alias: row.alias ?? systemAlias(),
+        default: true,
+      }
+      return persist(state, {
+        folders: [upgraded, ...base.filter((_, at) => at !== named)],
+        current:
+          state.current === null || state.current === folderId(row)
+            ? folderId(upgraded)
+            : state.current,
+        agents: state.agents,
+      })
+    }
+
+    const host: WorkspaceFolder = {
+      name,
+      path: folder,
+      alias: systemAlias(),
+      default: true,
+    }
+    return persist(state, {
+      folders: [host, ...base],
+      current: state.current ?? folderId(host),
+      agents: state.agents,
+    })
   }
 
   /**
@@ -167,7 +265,7 @@ export function createFsWorkspaceStore(
 
   const read = async (): Promise<WorkspaceState> =>
     adoptNamedRows(
-      await adoptHostFolder(readWorkspaceState(await documents.read(WORKSPACE_DOCUMENT)))
+      await ensureHostWorkspace(readWorkspaceState(await documents.read(WORKSPACE_DOCUMENT)))
     )
 
   const page = async (): Promise<WorkspacePage> => {
@@ -222,14 +320,19 @@ export function createFsWorkspaceStore(
         const folder = state.folders.find((known) => folderId(known) === id)
         if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
         const alias = name.trim()
-        /* Naming a workspace after its own folder stores nothing and drops any
-           earlier name, so the row and the folder cannot disagree. */
         const folders = state.folders.map((known) => {
           if (folderId(known) !== id) return known
+          /* The default workspace always reads as something: an empty name
+             restores the system name instead of falling back to the folder's. */
+          if (known.default === true) {
+            return { ...known, alias: alias === "" ? systemAlias() : alias }
+          }
+          /* Naming a workspace after its own folder stores nothing and drops any
+             earlier name, so the row and the folder cannot disagree. */
           if (alias === "" || alias === known.name) {
-            const plain: WorkspaceFolder = { name: known.name }
-            if (known.path !== undefined) plain.path = known.path
-            return plain
+            const next: WorkspaceFolder = { name: known.name }
+            if (known.path !== undefined) next.path = known.path
+            return next
           }
           return { ...known, alias }
         })
@@ -242,6 +345,9 @@ export function createFsWorkspaceStore(
         const state = await read()
         const folder = state.folders.find((known) => folderId(known) === id)
         if (folder === undefined) throw new Error(`not a known workspace: ${id}`)
+        if (folder.default === true) {
+          throw new Error("the default workspace cannot be removed")
+        }
         if (state.current === id) {
           throw new Error(
             "this workspace is in use; switch to another one before removing it"

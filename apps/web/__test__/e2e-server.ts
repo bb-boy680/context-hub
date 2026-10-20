@@ -7,16 +7,20 @@
  * without it the static fallback would hand `index.html` to `/hub/skills` and
  * the page would believe a library exists.
  *
- * Usage: node apps/web/__test__/e2e-server.ts --home <dir> [--folder <dir>] [--port <n>]
+ * Usage: node apps/web/__test__/e2e-server.ts --home <dir> [--folder <dir>]
+ *        [--port <n>] [--market <index.json|checkout>]
  */
+import path from "node:path"
 import { fileURLToPath } from "node:url"
 
 import {
+  createAboutHandler,
   createExtensionHandler,
   createExtensionMarketHandler,
   createStateHandler,
   createWorkspaceHandler,
 } from "@context-hub/core/handlers"
+import { createMarketReader } from "@context-hub/core/host/extension-market"
 import { createHubServer } from "@context-hub/core/host/server"
 
 function flag(name: string): string | undefined {
@@ -27,19 +31,32 @@ function flag(name: string): string | undefined {
 const home = flag("--home")
 const folder = flag("--folder")
 const port = Number(flag("--port") ?? "5283")
+const market = flag("--market") ?? process.env.MARKET_SOURCE
 
 if (home === undefined) {
   console.error("--home is required")
   process.exit(2)
 }
 
-/* The market reader is the real one: the probe points the page at a local
-   checkout, so the whole read/fetch/verify path runs rather than a fixture. */
+/* The market reader is the real one. The page always asks for
+   OFFICIAL_MARKET_URL; when --market names a local index, this reader ignores
+   that URL and reads the checkout instead, so the probe needs no network. */
+const marketReader = market === undefined ? null : createMarketReader()
+const marketIndex = market === undefined ? null : path.resolve(market)
+/* The page reads this at startup and compares every package's engines to it. */
+const version = "0.1.0"
 const server = createHubServer({
   middlewares: [
     createStateHandler({ home, log: () => undefined }),
+    createAboutHandler({ version, home }),
     createExtensionHandler({ home }),
-    createExtensionMarketHandler({ home }),
+    createExtensionMarketHandler({
+      home,
+      version,
+      ...(marketReader === null || marketIndex === null
+        ? {}
+        : { reader: { read: () => marketReader.read(marketIndex) } }),
+    }),
     createWorkspaceHandler({
       home,
       ...(folder === undefined ? {} : { folder }),

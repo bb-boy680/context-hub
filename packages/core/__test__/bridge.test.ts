@@ -39,7 +39,7 @@ import { resolveStoredFile } from "../src/host/assets-fs.ts"
 import { displayPath } from "../src/host/home.ts"
 
 const PACK_ID = "check.plugin"
-const MANIFEST = JSON.stringify({ id: PACK_ID, name: "Check", version: "0.0.1" })
+const MANIFEST = `id: ${PACK_ID}\nname: Check\nengines:\n  contextHub: ">=0.0.1 <0.7.0"\n`
 const BYTES = "the bytes this route serves\n"
 
 let home: string
@@ -53,7 +53,7 @@ beforeAll(async () => {
   await fs.mkdir(path.join(home, "assets"), { recursive: true })
   await fs.writeFile(path.join(home, "assets", "check.txt"), BYTES, "utf8")
   await fs.mkdir(path.join(home, "extensions", PACK_ID), { recursive: true })
-  await fs.writeFile(path.join(home, "extensions", PACK_ID, "plugin.json"), MANIFEST, "utf8")
+  await fs.writeFile(path.join(home, "extensions", PACK_ID, "plugin.yaml"), MANIFEST, "utf8")
   await fs.writeFile(path.join(home, "extensions", PACK_ID, "index.js"), "export default 1\n", "utf8")
 
   const server = createHubServer({
@@ -150,10 +150,10 @@ describe("the installed extensions", () => {
   it("refuse a file outside the plugin directory", async () => {
     /* The route treats one plugin directory as its root, so a path that climbs
        out of it is missing rather than a read of a sibling. */
-    const response = await fetch(at(`${EXTENSION_ROUTE}/${PACK_ID}/%2e%2e/other/plugin.json`))
+    const response = await fetch(at(`${EXTENSION_ROUTE}/${PACK_ID}/%2e%2e/other/plugin.yaml`))
     expect(response.status).toBe(404)
     expect(() =>
-      resolveStoredFile(path.join(home, "extensions", PACK_ID), "../other/plugin.json")
+      resolveStoredFile(path.join(home, "extensions", PACK_ID), "../other/plugin.yaml")
     ).toThrow()
   })
 

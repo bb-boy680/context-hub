@@ -59,6 +59,8 @@ export interface NetPort {
 export interface PlatformHost {
   /** Form name shown in the UI, e.g. "Web" or "Desktop". */
   readonly form: string
+  /** Context Hub version this build runs, compared against a package's `engines`. */
+  readonly version: string
   readonly capabilities: PlatformCapabilities
   readonly storage: StoragePort
   /** How this form reaches the network; `null` when it cannot. */

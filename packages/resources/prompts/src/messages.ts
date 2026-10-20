@@ -29,6 +29,7 @@ export const promptsMessages: Record<string, string> = {
   "prompts.action.close": "Close",
 
   "prompts.column.prompt": "Prompt",
+  "prompts.column.places": "Places",
   "prompts.column.body": "Content",
   "prompts.column.tags": "Tags",
   "prompts.column.updated": "Updated",
@@ -141,6 +142,7 @@ export const promptsMessages: Record<string, string> = {
 
   "prompts.source.local": "Local",
   "prompts.detail.tokens": "{tokens} tokens",
+  "prompts.detail.contextSize": "Context size",
   "prompts.detail.category.add": "Add a tag",
   "prompts.detail.category.placeholder": "New tag",
   "prompts.detail.category.remove": "Remove {tag}",

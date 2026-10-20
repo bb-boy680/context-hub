@@ -1277,14 +1277,170 @@ Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间�
 
 **规则**：
 - 每个 `plugins/<id>` 是完整 pnpm workspace 包：`package.json`、`build.mjs`、
-  `tsconfig.json`、`src/`、`plugin.json`、`README.md`；产物默认 `lib/index.js`。
-- `package.json` 的 `main` 必须与 `plugin.json` 的 `entry` 相同（默认
-  `lib/index.js`），`version` 必须与 `plugin.json` 和索引三处一致。hub 安装器
-  校验这些声明，旧插件没有 `package.json` 时保持原行为。
+  `tsconfig.json`、`src/`、`plugin.yaml`、`README.md`；产物默认 `lib/index.js`。
+- `version` 只写在 `package.json`；入口只取 `package.json` 的 `main`（缺省
+  `index.js`）。`plugin.yaml` 出现 `version` 或 `entry` 会被安装器和 loader 拒绝。
+- `marketplace.json` 由 `scripts/build-marketplace.mjs` 从根 `marketplace.yaml`
+  与每个插件的 `plugin.yaml` / `package.json` 生成，禁止手改；`source.url` 来自
+  `marketplace.yaml.repository`，图标在生成时内联成 `data:` URL。
+- 安装器校验索引 `version` 等于 `package.json.version`，permissions 仍必须与
+  manifest 一致；市场安装要求 `package.json` 存在。
 - `lib/` 要提交：Context Hub 没有 npm 发布层，安装器 clone 后直接加载。不要照搬
   deepseek-harness 把 `lib/` 放进 `.gitignore` 的做法——它的产物在 npm tarball 里。
 - 构建用 esbuild 并把 `absWorkingDir` 固定在插件目录，否则产物首行的路径注释随
   cwd 漂移，同一份源码会在不同机器上产出不同字节。
-- 判据：`pnpm build` 两次的 `sha256sum lib/index.js` 相同；`package.json`、
-  `plugin.json` 与 `marketplace.json` 的版本一致。
+- 判据：`pnpm build` 两次的 `sha256sum marketplace.json plugins/*/lib/index.js`
+  相同；索引 `versions[0].version` 等于对应 `package.json.version`。
 
+
+## 桌面 UI 验收必须在 Electron 窗口里做（2026-10-19）
+
+**问题模式**：实现桌面端流程时，我在浏览器里截图并汇报，用户直接问「我们说的是桌面端程序，为什么界面是在 web 里」。代码确实在 `apps/web`，桌面端 Electron 加载的是同一份页面；但**浏览器验收不能证明 preload 桥或打包后的页面加载路径**。用户看到的是测试外壳，不是交付形态。
+
+**规则**：凡是桌面端用户可见的流程，最终验收必须起真实 Electron，确认窗口里的页面和 IPC。浏览器只用于快速迭代，汇报时要明确说「这是 web 形态的临时验收」。桌面端跑法：`CONTEXT_HUB_HOME=<临时目录> pnpm exec electron --remote-debugging-port=9222 --user-data-dir=<临时 profile> .`，再用 CDP 读 `document.body.innerText` 和截图；不要靠浏览器结果替代桌面运行时验证。dev watcher（`node dev.ts`）与打包应用共用 userData 和单实例锁；验收安装包前先停掉它，否则启动安装后的应用只会聚焦已有的 dev 窗口。
+
+## 桌面主题可能不跨启动保留（2026-10-19，已实测确认）
+
+**问题模式**：在设置页选「深色」后，重启桌面应用，`document.documentElement.classList.contains("dark") === false`，`localStorage.theme === null`。原因是桌面 hub server 用 `--port 0`，窗口 origin 的端口每次启动不同，而 `ThemeProvider` 只把主题写进 `localStorage`（按 origin 隔离）。布局、安装方式等写进 `state/settings.json` 的选项会保留。
+
+**规则**：把主题当作「跨 origin 的机器偏好」时，不能只写 localStorage。修复方向是固定 origin（固定端口/自定义 protocol）或把主题落到 hub state 并在启动时作为 `ThemeProvider` 初值；这会改主题所有权，属于单独任务。验收时必须重启一次应用读 theme，而不是只看当前会话的 class。
+
+## Electron 窗口标题与图标不是 productName 自动带来的（2026-10-19）
+
+**问题模式**：桌面窗口截图里，Windows 标题栏显示 `vite-monorepo` 和 Electron 默认图标，用户直接说「怎么还有外面的壳，看着好丑」。`productName` 只决定安装目录、快捷方式和任务栏名称；窗口标题来自页面 `apps/web/index.html` 的 `<title>`，而模板一直留着 Vite 的标题。窗口/任务栏图标来自可执行文件，electron-builder 没有配置 `win.icon` 时嵌入的是 Electron 默认图标。
+
+**规则**：用户可见的桌面窗口标题必须与产品名一致，改 `apps/web/index.html` 的 `<title>`；打包图标用 `win.icon` 指向 `build/installerIcon.ico`（与安装器同一张品牌图）。改完要用真实打包产物看一次 `MainWindowTitle`，并确认 electron-builder 日志里不再出现 `default Electron icon is used`。设计稿的画板不含 OS 标题栏，不要把「有标题栏」本身当成实现偏差；要彻底去掉它属于独立的无边框窗口改造，需要同时设计拖拽区和窗口控制。
+
+## 安装器回归系统自带页面，首启向导已撤回（2026-10-19）
+
+**问题模式**：为了实现「安装范围 + 路径」合一的自定义页，`installer.nsh` 直接改 `$INSTDIR`。旧记录里出现相对路径 `23\Context Hub` 后，`initMultiUser` 把它读回 `$INSTDIR`，安装器把文件装到工作目录、注册表和快捷方式写成相对路径；随后默认的运行检查又弹出「Context Hub 无法关闭」，而任务管理器里根本没有该进程。设计稿里的首启向导也反复因为桌面端状态、窗口壳和打包验收而卡住。
+
+**规则**：桌面安装器只保留 electron-builder 自带的 assisted installer：`oneClick: false` 提供当前用户/所有用户，`allowToChangeInstallationDirectory: true` 提供原生目录页；不要再用 `nsis.include` 覆盖路径页，也不要恢复首启 React 向导。安装前若旧记录已有相对 `InstallLocation`，先删除 `HKCU\Software\<APP_GUID>`；原生目录页会把应用名追加到所选路径。
+
+## 扩展兼容性用 engines，不用 apiVersion（2026-10-20）
+
+**问题模式**：扩展清单原先用 `apiVersion: "^0.1"` 与内核 API 版本做精确比较，并且市场索引把“某个版本不兼容”当成整份文档无效。结果是：一个面向未来版本的插件会让整个市场页读不出来；已安装插件也没有更新路径；卸载只停用、不删 clone 下来的文件。用户明确要求改成 npm `engines` 风格，并让卸载真正删除代码。
+
+**规则**：
+- `plugin.yaml` 的 `engines.contextHub` 是必填 npm semver 区间，比较对象是仓库根 `package.json` 的 Context Hub **应用版本**，不是扩展 API 版本；判定用 `semver.satisfies(..., { includePrerelease: true })`，无效版本 fail closed。
+- 市场索引的每个版本都携带 `engines`；读取时只校验语法，不让单个不兼容版本拒绝整份索引。`compatibleVersion` 选第一个满足的版本，`versions[0]` 只用于展示。
+- 磁盘包和市场包必须有 `engines`；编译进构建的模块可省略。旧 `apiVersion` 包不再加载，需要从更新后的市场重装。
+- `state/extensions.json` 只存每个 id 的启用布尔值，不是描述或元数据；描述在 `plugin.yaml`，安装来源在 `index.json`。
+- 卸载磁盘扩展的顺序是「停用 → 删目录与记录 → 从运行中的 catalog 撤下」；失败时保持“已安装但停用”，不能让代码在文件已删后继续跑。内置/编译扩展只能停用。
+- 更新设置的命名空间是 `state/settings.json` 的 `plugins["hub.extensions"]`，与 SKILL 模块同机制；调度只随 hub 页面存活，自动更新会覆盖扩展目录里的本地手改，默认关闭。
+
+## 跳转参数里「输入词」和「点中的对象」是两件事（2026-10-20）
+
+**问题模式**：Ctrl+K 输入 `claude` 后点击 `claude-hud`，目标页仍然用 `q=claude` 筛选；
+同时五个 provider 还写了 `view=list`，强制覆盖用户在设置里选的 `grid` 布局。
+根因是 provider 把「搜索时输入什么」直接当成「点击后要筛什么」，并把「搜索跳转」
+和「页面布局」耦合在同一个 URL 参数里。
+
+**规则**：
+- 点击一个具体结果时，目标页的筛选词必须来自**被点中的对象**（`SearchResult.title` /
+  行自身名称），不是输入框里的模糊词。输入词只用于在弹窗里找候选。
+- 跳转 path 只携带「目标页怎么定位这个对象」的参数；凡是用户在设置里拥有的偏好
+  （布局、排序、主题），不得由跳转参数覆盖。删掉读取方要比保留一个「只影响显示」的
+  覆盖参数更彻底：后者会随下一次别人加 provider 又长回来。
+- 改共享 hook 的公开字段（这里是 `SearchPage.listView/clearListView`）前先 `rg` 全部
+  调用方；本次只有四个资产页，删除后 `rg` 应无源码命中（测试目录除外）。
+
+**验证方式**：单元测试要特意让输入词 ≠ 结果标题（如输入 `rewrite` 命中正文、
+期望 path 为 `q=changelog`），否则「输入恰好等于标题」测不出行为变化。
+真机验收同时读 URL、筛选框值和布局按钮的 `aria-pressed`：
+输入 `claude` 点 `claude-hud` 后应为 `/plugins?q=claude-hud`（无 `view`）、
+输入框值为 `claude-hud`、`网格视图` 仍 `aria-pressed=true`。
+
+## 搜索结果的头像要跟页面行用同一套判定（2026-10-20）
+
+**问题模式**：Ctrl+K 里 MCP 的 `context7` 只显示通用服务器图标，而 MCP 页面卡片显示它
+自报的绿色图标。页面用 `ServerTile`，优先级是 `check.icon.src` → 品牌图 → 字形；搜索
+provider 只读了 `markImage(server.mark)`，第三个分支之前的「探测图标」整支漏掉。
+
+**规则**：搜索 provider 复用某个页面行时，展示字段（头像、徽标、状态）必须和那个行的
+渲染函数读同一来源、同一优先级。搜索是同一行的第二个消费点，不是第二次设计。
+判据：页面组件里的 `icon ?? mark` 顺序，就是搜索结果 avatar 的顺序。
+
+**验证方式**：用真实 probe cache 断言（`GET /hub/mcp?action=cache&names=context7`
+返回 `icon.src`），单测断言 avatar 等于该 URL；真机 Ctrl+K 读 `[cmdk-item] img`
+的 `src`，与页面卡片的 `img` 对比，而不是只看截图里「有没有图」。
+
+## 「默认 / 内置」对象先确认是持久化还是视图计算（2026-10-20）
+
+**问题模式**：用户要求默认工作区不可删除、显示“默认工作区”、排在最前。我第一版计划
+把 `default` 做成视图层计算、文案交给前端 i18n，没有写进 `workspaces.json`。用户纠正：
+“进入系统时扫描 workspaces.json 有没有默认工作区，没有就添加，然后 alias 改成默认工作区，
+是需要写入的”。
+
+**规则**：需求里出现“默认 / 内置 / 系统创建”的对象时，先分清它是**持久化数据**还是
+**派生视图**。出现“写入、扫描、不存在就创建、alias 改成”这类词，就按持久化做：
+身份标记（如 `default: true`）和默认别名（如 `{ i18n: key }`）都落盘，UI 只做投影和翻译。
+不要因为“旧文档自动升级更省事”就替用户选择视图计算，尤其是对象还要参与重命名、
+置顶、不可删除这些用户可感知的语义时。
+
+默认工作区的**路径**也要和宿主 cwd 解耦：dev server 与 CLI 的 cwd 是项目目录，跟随
+cwd 会把仓库根写成默认；固定用 `userHome()`，并在启动扫描时清除指向别处的旧
+`default` 行（连同其系统别名），把默认标记迁到 home。桌面端 cwd 恰好是 home，
+这条差异只有 dev/CLI 形态会暴露。
+
+**验证方式**：测试必须直接读 `<hub home>/state/*.json`，断言 `"default": true` 和
+alias 对象已经落盘；只断言 API 返回的 view 字段不足以证明持久化。迁移测试用真实
+文件的副本 + 隔离 home 跑一次启动扫描，不要直接改用户的真实状态文件。
+
+## `dev:*` 命令必须服务源码，构建产物只能作为打包输入（2026-10-20）
+
+**问题模式**：用户跑 `pnpm dev:desktop` 改 `apps/web/src` 不生效。`dev:desktop` 只 watch
+Electron 的 main/preload/server bundle，页面永远加载 `apps/web/dist`——那是
+`pnpm --filter web build` 的产物，源码改动根本不进这个目录。文档里写了要另开
+`pnpm dev:web` 并设 `CONTEXT_HUB_DEV_URL`，但命令名 `dev` 让人预期改源码就会生效，
+没人会先去读那段。同一处还留着一个 watch `server.mjs` 的 watcher，而 dev 形态根本不
+加载它——它只会重启 Electron 制造"改动生效了"的假象。
+
+**规则**：一个 `dev` 入口的默认路径必须是**服务源码**；如果它服务构建产物，要么直接改掉，
+要么在启动日志里明说。判据：改一行源码后，dev server 提供的模块内容立即变化
+（`curl http://localhost:<port>/src/<file>` 即可看到），窗口通过 HMR/reload 看到它。
+同时检查 watcher 重建的产物**确实被运行时加载**；不被加载的 watcher 要删掉，不要留着
+它"看起来在工作"。
+
+
+## 桌面端选目录不要用 Chromium 的 File System Access API（2026-10-20）
+
+**问题模式**：桌面端“创建工作区”第一次选完目录没有反应，第二次点击彻底没反应，只能重启。
+两个原因叠在一起：`showDirectoryPicker()` 只返回目录名，服务端 `locate()` 只会在已知目录
+旁边按名字找，任意项目目录必然被拒；而 Electron 44 里第一次调用之后，后续调用会抛
+`NotAllowedError: ... File picker already active.`，`folder-picker.ts` 又把它当成“用户取消”
+吞掉。用本机 Electron 探针可稳定复现前两次调用分别得到 pending / NotAllowedError。
+
+**规则**：桌面 carrier 的原生能力走 preload 桥，不要依赖页面的浏览器 API。目录选择用
+主进程 `dialog.showOpenDialog(win, { properties: ["openDirectory"] })`，把**绝对路径**交给
+页面；浏览器分支才保留 `showDirectoryPicker()`。服务端 `WorkspaceStore.add()` 本来就
+接受绝对路径，不需要改。IPC handler 沿用 `event.sender === window.webContents` 校验，
+并发调用复用一个 in-flight Promise。
+
+**验证方式**：真机 Electron 验收必须覆盖“取消后再次点击还能打开对话框”“选主目录之外的
+目录能写入绝对 path”“重复添加不重复”“重启后仍在”。原生对话框可以用 Win32 自动化：
+`EnumWindows` 找 electron 进程的 `#32770`，子控件里 Edit 的 `GetDlgCtrlID=1152`、确定按钮
+`id=1`、取消 `id=2`，`WM_SETTEXT` + `BM_CLICK` 即可。Electron 窗口若是隐藏的，对话框会
+创建但不可见，先 `ShowWindow(SW_RESTORE)` + `SetForegroundWindow` 再操作。
+
+## dev server 的 Vite root 是 cwd，必须从 apps/web 启动（2026-10-20）
+
+**问题模式**：为了验收手工执行 `node apps/web/dev.ts`，Vite 在 5271 监听但 `/` 返回 404、
+页面空白；日志停在 `[optimizer] scanning dependencies...`。原因是 `createServer()` 没写
+`root`，Vite 用 `process.cwd()`——从仓库根启动时根目录没有 `index.html`。`pnpm dev:desktop`
+内部是 `spawn(..., { cwd: webDir })`，所以平时不会暴露。
+
+**规则**：手工起 web dev server 一律 `cd apps/web && node dev.ts`（或 `pnpm --filter web dev`）。
+另外，Bash 工具默认沙箱下 Vite 会卡在依赖扫描、端口能监听但不响应；这类长驻 dev server
+用 `dangerouslyDisableSandbox: true` 启动，和本文件里 `pnpm install` 的沙箱规则一致。
+
+## 一个 hub home 同时只能有一个 server（2026-10-20）
+
+**问题模式**：做构建形态验收时，dev web server（5270）和内置 server 的桌面实例共用同一个
+`CONTEXT_HUB_HOME`，两边的 workspace store 同时读改写 `state/workspaces.json`，结果文件被
+覆盖成只剩默认行，刚添加的工作区丢失。状态存储没有任何跨进程锁，契约就是“一个 home
+一个 server”。
+
+**规则**：任何 E2E 只允许一个 hub server 写同一个 home；验证构建形态前先停掉 dev server。
+看到 `workspaces.json` 行数无故减少，先查是不是还有另一个 server 在跑（`netstat` 看端口、
+`/hub/about` 看 home），不要先怀疑 store 的迁移逻辑。

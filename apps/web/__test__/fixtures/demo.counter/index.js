@@ -1,4 +1,4 @@
-// ../context-hub-extensions/plugins/demo.counter/src/index.tsx
+// Local e2e fixture: exercises the header contribution without a market install.
 import { useState } from "react";
 import { jsxs } from "react/jsx-runtime";
 function Counter() {

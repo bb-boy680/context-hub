@@ -11,12 +11,18 @@ import { SidebarInset, SidebarProvider } from "@context-hub/shadcn-ui/components
 
 import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
+import { DesktopMenuActions } from "@/components/desktop-menu-actions"
 
 export function AppLayout() {
   return (
     /* The design fixes the rail at 248px, which is what every page's 1192px
-       content column is measured against. */
-    <SidebarProvider style={{ "--sidebar-width": "248px" } as React.CSSProperties}>
+       content column is measured against. The top padding is the desktop
+       shell's title bar; it is 0 in a plain browser. */
+    <SidebarProvider
+      className="pt-[var(--context-hub-titlebar-height,0px)]"
+      style={{ "--sidebar-width": "248px" } as React.CSSProperties}
+    >
+      <DesktopMenuActions />
       <AppSidebar />
       <SidebarInset className="min-w-0">
         <AppHeader />

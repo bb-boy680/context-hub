@@ -44,7 +44,6 @@ export const variablesExtension: ExtensionModule = {
   manifest: {
     name: "Environment Variables",
     version: "0.1.0",
-    apiVersion: "^0.1",
     kind: "code",
     category: "asset",
     description:

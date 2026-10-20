@@ -23,7 +23,7 @@ export function AppHeader() {
   const headerItems = [...contributions].sort((a, b) => a.order - b.order)
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-header px-6">
+    <header className="sticky top-[var(--context-hub-titlebar-height,0px)] z-10 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-header px-6">
       <SidebarTrigger className="-ml-2 md:hidden" />
       <Breadcrumb className="min-w-0 flex-1">
         <BreadcrumbList>

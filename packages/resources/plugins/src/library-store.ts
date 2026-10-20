@@ -320,10 +320,12 @@ export class PluginLibrary extends Service {
    * The mark a client's own extension declares, which is what its row draws.
    *
    * An installer carries no mark of its own: it shows the icon its own extension
-   * declares, which is the same one the catalog row draws.
+   * declares, which is the same one the catalog row draws. That mark lives on
+   * the agent's target contribution — an agent plugin's target id and its
+   * manifest id need not match, so the manifest is not where to look.
    */
   private iconFor(id: string): ExtensionIcon {
-    const entries = this.owner.get("extensions")?.snapshot().entries ?? []
-    return entries.find((entry) => entry.manifest.id === id)?.manifest.icon ?? PlugIcon
+    const targets = this.owner.get("targets")?.placements() ?? []
+    return targets.find((placement) => placement.value.id === id)?.value.icon ?? PlugIcon
   }
 }

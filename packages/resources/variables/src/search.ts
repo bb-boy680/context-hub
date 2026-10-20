@@ -52,6 +52,6 @@ export function searchVariables(
       id: variable.name,
       title: variable.name,
       ...(variable.group === "" ? {} : { description: variable.group }),
-      path: searchPath(PAGE, query),
+      path: searchPath(PAGE, variable.name),
     }))
 }

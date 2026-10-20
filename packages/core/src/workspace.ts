@@ -15,6 +15,20 @@ export const WORKSPACE_ROUTE = "/hub/workspaces"
 /** State document that holds the known folders and the current one. */
 export const WORKSPACE_DOCUMENT = "workspaces"
 
+/** The i18n key a system-provided workspace name points at. */
+export const DEFAULT_WORKSPACE_NAME = "workspace.defaultName"
+
+/**
+ * A name the system gave: an i18n key the form translates, so the row reads in
+ * the person's own language instead of a name baked into the document.
+ */
+export interface WorkspaceI18nAlias {
+  i18n: string
+}
+
+/** The name a list row shows: one a person chose, or a system i18n key. */
+export type WorkspaceAlias = string | WorkspaceI18nAlias
+
 /**
  * One folder a form picked. The path is absent when the form cannot know one,
  * which is what a browser's own folder dialog leaves behind.
@@ -24,21 +38,31 @@ export interface WorkspaceFolder {
   path?: string
   /**
    * The name a person gave this workspace, shown instead of the folder's own
-   * name. Renaming a workspace renames the row, never the folder: the hub only
-   * reads and writes a folder it was pointed at.
+   * name, or a system name to translate. Renaming a workspace renames the row,
+   * never the folder: the hub only reads and writes a folder it was pointed at.
    */
-  alias?: string
+  alias?: WorkspaceAlias
+  /**
+   * The host's own folder. Written once by the store, kept at the front of the
+   * list, and never removable; its absence is what marks every other row.
+   */
+  default?: boolean
 }
 
 /** One workspace, described the way a list row needs it. */
 export interface WorkspaceView {
   /** What selection matches on: the path when this form knows one, else the name. */
   id: string
+  /** A person's name, or the folder's own name when there is no alias. */
   name: string
   /** The folder itself, absolute, for the work that reads inside it. */
   path: string | null
   /** The path as a person reads it, e.g. `~/work/hub`; `null` when a form knows no path. */
   display: string | null
+  /** Whether this is the host's own workspace: shown first and not removable. */
+  default: boolean
+  /** The i18n key of a system alias, for the form to translate; null otherwise. */
+  nameKey: string | null
 }
 
 /** Every workspace a form knows, and which one is current. */
@@ -79,12 +103,13 @@ export interface WorkspaceStore {
   /**
    * Give one known workspace the name a person chose, shown instead of the
    * folder's own name; an empty name drops it and the row reads the folder's
-   * name again. The folder itself is never moved.
+   * name again — on the default workspace an empty name restores the system
+   * name instead. The folder itself is never moved.
    */
   rename(id: string, name: string): Promise<WorkspacePage>
   /**
-   * Drop one workspace from the list. The folder on disk is untouched, and the
-   * current workspace is refused: the hub would have nothing to read.
+   * Drop one workspace from the list. The folder on disk is untouched, the
+   * current workspace is refused, and so is the default workspace.
    */
   remove(id: string): Promise<WorkspacePage>
   /**
@@ -165,15 +190,21 @@ export function readWorkspaceState(value: unknown): WorkspaceState {
   if (Array.isArray(stored.folders)) {
     for (const entry of stored.folders) {
       if (typeof entry !== "object" || entry === null) continue
-      const { name, path, alias } = entry as {
+      const { name, path, alias, default: isDefault } = entry as {
         name?: unknown
         path?: unknown
         alias?: unknown
+        default?: unknown
       }
       if (typeof name !== "string" || name === "") continue
       if (path !== undefined && (typeof path !== "string" || path === "")) continue
       const folder: WorkspaceFolder = path === undefined ? { name } : { name, path }
       if (typeof alias === "string" && alias !== "") folder.alias = alias
+      else if (typeof alias === "object" && alias !== null) {
+        const { i18n } = alias as { i18n?: unknown }
+        if (typeof i18n === "string" && i18n !== "") folder.alias = { i18n }
+      }
+      if (isDefault === true) folder.default = true
       if (!folders.some((known) => folderId(known) === folderId(folder))) folders.push(folder)
     }
   }

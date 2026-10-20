@@ -68,10 +68,10 @@ describe("searching the skills", () => {
     ])
   })
 
-  it("opens the page filtered, in the list view that marks the query", () => {
-    expect(searchSkills(value, "pdf", assetUrl)[0]?.path).toBe(
-      "/skills?q=pdf&view=list"
-    )
+  it("opens the page filtered by the clicked row's own name", () => {
+    const rows = searchSkills(value, "pdf", assetUrl)
+    expect(rows[0]?.path).toBe("/skills?q=pdf-extract")
+    expect(rows[1]?.path).toBe("/skills?q=pdf-forms")
   })
 
   it("returns nothing for an empty query", () => {

@@ -9,6 +9,8 @@
  * it, because a mark sitting on a pill has to look cut out of that pill rather
  * than framed.
  */
+import type { ReactNode } from "react"
+
 import type { ExtensionIcon } from "../types.ts"
 
 /** The 20px disc each mark occupies, and the 13px step between them. */
@@ -59,7 +61,7 @@ export function AvatarStack({
 
   return (
     <span
-      className="relative shrink-0"
+      className="relative inline-flex shrink-0"
       style={{ width: STEP * (slots - 1) + TILE, height: TILE }}
       aria-label={label}
       title={label}
@@ -82,6 +84,45 @@ export function AvatarStack({
           <span className="font-mono text-[10px] leading-none">{`+${more}`}</span>
           <span className={edge} aria-hidden />
         </span>
+      )}
+    </span>
+  )
+}
+
+/**
+ * A record's provenance as one line: the caller's own words about where it
+ * came from, a seam, and the marks of the agents holding it.
+ *
+ * The line is drawn by every detail panel and dialog, so it lives here rather
+ * than three times beside them. Without any marks there is nothing to separate,
+ * so the lead stands alone.
+ *
+ * @param lead — what the caller says about the record, e.g. its source.
+ * @param marks — the agents holding it, as their own icons.
+ * @param label — names the marks for assistive technology.
+ * @param seam — the ring that cuts each mark out of the surface behind it.
+ */
+export function MarksLine({
+  lead,
+  marks,
+  label,
+  seam = "ring-card",
+}: {
+  lead?: ReactNode
+  marks: readonly AvatarMark[]
+  label?: string
+  seam?: string
+}) {
+  return (
+    <span className="inline-flex max-w-full min-w-0 items-center gap-2">
+      {lead}
+      {marks.length === 0 ? null : (
+        <>
+          <span aria-hidden className="text-muted-soft">
+            ·
+          </span>
+          <AvatarStack marks={marks} seam={seam} label={label} />
+        </>
       )}
     </span>
   )

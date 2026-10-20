@@ -1,6 +1,6 @@
 /**
  * The server rows a global search offers: the fields the page's own filter
- * reads, the brand mark the page draws, and the address that opens the list.
+ * reads, the mark the page draws, and the address that opens the list.
  */
 import { describe, expect, it } from "vitest"
 
@@ -52,9 +52,29 @@ describe("searching the MCP servers", () => {
     expect(row?.description).toBeUndefined()
   })
 
-  it("opens the page filtered, in the list view that marks the query", () => {
+  it("wears the icon a probe reported instead of the brand mark", () => {
+    const [row] = searchServers(
+      [
+        server({
+          check: {
+            ok: true,
+            ms: 1,
+            probe: 1,
+            target: "github",
+            scope: "global",
+            at: 1,
+            icon: { src: "https://example.test/icon.svg" },
+          },
+        }),
+      ],
+      "github"
+    )
+    expect(row?.avatar).toBe("https://example.test/icon.svg")
+  })
+
+  it("opens the page filtered by the clicked row's own name", () => {
     expect(searchServers([server()], "git")[0]?.path).toBe(
-      "/mcp-servers?q=git&view=list"
+      "/mcp-servers?q=github"
     )
   })
 

@@ -427,14 +427,7 @@ export function McpServersPage() {
 
   const settings = useSettings()
   const search = useSearchPage()
-  /* A result from the global search asks for the list view, where the matched
-     text is marked; the page's own choice is what remains once that is cleared. */
-  const [localView, setLocalView] = React.useState<ViewId>(settings.layout)
-  const view = search.listView ? "list" : localView
-  const chooseView = (next: ViewId) => {
-    search.clearListView()
-    setLocalView(next)
-  }
+  const [view, setView] = React.useState<ViewId>(settings.layout)
   const [tab, setTab] = React.useState<TabId>("all")
   /* No tag narrows the list until one is picked. */
   const [tag, setTag] = React.useState("")
@@ -665,7 +658,7 @@ export function McpServersPage() {
             </div>
             <ToolbarActions
               view={view}
-              onView={chooseView}
+              onView={setView}
               onAdd={() => setAdding(true)}
               onCheck={library.refresh}
               checking={library.testing.length > 0}

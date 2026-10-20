@@ -42,7 +42,7 @@ import {
   type PluginCollected,
 } from "./library.ts"
 import { rowsForTab, SCOPE_LABELS, type PluginTab } from "./rows.ts"
-import { PluginTile } from "./parts.tsx"
+import { HolderStack, PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import { PluginNameTakenError, type PluginInstallScope } from "./contract.ts"
 
@@ -50,7 +50,6 @@ import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
 import {
   ActionTab,
   AutoplayVideo,
-  AvatarStack,
   FilterBar,
   Highlighted,
   Ledger,
@@ -194,26 +193,8 @@ function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
 }
 
 /**
- * The agents holding a pack, as their own marks.
- *
- * It answers "which agents have this" without the row being opened, which is the
- * question a pack's source word cannot: a pack collected from a repository can
- * still be sitting in three agents, and one only an agent holds is worded as a
- * local directory like every other pack on this machine.
+ * What every row's action cluster needs, gathered so it travels as one prop.
  */
-function HolderStack({ plugin }: { plugin: PluginRow }) {
-  if (plugin.held.length === 0) return null
-
-  return (
-    <AvatarStack
-      marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
-      seam="ring-card"
-      label={plugin.held.map((hold) => hold.label).join(" · ")}
-    />
-  )
-}
-
-/** What every row's action cluster needs, gathered so it travels as one prop. */
 interface RowActions {
   /** The clients this hub can deliver to, with what each one already holds. */
   clients: readonly PluginClient[]
@@ -296,8 +277,13 @@ function BundleCover({ plugin }: { plugin: PluginRow }) {
  * The cover of a pack with no picture: what the pack says about itself, rendered
  * as the document it is. A cover is a thumbnail, so the document is clipped
  * rather than scrolled — a card reads as one, not as a reading surface.
+ *
+ * Rendering the document is the most expensive thing a card does, and the page
+ * re-renders on every keystroke of its filter while the rows themselves have not
+ * moved. Memoised on the row, which keeps typing from re-rendering eight
+ * documents a key.
  */
-function ReadmeCover({ plugin }: { plugin: PluginRow }) {
+const ReadmeCover = React.memo(function ReadmeCover({ plugin }: { plugin: PluginRow }) {
   const readme = usePackReadme(plugin)
   if (readme === undefined || readme === null) return <BundleCover plugin={plugin} />
 
@@ -311,7 +297,7 @@ function ReadmeCover({ plugin }: { plugin: PluginRow }) {
       <Markdown imageBase={packImageBase(plugin)}>{readme}</Markdown>
     </div>
   )
-}
+})
 
 /**
  * What fills a card's cover box: the first picture a person added, drawn or
@@ -705,18 +691,6 @@ function PageHeading() {
   )
 }
 
-/** A value that follows its input once typing stops, not on every keystroke. */
-function useSettled(value: string, delay = 180) {
-  const [settled, setSettled] = React.useState(value)
-
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setSettled(value), delay)
-    return () => window.clearTimeout(timer)
-  }, [value, delay])
-
-  return settled
-}
-
 function ViewButton({
   icon: Icon,
   label,
@@ -753,27 +727,36 @@ export function PluginsPage() {
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const settings = useSettings()
   const search = useSearchPage()
-  /* A result from the global search asks for the list view, where the matched
-     text is marked; the page's own choice is what remains once that is cleared. */
-  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
-  const view = search.listView ? "list" : localView
-  const chooseView = (next: "grid" | "list") => {
-    search.clearListView()
-    setLocalView(next)
-  }
+  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   /* Which segment the Add dialog opens on; `null` while it is closed. */
   const [addTab, setAddTab] = React.useState<AddPluginTab | null>(null)
   /* The pack the detail lightbox is open on, by id. */
   const [detailId, setDetailId] = React.useState<string | null>(null)
   const [tag, setTag] = React.useState(ALL_TAGS)
+  /* Ticked rows, by key. Narrowing the list drops them: a batch action names
+     what the person can still see. */
+  const [checked, setChecked] = React.useState<readonly string[]>([])
   /* Typing narrows the same list the tag chips do; it is not a new view. The
      query lives in the address so the global search can seed it. */
   const query = search.query
   const setQuery = search.setQuery
-  const needle = useSettled(query)
-  /* Ticked rows, by key. Narrowing the list drops them: a batch action names
-     what the person can still see. */
-  const [checked, setChecked] = React.useState<readonly string[]>([])
+  /* The address is written once typing pauses. Every write re-renders the page,
+     and a page's cards draw their documents — far more work than the filter
+     itself — so keeping the box local until then is what keeps typing smooth.
+     The field owns what it shows; this only decides when the page follows. */
+  const pendingQuery = React.useRef<number | undefined>(undefined)
+  const writeQuery = React.useCallback(
+    (next: string) => {
+      window.clearTimeout(pendingQuery.current)
+      pendingQuery.current = window.setTimeout(() => {
+        setQuery(next)
+        setChecked([])
+      }, 120)
+    },
+    [setQuery]
+  )
+  React.useEffect(() => () => window.clearTimeout(pendingQuery.current), [])
+  const needle = query
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
   /* A batch a tab's menu started, which holds the menu's item disabled until the
@@ -1206,13 +1189,13 @@ export function PluginsPage() {
                 icon={LayoutGridIcon}
                 label={t("plugins.view.grid")}
                 active={view === "grid"}
-                onClick={() => chooseView("grid")}
+                onClick={() => setView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("plugins.view.list")}
                 active={view === "list"}
-                onClick={() => chooseView("list")}
+                onClick={() => setView("list")}
               />
             </div>
             <Button
@@ -1260,8 +1243,7 @@ export function PluginsPage() {
         <FilterBar
           query={query}
           onQuery={(next) => {
-            setQuery(next)
-            setChecked([])
+            writeQuery(next)
           }}
           tags={tagsOf(catalog)}
           tag={tag}

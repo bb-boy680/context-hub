@@ -37,7 +37,6 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
     manifest: {
       name: "MCP servers",
       version: "0.1.0",
-      apiVersion: "^0.1",
       kind: "code",
       category: "asset",
       description: "Declare the MCP servers agents may use, and where each is installed.",

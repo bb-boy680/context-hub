@@ -5,13 +5,15 @@ This is a Vite monorepo template with shadcn/ui.
 ## Running
 
 ```bash
-pnpm dev     # development
-pnpm build   # typecheck + build the page into apps/web/dist
-pnpm start   # the built form: apps/web/server.ts --static dist
-pnpm test    # every package's tests, in one process
+pnpm dev          # web and desktop together
+pnpm dev:web      # the browser form only
+pnpm dev:desktop  # the desktop shell only
+pnpm build        # typecheck + build the page into apps/web/dist
+pnpm start        # the built form: apps/web/server.ts --static dist
+pnpm test         # every package's tests, in one process
 ```
 
-Development runs **two processes**, because every other form is the same shape:
+`pnpm dev:web` runs **two processes**, because every other form is the same shape:
 the hub's own server (`apps/web/server.ts`, port 5270) holds every bridge, and
 Vite serves the page's source with HMR (port 5271) and forwards `/hub` to it.
 Both ports are written down in one place, `apps/web/hub-port.ts`. A built form
@@ -46,17 +48,25 @@ chosen from the tray menu. The sidebar shows the app version, and an available
 release appears there as a one-click update; clicking it downloads and restarts
 into the new version.
 
-`pnpm --filter @context-hub/desktop dev` watches the main, preload and server
-bundles and restarts Electron after a change; the application menu has Reload
-Page, Restart App and Toggle DevTools while it runs. Set
-`CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271` to point the window at the Vite dev
-server instead of starting its own server.
+The window's own title bar carries an **Application** menu, injected by the
+desktop shell rather than drawn by the page: About, Check for Updates, Reload,
+Refresh Plugins, Quit. Reload re-reads the skill and plugin libraries; Refresh
+Plugins fetches the extension market index again. Windows and macOS keep their
+native window buttons; Linux draws its own on the frameless window.
 
-The release version is the root `package.json` version. A packaged app checks
-GitHub Releases for a newer one and installs it in place after the hub server
-has stopped. Releases are built by `.github/workflows/release.yml`; see
+`pnpm dev:desktop` starts the web dev server (or reuses one already
+listening), so page source updates through Vite's HMR, and watches the main
+and preload bundles, restarting Electron after a change; the application menu
+has Reload Page, Restart App and Toggle DevTools while it runs. The hub server
+is the web dev server's child, so `server.ts` changes need a restart of the
+watcher. `CONTEXT_HUB_DEV_URL` points the window at a different dev server
+instead.
+
+The release version is the tag (`v1.2.0`). A packaged app checks GitHub
+Releases for a newer one and installs it in place after the hub server has
+stopped. Releases are built by `.github/workflows/release.yml`; see
 [docs/building.md](docs/building.md) for signing, feeds and the limits of what
-can be verified locally.
+can be verified locally. 中文图文步骤见 [docs/releasing.md](docs/releasing.md)。
 
 ## Extensions
 

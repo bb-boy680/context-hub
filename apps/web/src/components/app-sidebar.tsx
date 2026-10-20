@@ -152,7 +152,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const operate = navGroups.find((group) => group.id === "operate")
 
   return (
-    <Sidebar className="border-sidebar-border" {...props}>
+    <Sidebar
+      className="border-sidebar-border top-[var(--context-hub-titlebar-height,0px)] h-[calc(100svh-var(--context-hub-titlebar-height,0px))]"
+      {...props}
+    >
       <SidebarHeader className="px-4 pt-5 pb-0">
         <div className="flex items-center gap-2.5">
           <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-primary text-primary-foreground">

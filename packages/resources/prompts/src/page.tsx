@@ -27,10 +27,10 @@ import * as React from "react"
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import {
   AutoplayVideo,
-  AvatarStack,
   FilterBar,
   Highlighted,
   Ledger,
+  MarksLine,
   PageBody,
   PlaceScopePicker,
   TablePagination,
@@ -59,7 +59,7 @@ import {
   usePromptPlaces,
   type Holds,
 } from "./library.ts"
-import { PromptMeta, PromptTile } from "./parts.tsx"
+import { PromptMarks, PromptMeta, PromptTile } from "./parts.tsx"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
@@ -343,11 +343,7 @@ function PromptCard({ prompt, updated, busy, store, places, holds, onOpen, onGen
             do; the actions keep the right whether or not anything holds it. */}
         <div className="flex items-center gap-2">
           <span className="mr-auto flex min-w-0 items-center">
-            <AvatarStack
-              marks={marks}
-              seam="ring-card"
-              label={marks.map((mark) => mark.label).join(" · ")}
-            />
+            <PromptMarks marks={marks} />
           </span>
           {/* Taking the text itself, which needs no agent to go to, and then
               the delivery — the one the row is read for, so it keeps the end. */}
@@ -378,14 +374,7 @@ export function PromptsPage() {
 
   const settings = useSettings()
   const search = useSearchPage()
-  /* A result from the global search asks for the list view, where the matched
-     text is marked; the page's own choice is what remains once that is cleared. */
-  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
-  const view = search.listView ? "list" : localView
-  const chooseView = (next: "grid" | "list") => {
-    search.clearListView()
-    setLocalView(next)
-  }
+  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   /* The query lives in the address so the global search can seed it. */
   const query = search.query
   const setQuery = search.setQuery
@@ -614,7 +603,7 @@ export function PromptsPage() {
     {
       key: "prompt",
       label: t("prompts.column.prompt"),
-      width: "31.2%",
+      width: "29.2%",
       cell: (prompt) => (
         <span className="flex min-w-0 flex-col gap-1">
           {/* The title leads and the description follows: the pair a skill's
@@ -633,7 +622,7 @@ export function PromptsPage() {
     {
       key: "tags",
       label: t("prompts.column.tags"),
-      width: "24.4%",
+      width: "19.4%",
       cell: (prompt) => (
         <span className="flex flex-wrap items-center gap-1.5">
           {prompt.tags.slice(0, 3).map((item) => (
@@ -648,9 +637,30 @@ export function PromptsPage() {
       ),
     },
     {
+      key: "places",
+      label: t("prompts.column.places"),
+      width: "10%",
+      /* Which agents hold this prompt, as their own marks: the same stack the
+         card wears, so a row answers "who has this" without being opened. */
+      cell: (prompt) => {
+        const marks = heldMarks(places, holdsMap[prompt.id] ?? {}, (place) => t(place.labelKey))
+        return (
+          /* The same provenance line the detail panel draws, not just its
+             stack: a row and its panel must answer "where is this" alike. */
+          <span className="flex items-center">
+            <MarksLine
+              lead={<PromptMeta body={prompt.prompt} showTokens={false} />}
+              marks={marks}
+              label={marks.map((mark) => mark.label).join(" · ")}
+            />
+          </span>
+        )
+      },
+    },
+    {
       key: "tokens",
       label: t("prompts.column.body"),
-      width: "13.5%",
+      width: "12%",
       cell: (prompt) => (
         <span className="font-mono text-[12.5px] text-muted-foreground">
           {t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))}
@@ -660,7 +670,7 @@ export function PromptsPage() {
     {
       key: "updated",
       label: t("prompts.column.updated"),
-      width: "13%",
+      width: "11.5%",
       cell: (prompt) => (
         <span className="text-[12.5px] text-muted-foreground">
           {formatAge(prompt.updatedAt, state.active)}
@@ -774,13 +784,13 @@ export function PromptsPage() {
                 icon={LayoutGridIcon}
                 label={t("prompts.view.grid")}
                 active={view === "grid"}
-                onClick={() => chooseView("grid")}
+                onClick={() => setView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("prompts.view.list")}
                 active={view === "list"}
-                onClick={() => chooseView("list")}
+                onClick={() => setView("list")}
               />
             </div>
             <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddOpen(true)}>

@@ -60,6 +60,51 @@ describe("fetchMarketIndex", () => {
     expect(index).toEqual({ format: 1, title: "Test", plugins: [] })
   })
 
+  it("points a local index at the checkout that holds the plugin path", async () => {
+    const dir = await fs.mkdtemp(path.join(tmpdir(), "hub-local-index-"))
+    try {
+      await fs.mkdir(path.join(dir, "plugins", "demo.one"), { recursive: true })
+      const version = (at: string) => ({
+        version: "1.0.0",
+        engines: { contextHub: ">=0.0.1 <0.7.0" },
+        source: { type: "git", url: "https://github.com/example/repo", path: at },
+      })
+      await fs.writeFile(
+        path.join(dir, "marketplace.json"),
+        JSON.stringify({
+          format: 1,
+          title: "Local",
+          plugins: [
+            {
+              id: "demo.one",
+              title: "One",
+              description: "One",
+              icon: "https://example.test/one.svg",
+              author: "Test",
+              versions: [version("plugins/demo.one")],
+            },
+            {
+              id: "demo.two",
+              title: "Two",
+              description: "Two",
+              icon: "https://example.test/two.svg",
+              author: "Test",
+              versions: [version("plugins/demo.two")],
+            },
+          ],
+        })
+      )
+
+      const index = await fetchMarketIndex(dir)
+      expect(index.plugins[0]?.versions[0]?.source.url).toBe(path.resolve(dir))
+      expect(index.plugins[1]?.versions[0]?.source.url).toBe(
+        "https://github.com/example/repo"
+      )
+    } finally {
+      await fs.rm(dir, { recursive: true, force: true })
+    }
+  })
+
   it("refuses a non-success answer", async () => {
     status = 404
     await expect(fetchMarketIndex(base, OPTIONS)).rejects.toThrow(/answered 404/)
@@ -108,7 +153,7 @@ describe("fetchMarketIndex", () => {
               versions: [
                 {
                   version: "1.0.0",
-                  apiVersion: "^0.1",
+                  engines: { contextHub: ">=0.0.1 <0.7.0" },
                   source: { type: "git", url: dir },
                 },
               ],

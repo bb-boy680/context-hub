@@ -41,7 +41,7 @@ export function mcpSearch(library: McpLibrary): SearchContribution {
  *
  * @param servers — the folded rows the page draws.
  * @param query — what the person typed.
- * @returns the matching rows, with the brand mark when the server has one.
+ * @returns the matching rows, with the icon a probe reported, or the brand mark.
  */
 export function searchServers(
   servers: readonly McpServer[],
@@ -52,13 +52,13 @@ export function searchServers(
       matchesQuery(query, server.name, server.declaration, server.description)
     )
     .map((server) => {
-      const avatar = markImage(server.mark)
+      const avatar = server.check?.icon?.src ?? markImage(server.mark)
       return {
         id: server.id,
         title: server.name,
         ...(server.description === "" ? {} : { description: server.description }),
         ...(avatar === null ? {} : { avatar }),
-        path: searchPath(PAGE, query, { view: "list" }),
+        path: searchPath(PAGE, server.name),
       }
     })
 }

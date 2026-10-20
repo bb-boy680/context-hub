@@ -43,8 +43,11 @@ export interface VariableDocument {
 export interface VariableDraft {
   name: string
   group?: string
-  /** The value the row is created with; it is required. */
-  value: string
+  /**
+   * The value to write; omitted or blank records the name only and leaves the
+   * machine's value, if any, as it is.
+   */
+  value?: string
 }
 
 /** What an edit hands over; an omitted field is left as it is. */
@@ -63,8 +66,8 @@ export interface VariableStore {
    * Add one or more variables in one write.
    *
    * @throws when a name is invalid or already taken — including twice inside
-   *   the same batch — or when a row has no value. The name is the identity and
-   *   the value is part of the record, so neither is filled in silently.
+   *   the same batch, or when a value is not a string. A row without a value
+   *   records its name only; the machine's value, if there is one, is not touched.
    */
   create(drafts: readonly VariableDraft[]): Promise<VariableDocument>
   /**
