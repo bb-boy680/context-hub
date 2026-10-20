@@ -92,21 +92,23 @@ is not used because a pnpm install does not guarantee that layout on CI.
 pnpm --filter @context-hub/desktop dev
 ```
 
-This watches all three bundles, rebuilds on change, and restarts Electron after
-a successful rebuild. The application menu adds Restart App and Toggle DevTools
-while the watcher runs (Reload Page is always available). Stopping the watcher
-also stops the Electron process it started.
+This starts the web dev server (`apps/web/dev.ts`, pinned to ports 5270/5271)
+unless one is already listening, watches the main and preload bundles,
+rebuilds on change, and restarts Electron after a successful rebuild. Page
+source edits reach the window through Vite's HMR; the hub server is the web
+dev server's child, so `server.ts` changes need a restart of the watcher. The
+application menu adds Restart App and Toggle DevTools while the watcher runs
+(Reload Page is always available). Stopping the watcher also stops the
+Electron process and the web dev server it started.
 
-To use Vite's HMR for the page, run `pnpm dev` in another terminal and start
-the desktop with:
+To point the window at a different dev server, set:
 
 ```bash
-CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271 pnpm --filter @context-hub/desktop exec electron .
+CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271 pnpm --filter @context-hub/desktop dev
 ```
 
-`CONTEXT_HUB_DEV_URL` skips the server entirely; `/hub` requests go through
-Vite's existing proxy. Main-process and server changes still need the watcher
-or a rebuild.
+An explicit `CONTEXT_HUB_DEV_URL` is used as-is and the watcher does not start
+or stop a web dev server of its own.
 
 Crash notes land in `app.getPath("logs")` — on Windows
 `%APPDATA%\@context-hub\desktop\logs` — as `crash-<UTC>-<source>.log`. They

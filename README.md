@@ -54,11 +54,13 @@ Refresh Plugins, Quit. Reload re-reads the skill and plugin libraries; Refresh
 Plugins fetches the extension market index again. Windows and macOS keep their
 native window buttons; Linux draws its own on the frameless window.
 
-`pnpm dev:desktop` watches the main, preload and server
-bundles and restarts Electron after a change; the application menu has Reload
-Page, Restart App and Toggle DevTools while it runs. It loads `apps/web/dist`
-unless `CONTEXT_HUB_DEV_URL=http://127.0.0.1:5271` points the window at a running
-`pnpm dev:web` instead of starting its own server.
+`pnpm dev:desktop` starts the web dev server (or reuses one already
+listening), so page source updates through Vite's HMR, and watches the main
+and preload bundles, restarting Electron after a change; the application menu
+has Reload Page, Restart App and Toggle DevTools while it runs. The hub server
+is the web dev server's child, so `server.ts` changes need a restart of the
+watcher. `CONTEXT_HUB_DEV_URL` points the window at a different dev server
+instead.
 
 The release version is the tag (`v1.2.0`). A packaged app checks GitHub
 Releases for a newer one and installs it in place after the hub server has

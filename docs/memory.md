@@ -1387,3 +1387,18 @@ cwd 会把仓库根写成默认；固定用 `userHome()`，并在启动扫描时
 alias 对象已经落盘；只断言 API 返回的 view 字段不足以证明持久化。迁移测试用真实
 文件的副本 + 隔离 home 跑一次启动扫描，不要直接改用户的真实状态文件。
 
+## `dev:*` 命令必须服务源码，构建产物只能作为打包输入（2026-10-20）
+
+**问题模式**：用户跑 `pnpm dev:desktop` 改 `apps/web/src` 不生效。`dev:desktop` 只 watch
+Electron 的 main/preload/server bundle，页面永远加载 `apps/web/dist`——那是
+`pnpm --filter web build` 的产物，源码改动根本不进这个目录。文档里写了要另开
+`pnpm dev:web` 并设 `CONTEXT_HUB_DEV_URL`，但命令名 `dev` 让人预期改源码就会生效，
+没人会先去读那段。同一处还留着一个 watch `server.mjs` 的 watcher，而 dev 形态根本不
+加载它——它只会重启 Electron 制造"改动生效了"的假象。
+
+**规则**：一个 `dev` 入口的默认路径必须是**服务源码**；如果它服务构建产物，要么直接改掉，
+要么在启动日志里明说。判据：改一行源码后，dev server 提供的模块内容立即变化
+（`curl http://localhost:<port>/src/<file>` 即可看到），窗口通过 HMR/reload 看到它。
+同时检查 watcher 重建的产物**确实被运行时加载**；不被加载的 watcher 要删掉，不要留着
+它"看起来在工作"。
+
