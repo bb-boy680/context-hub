@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-19T18:03:01Z",
+  "updated_at": "2026-10-20T07:16:39Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "e600b797bfe832d7d3806b3a825a71289497d60e40e7e12ae5fa4d7d255e0969",
-      "size": 136143,
-      "normalized_sha256": "e600b797bfe832d7d3806b3a825a71289497d60e40e7e12ae5fa4d7d255e0969"
+      "sha256": "9ab0b12bf95b3384b5925e71e9866b29784d13f0a777fd9c0e5d13dd57a6b43a",
+      "size": 136691,
+      "normalized_sha256": "9ab0b12bf95b3384b5925e71e9866b29784d13f0a777fd9c0e5d13dd57a6b43a"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1439,15 +1439,15 @@
     },
     "packages/resources/mcp/src/library-store.ts": {
       "role": "index",
-      "sha256": "a67ec04c5bb93fad0e732341211b5a953c8b83c3e5aeded28a58bbc9f58de359",
-      "size": 21351,
-      "normalized_sha256": "1f634162901260f61b33131de43e093af51be966e5d5289548b2c1b312a5b88a"
+      "sha256": "50660bdb266b81b84cb5026ecc3711a7a2b5e7a121ce4f9b675d1b4e988e1a3f",
+      "size": 20961,
+      "normalized_sha256": "50660bdb266b81b84cb5026ecc3711a7a2b5e7a121ce4f9b675d1b4e988e1a3f"
     },
     "packages/resources/mcp/src/library.ts": {
       "role": "index",
-      "sha256": "3d579c08e8797a44bc82372095dc953be2e4737043b4458881ae9a8851a776bc",
-      "size": 17096,
-      "normalized_sha256": "3d579c08e8797a44bc82372095dc953be2e4737043b4458881ae9a8851a776bc"
+      "sha256": "5f55f5fda7cf10337aaf197680f96f2f6d35ffcc7018c460a7824df9f194c358",
+      "size": 17308,
+      "normalized_sha256": "5f55f5fda7cf10337aaf197680f96f2f6d35ffcc7018c460a7824df9f194c358"
     },
     "packages/resources/mcp/src/list-view.tsx": {
       "role": "index",
@@ -1745,9 +1745,9 @@
     },
     "packages/resources/plugins/src/library-store.ts": {
       "role": "index",
-      "sha256": "8a0f82dba144a7ba9b448bcb892774a9044970e8f8f41eb7446ff2329a01c55f",
-      "size": 13248,
-      "normalized_sha256": "fb2b9b1744009747145ea1309e65b308aa41a2cb51b458484661d9cef4a962f7"
+      "sha256": "dfc0d31bcd8d4a5823315c8bf459f2f778b400790979d13a556a4dfc26f89dea",
+      "size": 13079,
+      "normalized_sha256": "dfc0d31bcd8d4a5823315c8bf459f2f778b400790979d13a556a4dfc26f89dea"
     },
     "packages/resources/plugins/src/library.ts": {
       "role": "index",
