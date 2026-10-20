@@ -215,7 +215,7 @@ toolkit.ts[CN9S]: F:交给扩展的 MCP 工具集 | R:code:packages/resources/mc
 tools.ts[CN3T]: F:工具面板渲染形状 | R:- | A:McpTool,McpField | S:纯数据，真实连接答什么就交给面板画
 types.ts[CN8S]: F:MCP 页面渲染形状 | R:code:packages/resources/mcp/src/contract.ts,code:packages/resources/mcp/src/probe.ts,code:packages/resources/mcp/src/tools.ts | A:McpServer,McpDetail,McpInstall,McpRecord,McpAgentPlace,McpCatalog | S:品牌标记带的是名字而非组件或路径（组件过不了桥，路径是客户端的私事）；installed 与 enabled 是两个独立事实
 value.ts[KN5T]: F:编辑校验的相等判定 | R:- | A:canonical,sameValue,refuse,messageOf | S:比较前要把解析器造出的差异抹平：键序、对象原型、以及文件里声明的表与嵌套表
-search.ts[DN7T]: F:MCP 搜索行 | R:code:packages/resources/mcp/src/library-store.ts,code:packages/resources/mcp/src/marks.ts,code:packages/resources/mcp/src/types.ts | A:mcpSearch,searchServers | S:只读 library.rows() 的页面同款行；匹配 name/declaration/description；备注只用 description，空则省略；品牌图走 markImage；path 的 q 取 server.name，不再带 view
+search.ts[DN7T]: F:MCP 搜索行 | R:code:packages/resources/mcp/src/library-store.ts,code:packages/resources/mcp/src/marks.ts,code:packages/resources/mcp/src/types.ts | A:mcpSearch,searchServers | S:只读 library.rows() 的页面同款行；匹配 name/declaration/description；备注只用 description，空则省略；头像优先 check.icon.src，否则 markImage(mark)；path 的 q 取 server.name，不再带 view
 
 ===D:/work-space/dsh-context-hub/packages/resources/mcp/src/host/===
 cache.ts[PD8M]: F:探测缓存 | R:- | A:createProbeCache,PROBE_VERSION,MCP_DIR,cacheEntryOf,entriesOf | S:“已知”按名字判定：有答案就展示该答案，声明、scope 或工作目录变化都不触发重探（下次探测由人发起）；PROBE_VERSION 提升会作废全部旧答案；文件在 <home>/mcp/cache.json，属派生数据，读不了就丢弃重建而不修

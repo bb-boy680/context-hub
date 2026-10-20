@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-20T08:47:11Z",
+  "updated_at": "2026-10-20T08:52:05Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -53,9 +53,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "dbc7c38b9e2a74b00dbab926b0d66d020d43f9d442993ab407ddd91359971cd7",
-      "size": 138223,
-      "normalized_sha256": "dbc7c38b9e2a74b00dbab926b0d66d020d43f9d442993ab407ddd91359971cd7"
+      "sha256": "c69894650bb614fa7e1e09adcfb7a97e8a0a062004aef161b518a7f868e571fe",
+      "size": 138253,
+      "normalized_sha256": "c69894650bb614fa7e1e09adcfb7a97e8a0a062004aef161b518a7f868e571fe"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1325,9 +1325,9 @@
     },
     "packages/resources/mcp/__test__/search.test.ts": {
       "role": "observe",
-      "sha256": "8799a78f25399f3f104210869b011cc38eb4fdc7528e5ef8955c9dfafc032484",
-      "size": 1840,
-      "normalized_sha256": "8799a78f25399f3f104210869b011cc38eb4fdc7528e5ef8955c9dfafc032484"
+      "sha256": "c6bed413dc36b5292f9796a8f9bdb60d4b99ef8f25cf8d86e168beb24fcfdab7",
+      "size": 2309,
+      "normalized_sha256": "c6bed413dc36b5292f9796a8f9bdb60d4b99ef8f25cf8d86e168beb24fcfdab7"
     },
     "packages/resources/mcp/eslint.config.js": {
       "role": "index",
@@ -1517,9 +1517,9 @@
     },
     "packages/resources/mcp/src/search.ts": {
       "role": "index",
-      "sha256": "115e5b6be1382762147d92314e2692c6a200c3124dfd94f361677174675aa6af",
-      "size": 2016,
-      "normalized_sha256": "115e5b6be1382762147d92314e2692c6a200c3124dfd94f361677174675aa6af"
+      "sha256": "5c640c3de6211894698a213a7cdad09438f9f152918fcdaf8be92255ab4e0526",
+      "size": 2049,
+      "normalized_sha256": "5c640c3de6211894698a213a7cdad09438f9f152918fcdaf8be92255ab4e0526"
     },
     "packages/resources/mcp/src/server-dialog.tsx": {
       "role": "index",
