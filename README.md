@@ -1,188 +1,171 @@
-# shadcn/ui monorepo template
+<div align="center">
 
-This is a Vite monorepo template with shadcn/ui.
+<img src="assets/icon.png" width="40" alt="Context Hub" />
 
-## Running
+# Context Hub
+
+**One local hub for everything your AI coding agents read.**
+
+Context Hub keeps skills, MCP servers, plugins, prompts, and environment
+variables in one place, then delivers each one into the agent's own workspace or
+global directory. It runs as a desktop app, a standalone CLI, or a local web page.
+
+[![Skills](https://img.shields.io/badge/Skills-one%20library-7c3aed)](#features)
+[![MCP](https://img.shields.io/badge/MCP-declare%20once-0f766e)](#features)
+[![Prompts](https://img.shields.io/badge/Prompts-deliver%20anywhere-fb8c00)](#features)
+[![Plugins](https://img.shields.io/badge/Plugins-extensible-2563eb)](#features)
+[![Desktop](https://img.shields.io/badge/Desktop-Electron-47848f?logo=electron&logoColor=fff)](#install)
+[![TypeScript](https://img.shields.io/badge/TypeScript-React%2019-3178c6?logo=typescript&logoColor=fff)](#development)
+[![Latest release](https://img.shields.io/github/v/release/bb-boy680/context-hub?label=release&color=blue)](https://github.com/bb-boy680/context-hub/releases/latest)
+
+[English](README.md) · [简体中文](README.zh-CN.md)
+
+<img src="assets/screenshot-skills.png" alt="Context Hub — skills library" width="820" />
+
+</div>
+
+---
+
+## Why Context Hub?
+
+Every agent keeps its own assets in its own places: skills in a workspace folder,
+MCP servers in a JSON config, prompts in a commands directory, variables in a
+shell profile. Add a second agent and the same asset has to be maintained twice.
+
+Context Hub gives those assets one catalog and one install flow — while still
+leaving every file where the agent expects to find it.
+
+## Screenshots
+
+| MCP servers | Extensions |
+| --- | --- |
+| ![MCP servers](assets/screenshot-mcp.png) | ![Extensions](assets/screenshot-extensions.png) |
+
+## Features
+
+- **One library for every asset** — Skills, MCP servers, plugins, prompts, and
+  environment variables in a single workspace-aware catalog.
+- **Agent-native delivery** — Claude Code and Codex integrations install each
+  asset into that agent's own workspace or global directory; more agents arrive
+  as plugins.
+- **Declare once, use everywhere** — MCP servers and prompts are written into
+  each agent's own config, with per-client enable and disable.
+- **Desktop, CLI, or browser** — One local hub powers the Electron app,
+  standalone binaries, and the built web page.
+- **Extensible by design** — Agent integrations, asset modules, search
+  providers, settings sections, and language packs are all plugins.
+- **Global search** — Press `Ctrl/Cmd+K` to search every module from anywhere.
+- **Keeps itself current** — Skills and plugin packs track their upstream
+  sources; the desktop app updates itself from GitHub Releases.
+- **Local-first and bilingual** — Your assets stay in the agents' own
+  directories, and the UI ships in English and Simplified Chinese.
+
+## Install
+
+### Desktop app
+
+Download the latest build from [Releases](https://github.com/bb-boy680/context-hub/releases/latest):
+
+| Platform | File |
+| --- | --- |
+| Windows x64 | `Context-Hub-<version>-win-x64.exe` |
+| macOS (Apple Silicon) | `Context-Hub-<version>-mac-arm64.dmg` |
+| Linux x64 | `Context-Hub-<version>-linux-x86_64.AppImage` |
+
+> [!NOTE]
+> The builds are not code-signed. Windows SmartScreen and macOS Gatekeeper will
+> warn on first launch. The macOS build is currently arm64 only.
+
+### Standalone CLI
+
+Each binary embeds the hub and the page, so no Node.js or `npm install` is
+required:
+
+| Platform | File |
+| --- | --- |
+| Windows x64 | `context-hub-windows-x64.exe` |
+| Linux x64 / arm64 | `context-hub-linux-x64`, `context-hub-linux-arm64` |
+| macOS Apple Silicon / Intel | `context-hub-darwin-arm64`, `context-hub-darwin-x64` |
+
+Run it and open the URL it prints:
 
 ```bash
-pnpm dev          # web and desktop together
+./context-hub-linux-x64
+# context hub server listening on http://127.0.0.1:...
+```
+
+The CLI accepts `--port`, `--host`, `--folder`, `--home`, and `--static`; run it
+with `--help` for the full list.
+
+### From source
+
+Node.js 20 or newer and pnpm `10.33.4` are required.
+
+```bash
+pnpm install
+pnpm dev          # web app and desktop app together
 pnpm dev:web      # the browser form only
 pnpm dev:desktop  # the desktop shell only
-pnpm build        # typecheck + build the page into apps/web/dist
-pnpm start        # the built form: apps/web/server.ts --static dist
-pnpm test         # every package's tests, in one process
 ```
 
-`pnpm dev:web` runs **two processes**, because every other form is the same shape:
-the hub's own server (`apps/web/server.ts`, port 5270) holds every bridge, and
-Vite serves the page's source with HMR (port 5271) and forwards `/hub` to it.
-Both ports are written down in one place, `apps/web/hub-port.ts`. A built form
-and a desktop or command-line form run `apps/web/server.ts` and nothing else,
-so a route that answers in development answers after a build.
+## Usage
 
-To stop it, stop the hub server: it is Vite's child, and its exit takes Vite
-with it.
+1. **Choose your agents** in the sidebar. Only the agents you select are read
+   and written.
+2. **Add a workspace** — the folder of the project you are working on. The hub
+   reads each agent's workspace directories inside it.
+3. **Add assets** — import a skill from a folder or a registry your plugins
+   provide, add an MCP server, install a plugin pack, write a prompt, or record
+   an environment variable.
+4. **Install to a place** — skills, MCP servers, plugins, and prompts can be
+   delivered to a workspace or a global agent directory.
 
-## Command-line binary
+> [!TIP]
+> Press `Ctrl/Cmd+K` to search skills, servers, packs, prompts, and variables
+> without leaving the page you are on.
+>
+> The hub keeps its library in `~/.context-hub`. Set `CONTEXT_HUB_HOME` to use a
+> different directory.
+
+## Supported agents
+
+- **Claude Code** — skills, prompts, MCP servers, and plugin packs.
+- **Codex** — skills, prompts, MCP servers, and plugin packs.
+- **More agents** — installed as extensions from the [Context Hub extensions marketplace](https://github.com/bb-boy680/context-hub-extensions).
+
+## Development
 
 ```bash
-pnpm build:cli   # builds apps/web/release/cli for five targets
+pnpm dev                  # web + desktop, with HMR
+pnpm build                # build every package (page + desktop bundles)
+pnpm --filter web start   # serve the built form
+pnpm build:cli            # build the CLI for five targets (needs bun)
+pnpm build:desktop        # bundle the desktop main and preload processes
+pnpm test                 # every package's tests in one process
+pnpm lint                 # ESLint
+pnpm typecheck            # tsc across the workspace
 ```
 
-One standalone executable per platform (Windows x64, Linux x64 and arm64, macOS
-arm64 and x64). The built page is embedded in it, so nothing has to sit beside
-the file. `bun` must be on PATH to build it; running it needs no Node, npm or
-`dist/`. See [docs/building.md](docs/building.md) for the target list and the
-release workflow.
-
-## Desktop app
+Desktop installers are built per platform:
 
 ```bash
-pnpm --filter @context-hub/desktop package:win   # or package:mac / package:linux
+pnpm --filter @context-hub/desktop package:win
+pnpm --filter @context-hub/desktop package:mac
+pnpm --filter @context-hub/desktop package:linux
 ```
 
-The desktop app starts the hub as its own process and shows the page that
-process serves, so it runs the same server and routes as every other form.
-Closing the window hides it to the tray; the hub keeps running until Quit is
-chosen from the tray or Application menu. The sidebar shows the app version,
-and an available release appears there as a one-click update; clicking it
-downloads and restarts into the new version.
+The test suite writes real files, starts real HTTP listeners, and spawns a real
+MCP server; one update test also clones a git repository, so `git` must be on
+PATH.
 
-The window's own title bar carries an **Application** menu, injected by the
-desktop shell rather than drawn by the page: About, Check for Updates, Reload,
-Refresh Plugins, Restart, Quit. The tray repeats the same rows under Open
-Context Hub, and both menus follow the page language. Check for Updates stays
-visible but disabled when this build has no update feed. Reload re-reads the
-skill and plugin libraries; Refresh Plugins fetches the extension market index
-again. Windows and macOS keep their native window buttons; Linux draws its own
-on the frameless window.
+The kernel is built on Cordis; the UI uses React 19, Vite, Tailwind CSS, and
+shadcn/ui.
 
-`pnpm dev:desktop` starts the web dev server (or reuses one already
-listening), so page source updates through Vite's HMR, and watches the main
-and preload bundles, restarting Electron after a change; while it runs, the
-native File menu (View on macOS) adds Restart App and Toggle DevTools, and
-Reload Page is always there. The hub server is the web dev server's child, so
-`server.ts` changes need a restart of the watcher. `CONTEXT_HUB_DEV_URL` points
-the window at a different dev server instead.
+## Documentation
 
-The release version is the tag (`v1.2.0`). A packaged app checks GitHub
-Releases for a newer one and installs it in place after the hub server has
-stopped. Releases are built by `.github/workflows/release.yml`; see
-[docs/building.md](docs/building.md) for signing, feeds and the limits of what
-can be verified locally. 中文图文步骤见 [docs/releasing.md](docs/releasing.md)。
-
-## Extensions
-
-Context Hub loads extensions from `<hub-home>/extensions` and can install them
-from a remote market index. A plugin may be written as a normal React module
-(`import React from "react"`) and built with React marked external. See
-[docs/extensions.md](docs/extensions.md) for the package layout, the market
-index format, local development sources and the trust model.
-
-## Tests
-
-Vitest, one project per package, and **a package's tests live in `__test__/`
-beside its `src/`**. That is not a convention anyone has to remember: each
-package's `vitest.config.ts` spells the glob out, so a file left anywhere else is
-simply not collected.
-
-```bash
-pnpm test                            # every package, one process
-pnpm --filter @context-hub/skills test   # one package, from wherever you are
-npx vitest run --project mcp         # one project, from the root
-npx vitest                           # watch
-```
-
-The root `vitest.config.ts` is the only file that knows the whole list; a package
-joins the run by appearing there and by owning a `vitest.config.ts` of its own.
-Each package has one so its `include` needs no path arithmetic and a filtered run
-works from inside the package — the same reason each has its own `tsconfig.json`.
-
-`turbo` deliberately does not run the tests. One vitest process over every
-project shares a worker pool and a filter; `turbo test` would start ten of them.
-
-Most of these are not unit tests. The suite writes real files under
-`os.tmpdir()`, starts real `node:http` listeners on port 0, spawns a real MCP
-server through `process.execPath`, and clones a real git repository — so:
-
-- **`git` must be on PATH.** Only `packages/resources/skills/__test__/updates.test.ts`
-  needs it, and it is the one slow file (about 15 seconds of a 16-second run).
-- Nothing here reaches the network, and nothing writes outside a temporary
-  directory. Where a store takes a machine-level root (`userHome`), the tests
-  pass a temporary one, because its default is the person's real home.
-
-`pnpm install` in a sandboxed shell hangs rather than failing — the sandbox drops
-packets instead of refusing them. Run it with the sandbox off.
-
-### Where an asset page's data comes from
-
-The five asset libraries (Skills, MCP, Plugins, Prompts, Environment variables)
-are **read once, at startup**, not when a page that draws them is opened. Each
-module publishes its own read as a service — `catalog.skills`, `catalog.mcp`,
-`catalog.plugins`, `catalog.prompts`, `catalog.variables` — and
-`apps/web/src/lib/preload.ts` starts all five after the kernel is up, without
-waiting for the answers. The page watches that read through `useCatalog`; it
-does not make one of its own.
-
-A page that opens before the read lands starts it itself, which is the same read
-answered twice rather than a second one. What this buys: leaving a page no
-longer throws its rows away, and something outside the page — the global search,
-for instance — can see what the hub holds without having visited it.
-
-Global search is itself an extension (`@context-hub/global-search`). Every
-module offers one `search(query)` through the kernel's `search` contribution
-point; the palette calls them and never names a skill, server, pack, prompt, or
-variable itself. Settings and Extensions are shell pages rather than extensions,
-so that package offers their providers.
-
-Two rules to keep in mind when adding to this:
-
-- **A library that has never been read has nothing to read again.** Its watchers
-  ignore changes until someone asks, because the kernel's own startup is a
-  stream of extensions arriving; following that reads half of them and throws it
-  away.
-- **A service that both calls and watches the same thing must tell its watchers
-  only when the answer changed.** `workspaces.refresh()` announces only a
-  different list for exactly this reason: the libraries that ask it for the
-  folder in use are the ones subscribed to it.
-
-`createCatalog` (`packages/extensions/src/catalog.ts`) is where the races live —
-one read at a time, a late answer dropped rather than written over a newer one,
-and a failure that keeps the last answer and reports itself instead of rejecting.
-
-### Adding a route to the API
-
-1. Add a `createXHandler(): HubMiddleware` to the owning package's `handlers.ts`
-   — a plain `node:http` handler that either answers or calls `next()`.
-2. Its route constant lives in that package's seam module
-   (`plugin-skills` → `src/store.ts`, `plugins` → `src/contract.ts`), next to the
-   types it belongs to, so the browser side and the host side import one string
-   instead of spelling it twice.
-3. Mount it in `apps/web/server.ts`, in the order it has to be tried.
-4. Read the module you are editing for how it names actions: **there is no one
-   convention yet.** `plugin-skills` names every action in the query whatever
-   the method, `plugin-plugins` reads with a query and writes in the body,
-   `plugin-prompts` is REST, and `plugin-mcp` posts a body action. Unifying them
-   is the next stage; until then, curl the route you changed and check both ends
-   by hand — a route is a string, so no type check sees the two ends disagree.
-   Answers are JSON, and a failure is a 4xx carrying `{ error }`. The pipeline
-   (`readBody`, `sendJson`, `sendError`) is shared from
-   `@context-hub/core/host/http` — do not write another one.
-
-## Adding components
-
-To add components to your app, run the following command at the root of your `web` app:
-
-```bash
-pnpm dlx shadcn@latest add button -c apps/web
-```
-
-This will place the ui components in the `packages/shadcn-ui/src/components` directory.
-
-## Using components
-
-To use the components in your app, import them from the `ui` package.
-
-```tsx
-import { Button } from "@context-hub/shadcn-ui/components/button";
-```
+- [Building the distributable forms](docs/building.md) — CLI, desktop, release
+  versioning, and what can be verified locally.
+- [Extensions](docs/extensions.md) — package layout, market index, local
+  development sources, and the trust model.
+- [Releasing](docs/releasing.md) — the release workflow, in Chinese with
+  screenshots.
