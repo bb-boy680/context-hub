@@ -66,8 +66,7 @@ export const variablesMessages: Record<string, string> = {
   "variables.create.status": "State",
   "variables.create.addRow": "Add another",
   "variables.create.helper":
-    "One variable per row; pasted lines split into rows. Every row needs a value, written to the machine environment.",
-  "variables.create.valueRequired": "A value is required",
+    "One variable per row; pasted lines split into rows. A value is optional: leave it empty to register the name only, and the value comes from the machine environment.",
   "variables.create.privacy":
     "The index keeps names and groups; values are written to the machine environment and stay out of variables.json.",
   "variables.create.count": "{count} variables will be created",

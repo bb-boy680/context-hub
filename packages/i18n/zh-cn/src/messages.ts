@@ -931,8 +931,7 @@ export const messages: Record<string, string> = {
   "variables.create.status": "状态",
   "variables.create.addRow": "再添加一个",
   "variables.create.helper":
-    "每行一个变量；粘贴多行会按行拆开。每行都必须填写值，值会写入系统环境。",
-  "variables.create.valueRequired": "值不能为空",
+    "每行一个变量；粘贴多行会按行拆开。值可以留空：留空时只登记名字，值从系统环境读取。",
   "variables.create.privacy":
     "索引只保存名字和分组；值写入系统环境，不留在 variables.json。",
   "variables.create.count": "将创建 {count} 个变量",

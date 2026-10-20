@@ -468,7 +468,6 @@ function CreateDialog({
     const name = row.name.trim()
     if (name === "") return null
     if (!VARIABLE_NAME.test(name)) return t("variables.create.invalid")
-    if (row.value.trim() === "") return t("variables.create.valueRequired")
     if (filled.filter((one) => one.name.trim() === name).length > 1) {
       return t("variables.create.duplicateRow")
     }

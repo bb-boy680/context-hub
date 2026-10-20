@@ -114,13 +114,34 @@ describe("the variable library", () => {
     )
   })
 
-  it("refuses a row without a value", async () => {
+  it("records a row without a value and leaves the environment alone", async () => {
+    const environment = memoryEnvironment({ INHERITED: "from-shell" })
+    const store = createFsVariableStore({ home, environment })
+    const created = await store.create([
+      { name: "EMPTY", value: "  " },
+      { name: "MISSING" },
+      { name: "INHERITED", value: "" },
+    ])
+
+    expect(environment.writes).toEqual([])
+    expect(environment.values.get("INHERITED")).toBe("from-shell")
+    expect((await rawDocument()).variables.map((row) => row.name)).toEqual([
+      "EMPTY",
+      "MISSING",
+      "INHERITED",
+    ])
+    expect(created.variables.find((row) => row.name === "EMPTY")?.value).toBe("")
+    expect(created.variables.find((row) => row.name === "MISSING")?.value).toBe("")
+    expect(created.variables.find((row) => row.name === "INHERITED")?.value).toBe(
+      "from-shell"
+    )
+    await expect(store.create([{ name: "NUL", value: "a\0b" }])).rejects.toThrow(/NUL/)
+  })
+
+  it("still refuses an empty value when editing", async () => {
     const environment = memoryEnvironment()
     const store = createFsVariableStore({ home, environment })
-    await expect(store.create([{ name: "EMPTY", value: "  " }])).rejects.toThrow(
-      /value is required/
-    )
-    await expect(store.create([{ name: "EMPTY", value: "x" }])).resolves.toBeDefined()
+    await store.create([{ name: "EMPTY", value: "x" }])
     await expect(store.update("EMPTY", { value: "" })).rejects.toThrow(/value is required/)
   })
 
