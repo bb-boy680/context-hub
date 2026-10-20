@@ -12,6 +12,7 @@
  * also open the prompt.
  */
 import { CheckIcon, ChevronDownIcon, DownloadIcon, EllipsisIcon } from "lucide-react"
+import { Fragment } from "react"
 
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import { PlaceMenu, type PlaceGroup, type PlaceOption, type PlaceWords } from "@context-hub/extensions/components"
@@ -21,13 +22,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@context-hub/shadcn-ui/components/dropdown-menu"
 
-import { generatedUnder, holdsSomething, NOTHING_HELD, type Delivery, type Held } from "./deliver.ts"
+import { holdsSomething } from "./held.ts"
 import type { Holds } from "./library.ts"
-import type { PromptPlace } from "./provider.ts"
+import { promptMenu } from "./menu.ts"
+import type { PromptHeld, PromptPlace } from "./provider.ts"
 import type { Prompt } from "./store.ts"
 
 /** The scopes, in the order a list of places reads them. */
@@ -49,8 +52,8 @@ export const cardActionShell =
  */
 export type DeliveryRun = (
   place: PromptPlace,
-  action: Delivery,
-  document?: string,
+  form: string,
+  option?: string,
   remove?: boolean
 ) => void
 
@@ -58,10 +61,10 @@ export type DeliveryRun = (
  * One place's own ways of writing a prompt out — or taking one back, where it
  * is already there.
  *
- * The files a prompt becomes, and then one entry for every document this place
- * says it keeps. A place that declares no agents directory or no documents
- * simply has fewer entries, rather than being offered an action that would
- * fail.
+ * The forms come from the place itself, so a provider that knows one agent's
+ * files decides what this menu offers. A form with options becomes a heading
+ * and one row per option; a form without one is a single row. A place with no
+ * actions simply has no rows.
  *
  * The list is about *where*, and these are about *what*: the two questions have
  * different answers at every row, which is why they are not more rows of it.
@@ -73,61 +76,38 @@ export function GenerateItems({
   onGenerate,
 }: {
   place: PromptPlace
-  held: Held
+  held: PromptHeld
   /** A form that cannot reach the files says so here, rather than refusing. */
   disabled?: boolean
   onGenerate: DeliveryRun
 }) {
   const { t } = useI18n()
-  const documents = place.documents ?? []
 
   return (
     <>
-      <DropdownMenuItem
-        disabled={disabled}
-        variant={held.commands ? "destructive" : "default"}
-        onClick={() => onGenerate(place, "commands", undefined, held.commands)}
-      >
-        {t(held.commands ? "prompts.menu.commands.remove" : "prompts.menu.commands")}
-      </DropdownMenuItem>
-      <DropdownMenuItem
-        disabled={disabled}
-        variant={held.rule ? "destructive" : "default"}
-        onClick={() => onGenerate(place, "rule", undefined, held.rule)}
-      >
-        {t(held.rule ? "prompts.menu.rule.remove" : "prompts.menu.rule")}
-      </DropdownMenuItem>
-      {/* The agents file appears because the place declares a directory for it. */}
-      {place.agentDir === undefined ? null : (
-        <DropdownMenuItem
-          disabled={disabled}
-          variant={held.agent ? "destructive" : "default"}
-          onClick={() => onGenerate(place, "agent", undefined, held.agent)}
-        >
-          {t(held.agent ? "prompts.menu.agent.remove" : "prompts.menu.agent")}
-        </DropdownMenuItem>
-      )}
-      {/* The entries that follow exist because the place declares the files
-          they write — and a removal only where the place names a word for it. */}
-      {documents.length === 0 ? null : (
-        <>
-          <DropdownMenuSeparator />
-          {documents.map((document) => {
-            const removable =
-              held.documents.includes(document.id) && document.removeLabelKey !== undefined
+      {promptMenu(place, held).map((group, at) => (
+        <Fragment key={group.id}>
+          {group.labelKey === undefined ? null : (
+            <>
+              {at === 0 ? null : <DropdownMenuSeparator />}
+              <DropdownMenuLabel>{t(group.labelKey)}</DropdownMenuLabel>
+            </>
+          )}
+          {group.entries.map((entry) => {
+            const removable = entry.held && entry.removeLabelKey !== undefined
             return (
               <DropdownMenuItem
-                key={document.id}
+                key={entry.key}
                 disabled={disabled}
                 variant={removable ? "destructive" : "default"}
-                onClick={() => onGenerate(place, "instructions", document.id, removable)}
+                onClick={() => onGenerate(place, entry.form, entry.option, removable)}
               >
-                {t(removable ? (document.removeLabelKey ?? document.labelKey) : document.labelKey)}
+                {t(removable ? (entry.removeLabelKey ?? entry.labelKey) : entry.labelKey)}
               </DropdownMenuItem>
             )
           })}
-        </>
-      )}
+        </Fragment>
+      ))}
     </>
   )
 }
@@ -148,7 +128,7 @@ export function PlaceGenerate({
   onGenerate,
 }: {
   place: PromptPlace
-  held: Held
+  held: PromptHeld
   busy: boolean
   files: PlaceFiles | null
   onGenerate: DeliveryRun
@@ -226,10 +206,10 @@ function PlaceChoices({
     label: t(place.labelKey),
     /* The line under the name is whichever of the two answers the row cannot
        give by its name. A place that is only a directory has no name to
-       recognise, so it gives the root its forms land under; an agent's name
+       recognise, so it gives the directory its forms land under; an agent's name
        says what it is, so it explains what its `⋯` is for instead. */
     ...(place.generatedOnly === true
-      ? { where: generatedUnder(place) }
+      ? { where: place.where ?? "" }
       : { note: t("prompts.place.generates") }),
     selected: holdsSomething(holds[place.id]),
   }))
@@ -262,7 +242,7 @@ function PlaceChoices({
             {option.selected === true ? <CheckIcon className="mt-1 size-4 shrink-0" /> : null}
             <PlaceGenerate
               place={place}
-              held={holds[place.id] ?? NOTHING_HELD}
+              held={holds[place.id] ?? {}}
               busy={false}
               files={files}
               onGenerate={onGenerate}

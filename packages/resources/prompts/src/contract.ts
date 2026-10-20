@@ -8,8 +8,13 @@
  */
 export {
   PROMPT_SERVICE,
-  type PromptDocument,
+  type PromptForm,
+  type PromptFormOption,
+  type PromptHeld,
+  type PromptIo,
   type PromptPlace,
   type PromptProvider,
   type PromptService,
 } from "./provider.ts"
+export { type PromptTools } from "./toolkit.ts"
+export { type PromptFailure } from "./failure.ts"

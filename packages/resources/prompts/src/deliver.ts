@@ -1,43 +1,58 @@
 /**
- * The things a prompt can be delivered as.
+ * The things a prompt can be delivered as, for the places that declare their
+ * files as directories and documents.
+ *
+ * This is no longer the public contract: a provider implements `held`,
+ * `install` and `remove` itself. The functions here are the built-in workspace
+ * place's implementation and the legacy adapter's — kept together because they
+ * are the rules a generated file follows, not because the page calls them.
  *
  * All of them write into a client's own files, so all of them go through the
  * place files port — the one seam that owns both roots and refuses a path that
  * climbs out of them. Nothing here touches a disk, which is what makes the
  * whole set checkable without one.
- *
- * Three of the four write one file named after the prompt; the fourth appends a
- * section to a file the person also edits. That difference is why they are
- * named here rather than offered as one action with options: a generated file
- * can be taken back by deleting it, and a section is removed by its own marker.
  */
-import type { PlaceFiles, PlaceRef } from "@context-hub/core/place-files"
+import type { AssetScope, PlaceFiles, PlaceRef } from "@context-hub/core/place-files"
 
 import { commandFile } from "./command-file.ts"
 import { withSection, withoutSection } from "./instruction.ts"
 import { slugOf } from "./slug.ts"
-import type { PromptPlace } from "./provider.ts"
 import type { Prompt } from "./store.ts"
 
 /** What one delivery turns a prompt into. */
 export type Delivery = "commands" | "rule" | "agent" | "instructions"
 
+/** One file a prompt can be added to, as a place declares it. */
+export interface DeliveryDocument {
+  /** Stable id; what a delivery names when it asks for this one. */
+  readonly id: string
+  readonly labelKey: string
+  readonly removeLabelKey?: string
+  /** Path of the file, relative to the same root the two directories are read under. */
+  readonly file: string
+}
+
 /**
- * The root a place's generated files sit under.
+ * One place as these functions read it: two directories and the files beside
+ * them, all under one root.
  *
- * A place names directories inside one root — `.agents/commands`,
- * `.agents/rules` — and the root is what a person recognises when the place has
- * no name of its own.
+ * A provider may describe its place any way it likes; this is the description
+ * the directory/document actions need, and the built-in workspace place and the
+ * legacy adapter are the two that use it.
  */
-export function generatedUnder(place: PromptPlace): string {
-  const parts = place.commandDir.split("/")
-  return parts.length > 1 ? parts.slice(0, -1).join("/") : place.commandDir
+export interface DeliveryPlace {
+  readonly id: string
+  readonly scope: AssetScope
+  readonly commandDir: string
+  readonly ruleDir: string
+  readonly agentDir?: string
+  readonly documents?: readonly DeliveryDocument[]
 }
 
 /**
  * The file one delivery writes.
  *
- * @param place — the agent place it goes to.
+ * @param place — the place it goes to.
  * @param prompt — the prompt being delivered.
  * @param action — which of the four.
  * @param document — which of the place's files to add to; required by, and only
@@ -47,7 +62,7 @@ export function generatedUnder(place: PromptPlace): string {
  * action up.
  */
 export function targetOf(
-  place: PromptPlace,
+  place: DeliveryPlace,
   prompt: Prompt,
   action: Delivery,
   document?: string
@@ -72,7 +87,7 @@ export function targetOf(
 /** Whether one delivery is already in place, read from the file it writes. */
 export async function delivered(
   files: PlaceFiles,
-  place: PromptPlace,
+  place: DeliveryPlace,
   prompt: Prompt,
   action: Delivery,
   document?: string
@@ -116,14 +131,14 @@ function textOf(prompt: Prompt, action: Delivery, existing: string | null): stri
  * Carry out one delivery.
  *
  * @param files — the form's place files port.
- * @param place — the agent place it goes to.
+ * @param place — the place it goes to.
  * @param prompt — the prompt being delivered.
  * @param action — which of the four.
  * @param document — which of the place's files to add to; `instructions` only.
  */
 export async function deliver(
   files: PlaceFiles,
-  place: PromptPlace,
+  place: DeliveryPlace,
   prompt: Prompt,
   action: Delivery,
   document?: string
@@ -145,7 +160,7 @@ export async function deliver(
  */
 export async function undeliver(
   files: PlaceFiles,
-  place: PromptPlace,
+  place: DeliveryPlace,
   prompt: Prompt,
   action: Delivery,
   document?: string
@@ -189,14 +204,6 @@ export const NOTHING_HELD: Held = {
   documents: [],
 }
 
-/** Whether a place holds anything at all, including a place with no answer yet. */
-export function holdsSomething(held: Held | undefined): boolean {
-  return (
-    held !== undefined &&
-    (held.commands || held.rule || held.agent || held.documents.length > 0)
-  )
-}
-
 /**
  * Read what one place holds of one prompt, from the files themselves.
  *
@@ -205,7 +212,7 @@ export function holdsSomething(held: Held | undefined): boolean {
  */
 export async function heldAt(
   files: PlaceFiles,
-  place: PromptPlace,
+  place: DeliveryPlace,
   prompt: Prompt
 ): Promise<Held> {
   const documents = place.documents ?? []
@@ -226,47 +233,4 @@ export async function heldAt(
     agent,
     documents: sections.filter(([, there]) => there).map(([id]) => id),
   }
-}
-
-/** One agent that holds a prompt, as its mark. */
-export interface HeldMark {
-  /** The agent's id: two scopes of one agent are one mark. */
-  readonly id: string
-  readonly icon: PromptPlace["icon"]
-  /** The labels of the places that hold it, joined the way a title reads. */
-  readonly label: string
-}
-
-/**
- * The marks for the agents holding one prompt.
- *
- * A place is one agent under one root, and a row of marks answers "which
- * agents", not "which files": the workspace and machine-wide places of one
- * agent share an icon and a name, so they share a mark.
- *
- * @param places — every place a delivery can go to, in reading order.
- * @param holds — what each place holds, keyed by place id.
- * @param labelOf — a place's name in the active locale.
- */
-export function heldMarks(
-  places: readonly PromptPlace[],
-  holds: Readonly<Record<string, Held>>,
-  labelOf: (place: PromptPlace) => string
-): HeldMark[] {
-  const marks = new Map<string, { icon: PromptPlace["icon"]; labels: string[] }>()
-  for (const place of places) {
-    if (!holdsSomething(holds[place.id])) continue
-    const seen = marks.get(place.agent)
-    if (seen === undefined) {
-      marks.set(place.agent, { icon: place.icon, labels: [labelOf(place)] })
-      continue
-    }
-    const label = labelOf(place)
-    if (!seen.labels.includes(label)) seen.labels.push(label)
-  }
-  return [...marks].map(([id, mark]) => ({
-    id,
-    icon: mark.icon,
-    label: mark.labels.join(" · "),
-  }))
 }

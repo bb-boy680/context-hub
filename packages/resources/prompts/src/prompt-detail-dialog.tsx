@@ -54,7 +54,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui
 import { Textarea } from "@context-hub/shadcn-ui/components/textarea"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
-import { generatedUnder, heldMarks, holdsSomething, NOTHING_HELD, type Delivery } from "./deliver.ts"
+import { heldMarks, holdsSomething } from "./held.ts"
 import { PlaceGenerate } from "./install-menu.tsx"
 import { tokenLabel, useHolds, usePromptStore, type Holds } from "./library.ts"
 import { PromptMeta, PromptTile } from "./parts.tsx"
@@ -221,7 +221,7 @@ function PlacesSection({
   holds: Holds
   files: PlaceFiles | null
   busy: boolean
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
+  onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) => void
 }) {
   const { t } = useI18n()
   const held = places.filter((place) => holdsSomething(holds[place.id])).length
@@ -244,7 +244,7 @@ function PlacesSection({
       <span className="flex shrink-0 items-center gap-1">
         <PlaceGenerate
           place={place}
-          held={holds[place.id] ?? NOTHING_HELD}
+          held={holds[place.id] ?? {}}
           busy={busy}
           files={files}
           onGenerate={onGenerate}
@@ -264,14 +264,11 @@ function PlacesSection({
         /* The second line is whichever of the two answers the row cannot give
            by its name. An agent's name says what it is but not what its `⋯` is
            for, so that row explains the menu. A place that is only a directory
-           has no name to recognise, so that row gives the directory — and it
-           gives the root both directories sit under, since writing
-           `.agents/commands` there would name one of the two forms the menu
-           offers rather than the place they share. */
+           has no name to recognise, so that row gives the directory. */
         ...(place.generatedOnly === true
-          ? { where: generatedUnder(place) }
+          ? { where: place.where ?? "" }
           : { note: t("prompts.place.generates") }),
-        selected: holds[place.id]?.commands === true,
+        selected: holdsSomething(holds[place.id]),
       })),
   }))
 
@@ -572,7 +569,7 @@ function InfoPanel({
   holds: Holds
   files: PlaceFiles | null
   busy: boolean
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
+  onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) => void
   onDelete: () => void
   onRename: (name: string) => void
   onDescribe: (description: string) => void
@@ -819,8 +816,8 @@ export function PromptDetailDialog({
   onGenerate: (
     prompt: StoredPrompt,
     place: PromptPlace,
-    action: Delivery,
-    document?: string,
+    form: string,
+    option?: string,
     remove?: boolean
   ) => void
   onDelete: (prompt: StoredPrompt) => void
@@ -884,7 +881,7 @@ function Lightbox({
   files: PlaceFiles | null
   busy: boolean
   stamp: number
-  onGenerate: (place: PromptPlace, action: Delivery, document?: string, remove?: boolean) => void
+  onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) => void
   onDelete: () => void
   onChanged: () => void
   onRename: (name: string) => void

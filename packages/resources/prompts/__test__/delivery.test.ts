@@ -19,8 +19,16 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createFsPlaceFiles } from "@context-hub/core/host/place-files"
 
-import { deliver, delivered, heldAt, heldMarks, holdsSomething, NOTHING_HELD, targetOf, undeliver } from "../src/deliver.ts"
-import type { PromptPlace } from "../src/provider.ts"
+import {
+  deliver,
+  delivered,
+  heldAt,
+  NOTHING_HELD,
+  targetOf,
+  undeliver,
+  type DeliveryPlace,
+} from "../src/deliver.ts"
+import { holdsSomething } from "../src/held.ts"
 import type { Prompt } from "../src/store.ts"
 
 let home: string
@@ -36,11 +44,8 @@ let machine: string
 let files: ReturnType<typeof createFsPlaceFiles>
 
 /** The place the prompts module registers, as it registers it. */
-const WORKSPACE: PromptPlace = {
+const WORKSPACE: DeliveryPlace = {
   id: "workspace",
-  agent: "hub.prompt.catalog",
-  labelKey: "prompts.location.workspace",
-  icon: () => null,
   scope: "workspace",
   commandDir: ".agents/commands",
   ruleDir: ".agents/rules",
@@ -49,12 +54,10 @@ const WORKSPACE: PromptPlace = {
     { id: "agents", labelKey: "prompts.menu.document.agents", file: "AGENTS.md" },
     { id: "design", labelKey: "prompts.menu.document.design", file: "DESIGN.md" },
   ],
-  generatedOnly: true,
-  order: 0,
 }
 
 /** The same place in the machine-wide scope, where the roots differ. */
-const GLOBAL: PromptPlace = { ...WORKSPACE, id: "workspace-global", scope: "global" }
+const GLOBAL: DeliveryPlace = { ...WORKSPACE, id: "workspace-global", scope: "global" }
 
 /* The title and the description are deliberately different sentences with
    different file names: every assertion below about `code-review.md` is an
@@ -194,7 +197,7 @@ describe("taking things back", () => {
   })
 
   it("deletes a document that held nothing but the section", async () => {
-    const notes: PromptPlace = {
+    const notes: DeliveryPlace = {
       ...WORKSPACE,
       documents: [{ id: "notes", labelKey: "x", file: "NOTES.md" }],
     }
@@ -216,7 +219,7 @@ describe("taking things back", () => {
    the workspace root. */
 describe("a document that climbs out of its scope", () => {
   it("is refused, and nothing is written beside the workspace", async () => {
-    const climbing: PromptPlace = {
+    const climbing: DeliveryPlace = {
       ...WORKSPACE,
       documents: [{ id: "bad", labelKey: "x", file: "../outside.md" }],
     }
@@ -244,7 +247,7 @@ describe("the machine-wide root", () => {
    these cases out of the ones above. */
 describe("what one place already holds", () => {
   const probe: Prompt = { ...prompt, name: "Held Probe", prompt: "Probe body." }
-  const park: PromptPlace = {
+  const park: DeliveryPlace = {
     ...WORKSPACE,
     id: "park",
     commandDir: ".probe/commands",
@@ -258,7 +261,7 @@ describe("what one place already holds", () => {
 
   it("holds nothing before anything is written", async () => {
     expect(await heldAt(files, park, probe)).toEqual(NOTHING_HELD)
-    expect(holdsSomething(NOTHING_HELD)).toBe(false)
+    expect(holdsSomething({})).toBe(false)
   })
 
   it("reports each kind it has, and only the documents carrying a section", async () => {
@@ -269,51 +272,6 @@ describe("what one place already holds", () => {
 
     const held = await heldAt(files, park, probe)
     expect(held).toEqual({ commands: true, rule: true, agent: true, documents: ["design"] })
-    expect(holdsSomething(held)).toBe(true)
-  })
-})
-
-describe("the marks of the agents holding a prompt", () => {
-  const spot = (id: string, agent: string): PromptPlace => ({
-    ...WORKSPACE,
-    id,
-    agent,
-    commandDir: `.${id}/commands`,
-    ruleDir: `.${id}/rules`,
-    agentDir: `.${id}/agents`,
-  })
-  const labelOf = (place: PromptPlace) => place.id
-  const has = { commands: true, rule: false, agent: false, documents: [] } as const
-  const none = NOTHING_HELD
-
-  it("draws nothing when no place holds it", () => {
-    expect(heldMarks([spot("one", "a")], { one: none }, labelOf)).toEqual([])
-  })
-
-  /* The two scopes of one agent are one agent, and a row of marks answers
-     "which agents". */
-  it("merges the scopes of one agent into one mark", () => {
-    const marks = heldMarks(
-      [spot("a-workspace", "a"), spot("a-global", "a")],
-      { "a-workspace": has, "a-global": has },
-      labelOf
-    )
-    expect(marks.map((mark) => mark.id)).toEqual(["a"])
-    expect(marks[0].label).toBe("a-workspace · a-global")
-  })
-
-  it("gives each agent its own mark, in the order the places read", () => {
-    const marks = heldMarks(
-      [spot("a", "one"), spot("b", "two")],
-      { a: has, b: has },
-      labelOf
-    )
-    expect(marks.map((mark) => mark.id)).toEqual(["one", "two"])
-  })
-
-  /* A section in a document is a delivery too, and the card says so. */
-  it("counts a document's section as a mark", () => {
-    const marks = heldMarks([spot("a", "one")], { a: { ...none, documents: ["agents"] } }, labelOf)
-    expect(marks.map((mark) => mark.id)).toEqual(["one"])
+    expect(holdsSomething({ commands: true, "instructions:design": true })).toBe(true)
   })
 })

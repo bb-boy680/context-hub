@@ -50,7 +50,7 @@ export interface LocaleContribution {
 }
 
 /** Asset kinds an agent target can receive. */
-export type AgentAssetKind = "skill" | "mcp" | "memory" | "hook"
+export type AgentAssetKind = "skill" | "mcp" | "memory" | "hook" | "agent"
 
 /** One location an agent reads injected assets from. */
 export interface AgentTargetLocation {

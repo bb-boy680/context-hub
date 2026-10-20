@@ -1,14 +1,13 @@
 /**
- * The one service an agent plugin publishes into when it knows where an agent
- * takes a prompt: the directory a prompt is delivered to as a command, the
- * directory a generated rule goes in, the directory an agents file goes in, and
- * the instruction file a prompt can be added to.
+ * The one service an agent plugin publishes into when it knows how that agent
+ * takes a prompt.
  *
- * The prompts module owns the page, the library and the four delivery actions;
- * it knows no agent's directories. Each agent extension knows exactly one agent
- * and registers its places here, so adding an agent is a plugin — the page has
- * no list of agents to keep in step, and a place that declares no instruction
- * file simply does not offer the action that writes one.
+ * The prompts module owns the page, the library and the shared workspace place;
+ * it knows no agent's directories or file formats. Each agent extension knows
+ * exactly one agent and registers a provider here: the forms it offers, where
+ * each one writes, and how to tell whether the agent already holds a prompt.
+ * Adding an agent is then a plugin — the page has no list of actions to keep in
+ * step, and a place that declares no form simply does not offer it.
  *
  * These paths are the machine-readable ones. A target's `locations` are the
  * strings a catalog row prints; a place is what an action writes to, which is a
@@ -17,42 +16,51 @@
 import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
-import type { AssetScope } from "@context-hub/core/place-files"
+import type { AssetScope, PlaceFiles } from "@context-hub/core/place-files"
 import { chosenProviders, type ExtensionIcon } from "@context-hub/extensions"
+
+import { isLegacyPromptProvider, legacyPromptProvider } from "./legacy.ts"
+import type { LegacyPromptProvider } from "./legacy.ts"
+import { promptTools, type PromptTools } from "./toolkit.ts"
+import type { Prompt } from "./store.ts"
 
 /** The service name the prompts module publishes and every agent plugin requires. */
 export const PROMPT_SERVICE = "prompts"
 
-/**
- * One file a prompt can be added to as a marked section.
- *
- * The file belongs to whoever writes in it, so nothing here ever replaces it:
- * the section goes in under a marker of this hub's own, and a second delivery
- * of the same prompt replaces that section rather than adding a second one.
- */
-export interface PromptDocument {
-  /** Stable id; what a delivery names when it asks for this one. */
+/** One option inside a form that offers a choice, e.g. one instruction file. */
+export interface PromptFormOption {
+  /** Stable id; half of the key this option is held under. */
   readonly id: string
-  /** Message key for the file's name, as the row that offers it reads. */
+  /** Message key for the option's name, as the row that offers it reads. */
   readonly labelKey: string
-  /**
-   * Message key for taking the section back out; without it the file stays
-   * add-only, which is what an external place that never wrote a removable
-   * marker gets instead of a broken label.
-   */
+  /** Message key for taking it back; without it the option stays add-only. */
   readonly removeLabelKey?: string
-  /** Path of the file, relative to the same root the two directories are read under. */
-  readonly file: string
 }
 
 /**
- * One place an agent takes prompts in, declared as two directories and the
- * files beside them.
+ * One way a place takes a prompt: a directory of generated files, or a set of
+ * files a section can be added to.
  *
- * A directory rather than a file: a prompt becomes its own file, named after the
- * prompt, and the name is only known once someone has written one. Both roots a
- * place can sit under are the client's roots — the workspace in use, and the
- * machine-wide one — so nothing here names an absolute path.
+ * A form without options is one action. A form with options is a heading and
+ * one action per option — the shape an agent with several instruction files
+ * needs, without making every provider invent its own menu.
+ */
+export interface PromptForm {
+  /** Stable id; what a delivery names and how the form is held. */
+  readonly id: string
+  /** Message key for the action, or for the heading when there are options. */
+  readonly labelKey: string
+  /** Message key for taking the single action back. */
+  readonly removeLabelKey?: string
+  /** The choices the form offers, in the order a menu reads them. */
+  readonly options?: readonly PromptFormOption[]
+}
+
+/**
+ * One place an agent takes prompts in: one root, and the forms it offers there.
+ *
+ * Both roots a place can sit under are the client's roots — the workspace in
+ * use, and the machine-wide one — so nothing here names an absolute path.
  */
 export interface PromptPlace {
   /** Stable id; the row's key and the target a delivery names. */
@@ -62,29 +70,13 @@ export interface PromptPlace {
   /** Message key for the agent's name. */
   readonly labelKey: string
   readonly icon: ExtensionIcon
-  /** The root both directories below are read under. */
+  /** The root every form below is read under. */
   readonly scope: AssetScope
-  /** Where a prompt is installed as a command, `/`-separated, e.g. ".claude/commands". */
-  readonly commandDir: string
-  /** Where a generated rule goes, e.g. ".claude/rules". */
-  readonly ruleDir: string
+  /** Sort rank among the places of its own scope. */
+  readonly order: number
   /**
-   * Where a prompt is written as an agents file, e.g. ".agents/agents".
-   *
-   * Absent where the agent has no such directory: the action is then not
-   * offered at all, rather than offered and failing.
-   */
-  readonly agentDir?: string
-  /**
-   * The files a prompt can be added to, in the order a menu offers them.
-   * Absent where the place holds none: the actions that write one are then not
-   * offered at all, rather than offered and failing.
-   */
-  readonly documents?: readonly PromptDocument[]
-  /**
-   * Whether this place takes only what a prompt is written *out* as — a
-   * command, a rule, an agents file, a section of one of its documents — and
-   * not the prompt itself.
+   * Whether this place takes only what a prompt is written *out* as, and not
+   * the prompt itself.
    *
    * A place that is a workspace's own output directory has no such reading: it
    * is where the generated forms land, and "install the prompt here" names no
@@ -92,11 +84,29 @@ export interface PromptPlace {
    * as somewhere the prompt itself can be read.
    */
   readonly generatedOnly?: boolean
-  /** Sort rank among the places of its own scope. */
-  readonly order: number
+  /** The directory a person recognises, e.g. ".claude" or "~/.codex". */
+  readonly where?: string
+  /** Every way this place takes a prompt, in menu order. */
+  readonly forms: readonly PromptForm[]
 }
 
-/** One agent, as the prompts module uses it: where that agent takes prompts. */
+/** What one place already holds of one prompt: form or form:option keys. */
+export type PromptHeld = Readonly<Record<string, boolean>>
+
+/** Where a provider reads and writes the client files it owns. */
+export interface PromptIo {
+  readonly files: PlaceFiles
+  /** The workspace in use, as a path, or null when this hub has none. */
+  workspace(): Promise<string | null>
+}
+
+/**
+ * One agent, as the prompts module uses it: where it takes prompts and how.
+ *
+ * The three methods are the whole contract. `held` is read from the files each
+ * time — nothing records a delivery — and `install`/`remove` do one action.
+ * A provider that cannot reach its files says so through {@link PromptTools.PromptError}.
+ */
 export interface PromptProvider {
   /** The agent's id, e.g. "hub.target.claude-code". */
   readonly id: string
@@ -107,6 +117,24 @@ export interface PromptProvider {
   readonly shared?: boolean
   /** Every place this agent takes prompts in. */
   readonly places: readonly PromptPlace[]
+  /** What each place already holds of one prompt. */
+  held(io: PromptIo, place: string, prompt: Prompt): Promise<PromptHeld>
+  /** Write one form into one place, replacing what the same prompt wrote there. */
+  install(
+    io: PromptIo,
+    place: string,
+    prompt: Prompt,
+    form: string,
+    option?: string
+  ): Promise<void>
+  /** Take one form back; false when there was nothing to take back. */
+  remove(
+    io: PromptIo,
+    place: string,
+    prompt: Prompt,
+    form: string,
+    option?: string
+  ): Promise<boolean>
 }
 
 /**
@@ -122,6 +150,9 @@ export interface PromptProvider {
 export class PromptService extends Service {
   private readonly held: PromptProvider[] = []
 
+  /** The file-naming and section rules a provider cannot import itself. */
+  readonly tools: PromptTools = promptTools
+
   constructor(ctx: Context) {
     super(ctx, PROMPT_SERVICE)
   }
@@ -131,13 +162,78 @@ export class PromptService extends Service {
     return this.held
   }
 
-  /** Add one provider, for as long as the plugin that added it stays loaded. */
-  register(provider: PromptProvider): () => void {
-    this.held.push(provider)
+  /** The provider that declared one place, or none when no one did. */
+  providerOf(place: string): PromptProvider | undefined {
+    return this.held.find((provider) => provider.places.some((one) => one.id === place))
+  }
+
+  /**
+   * Add one provider, for as long as the plugin that added it stays loaded.
+   *
+   * A provider written before this contract — places only, with directories and
+   * documents — is wrapped by the legacy adapter rather than refused. The old
+   * shape is a data description, and the adapter knows how to carry it out.
+   *
+   * @throws when the value is neither shape, or when it claims a place id that
+   * is already registered: two providers behind one id would send a write to
+   * the wrong one.
+   */
+  register(provider: PromptProvider | LegacyPromptProvider): () => void {
+    const next = isLegacyPromptProvider(provider)
+      ? legacyPromptProvider(provider)
+      : (provider as PromptProvider)
+    assertProvider(next)
+
+    const places = next.places.map((place) => place.id)
+    if (new Set(places).size !== places.length) {
+      throw new Error(`${next.id} declares the same place twice`)
+    }
+    const taken = places.find((id) =>
+      this.held.some((one) => one.places.some((place) => place.id === id))
+    )
+    if (taken !== undefined) {
+      throw new Error(`the place ${taken} is already registered`)
+    }
+
+    this.held.push(next)
     return this.ctx.effect(() => () => {
-      const at = this.held.indexOf(provider)
+      const at = this.held.indexOf(next)
       if (at >= 0) this.held.splice(at, 1)
     })
+  }
+}
+
+/**
+ * Check that a provider carries what the page will call.
+ *
+ * An installed extension is a folder of code, not a type: it can arrive with a
+ * shape this build does not know, and a provider silently missing `held` would
+ * make the menu draw rows that cannot answer. Refusing it names what was wrong.
+ */
+function assertProvider(provider: PromptProvider): void {
+  if (typeof provider !== "object" || provider === null) {
+    throw new Error("a prompt provider is an object")
+  }
+  if (typeof provider.id !== "string" || provider.id === "") {
+    throw new Error("a prompt provider needs an id")
+  }
+  if (!Array.isArray(provider.places) || provider.places.length === 0) {
+    throw new Error(`${provider.id} declares no places`)
+  }
+  if (
+    typeof provider.held !== "function" ||
+    typeof provider.install !== "function" ||
+    typeof provider.remove !== "function"
+  ) {
+    throw new Error(`${provider.id} does not implement held, install and remove`)
+  }
+  for (const place of provider.places) {
+    if (typeof place !== "object" || place === null || typeof place.id !== "string") {
+      throw new Error(`${provider.id} declares a place without an id`)
+    }
+    if (!Array.isArray(place.forms) || place.forms.length === 0) {
+      throw new Error(`${provider.id}/${place.id} declares no forms`)
+    }
   }
 }
 

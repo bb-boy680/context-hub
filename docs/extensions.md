@@ -123,6 +123,82 @@ export fails that test rather than the first plugin that uses it.
 Do not import any other package. UI components come from `scope.ui`; icons from
 `scope.icons` and `scope.icon(name)`.
 
+## Prompt providers
+
+An agent extension that takes prompts declares where and how it takes them by
+registering a provider into the `prompts` service:
+
+```yaml
+inject: [prompts]
+```
+
+```ts
+ctx.prompts.register({
+  id: "hub.target.example",
+  places: [
+    {
+      id: "example-global",
+      agent: "hub.target.example",
+      labelKey: "example.tab",
+      icon,
+      scope: "global",
+      order: 20,
+      where: "~/.example",
+      forms: [
+        { id: "commands", labelKey: "prompts.menu.commands" },
+        {
+          id: "instructions",
+          labelKey: "example.menu.instructions",
+          options: [{ id: "memory", labelKey: "example.menu.memory" }],
+        },
+      ],
+    },
+  ],
+  async held(io, place, prompt) {
+    return { commands: await exists(io.files, place, prompt) }
+  },
+  async install(io, place, prompt, form, option) {
+    /* Write the file this action names. */
+  },
+  async remove(io, place, prompt, form, option) {
+    /* Return false when there was nothing to take back. */
+  },
+})
+```
+
+The page draws only the forms a place declares; it has no fixed list of
+actions. `held` answers what one place already holds: a form without options is
+held under its own id (`commands`), a form with options under
+`<form>:<option>` (`instructions:memory`). `install` and `remove` receive the
+same ids, and `remove` returns whether anything was there.
+
+`io.files` is the `PlaceFiles` port — whole-file `read` / `write` / `remove`
+under the workspace and machine-wide roots. `io.workspace()` is the workspace
+path, or null. The provider owns its paths: nothing in the hub knows an
+agent's directories.
+
+`ctx.prompts.tools` carries the rules a provider cannot import:
+
+| Function | Use |
+| --- | --- |
+| `slugOf(name)` | A prompt's display name as a safe file name. |
+| `describeBody(body)` | The first meaningful line, for a description a prompt did not give. |
+| `commandFile({ name, description, body, frontmatter })` | The text of a generated command, rule or agents file. |
+| `withSection(existing, { slug, title, body })` | Add or replace a marked section in an instruction file. |
+| `withoutSection(existing, slug)` | Take that section out; `null` when it was never there. |
+| `PromptError(key, params?, detail?)` | A failure the page shows as its own localized sentence. |
+
+A thrown `PromptError` keeps its key and params; the page resolves them against
+the extension's locale. Any other throw is logged and shown as a generic
+localized failure. A provider should name unknown places, unknown forms, and a
+file it refuses to overwrite.
+
+Registration is tied to the plugin's lifetime and rejects duplicate place ids.
+A provider written for the old contract — `places` with `commandDir`,
+`ruleDir`, `agentDir` and `documents`, and no methods — is wrapped by a legacy
+adapter and keeps working. The adapter is transitional and is removed when the
+hub's `engines` upper bound (0.7.0) no longer admits such a version.
+
 ## Market index
 
 The host reads one JSON index and installs one plugin directory at a time. The
