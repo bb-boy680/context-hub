@@ -28,6 +28,7 @@ import {
   CodeEditor,
   CodeView,
   DialogSplit,
+  MarksLine,
   MediaPane,
   PlaceList,
   TagEditor,
@@ -56,7 +57,7 @@ import { toast } from "@context-hub/shadcn-ui/components/toast"
 import { generatedUnder, heldMarks, holdsSomething, NOTHING_HELD, type Delivery } from "./deliver.ts"
 import { PlaceGenerate } from "./install-menu.tsx"
 import { tokenLabel, useHolds, usePromptStore, type Holds } from "./library.ts"
-import { PromptMarks, PromptMeta, PromptTile } from "./parts.tsx"
+import { PromptMeta, PromptTile } from "./parts.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptStore, StoredPrompt } from "./store.ts"
 
@@ -602,15 +603,11 @@ function InfoPanel({
             <NameLine text={prompt.name} onWrite={onRename} />
           </DialogTitle>
           <DialogDescription className="flex min-w-0 items-center gap-2">
-            <PromptMeta body={prompt.prompt} showTokens={false} />
-            {/* The seam the other provenance lines draw between the source and
-                the marks; with no marks there is nothing to separate. */}
-            {marks.length === 0 ? null : (
-              <span aria-hidden className="text-muted-soft">
-                ·
-              </span>
-            )}
-            <PromptMarks marks={marks} />
+            <MarksLine
+              lead={<PromptMeta body={prompt.prompt} showTokens={false} />}
+              marks={marks}
+              label={marks.map((mark) => mark.label).join(" · ")}
+            />
           </DialogDescription>
         </div>
         <DialogClose

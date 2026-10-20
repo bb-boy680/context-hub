@@ -27,13 +27,13 @@ import { installedCount, MCP_SCOPES, placesInScope, placesOf, type McpPlaceState
 import { FilesPane } from "./detail-files.tsx"
 import { ToolsPane } from "./detail-tools.tsx"
 import { entryOf } from "./records.ts"
-import { AgentStack, ServerTile, StatusPill } from "./parts.tsx"
+import { heldPlaces, ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"
 import { ServerForm, formErrors, valuesOf, type ServerFormErrors, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
-import type { McpAgentPlace, McpServer } from "./types.ts"
+import { displayPlaceFile, type McpAgentPlace, type McpServer } from "./types.ts"
 import { useI18n } from "@context-hub/extensions/react"
-import { DialogSplit, PlaceList, TagEditor } from "@context-hub/extensions/components"
+import { DialogSplit, MarksLine, PlaceList, TagEditor } from "@context-hub/extensions/components"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Dialog, DialogClose, DialogTitle } from "@context-hub/shadcn-ui/components/dialog"
 import { Popover, PopoverArrow, PopoverContent, PopoverTrigger } from "@context-hub/shadcn-ui/components/popover"
@@ -471,6 +471,9 @@ function ServerPanel({
 }) {
   const { t } = useI18n()
   const states = placesOf(places, server.detail.installs)
+  /* The stack already says how many places hold this, one mark per client
+     file; with none the line keeps its transport and nothing follows. */
+  const held = heldPlaces(server, places)
 
   return (
     <aside className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
@@ -481,16 +484,22 @@ function ServerPanel({
             {server.name}
           </DialogTitle>
           <div className="flex items-center gap-1.5 text-[12px] leading-[1.3]">
-            <PlugIcon className="size-[13px] text-muted-soft" />
-            <span className="font-mono font-semibold text-foreground">{server.transport}</span>
-            {/* The stack already says how many places hold this, one mark per
-                client file; with none there is nothing to separate. */}
-            {server.installed === 0 ? null : (
-              <>
-                <span className="text-muted-soft">·</span>
-                <AgentStack server={server} places={places} />
-              </>
-            )}
+            <MarksLine
+              lead={
+                <>
+                  <PlugIcon className="size-[13px] text-muted-soft" />
+                  <span className="font-mono font-semibold text-foreground">
+                    {server.transport}
+                  </span>
+                </>
+              }
+              marks={held.map((place) => ({ id: place.id, icon: place.icon }))}
+              /* One line per file: a client holding two of them would otherwise
+                 read as one run of words with no seam between the two. */
+              label={held
+                .map((place) => `${place.label} · ${displayPlaceFile(place)}`)
+                .join("\n")}
+            />
           </div>
         </div>
         <DialogClose

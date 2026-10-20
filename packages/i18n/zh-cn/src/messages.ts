@@ -757,6 +757,7 @@ export const messages: Record<string, string> = {
   "prompts.action.delete": "删除",
   "prompts.action.close": "关闭",
   "prompts.column.prompt": "提示词",
+  "prompts.column.places": "位置",
   "prompts.column.body": "内容",
   "prompts.column.tags": "标签",
   "prompts.column.updated": "更新时间",

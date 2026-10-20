@@ -30,6 +30,7 @@ import {
   FilterBar,
   Highlighted,
   Ledger,
+  MarksLine,
   PageBody,
   PlaceScopePicker,
   TablePagination,
@@ -609,7 +610,7 @@ export function PromptsPage() {
     {
       key: "prompt",
       label: t("prompts.column.prompt"),
-      width: "31.2%",
+      width: "29.2%",
       cell: (prompt) => (
         <span className="flex min-w-0 flex-col gap-1">
           {/* The title leads and the description follows: the pair a skill's
@@ -628,7 +629,7 @@ export function PromptsPage() {
     {
       key: "tags",
       label: t("prompts.column.tags"),
-      width: "24.4%",
+      width: "19.4%",
       cell: (prompt) => (
         <span className="flex flex-wrap items-center gap-1.5">
           {prompt.tags.slice(0, 3).map((item) => (
@@ -643,9 +644,30 @@ export function PromptsPage() {
       ),
     },
     {
+      key: "places",
+      label: t("prompts.column.places"),
+      width: "10%",
+      /* Which agents hold this prompt, as their own marks: the same stack the
+         card wears, so a row answers "who has this" without being opened. */
+      cell: (prompt) => {
+        const marks = heldMarks(places, holdsMap[prompt.id] ?? {}, (place) => t(place.labelKey))
+        return (
+          /* The same provenance line the detail panel draws, not just its
+             stack: a row and its panel must answer "where is this" alike. */
+          <span className="flex items-center">
+            <MarksLine
+              lead={<PromptMeta body={prompt.prompt} showTokens={false} />}
+              marks={marks}
+              label={marks.map((mark) => mark.label).join(" · ")}
+            />
+          </span>
+        )
+      },
+    },
+    {
       key: "tokens",
       label: t("prompts.column.body"),
-      width: "13.5%",
+      width: "12%",
       cell: (prompt) => (
         <span className="font-mono text-[12.5px] text-muted-foreground">
           {t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))}
@@ -655,7 +677,7 @@ export function PromptsPage() {
     {
       key: "updated",
       label: t("prompts.column.updated"),
-      width: "13%",
+      width: "11.5%",
       cell: (prompt) => (
         <span className="text-[12.5px] text-muted-foreground">
           {formatAge(prompt.updatedAt, state.active)}

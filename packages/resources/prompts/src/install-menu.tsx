@@ -85,12 +85,14 @@ export function GenerateItems({
     <>
       <DropdownMenuItem
         disabled={disabled}
+        variant={held.commands ? "destructive" : "default"}
         onClick={() => onGenerate(place, "commands", undefined, held.commands)}
       >
         {t(held.commands ? "prompts.menu.commands.remove" : "prompts.menu.commands")}
       </DropdownMenuItem>
       <DropdownMenuItem
         disabled={disabled}
+        variant={held.rule ? "destructive" : "default"}
         onClick={() => onGenerate(place, "rule", undefined, held.rule)}
       >
         {t(held.rule ? "prompts.menu.rule.remove" : "prompts.menu.rule")}
@@ -99,6 +101,7 @@ export function GenerateItems({
       {place.agentDir === undefined ? null : (
         <DropdownMenuItem
           disabled={disabled}
+          variant={held.agent ? "destructive" : "default"}
           onClick={() => onGenerate(place, "agent", undefined, held.agent)}
         >
           {t(held.agent ? "prompts.menu.agent.remove" : "prompts.menu.agent")}
@@ -116,6 +119,7 @@ export function GenerateItems({
               <DropdownMenuItem
                 key={document.id}
                 disabled={disabled}
+                variant={removable ? "destructive" : "default"}
                 onClick={() => onGenerate(place, "instructions", document.id, removable)}
               >
                 {t(removable ? (document.removeLabelKey ?? document.labelKey) : document.labelKey)}

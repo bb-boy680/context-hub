@@ -29,6 +29,7 @@ export const promptsMessages: Record<string, string> = {
   "prompts.action.close": "Close",
 
   "prompts.column.prompt": "Prompt",
+  "prompts.column.places": "Places",
   "prompts.column.body": "Content",
   "prompts.column.tags": "Tags",
   "prompts.column.updated": "Updated",

@@ -42,7 +42,7 @@ import * as React from "react"
 
 import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
-import { HolderStack, PluginTile } from "./parts.tsx"
+import { PluginTile } from "./parts.tsx"
 import {
   dataUrlOf,
   packContents,
@@ -65,6 +65,7 @@ import type { PluginFileEntry, PluginRow } from "./types.ts"
 import {
   CodeCard,
   DialogSplit,
+  MarksLine,
   MediaGallery,
   PlaceList,
   TagEditor,
@@ -1072,15 +1073,11 @@ function InfoPanel({
             {plugin.name}
           </DialogTitle>
           <DialogDescription className="flex min-w-0 items-center gap-2 font-mono text-[12px] text-muted-foreground">
-            {t(`plugins.source.${plugin.source}`)}
-            {/* The seam the other provenance lines draw between the source and
-                the marks; with no marks there is nothing to separate. */}
-            {plugin.held.length === 0 ? null : (
-              <span aria-hidden className="text-muted-soft">
-                ·
-              </span>
-            )}
-            <HolderStack plugin={plugin} />
+            <MarksLine
+              lead={t(`plugins.source.${plugin.source}`)}
+              marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
+              label={plugin.held.map((hold) => hold.label).join(" · ")}
+            />
           </DialogDescription>
         </div>
         <DialogClose
