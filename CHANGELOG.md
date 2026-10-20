@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.2.0 (2026-10-20)
+
+### Features
+
+- **prompts:** let agent extensions own prompt delivery ([5cf1487](https://github.com/bb-boy680/context-hub/commit/5cf14876df4389bd1e46f8fe11b643d2b1d5ffb9))
+
+### Bug Fixes
+
+- **skills:** skip installed skills in batch install ([bf6009b](https://github.com/bb-boy680/context-hub/commit/bf6009b490516e71a46f696aaf749611ac4db72a))
+
+**Full Changelog**: https://github.com/bb-boy680/context-hub/compare/v0.1.1...v0.2.0
+
 ## v0.1.1 (2026-10-20)
 
 ### Features
