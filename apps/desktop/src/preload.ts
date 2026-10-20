@@ -9,6 +9,7 @@ import { contextBridge, ipcRenderer } from "electron"
 import {
   APP_MENU_ACTION_CHANNEL,
   DESKTOP_INFO_CHANNEL,
+  PICK_FOLDER_CHANNEL,
   UPDATE_CHANGED_CHANNEL,
   UPDATE_START_CHANNEL,
   UPDATE_STATE_CHANNEL,
@@ -21,6 +22,8 @@ import type { UpdateState } from "./update-state.ts"
 
 const desktop: DesktopBridge = {
   info: () => ipcRenderer.invoke(DESKTOP_INFO_CHANNEL) as Promise<DesktopInfo>,
+  pickFolder: () =>
+    ipcRenderer.invoke(PICK_FOLDER_CHANNEL) as Promise<string | null>,
   updateState: () =>
     ipcRenderer.invoke(UPDATE_STATE_CHANNEL) as Promise<UpdateState>,
   update: () => ipcRenderer.invoke(UPDATE_START_CHANNEL) as Promise<void>,

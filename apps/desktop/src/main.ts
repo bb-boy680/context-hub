@@ -30,6 +30,7 @@ import {
   APP_MENU_ACTION_CHANNEL,
   APP_MENU_CHANNEL,
   DESKTOP_INFO_CHANNEL,
+  PICK_FOLDER_CHANNEL,
   TITLEBAR_HEIGHT,
   UPDATE_CHANGED_CHANNEL,
   UPDATE_START_CHANNEL,
@@ -60,6 +61,8 @@ let serverStopping = false
 let stopping: Promise<void> | null = null
 let stdoutTail = ""
 let stderrTail = ""
+/* The folder dialog in flight, so a second ask joins it instead of opening another. */
+let picking: Promise<string | null> | null = null
 
 const TAIL_BYTES = 64 * 1024
 const DIALOG_TAIL_BYTES = 2 * 1024
@@ -460,6 +463,28 @@ if (!locked) {
       platform: process.platform,
       updatesEnabled: updater.enabled,
     }))
+    ipcMain.handle(PICK_FOLDER_CHANNEL, (event): Promise<string | null> | null => {
+      if (
+        window === null ||
+        window.isDestroyed() ||
+        event.sender !== window.webContents
+      ) {
+        return null
+      }
+      if (picking !== null) return picking
+
+      const target = window
+      picking = dialog
+        .showOpenDialog(target, { properties: ["openDirectory"] })
+        .then(({ canceled, filePaths }) =>
+          canceled ? null : (filePaths[0] ?? null)
+        )
+        .catch(() => null)
+        .finally(() => {
+          picking = null
+        })
+      return picking
+    })
     ipcMain.handle(UPDATE_STATE_CHANNEL, () => updater.state)
     ipcMain.handle(UPDATE_START_CHANNEL, () => updater.update())
     ipcMain.handle(

@@ -30,6 +30,8 @@ export interface UpdateState {
 
 export interface DesktopBridge {
   info(): Promise<DesktopInfo>
+  /** Ask the carrier for a folder; its absolute path, or null when dismissed. */
+  pickFolder(): Promise<string | null>
   updateState(): Promise<UpdateState>
   update(): Promise<void>
   /** Run a menu row that is the page's to carry out. */

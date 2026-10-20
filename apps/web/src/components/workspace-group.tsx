@@ -132,9 +132,10 @@ export function WorkspaceGroup() {
 
   /**
    * Ask for a folder through the system's own dialog, which is the one a person
-   * expects and the only one a page may open. It reports the folder's name and
-   * nothing else — a page is never told where a folder is — so the hub places
-   * that name among the folders it knows.
+   * expects and the only one a page may open. The desktop carrier reports the
+   * folder's absolute path; a browser reports its name and nothing else — a
+   * page is never told where a folder is — so there the hub places that name
+   * among the folders it knows.
    */
   const create = async () => {
     const picked = await pickFolder()
@@ -148,7 +149,7 @@ export function WorkspaceGroup() {
       return
     }
     setNotice(null)
-    setNotice(await add(picked.name))
+    setNotice(await add(picked.path ?? picked.name))
   }
 
   /* One line for whichever of the two answers last: the form's own, or the hub's. */

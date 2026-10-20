@@ -9,6 +9,9 @@ import type { UpdateState } from "./update-state.ts"
 /** Renderer → main: which build this is and whether it has an update feed. */
 export const DESKTOP_INFO_CHANNEL = "context-hub:desktop-info"
 
+/** Renderer → main: ask the carrier for a folder, answered with its path. */
+export const PICK_FOLDER_CHANNEL = "context-hub:pick-folder"
+
 /** Renderer → main: the current update state, and the sidebar action. */
 export const UPDATE_STATE_CHANNEL = "context-hub:update-state"
 export const UPDATE_START_CHANNEL = "context-hub:update-start"
@@ -46,6 +49,8 @@ export interface DesktopInfo {
 /** The shape preload exposes as `window.contextHub.desktop`. */
 export interface DesktopBridge {
   info(): Promise<DesktopInfo>
+  /** Ask the carrier for a folder; its absolute path, or null when dismissed. */
+  pickFolder(): Promise<string | null>
   updateState(): Promise<UpdateState>
   /** available → start the download; ready → install now. */
   update(): Promise<void>

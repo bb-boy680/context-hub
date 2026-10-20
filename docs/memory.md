@@ -1402,3 +1402,45 @@ Electron 的 main/preload/server bundle，页面永远加载 `apps/web/dist`—�
 同时检查 watcher 重建的产物**确实被运行时加载**；不被加载的 watcher 要删掉，不要留着
 它"看起来在工作"。
 
+
+## 桌面端选目录不要用 Chromium 的 File System Access API（2026-10-20）
+
+**问题模式**：桌面端“创建工作区”第一次选完目录没有反应，第二次点击彻底没反应，只能重启。
+两个原因叠在一起：`showDirectoryPicker()` 只返回目录名，服务端 `locate()` 只会在已知目录
+旁边按名字找，任意项目目录必然被拒；而 Electron 44 里第一次调用之后，后续调用会抛
+`NotAllowedError: ... File picker already active.`，`folder-picker.ts` 又把它当成“用户取消”
+吞掉。用本机 Electron 探针可稳定复现前两次调用分别得到 pending / NotAllowedError。
+
+**规则**：桌面 carrier 的原生能力走 preload 桥，不要依赖页面的浏览器 API。目录选择用
+主进程 `dialog.showOpenDialog(win, { properties: ["openDirectory"] })`，把**绝对路径**交给
+页面；浏览器分支才保留 `showDirectoryPicker()`。服务端 `WorkspaceStore.add()` 本来就
+接受绝对路径，不需要改。IPC handler 沿用 `event.sender === window.webContents` 校验，
+并发调用复用一个 in-flight Promise。
+
+**验证方式**：真机 Electron 验收必须覆盖“取消后再次点击还能打开对话框”“选主目录之外的
+目录能写入绝对 path”“重复添加不重复”“重启后仍在”。原生对话框可以用 Win32 自动化：
+`EnumWindows` 找 electron 进程的 `#32770`，子控件里 Edit 的 `GetDlgCtrlID=1152`、确定按钮
+`id=1`、取消 `id=2`，`WM_SETTEXT` + `BM_CLICK` 即可。Electron 窗口若是隐藏的，对话框会
+创建但不可见，先 `ShowWindow(SW_RESTORE)` + `SetForegroundWindow` 再操作。
+
+## dev server 的 Vite root 是 cwd，必须从 apps/web 启动（2026-10-20）
+
+**问题模式**：为了验收手工执行 `node apps/web/dev.ts`，Vite 在 5271 监听但 `/` 返回 404、
+页面空白；日志停在 `[optimizer] scanning dependencies...`。原因是 `createServer()` 没写
+`root`，Vite 用 `process.cwd()`——从仓库根启动时根目录没有 `index.html`。`pnpm dev:desktop`
+内部是 `spawn(..., { cwd: webDir })`，所以平时不会暴露。
+
+**规则**：手工起 web dev server 一律 `cd apps/web && node dev.ts`（或 `pnpm --filter web dev`）。
+另外，Bash 工具默认沙箱下 Vite 会卡在依赖扫描、端口能监听但不响应；这类长驻 dev server
+用 `dangerouslyDisableSandbox: true` 启动，和本文件里 `pnpm install` 的沙箱规则一致。
+
+## 一个 hub home 同时只能有一个 server（2026-10-20）
+
+**问题模式**：做构建形态验收时，dev web server（5270）和内置 server 的桌面实例共用同一个
+`CONTEXT_HUB_HOME`，两边的 workspace store 同时读改写 `state/workspaces.json`，结果文件被
+覆盖成只剩默认行，刚添加的工作区丢失。状态存储没有任何跨进程锁，契约就是“一个 home
+一个 server”。
+
+**规则**：任何 E2E 只允许一个 hub server 写同一个 home；验证构建形态前先停掉 dev server。
+看到 `workspaces.json` 行数无故减少，先查是不是还有另一个 server 在跑（`netstat` 看端口、
+`/hub/about` 看 home），不要先怀疑 store 的迁移逻辑。
