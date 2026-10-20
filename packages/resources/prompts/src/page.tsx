@@ -374,14 +374,7 @@ export function PromptsPage() {
 
   const settings = useSettings()
   const search = useSearchPage()
-  /* A result from the global search asks for the list view, where the matched
-     text is marked; the page's own choice is what remains once that is cleared. */
-  const [localView, setLocalView] = React.useState<"grid" | "list">(settings.layout)
-  const view = search.listView ? "list" : localView
-  const chooseView = (next: "grid" | "list") => {
-    search.clearListView()
-    setLocalView(next)
-  }
+  const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   /* The query lives in the address so the global search can seed it. */
   const query = search.query
   const setQuery = search.setQuery
@@ -791,13 +784,13 @@ export function PromptsPage() {
                 icon={LayoutGridIcon}
                 label={t("prompts.view.grid")}
                 active={view === "grid"}
-                onClick={() => chooseView("grid")}
+                onClick={() => setView("grid")}
               />
               <ViewButton
                 icon={ListIcon}
                 label={t("prompts.view.list")}
                 active={view === "list"}
-                onClick={() => chooseView("list")}
+                onClick={() => setView("list")}
               />
             </div>
             <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setAddOpen(true)}>

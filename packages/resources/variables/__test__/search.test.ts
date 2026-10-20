@@ -43,9 +43,9 @@ describe("searching the environment variables", () => {
     expect(JSON.stringify(row)).not.toContain("sk-secret")
   })
 
-  it("opens the page filtered", () => {
+  it("opens the page filtered by the clicked row's own name", () => {
     expect(searchVariables(document, "anthropic")[0]?.path).toBe(
-      "/variables?q=anthropic"
+      "/variables?q=ANTHROPIC_API_KEY"
     )
   })
 

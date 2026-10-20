@@ -58,7 +58,7 @@ export function searchServers(
         title: server.name,
         ...(server.description === "" ? {} : { description: server.description }),
         ...(avatar === null ? {} : { avatar }),
-        path: searchPath(PAGE, query, { view: "list" }),
+        path: searchPath(PAGE, server.name),
       }
     })
 }

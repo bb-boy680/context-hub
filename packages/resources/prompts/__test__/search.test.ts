@@ -47,9 +47,9 @@ describe("searching the prompts", () => {
     expect(withoutNote?.description).toBeUndefined()
   })
 
-  it("opens the page filtered, in the list view that marks the query", () => {
-    expect(searchPrompts(value, "changelog", assetUrl)[0]?.path).toBe(
-      "/prompts?q=changelog&view=list"
+  it("opens the page filtered by the clicked row's own name", () => {
+    expect(searchPrompts(value, "rewrite", assetUrl)[0]?.path).toBe(
+      "/prompts?q=changelog"
     )
   })
 

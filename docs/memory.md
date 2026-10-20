@@ -1328,3 +1328,25 @@ Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间�
 - `state/extensions.json` 只存每个 id 的启用布尔值，不是描述或元数据；描述在 `plugin.yaml`，安装来源在 `index.json`。
 - 卸载磁盘扩展的顺序是「停用 → 删目录与记录 → 从运行中的 catalog 撤下」；失败时保持“已安装但停用”，不能让代码在文件已删后继续跑。内置/编译扩展只能停用。
 - 更新设置的命名空间是 `state/settings.json` 的 `plugins["hub.extensions"]`，与 SKILL 模块同机制；调度只随 hub 页面存活，自动更新会覆盖扩展目录里的本地手改，默认关闭。
+
+## 跳转参数里「输入词」和「点中的对象」是两件事（2026-10-20）
+
+**问题模式**：Ctrl+K 输入 `claude` 后点击 `claude-hud`，目标页仍然用 `q=claude` 筛选；
+同时五个 provider 还写了 `view=list`，强制覆盖用户在设置里选的 `grid` 布局。
+根因是 provider 把「搜索时输入什么」直接当成「点击后要筛什么」，并把「搜索跳转」
+和「页面布局」耦合在同一个 URL 参数里。
+
+**规则**：
+- 点击一个具体结果时，目标页的筛选词必须来自**被点中的对象**（`SearchResult.title` /
+  行自身名称），不是输入框里的模糊词。输入词只用于在弹窗里找候选。
+- 跳转 path 只携带「目标页怎么定位这个对象」的参数；凡是用户在设置里拥有的偏好
+  （布局、排序、主题），不得由跳转参数覆盖。删掉读取方要比保留一个「只影响显示」的
+  覆盖参数更彻底：后者会随下一次别人加 provider 又长回来。
+- 改共享 hook 的公开字段（这里是 `SearchPage.listView/clearListView`）前先 `rg` 全部
+  调用方；本次只有四个资产页，删除后 `rg` 应无源码命中（测试目录除外）。
+
+**验证方式**：单元测试要特意让输入词 ≠ 结果标题（如输入 `rewrite` 命中正文、
+期望 path 为 `q=changelog`），否则「输入恰好等于标题」测不出行为变化。
+真机验收同时读 URL、筛选框值和布局按钮的 `aria-pressed`：
+输入 `claude` 点 `claude-hud` 后应为 `/plugins?q=claude-hud`（无 `view`）、
+输入框值为 `claude-hud`、`网格视图` 仍 `aria-pressed=true`。

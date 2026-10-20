@@ -54,9 +54,9 @@ describe("searching the plugins", () => {
     expect(row?.avatar).toContain("engineering-kit/icon.png")
   })
 
-  it("opens the page filtered, in the list view that marks the query", () => {
+  it("opens the page filtered by the clicked row's own name", () => {
     expect(searchPlugins(value, "engineer", "en", t)[0]?.path).toBe(
-      "/plugins?q=engineer&view=list"
+      "/plugins?q=engineering-kit"
     )
   })
 

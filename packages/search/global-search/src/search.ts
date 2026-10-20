@@ -216,7 +216,7 @@ function searchShellSettings(
         id: `${entry.anchor}:${entry.titleKey}`,
         title,
         ...(description === undefined ? {} : { description }),
-        path: `${searchPath("/settings", query)}#${entry.anchor}`,
+        path: `${searchPath("/settings", title)}#${entry.anchor}`,
       },
     ]
   })
@@ -237,7 +237,7 @@ function searchSections(
         id: `settings-section:${section.id}`,
         title,
         description,
-        path: `${searchPath("/settings", query)}#${section.id}`,
+        path: `${searchPath("/settings", title)}#${section.id}`,
       },
     ]
   })
@@ -266,7 +266,7 @@ export function searchExtensions(
         title: name,
         ...(description === "" ? {} : { description }),
         icon: entry.manifest.icon,
-        path: searchPath("/extensions", query),
+        path: searchPath("/extensions", name),
       },
     ]
   })

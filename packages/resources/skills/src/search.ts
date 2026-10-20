@@ -67,7 +67,7 @@ export function searchSkills(
       title: name,
       ...(description === "" ? {} : { description }),
       ...(avatar === undefined || avatar === null ? {} : { avatar }),
-      path: searchPath(PAGE, query, { view: "list" }),
+      path: searchPath(PAGE, name),
     })
   }
 

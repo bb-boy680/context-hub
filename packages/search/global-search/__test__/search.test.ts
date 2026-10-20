@@ -69,7 +69,7 @@ describe("searching the settings", () => {
         id: "appearance:settings.theme.title",
         title: "Theme",
         description: "Follow the system's dark and light setting.",
-        path: "/settings?q=dark#appearance",
+        path: "/settings?q=Theme#appearance",
       },
     ])
   })
@@ -77,7 +77,7 @@ describe("searching the settings", () => {
   it("finds a row through the group it sits in", () => {
     const [row] = searchSettings(t, "images")
     expect(row?.title).toBe("Download remote cover images")
-    expect(row?.path).toBe("/settings?q=images#images")
+    expect(row?.path).toBe("/settings?q=Download+remote+cover+images#images")
   })
 
   it("finds the extension update rows under their own anchor", () => {
@@ -86,7 +86,7 @@ describe("searching the settings", () => {
         id: "extensions:settings.extensions.dailyAt",
         title: "Time of day",
         description: "Local time the daily check runs.",
-        path: "/settings?q=time+of+day#extensions",
+        path: "/settings?q=Time+of+day#extensions",
       },
     ])
   })
@@ -101,7 +101,7 @@ describe("searching the settings", () => {
         id: "settings-section:skills-updates",
         title: "Skill updates",
         description: "When the hub checks skill sources.",
-        path: "/settings?q=skill+updates#skills-updates",
+        path: "/settings?q=Skill+updates#skills-updates",
       },
     ])
   })
@@ -130,9 +130,9 @@ describe("searching the extensions", () => {
 
   it("keeps the package's own mark and opens the extensions page", () => {
     const icon = () => null
-    const [row] = searchExtensions([extension({ icon })], "hello", "en")
+    const [row] = searchExtensions([extension({ icon })], "acme.hello", "en")
     expect(row?.icon).toBe(icon)
-    expect(row?.path).toBe("/extensions?q=hello")
+    expect(row?.path).toBe("/extensions?q=Hello")
   })
 
   it("returns nothing for an empty query", () => {

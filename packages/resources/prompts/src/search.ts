@@ -65,7 +65,7 @@ export function searchPrompts(
         title: row.name,
         ...(row.description === "" ? {} : { description: row.description }),
         ...(avatar === null ? {} : { avatar }),
-        path: searchPath(PAGE, query, { view: "list" }),
+        path: searchPath(PAGE, row.name),
       }
     })
 }

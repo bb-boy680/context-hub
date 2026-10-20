@@ -52,9 +52,9 @@ describe("searching the MCP servers", () => {
     expect(row?.description).toBeUndefined()
   })
 
-  it("opens the page filtered, in the list view that marks the query", () => {
+  it("opens the page filtered by the clicked row's own name", () => {
     expect(searchServers([server()], "git")[0]?.path).toBe(
-      "/mcp-servers?q=git&view=list"
+      "/mcp-servers?q=github"
     )
   })
 
