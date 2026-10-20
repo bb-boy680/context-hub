@@ -42,7 +42,7 @@ import {
   type PluginCollected,
 } from "./library.ts"
 import { rowsForTab, SCOPE_LABELS, type PluginTab } from "./rows.ts"
-import { PluginTile } from "./parts.tsx"
+import { HolderStack, PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import { PluginNameTakenError, type PluginInstallScope } from "./contract.ts"
 
@@ -50,7 +50,6 @@ import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
 import {
   ActionTab,
   AutoplayVideo,
-  AvatarStack,
   FilterBar,
   Highlighted,
   Ledger,
@@ -194,26 +193,8 @@ function PluginSourceLine({ plugin }: { plugin: PluginRow }) {
 }
 
 /**
- * The agents holding a pack, as their own marks.
- *
- * It answers "which agents have this" without the row being opened, which is the
- * question a pack's source word cannot: a pack collected from a repository can
- * still be sitting in three agents, and one only an agent holds is worded as a
- * local directory like every other pack on this machine.
+ * What every row's action cluster needs, gathered so it travels as one prop.
  */
-function HolderStack({ plugin }: { plugin: PluginRow }) {
-  if (plugin.held.length === 0) return null
-
-  return (
-    <AvatarStack
-      marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
-      seam="ring-card"
-      label={plugin.held.map((hold) => hold.label).join(" · ")}
-    />
-  )
-}
-
-/** What every row's action cluster needs, gathered so it travels as one prop. */
 interface RowActions {
   /** The clients this hub can deliver to, with what each one already holds. */
   clients: readonly PluginClient[]

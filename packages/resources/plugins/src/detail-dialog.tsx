@@ -42,7 +42,7 @@ import * as React from "react"
 
 import { PluginFileTree, fileTreeKey } from "./file-tree.tsx"
 import { UpdateAction } from "./install-actions.tsx"
-import { PluginTile } from "./parts.tsx"
+import { HolderStack, PluginTile } from "./parts.tsx"
 import {
   dataUrlOf,
   packContents,
@@ -95,6 +95,7 @@ import {
   PopoverTrigger,
 } from "@context-hub/shadcn-ui/components/popover"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
+import { Separator } from "@context-hub/shadcn-ui/components/separator"
 import { Spinner } from "@context-hub/shadcn-ui/components/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui/components/tabs"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
@@ -694,6 +695,15 @@ function MetaRow({ label, value }: { label: string; value: string }) {
   )
 }
 
+/** A hairline between two groups, with the canvas's own 17px of air. */
+function Rule() {
+  return (
+    <div className="flex h-[17px] items-center">
+      <Separator />
+    </div>
+  )
+}
+
 /** The pill a place row's own action wears, in the panel's 30px measure. */
 const placePill =
   "h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
@@ -1062,17 +1072,15 @@ function InfoPanel({
             {plugin.name}
           </DialogTitle>
           <DialogDescription className="flex min-w-0 items-center gap-2 font-mono text-[12px] text-muted-foreground">
-            {/* A pack need not declare a revision, and a lone "v" reads as a
-                broken line rather than as a pack that named none. */}
-            {plugin.version === "" ? null : (
-              <>
-                {t("plugins.version").replace("{version}", plugin.version)}
-                <span aria-hidden className="text-muted-soft">
-                  ·
-                </span>
-              </>
-            )}
             {t(`plugins.source.${plugin.source}`)}
+            {/* The seam the other provenance lines draw between the source and
+                the marks; with no marks there is nothing to separate. */}
+            {plugin.held.length === 0 ? null : (
+              <span aria-hidden className="text-muted-soft">
+                ·
+              </span>
+            )}
+            <HolderStack plugin={plugin} />
           </DialogDescription>
         </div>
         <DialogClose
@@ -1126,9 +1134,18 @@ function InfoPanel({
           onUpdate={onUpdate}
         />
 
-        {/* When this last moved, which answers the same "what is this pack"
-            question the source block above asks, so it sits with it. A pack the
-            hub never collected has moved nowhere here and carries no such time. */}
+        {/* The version and when this last moved are facts about the record
+            rather than about where it goes; the source block above already
+            draws the hairline that separates them from it. A pack need not
+            declare a revision, and one the hub never collected has moved
+            nowhere here. */}
+        {plugin.version === "" ? null : (
+          <MetaRow
+            label={t("plugins.detail.version")}
+            value={t("plugins.version").replace("{version}", plugin.version)}
+          />
+        )}
+        {plugin.version !== "" && plugin.updated !== "" ? <Rule /> : null}
         {plugin.updated === "" ? null : (
           <div className="flex flex-col">
             <MetaRow label={t("plugins.detail.updated")} value={plugin.updated} />

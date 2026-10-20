@@ -134,6 +134,7 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.empty.tabHint": "The same packs are still on the other tabs.",
   "plugins.footer.count": "{shown} of {total} plugins",
   "plugins.detail.source": "From",
+  "plugins.detail.version": "Version",
   "plugins.detail.updated": "Updated",
   "plugins.detail.places": "Places",
   "plugins.detail.places.held": "{count} installed",

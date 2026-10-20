@@ -1,10 +1,13 @@
 /**
  * The small pieces the plugin views repeat, drawn the way the MCP module draws
  * its own: the two asset pages show the same kind of thing, so a pack's mark
- * and a server's mark wear the same tile.
+ * and a server's mark wear the same tile — and the agents holding a pack wear
+ * the same stack wherever the pack is drawn.
  */
 import { PlugIcon } from "lucide-react"
 import * as React from "react"
+
+import { AvatarStack } from "@context-hub/extensions/components"
 
 import type { PluginRow } from "./types.ts"
 
@@ -51,5 +54,25 @@ export function PluginTile({
         />
       )}
     </span>
+  )
+}
+
+/**
+ * The agents holding a pack, as their own marks.
+ *
+ * It answers "which agents have this" without the row being opened, which is the
+ * question a pack's source word cannot: a pack collected from a repository can
+ * still be sitting in three agents, and one only an agent holds is worded as a
+ * local directory like every other pack on this machine.
+ */
+export function HolderStack({ plugin }: { plugin: PluginRow }) {
+  if (plugin.held.length === 0) return null
+
+  return (
+    <AvatarStack
+      marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
+      seam="ring-card"
+      label={plugin.held.map((hold) => hold.label).join(" · ")}
+    />
   )
 }

@@ -141,6 +141,7 @@ export const promptsMessages: Record<string, string> = {
 
   "prompts.source.local": "Local",
   "prompts.detail.tokens": "{tokens} tokens",
+  "prompts.detail.contextSize": "Context size",
   "prompts.detail.category.add": "Add a tag",
   "prompts.detail.category.placeholder": "New tag",
   "prompts.detail.category.remove": "Remove {tag}",

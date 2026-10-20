@@ -27,7 +27,7 @@ import { installedCount, MCP_SCOPES, placesInScope, placesOf, type McpPlaceState
 import { FilesPane } from "./detail-files.tsx"
 import { ToolsPane } from "./detail-tools.tsx"
 import { entryOf } from "./records.ts"
-import { ServerTile, StatusPill } from "./parts.tsx"
+import { AgentStack, ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"
 import { ServerForm, formErrors, valuesOf, type ServerFormErrors, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
@@ -483,10 +483,14 @@ function ServerPanel({
           <div className="flex items-center gap-1.5 text-[12px] leading-[1.3]">
             <PlugIcon className="size-[13px] text-muted-soft" />
             <span className="font-mono font-semibold text-foreground">{server.transport}</span>
-            <span className="text-muted-soft">·</span>
-            <span className="text-muted-foreground">
-              {t("mcp.detail.place.count").replace("{count}", String(server.installed))}
-            </span>
+            {/* The stack already says how many places hold this, one mark per
+                client file; with none there is nothing to separate. */}
+            {server.installed === 0 ? null : (
+              <>
+                <span className="text-muted-soft">·</span>
+                <AgentStack server={server} places={places} />
+              </>
+            )}
           </div>
         </div>
         <DialogClose

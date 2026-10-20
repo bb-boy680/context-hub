@@ -27,7 +27,6 @@ import * as React from "react"
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import {
   AutoplayVideo,
-  AvatarStack,
   FilterBar,
   Highlighted,
   Ledger,
@@ -59,7 +58,7 @@ import {
   usePromptPlaces,
   type Holds,
 } from "./library.ts"
-import { PromptMeta, PromptTile } from "./parts.tsx"
+import { PromptMarks, PromptMeta, PromptTile } from "./parts.tsx"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
@@ -343,11 +342,7 @@ function PromptCard({ prompt, updated, busy, store, places, holds, onOpen, onGen
             do; the actions keep the right whether or not anything holds it. */}
         <div className="flex items-center gap-2">
           <span className="mr-auto flex min-w-0 items-center">
-            <AvatarStack
-              marks={marks}
-              seam="ring-card"
-              label={marks.map((mark) => mark.label).join(" · ")}
-            />
+            <PromptMarks marks={marks} />
           </span>
           {/* Taking the text itself, which needs no agent to go to, and then
               the delivery — the one the row is read for, so it keeps the end. */}

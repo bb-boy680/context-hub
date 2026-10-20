@@ -53,10 +53,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui
 import { Textarea } from "@context-hub/shadcn-ui/components/textarea"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
-import { generatedUnder, holdsSomething, NOTHING_HELD, type Delivery } from "./deliver.ts"
+import { generatedUnder, heldMarks, holdsSomething, NOTHING_HELD, type Delivery } from "./deliver.ts"
 import { PlaceGenerate } from "./install-menu.tsx"
-import { useHolds, usePromptStore, type Holds } from "./library.ts"
-import { PromptMeta, PromptTile } from "./parts.tsx"
+import { tokenLabel, useHolds, usePromptStore, type Holds } from "./library.ts"
+import { PromptMarks, PromptMeta, PromptTile } from "./parts.tsx"
 import type { PromptPlace } from "./provider.ts"
 import type { PromptStore, StoredPrompt } from "./store.ts"
 
@@ -581,6 +581,12 @@ function InfoPanel({
 }) {
   const { t } = useI18n()
   const [copied, setCopied] = React.useState(false)
+  /* The agents holding this prompt, drawn the way the card drew them: a place
+     is one agent under one root, so two scopes of one agent share a mark. */
+  const marks = React.useMemo(
+    () => heldMarks(places, holds, (place) => t(place.labelKey)),
+    [places, holds, t]
+  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -596,7 +602,15 @@ function InfoPanel({
             <NameLine text={prompt.name} onWrite={onRename} />
           </DialogTitle>
           <DialogDescription className="flex min-w-0 items-center gap-2">
-            <PromptMeta body={prompt.prompt} />
+            <PromptMeta body={prompt.prompt} showTokens={false} />
+            {/* The seam the other provenance lines draw between the source and
+                the marks; with no marks there is nothing to separate. */}
+            {marks.length === 0 ? null : (
+              <span aria-hidden className="text-muted-soft">
+                ·
+              </span>
+            )}
+            <PromptMarks marks={marks} />
           </DialogDescription>
         </div>
         <DialogClose
@@ -643,15 +657,20 @@ function InfoPanel({
         />
 
         {/* When this last moved, which is a fact about the record rather than
-            about where it goes — so it sits at the panel's foot, behind the
-            hairline the other panels put between two groups. A row the hub
-            never wrote carries no such time. */}
+            about where it goes, so it sits at the panel's foot. The prompt's
+            size follows it, under a hairline: the two are facts about the
+            record, not about its deliveries. A row the hub never wrote carries
+            no such time. */}
         {updated === "" ? null : (
           <>
-            <Rule />
             <MetaRow label={t("prompts.detail.updated")} value={updated} />
+            <Rule />
           </>
         )}
+        <MetaRow
+          label={t("prompts.detail.contextSize")}
+          value={t("prompts.detail.tokens").replace("{tokens}", tokenLabel(prompt.prompt))}
+        />
       </div>
 
       <div className="flex h-16 shrink-0 items-center gap-2.5 border-t border-border px-5">
