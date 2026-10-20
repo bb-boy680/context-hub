@@ -529,13 +529,13 @@ export class McpLibrary extends Service {
    * The mark of the extension that registered a provider.
    *
    * A place carries no mark of its own: it shows the icon its own extension
-   * declares, which is the same one the catalog row draws.
+   * declares, which is the same one the catalog row draws. That mark lives on
+   * the agent's target contribution — a provider id and its plugin's manifest id
+   * need not match, so the manifest is not where to look.
    */
   private icon(id: string): ExtensionIcon {
-    return (
-      this.ctx.extensions.snapshot().entries.find((entry) => entry.manifest.id === id)?.manifest
-        .icon ?? ServerIcon
-    )
+    const targets = this.ctx.get("targets")?.placements() ?? []
+    return targets.find((placement) => placement.value.id === id)?.value.icon ?? ServerIcon
   }
 }
 

@@ -18,7 +18,14 @@ import * as React from "react"
 import { ServerIcon } from "lucide-react"
 
 import { createCatalog, chosenProviders, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n } from "@context-hub/extensions/react"
+import {
+  useCatalog,
+  useChosenAgents,
+  useContributions,
+  useExtensionSnapshot,
+  useHub,
+  useI18n,
+} from "@context-hub/extensions/react"
 
 import { buildCatalog, placesOf, type ScannedPlace } from "./catalog.ts"
 import { McpError, failureText, mcpFailure } from "./contract.ts"
@@ -135,11 +142,14 @@ export function useMcpLibrary(): McpLibrary {
   const [actionFailure, setActionFailure] = React.useState<string | null>(null)
 
   /* A place carries no mark of its own: it shows the icon its own extension
-     declares, which is the same one the catalog row draws. */
+     declares, which is the same one the catalog row draws. That mark lives on
+     the agent's target contribution — a provider id and its plugin's manifest id
+     need not match, so the manifest is not where to look. */
+  const targets = useContributions("target")
   const iconFor = React.useCallback(
     (id: string): ExtensionIcon =>
-      snapshot.entries.find((entry) => entry.manifest.id === id)?.manifest.icon ?? ServerIcon,
-    [snapshot]
+      targets.find((target) => target.id === id)?.icon ?? ServerIcon,
+    [targets]
   )
 
   /* Which providers exist is what a scan follows: an extension being enabled or
