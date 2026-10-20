@@ -7,6 +7,7 @@
 import { contextBridge, ipcRenderer } from "electron"
 
 import {
+  APP_LANGUAGE_CHANNEL,
   APP_MENU_ACTION_CHANNEL,
   DESKTOP_INFO_CHANNEL,
   PICK_FOLDER_CHANNEL,
@@ -17,8 +18,19 @@ import {
   type DesktopInfo,
   type DesktopMenuAction,
 } from "./bridge.ts"
+import { createMenuActionQueue } from "./menu-action-queue.ts"
 import { installTitlebarMenu } from "./preload-menu.ts"
 import type { UpdateState } from "./update-state.ts"
+
+/* Listen from preload time: the page's subscriber arrives later, and a row
+   chosen in that window must still run once it does. */
+const menuActions = createMenuActionQueue<DesktopMenuAction>()
+ipcRenderer.on(
+  APP_MENU_ACTION_CHANNEL,
+  (_event: unknown, action: DesktopMenuAction): void => {
+    menuActions.push(action)
+  }
+)
 
 const desktop: DesktopBridge = {
   info: () => ipcRenderer.invoke(DESKTOP_INFO_CHANNEL) as Promise<DesktopInfo>,
@@ -27,14 +39,8 @@ const desktop: DesktopBridge = {
   updateState: () =>
     ipcRenderer.invoke(UPDATE_STATE_CHANNEL) as Promise<UpdateState>,
   update: () => ipcRenderer.invoke(UPDATE_START_CHANNEL) as Promise<void>,
-  onMenuAction: (listener) => {
-    const handler = (_event: unknown, action: DesktopMenuAction): void =>
-      listener(action)
-    ipcRenderer.on(APP_MENU_ACTION_CHANNEL, handler)
-    return () => {
-      ipcRenderer.removeListener(APP_MENU_ACTION_CHANNEL, handler)
-    }
-  },
+  onMenuAction: (listener) => menuActions.subscribe(listener),
+  setLanguage: (zh) => ipcRenderer.send(APP_LANGUAGE_CHANNEL, zh),
   subscribe: (listener) => {
     const handler = (_event: unknown, state: UpdateState): void => listener(state)
     ipcRenderer.on(UPDATE_CHANGED_CHANNEL, handler)

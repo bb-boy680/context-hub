@@ -36,6 +36,8 @@ export interface DesktopBridge {
   update(): Promise<void>
   /** Run a menu row that is the page's to carry out. */
   onMenuAction(listener: (action: DesktopMenuAction) => void): () => void
+  /** Tell the shell which language the page is showing. */
+  setLanguage(zh: boolean): void
   subscribe(listener: (state: UpdateState) => void): () => void
 }
 

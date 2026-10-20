@@ -22,6 +22,9 @@ export const APP_MENU_CHANNEL = "context-hub:app-menu"
 /** Main → renderer: a menu row whose work belongs to the page. */
 export const APP_MENU_ACTION_CHANNEL = "context-hub:app-menu-action"
 
+/** Renderer → main: the page language, so the tray labels follow it. */
+export const APP_LANGUAGE_CHANNEL = "context-hub:app-language"
+
 /** Linux window controls; the other platforms draw their native buttons. */
 export const WINDOW_MINIMIZE_CHANNEL = "context-hub:window-minimize"
 export const WINDOW_MAXIMIZE_CHANNEL = "context-hub:window-maximize"
@@ -56,5 +59,7 @@ export interface DesktopBridge {
   update(): Promise<void>
   /** Run a menu row that is the page's to carry out. */
   onMenuAction(listener: (action: DesktopMenuAction) => void): () => void
+  /** Tell the shell which language the page is showing. */
+  setLanguage(zh: boolean): void
   subscribe(listener: (state: UpdateState) => void): () => void
 }

@@ -72,10 +72,11 @@ time; there is no manifest file to ship next to the binary.
 
 The main process chooses `--port 0`, reads the origin from the server's stdout,
 and only then creates the window. Closing the window hides it to the tray
-instead of stopping the hub; the tray menu offers Open Context Hub, updates
-when configured, and Quit. `before-quit` asks the server to close and waits for
-it before the process exits. A second launch focuses the existing window
-instead of starting a second server.
+instead of stopping the hub; the tray menu repeats the title-bar Application
+menu's rows (About, updates, Reload, Refresh Plugins, Restart, Quit) under Open
+Context Hub, and both menus follow the page language. `before-quit` asks the
+server to close and waits for it before the process exits. A second launch
+focuses the existing window instead of starting a second server.
 
 The server's working directory is the person's home, not the install directory:
 without that, a shortcut could make an unrelated folder look like the workspace.
@@ -96,9 +97,10 @@ This starts the web dev server (`apps/web/dev.ts`, pinned to ports 5270/5271)
 unless one is already listening, watches the main and preload bundles,
 rebuilds on change, and restarts Electron after a successful rebuild. Page
 source edits reach the window through Vite's HMR; the hub server is the web
-dev server's child, so `server.ts` changes need a restart of the watcher. The
-application menu adds Restart App and Toggle DevTools while the watcher runs
-(Reload Page is always available). Stopping the watcher also stops the
+dev server's child, so `server.ts` changes need a restart of the watcher. While
+the watcher runs, the native File menu (View on macOS) adds Restart App and
+Toggle DevTools; Reload Page is always available. The title-bar Application
+menu and the tray always offer Restart. Stopping the watcher also stops the
 Electron process and the web dev server it started.
 
 To point the window at a different dev server, set:
@@ -191,7 +193,10 @@ manual-install only.
 
 The packaged app checks the GitHub Releases feed described by
 `resources/app-update.yml`. It checks once shortly after startup and every four
-hours, and the File menu (View on macOS) and tray offer Check for Updates.
+hours, and the title-bar Application menu, the native File menu (View on macOS)
+and the tray offer Check for Updates. The Application menu and tray keep the
+row visible but disabled when this build has no update feed; the native menu
+omits it.
 
 An automatic check never opens a dialog: the sidebar shows an update action
 beside the version. Clicking it downloads silently and, when the download

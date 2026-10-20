@@ -27,6 +27,7 @@ import {
 import type { UtilityProcess } from "electron"
 
 import {
+  APP_LANGUAGE_CHANNEL,
   APP_MENU_ACTION_CHANNEL,
   APP_MENU_CHANNEL,
   DESKTOP_INFO_CHANNEL,
@@ -39,14 +40,15 @@ import {
   WINDOW_MAXIMIZE_CHANNEL,
   WINDOW_MINIMIZE_CHANNEL,
   WINDOW_STATE_CHANNEL,
+  type DesktopMenuAction,
 } from "./bridge.ts"
-import { appMenuTemplate } from "./app-menu.ts"
-import { appendTail, tailOf, writeCrashLog } from "./crash-log.ts"
 import {
-  applicationMenuTemplate,
+  appMenuTemplate,
   trayMenuTemplate,
-  type MenuActions,
-} from "./menu.ts"
+  type AppMenuOptions,
+} from "./app-menu.ts"
+import { appendTail, tailOf, writeCrashLog } from "./crash-log.ts"
+import { applicationMenuTemplate, type MenuActions } from "./menu.ts"
 import { RESTART_EXIT_CODE } from "./restart.ts"
 import { serverUrlFrom } from "./server-output.ts"
 import { createUpdater, type Updater } from "./update.ts"
@@ -56,6 +58,8 @@ let window: BrowserWindow | null = null
 let tray: Tray | null = null
 let updates: Updater | null = null
 let loadedUrl: string | null = null
+/* The page's language, mirrored here so the tray follows it. */
+let menuZh = false
 let quitting = false
 let serverStopping = false
 let stopping: Promise<void> | null = null
@@ -368,10 +372,9 @@ async function restartApp(): Promise<void> {
   app.quit()
 }
 
-/** Menu and tray callbacks share one set of actions. */
+/** The native menu's callbacks; it has no page-owned rows. */
 function menuActions(): MenuActions {
   return {
-    openWindow: () => showWindow(),
     reloadPage: () => reloadPage(),
     checkForUpdates: () => updates?.check(true),
     restartApp: () => void restartApp(),
@@ -380,8 +383,63 @@ function menuActions(): MenuActions {
   }
 }
 
+/**
+ * The shared rows' callbacks. The title-bar menu and the tray both use them,
+ * so a row means the same thing in either place.
+ */
+function appMenuOptions(zh: boolean): AppMenuOptions {
+  return {
+    zh,
+    updatesEnabled: updates?.enabled === true,
+    send: sendPageAction,
+    checkForUpdates: () => updates?.check(true),
+    restartApp: () => void restartApp(),
+    quit: () => app.quit(),
+  }
+}
+
+/**
+ * Run a row whose work belongs to the page. The tray can be used while the
+ * window is hidden, so bring it back first; if it is still loading, wait for
+ * the main frame instead of dropping the click.
+ */
+function sendPageAction(action: DesktopMenuAction): void {
+  showWindow()
+  const target = window
+  if (target === null || target.isDestroyed()) return
+  if (target.webContents.isLoadingMainFrame()) {
+    target.webContents.once("did-finish-load", () => {
+      if (!target.isDestroyed()) {
+        target.webContents.send(APP_MENU_ACTION_CHANNEL, action)
+      }
+    })
+    return
+  }
+  target.webContents.send(APP_MENU_ACTION_CHANNEL, action)
+}
+
+/** Rebuild the tray rows; the page language can change while it runs. */
+function refreshTrayMenu(): void {
+  if (tray === null) return
+  tray.setContextMenu(
+    Menu.buildFromTemplate(
+      trayMenuTemplate({
+        ...appMenuOptions(menuZh),
+        openWindow: () => showWindow(),
+      })
+    )
+  )
+}
+
+/** Keep the tray's labels on the page's language. */
+function setMenuLanguage(zh: boolean): void {
+  if (menuZh === zh) return
+  menuZh = zh
+  refreshTrayMenu()
+}
+
 /** The tray keeps the hub reachable after the window is hidden. */
-function createTray(actions: MenuActions): void {
+function createTray(): void {
   const file = process.platform === "darwin" ? "trayTemplate.png" : "tray.png"
   const image = nativeImage.createFromPath(path.join(app.getAppPath(), "assets", file))
   if (image.isEmpty()) return
@@ -395,15 +453,7 @@ function createTray(actions: MenuActions): void {
   }
 
   tray.setToolTip("Context Hub")
-  tray.setContextMenu(
-    Menu.buildFromTemplate(
-      trayMenuTemplate({
-        updatesEnabled: updates?.enabled === true,
-        dev: !app.isPackaged,
-        actions,
-      })
-    )
-  )
+  refreshTrayMenu()
   /* On macOS the menu is the tray's click action; elsewhere a click reopens. */
   if (process.platform !== "darwin") tray.on("click", () => showWindow())
 }
@@ -501,20 +551,11 @@ if (!locked) {
         ) {
           return undefined
         }
+        if (typeof zh === "boolean") setMenuLanguage(zh)
         const target = window
         const zoom = target.webContents.getZoomFactor()
         const menu = Menu.buildFromTemplate(
-          appMenuTemplate({
-            zh: zh === true,
-            updatesEnabled: updater.enabled,
-            send: (action) => {
-              if (!target.isDestroyed()) {
-                target.webContents.send(APP_MENU_ACTION_CHANNEL, action)
-              }
-            },
-            checkForUpdates: () => updater.check(true),
-            quit: () => app.quit(),
-          })
+          appMenuTemplate(appMenuOptions(zh === true))
         )
         return new Promise<void>((resolve) => {
           menu.popup({
@@ -526,6 +567,17 @@ if (!locked) {
         })
       }
     )
+    ipcMain.on(APP_LANGUAGE_CHANNEL, (event, zh: unknown) => {
+      if (
+        window === null ||
+        window.isDestroyed() ||
+        event.sender !== window.webContents ||
+        typeof zh !== "boolean"
+      ) {
+        return
+      }
+      setMenuLanguage(zh)
+    })
     ipcMain.handle(WINDOW_MINIMIZE_CHANNEL, () => window?.minimize())
     ipcMain.handle(WINDOW_MAXIMIZE_CHANNEL, () => {
       if (window === null || window.isDestroyed()) return
@@ -539,7 +591,7 @@ if (!locked) {
       }
     })
     const actions = menuActions()
-    createTray(actions)
+    createTray()
     Menu.setApplicationMenu(
       Menu.buildFromTemplate(
         applicationMenuTemplate({

@@ -21,12 +21,12 @@ export function DesktopMenuActions() {
   const ctx = useHub()
   const navigate = useNavigate()
 
-  /* The shell's menu bar follows the page language; `lang` is also what the
-     browser and assistive technology read. */
+  /* The shell's menu bar and tray follow the page language; `lang` is also
+     what the browser and assistive technology read. */
   React.useEffect(() => {
-    document.documentElement.lang = state.active.toLowerCase().includes("zh")
-      ? "zh-CN"
-      : "en"
+    const zh = state.active.toLowerCase().includes("zh")
+    document.documentElement.lang = zh ? "zh-CN" : "en"
+    desktopBridge()?.setLanguage(zh)
   }, [state.active])
 
   /* `get`'s answer depends on the module augmentation being visible; narrow it
