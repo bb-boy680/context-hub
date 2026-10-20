@@ -8,6 +8,8 @@
     "build:cli": "pnpm --filter web build && pnpm --filter web build:cli",
     "build:desktop": "pnpm --filter @context-hub/desktop build",
     "dev": "turbo dev",
+    "dev:web": "pnpm --filter web dev",
+    "dev:desktop": "pnpm --filter @context-hub/desktop dev",
     "lint": "turbo lint",
     "format": "turbo format",
     "test": "vitest run",
