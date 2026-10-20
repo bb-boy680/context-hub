@@ -7,8 +7,12 @@
  */
 import * as React from "react"
 
-import { WORKSPACE_ROUTE } from "@context-hub/core/workspace"
-import type { WorkspacePage, WorkspaceService } from "@context-hub/core/workspace"
+import { DEFAULT_WORKSPACE_NAME, WORKSPACE_ROUTE } from "@context-hub/core/workspace"
+import type {
+  WorkspacePage,
+  WorkspaceService,
+  WorkspaceView,
+} from "@context-hub/core/workspace"
 import { useHub } from "@context-hub/extensions/react"
 
 /** A failure explained for the menu. */
@@ -30,9 +34,33 @@ function samePage(left: WorkspacePage | null, right: WorkspacePage | null): bool
       folder.id === other.id &&
       folder.name === other.name &&
       folder.path === other.path &&
-      folder.display === other.display
+      folder.display === other.display &&
+      folder.default === other.default &&
+      folder.nameKey === other.nameKey
     )
   })
+}
+
+/** The text a sidebar row shows: a system name translated, else the row's own. */
+export function workspaceLabel(
+  folder: WorkspaceView,
+  t: (key: string) => string
+): string {
+  return folder.nameKey === null ? folder.name : t(folder.nameKey)
+}
+
+/**
+ * What the rename field submits. The default workspace submits an empty name,
+ * which restores its system name; every other row submits what was typed.
+ */
+export function renameSubmission(
+  defaultWorkspace: boolean,
+  next: string,
+  t: (key: string) => string
+): string {
+  if (!defaultWorkspace) return next
+  const trimmed = next.trim()
+  return trimmed === "" || trimmed === t(DEFAULT_WORKSPACE_NAME) ? "" : next
 }
 
 async function call<T>(url: string, method: "GET" | "POST", body?: unknown): Promise<T> {

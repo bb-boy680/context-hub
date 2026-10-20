@@ -17,9 +17,15 @@ import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { folderId, readWorkspaceState, workspaceName } from "../src/workspace.ts"
+import {
+  DEFAULT_WORKSPACE_NAME,
+  folderId,
+  readWorkspaceState,
+  workspaceName,
+} from "../src/workspace.ts"
 import { createFsWorkspaceStore } from "../src/host/workspaces-fs.ts"
 import { projectRoot } from "../src/host/fs-browse.ts"
+import { ensureDefaultWorkspace } from "../handlers.ts"
 
 const EMPTY = { folders: [], current: null, agents: [] }
 
@@ -297,6 +303,8 @@ describe("the host's own folder", () => {
     expect(healed.folders, "the name-only row is replaced, not duplicated").toHaveLength(2)
     expect(healed.folders[0]?.name).toBe("my-project")
     expect(healed.folders[0]?.path).toBe(repo)
+    expect(healed.folders[0]?.default).toBe(true)
+    expect(healed.folders[0]?.nameKey).toBe(DEFAULT_WORKSPACE_NAME)
     expect(healed.current).toBe(repo)
     expect(healed.folders[1]?.name, "a row the host does not name is left alone").toBe("elsewhere")
     expect(healed.folders[1]?.path).toBeNull()
@@ -331,5 +339,329 @@ describe("the host's own folder", () => {
   it("adopts nothing for a host with no folder of its own", async () => {
     const plain = await createFsWorkspaceStore(path.join(hostHome, "plain")).page()
     expect(plain.folders).toEqual([])
+  })
+})
+
+/* The host's own folder is written down as the default workspace: created or
+   upgraded once, named by the system until a person renames it, first in the
+   document, and never removable. */
+describe("the default workspace", () => {
+  let root: string
+  let host: string
+
+  beforeAll(async () => {
+    root = await fs.mkdtemp(path.join(tmpdir(), "context-hub-default-"))
+    host = path.join(root, "host")
+    await fs.mkdir(host, { recursive: true })
+  })
+
+  afterAll(async () => {
+    await fs.rm(root, { recursive: true, force: true })
+  })
+
+  /** A fresh hub home, so one case cannot leave state for another. */
+  const open = async (): Promise<{
+    hub: string
+    store: ReturnType<typeof createFsWorkspaceStore>
+  }> => {
+    const hub = await fs.mkdtemp(path.join(root, "hub-"))
+    return { hub, store: createFsWorkspaceStore(hub, { folder: host }) }
+  }
+
+  const stored = async (hub: string): Promise<unknown> =>
+    JSON.parse(await fs.readFile(path.join(hub, "state", "workspaces.json"), "utf8"))
+
+  const seed = async (hub: string, value: unknown): Promise<void> => {
+    await fs.mkdir(path.join(hub, "state"), { recursive: true })
+    await fs.writeFile(path.join(hub, "state", "workspaces.json"), JSON.stringify(value))
+  }
+
+  it("is written down, named by the system, and current", async () => {
+    const { hub, store } = await open()
+    const page = await store.page()
+    expect(page.folders).toHaveLength(1)
+    expect(page.folders[0]).toMatchObject({
+      name: "host",
+      path: host,
+      default: true,
+      nameKey: DEFAULT_WORKSPACE_NAME,
+    })
+    expect(page.current).toBe(host)
+    expect(await stored(hub)).toEqual({
+      folders: [
+        {
+          name: "host",
+          path: host,
+          alias: { i18n: DEFAULT_WORKSPACE_NAME },
+          default: true,
+        },
+      ],
+      current: host,
+      agents: [],
+    })
+  })
+
+  it("is written at the person's home before the first read when the host starts", async () => {
+    const { hub } = await open()
+    await ensureDefaultWorkspace({ home: hub, folder: host })
+    expect(await stored(hub)).toEqual({
+      folders: [
+        {
+          name: workspaceName(homedir()),
+          path: homedir(),
+          alias: { i18n: DEFAULT_WORKSPACE_NAME },
+          default: true,
+        },
+      ],
+      current: homedir(),
+      agents: [],
+    })
+  })
+
+  it("points at the person's home even when the host runs in a project", async () => {
+    const { hub } = await open()
+    const page = await createFsWorkspaceStore(hub, {
+      folder: host,
+      defaultFolder: homedir(),
+    }).page()
+    expect(page.folders[0]).toMatchObject({
+      path: homedir(),
+      default: true,
+      nameKey: DEFAULT_WORKSPACE_NAME,
+    })
+  })
+
+  it("moves a default mark that points at another folder to the person's home", async () => {
+    const { hub } = await open()
+    const other = path.join(root, "other")
+    await seed(hub, {
+      folders: [
+        {
+          name: "host",
+          path: host,
+          alias: { i18n: DEFAULT_WORKSPACE_NAME },
+          default: true,
+        },
+        { name: "other", path: other },
+      ],
+      current: other,
+    })
+    const page = await createFsWorkspaceStore(hub, {
+      folder: host,
+      defaultFolder: homedir(),
+    }).page()
+    expect(page.folders[0]).toMatchObject({
+      path: homedir(),
+      default: true,
+      nameKey: DEFAULT_WORKSPACE_NAME,
+    })
+    expect(
+      page.folders.find((folder) => folder.path === host),
+      "the stale default loses both the mark and the system name"
+    ).toMatchObject({
+      name: "host",
+      nameKey: null,
+      default: false,
+    })
+    expect(page.current, "the person's current folder is left alone").toBe(other)
+  })
+
+  it("keeps a name a person gave it on the next scan", async () => {
+    const { hub, store } = await open()
+    await store.page()
+    const renamed = await store.rename(host, "Home")
+    expect(renamed.folders[0]).toMatchObject({
+      name: "Home",
+      nameKey: null,
+      default: true,
+    })
+    const reopened = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(reopened.folders).toHaveLength(1)
+    expect(reopened.folders[0]).toMatchObject({
+      name: "Home",
+      nameKey: null,
+      default: true,
+    })
+    expect(await stored(hub)).toEqual({
+      folders: [{ name: "host", path: host, alias: "Home", default: true }],
+      current: host,
+      agents: [],
+    })
+  })
+
+  it("upgrades an existing host row and puts it first", async () => {
+    const { hub } = await open()
+    const other = path.join(root, "other")
+    await seed(hub, {
+      folders: [{ name: "other", path: other }, { name: "host", path: host }],
+      current: other,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.folders.map((folder) => folder.path)).toEqual([host, other])
+    expect(page.folders[0]).toMatchObject({
+      default: true,
+      nameKey: DEFAULT_WORKSPACE_NAME,
+    })
+    expect(page.current, "an existing choice is not overridden").toBe(other)
+  })
+
+  it("keeps a name a person already gave when upgrading", async () => {
+    const { hub } = await open()
+    await seed(hub, {
+      folders: [{ name: "host", path: host, alias: "Mine" }],
+      current: host,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.folders[0]).toMatchObject({
+      name: "Mine",
+      nameKey: null,
+      default: true,
+    })
+  })
+
+  it("adds itself when the document has no host row", async () => {
+    const { hub } = await open()
+    const other = path.join(root, "other")
+    await seed(hub, {
+      folders: [{ name: "other", path: other }],
+      current: other,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.folders.map((folder) => folder.path)).toEqual([host, other])
+    expect(page.current).toBe(other)
+  })
+
+  it("moves an existing default row to the front without touching its name", async () => {
+    const { hub } = await open()
+    const other = path.join(root, "other")
+    await seed(hub, {
+      folders: [
+        { name: "other", path: other },
+        { name: "host", path: host, alias: "Mine", default: true },
+      ],
+      current: other,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.folders.map((folder) => folder.path)).toEqual([host, other])
+    expect(page.folders[0]).toMatchObject({ name: "Mine", default: true })
+    expect(page.current).toBe(other)
+  })
+
+  it("keeps only the first default row when a document names several", async () => {
+    const { hub } = await open()
+    const other = path.join(root, "other")
+    const first = path.join(root, "first")
+    const second = path.join(root, "second")
+    await seed(hub, {
+      folders: [
+        { name: "other", path: other },
+        { name: "first", path: first, alias: "First", default: true },
+        { name: "second", path: second, default: true },
+      ],
+      current: other,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.folders.map((folder) => folder.default)).toEqual([true, false, false])
+    expect(page.folders.map((folder) => folder.path)).toEqual([first, other, second])
+    expect(page.folders[0]?.name).toBe("First")
+  })
+
+  it("gives a default row without a name the system name", async () => {
+    const { hub } = await open()
+    await seed(hub, {
+      folders: [{ name: "host", path: host, default: true }],
+      current: host,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.folders[0]).toMatchObject({
+      nameKey: DEFAULT_WORKSPACE_NAME,
+      default: true,
+    })
+    expect(await stored(hub)).toEqual({
+      folders: [
+        {
+          name: "host",
+          path: host,
+          alias: { i18n: DEFAULT_WORKSPACE_NAME },
+          default: true,
+        },
+      ],
+      current: host,
+      agents: [],
+    })
+  })
+
+  it("makes itself current when the document has no current row", async () => {
+    const { hub } = await open()
+    await seed(hub, {
+      folders: [{ name: "host", path: host, default: true }],
+      current: null,
+    })
+    const page = await createFsWorkspaceStore(hub, { folder: host }).page()
+    expect(page.current).toBe(host)
+  })
+
+  it("stays first when folders are added and removed", async () => {
+    const { store } = await open()
+    const other = path.join(root, "other")
+    await fs.mkdir(other, { recursive: true })
+    await store.page()
+    const added = await store.add(other)
+    expect(added.folders[0]?.default).toBe(true)
+    await store.select(host)
+    const removed = await store.remove(other)
+    expect(removed.folders[0]?.default).toBe(true)
+    expect(removed.folders).toHaveLength(1)
+  })
+
+  it("still lets a normal workspace drop a name by typing its folder name", async () => {
+    const { store } = await open()
+    const other = path.join(root, "other")
+    await fs.mkdir(other, { recursive: true })
+    await store.page()
+    await store.add(other)
+    await store.rename(other, "Custom")
+    const back = await store.rename(other, "other")
+    expect(back.folders.find((folder) => folder.path === other)).toMatchObject({
+      name: "other",
+      nameKey: null,
+      default: false,
+    })
+  })
+
+  it("refuses to remove itself", async () => {
+    const { store } = await open()
+    await store.page()
+    await expect(store.remove(host)).rejects.toThrow(/default workspace cannot be removed/)
+    expect((await store.page()).folders[0]?.path).toBe(host)
+  })
+
+  it("reads only a real default mark and alias", () => {
+    const kept = readWorkspaceState({
+      folders: [
+        {
+          name: "a",
+          alias: { i18n: DEFAULT_WORKSPACE_NAME, extra: true },
+          default: true,
+        },
+        { name: "b", alias: "Mine" },
+      ],
+    })
+    expect(kept.folders[0]).toEqual({
+      name: "a",
+      alias: { i18n: DEFAULT_WORKSPACE_NAME },
+      default: true,
+    })
+    expect(kept.folders[1]).toEqual({ name: "b", alias: "Mine" })
+    for (const alias of ["", 42, null, {}, { i18n: "" }, { i18n: 42 }]) {
+      expect(
+        readWorkspaceState({ folders: [{ name: "x", alias }] }).folders[0]?.alias
+      ).toBeUndefined()
+    }
+    for (const value of [false, "true", 1]) {
+      expect(
+        readWorkspaceState({ folders: [{ name: "x", default: value }] }).folders[0]?.default
+      ).toBeUndefined()
+    }
   })
 })

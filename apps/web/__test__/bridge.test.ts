@@ -19,6 +19,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { createHubServer, type HubListener } from "@context-hub/core/host/server"
 import { createPlaceFileHandler, createWorkspaceHandler } from "@context-hub/core/handlers"
+import { DEFAULT_WORKSPACE_NAME } from "@context-hub/core/workspace"
 
 import { createRemotePlaceFiles, placeFilesAvailable } from "../src/lib/place-files.ts"
 import { createRemoteWorkspaceService } from "../src/lib/workspaces.ts"
@@ -96,6 +97,44 @@ describe("the workspace list", () => {
     await workspaces.refresh()
     expect(workspaces.failure()).toBeNull()
     expect(workspaces.current()?.current).toBeTruthy()
+  })
+
+  it("marks the host's own folder, keeps it first, and cannot remove it", async () => {
+    const workspaces = service()
+    await workspaces.refresh()
+    const page = workspaces.current()
+    const first = page?.folders[0]
+    expect(first).toMatchObject({
+      path: folder,
+      default: true,
+      nameKey: DEFAULT_WORKSPACE_NAME,
+    })
+    expect(page?.current).toBe(first?.id)
+
+    const stored = JSON.parse(
+      await fs.readFile(path.join(home, "state", "workspaces.json"), "utf8")
+    )
+    expect(stored.folders[0]).toMatchObject({
+      default: true,
+      alias: { i18n: DEFAULT_WORKSPACE_NAME },
+    })
+
+    const before = page?.folders.length ?? 0
+    expect(await workspaces.remove(first!.id), workspaces.failure() ?? "").toBe(false)
+    expect(workspaces.failure()).toMatch(/default workspace cannot be removed/)
+    expect(workspaces.current()?.folders).toHaveLength(before)
+
+    expect(await workspaces.rename(first!.id, "Home"), workspaces.failure() ?? "").toBe(true)
+    expect(workspaces.current()?.folders[0]).toMatchObject({
+      name: "Home",
+      nameKey: null,
+      default: true,
+    })
+    expect(await workspaces.rename(first!.id, ""), workspaces.failure() ?? "").toBe(true)
+    expect(workspaces.current()?.folders[0]).toMatchObject({
+      nameKey: DEFAULT_WORKSPACE_NAME,
+      default: true,
+    })
   })
 
   it("takes one in, renames it, switches away, and gives it up", async () => {

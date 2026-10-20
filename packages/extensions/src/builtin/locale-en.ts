@@ -79,6 +79,7 @@ const en: Record<string, string> = {
   "menu.refreshPlugins.done": "Plugin market refreshed",
   "menu.refreshPlugins.failed": "The plugin market could not be refreshed: {reason}",
   "workspace.group.title": "Workspaces",
+  "workspace.defaultName": "Default workspace",
   "agents.group.title": "Agents",
   "agents.group.expand": "Show {count} more",
   "agents.group.collapse": "Show fewer",

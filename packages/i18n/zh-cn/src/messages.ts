@@ -84,6 +84,7 @@ export const messages: Record<string, string> = {
   "search.group.settings": "设置",
   "search.group.extensions": "扩展",
   "workspace.group.title": "工作区",
+  "workspace.defaultName": "默认工作区",
   "agents.group.title": "Agents",
   "agents.group.expand": "再展开 {count} 个",
   "agents.group.collapse": "收起",
