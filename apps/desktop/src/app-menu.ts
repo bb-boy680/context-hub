@@ -1,9 +1,10 @@
 /**
- * The menu the title-bar button opens.
+ * The commands shared by the title-bar menu and the tray menu.
  *
- * This is only the template: the main process owns the native popup, the
- * update check and quitting. Rows whose work belongs to the page are sent back
- * to the renderer instead of being carried out here.
+ * This is the only place the common rows are defined: the title-bar popup
+ * shows them directly, and the tray prepends its way back to the window.
+ * Labels follow the page language. An unavailable update feed keeps the row
+ * in place but disabled, so both menus have the same shape everywhere.
  */
 import type { MenuItemConstructorOptions } from "electron"
 
@@ -13,11 +14,18 @@ export interface AppMenuOptions {
   /** Whether the page is showing Chinese; the labels follow it. */
   zh: boolean
   updatesEnabled: boolean
+  /** Runs a row whose work belongs to the page. */
   send(action: DesktopMenuAction): void
   checkForUpdates(): void
+  restartApp(): void
   quit(): void
 }
 
+export interface TrayMenuOptions extends AppMenuOptions {
+  openWindow(): void
+}
+
+/** The rows the title-bar menu and the tray have in common. */
 export function appMenuTemplate(
   options: AppMenuOptions
 ): MenuItemConstructorOptions[] {
@@ -43,8 +51,26 @@ export function appMenuTemplate(
     },
     { type: "separator" },
     {
+      label: zh ? "重新启动" : "Restart App",
+      click: options.restartApp,
+    },
+    {
       label: zh ? "退出" : "Quit",
       click: options.quit,
     },
+  ]
+}
+
+/** The tray repeats every shared row and adds only the way back to the window. */
+export function trayMenuTemplate(
+  options: TrayMenuOptions
+): MenuItemConstructorOptions[] {
+  return [
+    {
+      label: options.zh ? "打开 Context Hub" : "Open Context Hub",
+      click: options.openWindow,
+    },
+    { type: "separator" },
+    ...appMenuTemplate(options),
   ]
 }

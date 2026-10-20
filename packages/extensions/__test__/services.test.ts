@@ -427,6 +427,22 @@ describe("replacing a running extension", () => {
   })
 })
 
+describe("a locked extension", () => {
+  let kernel: Kernel
+
+  beforeAll(async () => {
+    kernel = await createHubKernel({ host: testHost(), extensions: [locked] })
+    await kernel.start()
+  })
+
+  it("cannot be disabled, and stays on", async () => {
+    await expect(kernel.ctx.extensions.disable("test.locked")).rejects.toThrow(
+      /cannot be disabled/
+    )
+    expect(entryOf(kernel, "test.locked")?.enabled).toBe(true)
+  })
+})
+
 describe("removing an extension from the running catalog", () => {
   let kernel: Kernel
   let documents: Map<string, unknown>

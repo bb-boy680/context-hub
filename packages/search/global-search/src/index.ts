@@ -28,6 +28,9 @@ export const globalSearchExtension: ExtensionModule = {
     description: "Search every module from anywhere with Ctrl+K.",
     icon: SearchIcon,
     defaultEnabled: true,
+    /* The header control and the palette are part of the shell, not a module a
+       person may switch off. */
+    locked: true,
     permissions: [],
   },
   inject: ["header", "locales", "search", "i18n", "extensions"],

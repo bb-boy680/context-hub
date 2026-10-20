@@ -44,23 +44,26 @@ pnpm --filter @context-hub/desktop package:win   # or package:mac / package:linu
 The desktop app starts the hub as its own process and shows the page that
 process serves, so it runs the same server and routes as every other form.
 Closing the window hides it to the tray; the hub keeps running until Quit is
-chosen from the tray menu. The sidebar shows the app version, and an available
-release appears there as a one-click update; clicking it downloads and restarts
-into the new version.
+chosen from the tray or Application menu. The sidebar shows the app version,
+and an available release appears there as a one-click update; clicking it
+downloads and restarts into the new version.
 
 The window's own title bar carries an **Application** menu, injected by the
 desktop shell rather than drawn by the page: About, Check for Updates, Reload,
-Refresh Plugins, Quit. Reload re-reads the skill and plugin libraries; Refresh
-Plugins fetches the extension market index again. Windows and macOS keep their
-native window buttons; Linux draws its own on the frameless window.
+Refresh Plugins, Restart, Quit. The tray repeats the same rows under Open
+Context Hub, and both menus follow the page language. Check for Updates stays
+visible but disabled when this build has no update feed. Reload re-reads the
+skill and plugin libraries; Refresh Plugins fetches the extension market index
+again. Windows and macOS keep their native window buttons; Linux draws its own
+on the frameless window.
 
 `pnpm dev:desktop` starts the web dev server (or reuses one already
 listening), so page source updates through Vite's HMR, and watches the main
-and preload bundles, restarting Electron after a change; the application menu
-has Reload Page, Restart App and Toggle DevTools while it runs. The hub server
-is the web dev server's child, so `server.ts` changes need a restart of the
-watcher. `CONTEXT_HUB_DEV_URL` points the window at a different dev server
-instead.
+and preload bundles, restarting Electron after a change; while it runs, the
+native File menu (View on macOS) adds Restart App and Toggle DevTools, and
+Reload Page is always there. The hub server is the web dev server's child, so
+`server.ts` changes need a restart of the watcher. `CONTEXT_HUB_DEV_URL` points
+the window at a different dev server instead.
 
 The release version is the tag (`v1.2.0`). A packaged app checks GitHub
 Releases for a newer one and installs it in place after the hub server has

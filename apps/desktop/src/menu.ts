@@ -1,13 +1,14 @@
 /**
- * Native menus. Templates stay data so tests can read them without Electron.
+ * The platform's native application menu (File/Edit/View).
  *
- * Updates and developer actions are omitted when they cannot work, rather than
- * leaving menu items that always fail.
+ * The title-bar "Application" menu and the tray share their rows in
+ * `app-menu.ts`; this file only owns the OS-level menu. Here updates and
+ * developer actions are omitted when they cannot work, rather than leaving
+ * menu items that always fail.
  */
 import type { MenuItemConstructorOptions } from "electron"
 
 export interface MenuActions {
-  openWindow: () => void
   reloadPage: () => void
   checkForUpdates: () => void
   restartApp: () => void
@@ -99,30 +100,5 @@ export function applicationMenuTemplate(
           },
         ]
       : []),
-  ]
-}
-
-/** The tray menu; it stays reachable after the window is hidden. */
-export function trayMenuTemplate(options: {
-  updatesEnabled: boolean
-  dev: boolean
-  actions: MenuActions
-}): MenuItemConstructorOptions[] {
-  return [
-    { label: "Open Context Hub", click: () => options.actions.openWindow() },
-    ...(options.updatesEnabled
-      ? [
-          { type: "separator" as const },
-          {
-            label: "Check for Updates",
-            click: () => options.actions.checkForUpdates(),
-          },
-        ]
-      : []),
-    ...(options.dev
-      ? [{ label: "Restart App", click: () => options.actions.restartApp() }]
-      : []),
-    { type: "separator" },
-    { label: "Quit", click: () => options.actions.quit() },
   ]
 }

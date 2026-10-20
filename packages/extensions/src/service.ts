@@ -312,7 +312,7 @@ export class ExtensionService extends Service {
     if (entry.status === "incompatible") {
       throw new Error(`extensions: "${id}" requires a different Context Hub version`)
     }
-    if (enabled && entry.manifest.locked === true) {
+    if (!enabled && entry.manifest.locked === true) {
       throw new Error(`extensions: "${id}" is required and cannot be disabled`)
     }
     if (entry.enabled === enabled) return
