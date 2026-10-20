@@ -277,8 +277,13 @@ function BundleCover({ plugin }: { plugin: PluginRow }) {
  * The cover of a pack with no picture: what the pack says about itself, rendered
  * as the document it is. A cover is a thumbnail, so the document is clipped
  * rather than scrolled — a card reads as one, not as a reading surface.
+ *
+ * Rendering the document is the most expensive thing a card does, and the page
+ * re-renders on every keystroke of its filter while the rows themselves have not
+ * moved. Memoised on the row, which keeps typing from re-rendering eight
+ * documents a key.
  */
-function ReadmeCover({ plugin }: { plugin: PluginRow }) {
+const ReadmeCover = React.memo(function ReadmeCover({ plugin }: { plugin: PluginRow }) {
   const readme = usePackReadme(plugin)
   if (readme === undefined || readme === null) return <BundleCover plugin={plugin} />
 
@@ -292,7 +297,7 @@ function ReadmeCover({ plugin }: { plugin: PluginRow }) {
       <Markdown imageBase={packImageBase(plugin)}>{readme}</Markdown>
     </div>
   )
-}
+})
 
 /**
  * What fills a card's cover box: the first picture a person added, drawn or
@@ -686,18 +691,6 @@ function PageHeading() {
   )
 }
 
-/** A value that follows its input once typing stops, not on every keystroke. */
-function useSettled(value: string, delay = 180) {
-  const [settled, setSettled] = React.useState(value)
-
-  React.useEffect(() => {
-    const timer = window.setTimeout(() => setSettled(value), delay)
-    return () => window.clearTimeout(timer)
-  }, [value, delay])
-
-  return settled
-}
-
 function ViewButton({
   icon: Icon,
   label,
@@ -747,14 +740,30 @@ export function PluginsPage() {
   /* The pack the detail lightbox is open on, by id. */
   const [detailId, setDetailId] = React.useState<string | null>(null)
   const [tag, setTag] = React.useState(ALL_TAGS)
+  /* Ticked rows, by key. Narrowing the list drops them: a batch action names
+     what the person can still see. */
+  const [checked, setChecked] = React.useState<readonly string[]>([])
   /* Typing narrows the same list the tag chips do; it is not a new view. The
      query lives in the address so the global search can seed it. */
   const query = search.query
   const setQuery = search.setQuery
-  const needle = useSettled(query)
-  /* Ticked rows, by key. Narrowing the list drops them: a batch action names
-     what the person can still see. */
-  const [checked, setChecked] = React.useState<readonly string[]>([])
+  /* The address is written once typing pauses. Every write re-renders the page,
+     and a page's cards draw their documents — far more work than the filter
+     itself — so keeping the box local until then is what keeps typing smooth.
+     The field owns what it shows; this only decides when the page follows. */
+  const pendingQuery = React.useRef<number | undefined>(undefined)
+  const writeQuery = React.useCallback(
+    (next: string) => {
+      window.clearTimeout(pendingQuery.current)
+      pendingQuery.current = window.setTimeout(() => {
+        setQuery(next)
+        setChecked([])
+      }, 120)
+    },
+    [setQuery]
+  )
+  React.useEffect(() => () => window.clearTimeout(pendingQuery.current), [])
+  const needle = query
   const [page, setPage] = React.useState(0)
   const [pageSize, setPageSize] = React.useState(12)
   /* A batch a tab's menu started, which holds the menu's item disabled until the
@@ -1241,8 +1250,7 @@ export function PluginsPage() {
         <FilterBar
           query={query}
           onQuery={(next) => {
-            setQuery(next)
-            setChecked([])
+            writeQuery(next)
           }}
           tags={tagsOf(catalog)}
           tag={tag}

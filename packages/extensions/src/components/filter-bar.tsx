@@ -70,6 +70,23 @@ export function FilterBar({
   const visible = expanded ? tags : tags.slice(0, VISIBLE_TAGS)
   const rest = tags.length - visible.length
 
+  /* The value the box shows, which follows the caller's until someone types.
+     The address updates through a router transition, so on a busy page its
+     commit arrives a keystroke late; a field bound straight to that value would
+     snap back under the typist and every key would replace the whole query.
+     A focused field keeps what was typed; a value written from elsewhere — the
+     palette's `?q=` — is adopted while the field is not being used. */
+  const [draft, setDraft] = React.useState(query)
+  React.useEffect(() => {
+    if (document.activeElement === field.current) return
+    setDraft(query)
+  }, [query])
+
+  const write = (next: string) => {
+    setDraft(next)
+    onQuery(next)
+  }
+
   /* The shortcut the box prints, so the key it names does focus it. */
   React.useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -107,24 +124,24 @@ export function FilterBar({
         <SearchIcon className="size-4 shrink-0 text-muted-foreground" />
         <input
           ref={field}
-          value={query}
+          value={draft}
           aria-label={words.search}
           placeholder={words.search}
-          onChange={(event) => onQuery(event.target.value)}
+          onChange={(event) => write(event.target.value)}
           onKeyDown={(event) => {
-            if (event.key !== "Escape" || query === "") return
+            if (event.key !== "Escape" || draft === "") return
             event.preventDefault()
-            onQuery("")
+            write("")
           }}
           className={INPUT}
         />
-        {query === "" ? (
+        {draft === "" ? (
           <Kbd className="shrink-0 border-0 bg-transparent text-muted-foreground">/</Kbd>
         ) : (
           <button
             type="button"
             aria-label={words.clear}
-            onClick={() => onQuery("")}
+            onClick={() => write("")}
             className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
           >
             <XIcon className="size-3.5" />
