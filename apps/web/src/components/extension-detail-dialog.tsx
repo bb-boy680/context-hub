@@ -26,6 +26,10 @@ import {
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
+const destructive =
+  "border-destructive/35 bg-transparent text-destructive hover:bg-destructive/5 hover:text-destructive dark:border-destructive/35 dark:bg-transparent"
+const warning =
+  "border-amber-600/35 bg-transparent text-amber-600 hover:bg-amber-600/5 hover:text-amber-700 dark:border-amber-400/35 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
 
 /** One source fact in the market origin block. */
 function SourceRow({
@@ -337,7 +341,7 @@ function ExtensionDetailBody({
         </DialogClose>
         {primary === "update" && entry.stored && onUninstall !== undefined ? (
           <Button
-            className={`px-3 text-secondary-foreground hover:bg-muted hover:text-foreground ${outline}`}
+            className={`px-3 ${destructive}`}
             variant="outline"
             disabled={busy}
             onClick={() => run(() => onUninstall(entry))}
@@ -349,11 +353,21 @@ function ExtensionDetailBody({
         {primary === null ? null : (
           <Button
             className={
-              primary === "uninstall" || primary === "disable"
-                ? `px-3 text-secondary-foreground hover:bg-muted hover:text-foreground ${outline}`
-                : "px-3"
+              primary === "update"
+                ? `px-3 ${warning}`
+                : primary === "uninstall"
+                  ? `px-3 ${destructive}`
+                  : primary === "disable"
+                    ? `px-3 text-secondary-foreground hover:bg-muted hover:text-foreground ${outline}`
+                    : "px-3"
             }
-            variant={primary === "uninstall" || primary === "disable" ? "outline" : "default"}
+            variant={
+              primary === "update" ||
+              primary === "uninstall" ||
+              primary === "disable"
+                ? "outline"
+                : "default"
+            }
             disabled={busy || entry.status === "activating"}
             data-testid="extension-action"
             onClick={runPrimary}

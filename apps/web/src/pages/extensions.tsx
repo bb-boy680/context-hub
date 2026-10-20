@@ -46,6 +46,8 @@ import { Input } from "@context-hub/shadcn-ui/components/input"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 const outline = "border-border bg-transparent dark:border-input dark:bg-transparent"
+const destructive =
+  "border-destructive/35 bg-transparent text-destructive hover:bg-destructive/5 hover:text-destructive dark:border-destructive/35 dark:bg-transparent"
 
 const marketClient = createRemoteExtensionMarket()
 
@@ -64,6 +66,8 @@ function actionOf(
   update: MarketUpdateEntry | null,
   remote: MarketEntry | undefined
 ): RowAction | null {
+  /* Built-in packages are always on; the row offers no action at all. */
+  if (entry.manifest.locked === true) return null
   if (update !== null && update.target !== null) return "update"
   /* A listed plugin this hub cannot run has nothing to offer; an installed one
      keeps its row so it can still be removed. */
@@ -122,7 +126,9 @@ function ExtensionRow({
               <Badge variant="secondary">{t("extensions.status.builtin")}</Badge>
             ) : null}
             {updateAvailable ? (
-              <Badge>{t("extensions.market.updateAvailable")}</Badge>
+              <span className="shrink-0 text-[11px] leading-[14px] font-semibold text-amber-600 dark:text-amber-400">
+                {t("extensions.market.updateAvailable")}
+              </span>
             ) : null}
             {updateBlocked || (status === "incompatible" && !updateAvailable) ? (
               <Badge variant="destructive">
@@ -169,21 +175,27 @@ function ExtensionActionButton({
   onAction: () => void
 }) {
   const { t } = useI18n()
-  const secondary = action === "uninstall" || action === "disable"
+  const secondary = action === "disable"
+  const updating = action === "update"
+  const uninstalling = action === "uninstall"
   const label = t(ACTION_LABEL[action])
 
   return (
     <Button
       type="button"
       size="default"
-      variant={secondary ? "outline" : "default"}
+      variant={updating || uninstalling || secondary ? "outline" : "default"}
       disabled={busy}
       aria-label={label}
       onClick={onAction}
       className={
-        secondary
-          ? `px-3 ${outline} text-secondary-foreground hover:bg-muted hover:text-foreground`
-          : "px-3"
+        updating
+          ? "px-3 border-amber-600/35 bg-transparent text-amber-600 hover:bg-amber-600/5 hover:text-amber-700 dark:border-amber-400/35 dark:bg-transparent dark:text-amber-400 dark:hover:bg-amber-400/10 dark:hover:text-amber-300"
+          : uninstalling
+            ? `px-3 ${destructive}`
+            : secondary
+              ? `px-3 ${outline} text-secondary-foreground hover:bg-muted hover:text-foreground`
+              : "px-3"
       }
     >
       {label}
