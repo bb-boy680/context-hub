@@ -28,6 +28,7 @@ import { SearchSkillsDialog } from "./search-dialog.tsx"
 import { holdsOf, inLibrary, modified, outdated, placePath, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
+import type { SkillPlace } from "./provider.ts"
 import { tagTone } from "./tags.ts"
 import type { SkillPlaceRef, SkillStore } from "./store.ts"
 import type { Skill } from "./types.ts"
@@ -704,7 +705,7 @@ function BatchInstall({
   count: number
   /** Why a workspace place cannot be written, ready to show; `null` when one can. */
   blocked: string | null
-  onInstall: (ref: SkillPlaceRef) => void
+  onInstall: (place: SkillPlace) => void
 }) {
   const { t } = useI18n()
   const places = useReadablePlaces()
@@ -744,7 +745,7 @@ function BatchInstall({
         })).filter((group) => group.options.length > 0)}
         onPick={(id) => {
           const place = writable.find((entry) => entry.id === id)
-          if (place !== undefined) onInstall({ scope: place.scope, dir: place.dir })
+          if (place !== undefined) onInstall(place)
         }}
       />
     </DropdownMenu>
@@ -863,9 +864,13 @@ function SkillTable({
           <BatchInstall
             count={checked.length}
             blocked={blocked}
-            onInstall={(ref) => {
+            onInstall={(place) => {
               for (const skill of skills) {
-                if (checked.includes(skillKey(skill))) onInstall(skill, ref)
+                if (!checked.includes(skillKey(skill))) continue
+                /* A place already holding this skill is left alone: writing it
+                   there again refuses instead of adding anything. */
+                if (holdsOf(skill).some((hold) => hold.id === place.id)) continue
+                onInstall(skill, { scope: place.scope, dir: place.dir })
               }
               onCheck([])
             }}
