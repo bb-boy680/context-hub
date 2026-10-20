@@ -1350,3 +1350,17 @@ Context Hub 的远程插件是 clone 后由浏览器直接 `import()`，中间�
 真机验收同时读 URL、筛选框值和布局按钮的 `aria-pressed`：
 输入 `claude` 点 `claude-hud` 后应为 `/plugins?q=claude-hud`（无 `view`）、
 输入框值为 `claude-hud`、`网格视图` 仍 `aria-pressed=true`。
+
+## 搜索结果的头像要跟页面行用同一套判定（2026-10-20）
+
+**问题模式**：Ctrl+K 里 MCP 的 `context7` 只显示通用服务器图标，而 MCP 页面卡片显示它
+自报的绿色图标。页面用 `ServerTile`，优先级是 `check.icon.src` → 品牌图 → 字形；搜索
+provider 只读了 `markImage(server.mark)`，第三个分支之前的「探测图标」整支漏掉。
+
+**规则**：搜索 provider 复用某个页面行时，展示字段（头像、徽标、状态）必须和那个行的
+渲染函数读同一来源、同一优先级。搜索是同一行的第二个消费点，不是第二次设计。
+判据：页面组件里的 `icon ?? mark` 顺序，就是搜索结果 avatar 的顺序。
+
+**验证方式**：用真实 probe cache 断言（`GET /hub/mcp?action=cache&names=context7`
+返回 `icon.src`），单测断言 avatar 等于该 URL；真机 Ctrl+K 读 `[cmdk-item] img`
+的 `src`，与页面卡片的 `img` 对比，而不是只看截图里「有没有图」。
