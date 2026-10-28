@@ -335,7 +335,7 @@ export function createSkillHandler(
           sendJson(response, 200, { ok: true })
           return
 
-        /* Link one library skill into a place, or adopt one out of it. */
+        /* Install one library skill into a place, or copy one out of it. */
         case "install-place":
           sendJson(response, 200, {
             mode: await api.installInto(
@@ -348,11 +348,7 @@ export function createSkillHandler(
 
         case "adopt-place":
           sendJson(response, 200, {
-            mode: await api.adoptFrom(
-              requiredText(body.name, "skill name"),
-              bodyRef(body),
-              bodyMode(body.mode)
-            ),
+            mode: await api.adoptFrom(requiredText(body.name, "skill name"), bodyRef(body)),
           })
           return
 
