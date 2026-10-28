@@ -44,8 +44,10 @@ export function parsePackageList(output: string): PackageSkill[] {
   if (start < 0) return []
   const skills: PackageSkill[] = []
   for (const line of lines.slice(start + 1)) {
-    if (line.startsWith("└") || line.includes("Use --skill")) break
-    if (!line.startsWith("│")) continue
+    /* clack falls back to `|` and `—` when it cannot detect a Unicode terminal,
+       which is what an app launched from Explorer gets on Windows. */
+    if (line.startsWith("└") || line.startsWith("—") || line.includes("Use --skill")) break
+    if (!line.startsWith("│") && !line.startsWith("|")) continue
     const body = line.slice(1)
     if (body.trim() === "") continue
     const indent = body.length - body.trimStart().length

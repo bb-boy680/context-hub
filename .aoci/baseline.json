@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-28T10:47:24Z",
+  "updated_at": "2026-10-28T11:00:44Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "5bce3628293a490eb4243941ea945da08b3a7d01d9a4ef2dcab8e064a2c98a2d",
-      "size": 144488,
-      "normalized_sha256": "5bce3628293a490eb4243941ea945da08b3a7d01d9a4ef2dcab8e064a2c98a2d"
+      "sha256": "c55965863cab108cab5834a90c30e1af2fd5cef57759581269914bb721ed2a33",
+      "size": 144501,
+      "normalized_sha256": "c55965863cab108cab5834a90c30e1af2fd5cef57759581269914bb721ed2a33"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -2159,9 +2159,9 @@
     },
     "packages/resources/skills/__test__/package.test.ts": {
       "role": "observe",
-      "sha256": "084ab08ff767f3cdc26cc21a9101380aae5f7265e198b521ab92c625588fcd34",
-      "size": 20415,
-      "normalized_sha256": "084ab08ff767f3cdc26cc21a9101380aae5f7265e198b521ab92c625588fcd34"
+      "sha256": "cdee09595c99d262efada943281b700e17de59237eddfd9e2f5e1c36e2577c96",
+      "size": 21156,
+      "normalized_sha256": "cdee09595c99d262efada943281b700e17de59237eddfd9e2f5e1c36e2577c96"
     },
     "packages/resources/skills/__test__/place-skills.test.ts": {
       "role": "observe",
@@ -2297,9 +2297,9 @@
     },
     "packages/resources/skills/src/host/skills-cli.ts": {
       "role": "index",
-      "sha256": "5bba71e7065bddad90bd7b8cb48cc6ed595aa9dabce0cd105bd976627a9650a8",
-      "size": 13915,
-      "normalized_sha256": "85eacc0e3ca7c0041face62b8369c9172c536d6f99457d87643a5752392d344b"
+      "sha256": "fc90eb475a9c5d807543bbc52531d76d8f91f1bd0c76a78686f9bf90a648cef1",
+      "size": 13770,
+      "normalized_sha256": "fc90eb475a9c5d807543bbc52531d76d8f91f1bd0c76a78686f9bf90a648cef1"
     },
     "packages/resources/skills/src/host/skills-fs.ts": {
       "role": "index",

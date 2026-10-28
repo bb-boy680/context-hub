@@ -162,6 +162,30 @@ describe("the --list report", () => {
       "a report with no listing yields nothing"
     ).toEqual([])
   })
+
+  /* Captured from the same command where clack fell back to ASCII: an app
+     launched from Explorer gets no terminal hint, so `│`/`└` become `|`/`—`. */
+  const ascii = [
+    "",
+    "|",
+    "o  Source: https://github.com/oil-oil/video-editor.git",
+    "|",
+    "o  Available Skills",
+    "|",
+    "|    video-editor",
+    "|",
+    "|      Cut raw footage into a rough cut.",
+    "",
+    "|",
+    "—  Use --skill <name> to install specific skills",
+    "",
+  ].join("\n")
+
+  it("reads the ASCII fallback the CLI uses without a Unicode terminal", () => {
+    expect(parsePackageList(ascii), "the ASCII glyphs read the same").toEqual([
+      { name: "video-editor", description: "Cut raw footage into a rough cut." },
+    ])
+  })
 })
 
 const manifest = (text: string) => new File([`${text}`], "SKILL.md")

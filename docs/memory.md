@@ -1462,3 +1462,17 @@ Agent 持有”的展示与交互（头像、菜单 selected、详情的位置�
 **验证方式**：用真实的“库副本 + 全局 symlink”数据打开 `/skills`：行的 provenance 必须出现
 该 Agent 的头像，详情“位置”里该 Agent 行必须是“移除”而不是禁用的“安装”。不要在验收时
 真点“移除”，那会删掉用户已装好的 Agent 条目。
+
+## 装好的桌面端不退，`pnpm dev` 的 Electron 会静默退出（2026-10-28）
+
+**问题模式**：修完 skills 下载的 ASCII 解析 bug 后，用户跑 `pnpm dev` 说“还是报错”。实际
+dev 的 Electron 启动 0 秒就退出（exit 0，日志只有 `Unable to create cache: 拒绝访问`），
+原因是安装版还在托盘里跑着、占着同一个 `userData` 的单实例锁（`main.ts` 的
+`requestSingleInstanceLock`），`second-instance` 又把旧窗口弹到前面——用户看到的一直是
+旧安装包。关窗口不等于退出，托盘里的进程还在。
+
+**规则**：判断“dev 桌面端有没有真的起来”，不要看窗口，看进程里有没有
+`electron.exe ... apps/desktop`（或 `CONTEXT_HUB_DEV_URL`），并直接 curl dev hub 的
+`/hub/skills` 看返回的是新还是旧行为。运行 `pnpm dev` 前先从托盘“退出”安装版，否则
+dev Electron 会秒退并把旧窗口弹出来。新逻辑生效与否，用 dev hub 端口（5270）直接验证，
+不要用安装版端口（安装包的 server 是打包时的旧代码）。
