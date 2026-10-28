@@ -52,6 +52,7 @@ export function skillsModuleWith(
       description: "Browse, import and install skills, and keep them in this workspace.",
       icon: SparklesIcon,
       defaultEnabled: true,
+      locked: true,
       permissions: ["assets.read", "assets.write"],
       provides: [SKILL_SERVICE, SKILL_LIBRARY_SERVICE],
     },

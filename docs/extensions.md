@@ -323,7 +323,9 @@ extensions, and use the same detail dialog and the same action button.
   A failed deletion leaves the extension installed but disabled, so code is
   never running after its files are gone.
 - A package compiled into the build has no directory to delete; its action is
-  **Disable** / **Enable**, and it stays in the catalog.
+  **Disable** / **Enable**, and it stays in the catalog. A locked built-in
+  (`locked: true` in its manifest) shows **Built-in** instead and offers no
+  action.
 - `state/extensions.json` holds one boolean per extension and nothing else:
   descriptions live in `plugin.yaml`, install source/version/time in
   `index.json`. Removing the key is how an uninstall forgets the user's choice.

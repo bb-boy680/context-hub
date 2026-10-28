@@ -50,6 +50,7 @@ export const promptsExtension: ExtensionModule = {
       "Keep prompts in one place, and deliver them to an agent as a command, a rule, or a line of its instructions.",
     icon: FileTextIcon,
     defaultEnabled: true,
+    locked: true,
     permissions: ["assets.read", "filesystem"],
     provides: [PROMPT_SERVICE, PROMPT_LIBRARY_SERVICE],
   },

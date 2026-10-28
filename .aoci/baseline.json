@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-28T11:32:44Z",
+  "updated_at": "2026-10-28T12:59:13Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "cf4602201851cfdda26fa2a70092cb6af2eec2f2e12113b7a535229368f8f20d",
-      "size": 145579,
-      "normalized_sha256": "cf4602201851cfdda26fa2a70092cb6af2eec2f2e12113b7a535229368f8f20d"
+      "sha256": "db9b09bd15a6042f88500cdfad4393ef652907d68b8a59b60788fe27a7ffb8cb",
+      "size": 145799,
+      "normalized_sha256": "db9b09bd15a6042f88500cdfad4393ef652907d68b8a59b60788fe27a7ffb8cb"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1295,9 +1295,9 @@
     },
     "packages/i18n/zh-cn/src/index.ts": {
       "role": "index",
-      "sha256": "dde4bf0f09ff6463d3110bd1ab3cfea619751daa74cb1bcb1e57016a6491128e",
-      "size": 948,
-      "normalized_sha256": "dde4bf0f09ff6463d3110bd1ab3cfea619751daa74cb1bcb1e57016a6491128e"
+      "sha256": "849a0272e767141398b030a50b5d30cc8fbb747d802d001fcd2471fe4b52823e",
+      "size": 965,
+      "normalized_sha256": "849a0272e767141398b030a50b5d30cc8fbb747d802d001fcd2471fe4b52823e"
     },
     "packages/i18n/zh-cn/src/messages.ts": {
       "role": "index",
@@ -1427,9 +1427,9 @@
     },
     "packages/resources/mcp/src/extension.ts": {
       "role": "index",
-      "sha256": "fe13791607fd185fc7a249dd8f66a60e303a14357897803780eec6e04c386667",
-      "size": 2613,
-      "normalized_sha256": "fe13791607fd185fc7a249dd8f66a60e303a14357897803780eec6e04c386667"
+      "sha256": "1cde691a96f9983c5998281b7b047b3623b82c1aa7a0387ecc0971d0131552b9",
+      "size": 2633,
+      "normalized_sha256": "1cde691a96f9983c5998281b7b047b3623b82c1aa7a0387ecc0971d0131552b9"
     },
     "packages/resources/mcp/src/failure.ts": {
       "role": "index",
@@ -1763,9 +1763,9 @@
     },
     "packages/resources/plugins/src/index.ts": {
       "role": "index",
-      "sha256": "43bfc904d60adf59d3011f8ebd1acdecb49f6147c97ef79b8799973a591b73b6",
-      "size": 4326,
-      "normalized_sha256": "43bfc904d60adf59d3011f8ebd1acdecb49f6147c97ef79b8799973a591b73b6"
+      "sha256": "83772a725764b907155a2b651256f1af9f57ed7f18d657d5bd788d30cc80ad7a",
+      "size": 4344,
+      "normalized_sha256": "83772a725764b907155a2b651256f1af9f57ed7f18d657d5bd788d30cc80ad7a"
     },
     "packages/resources/plugins/src/inspect.ts": {
       "role": "index",
@@ -2021,9 +2021,9 @@
     },
     "packages/resources/prompts/src/index.ts": {
       "role": "index",
-      "sha256": "e83934d03ef30df6bc1f154a9dfbbc36bb1f70f0c55c46d84a541dc8f97b86b9",
-      "size": 3648,
-      "normalized_sha256": "e83934d03ef30df6bc1f154a9dfbbc36bb1f70f0c55c46d84a541dc8f97b86b9"
+      "sha256": "feae00c11ead43399bd4c664503cec201444026b865614e35dc097242f439285",
+      "size": 3666,
+      "normalized_sha256": "feae00c11ead43399bd4c664503cec201444026b865614e35dc097242f439285"
     },
     "packages/resources/prompts/src/install-menu.tsx": {
       "role": "index",
@@ -2255,9 +2255,9 @@
     },
     "packages/resources/skills/src/extension.ts": {
       "role": "index",
-      "sha256": "3e9eec015dad41487bc4517d2ee593019f04bad65eaa09de2f78bf2b031c81d2",
-      "size": 4110,
-      "normalized_sha256": "3e9eec015dad41487bc4517d2ee593019f04bad65eaa09de2f78bf2b031c81d2"
+      "sha256": "d4e346011cc6760be286d62cd15cb1560cfb65367ac7e760f1109ef3075f6b92",
+      "size": 4130,
+      "normalized_sha256": "d4e346011cc6760be286d62cd15cb1560cfb65367ac7e760f1109ef3075f6b92"
     },
     "packages/resources/skills/src/file-tree.tsx": {
       "role": "index",
@@ -2519,9 +2519,9 @@
     },
     "packages/resources/variables/src/index.ts": {
       "role": "index",
-      "sha256": "7a6c607af4fa8f3abe92d88a180ab5cc5fe60af80f1d4ce310fcc5ae4defc2b5",
-      "size": 3215,
-      "normalized_sha256": "7a6c607af4fa8f3abe92d88a180ab5cc5fe60af80f1d4ce310fcc5ae4defc2b5"
+      "sha256": "dd4bb8801dd5c957b203eebd5050fabaf2275fc38515f7689fa25d75f2907422",
+      "size": 3233,
+      "normalized_sha256": "dd4bb8801dd5c957b203eebd5050fabaf2275fc38515f7689fa25d75f2907422"
     },
     "packages/resources/variables/src/library-store.ts": {
       "role": "index",

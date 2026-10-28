@@ -56,6 +56,7 @@ export const pluginsExtension: ExtensionModule = {
     description: "Browse the packs this hub knows, and keep them in the agents that use them.",
     icon: PlugIcon,
     defaultEnabled: true,
+    locked: true,
     permissions: ["assets.read", "assets.write"],
     provides: [PLUGIN_SERVICE, PLUGIN_LIBRARY_SERVICE],
   },
