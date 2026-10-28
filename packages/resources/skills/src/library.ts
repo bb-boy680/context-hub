@@ -164,12 +164,36 @@ export function inLibrary(skill: Skill): boolean {
 }
 
 /**
- * A skill a place holds and the library does not, which is what 收录 is for. A
- * place's own row is out when the library already holds that name: taking it in
- * would collide with the copy already there rather than add anything.
+ * A skill a place holds and the library does not, which is what 收录 is for.
  */
 export function unstored(skill: Skill): boolean {
-  return skill.inLibrary !== true && !inLibrary(skill) && holdsOf(skill).length > 0
+  return !inLibrary(skill) && holdsOf(skill).length > 0
+}
+
+/**
+ * Whether a place's own skill still gets a row of its own. A name the library
+ * already holds is represented by the library row; showing the place's copy as
+ * well would be the same skill twice, and the library copy is the one to manage.
+ *
+ * @param skill — the skill as the place reads it.
+ * @param items — the library rows in view.
+ */
+export function showsOwnRow(
+  skill: Pick<PlaceSkill, "name" | "origin">,
+  items: readonly SkillSummary[]
+): boolean {
+  return skill.origin !== "hub" && !items.some((item) => item.name === skill.name)
+}
+
+/**
+ * Every place a row belongs on screen under: the ones holding its files, and
+ * any holding a same-named skill of their own, which the library row stands for.
+ *
+ * @param skill — the row.
+ * @returns the places its tab and count include it in.
+ */
+export function placedIn(skill: Skill): SkillHold[] {
+  return [...holdsOf(skill), ...(skill.takenAt ?? [])]
 }
 
 /**
@@ -517,7 +541,7 @@ export function useSkillLibrary(
        */
       const holding: SkillHold[] = []
       let linkAt: "library" | SkillPlaceId | undefined
-      const takenAt: SkillPlaceId[] = []
+      const takenAt: SkillHold[] = []
       for (const place of roots) {
         const own = place.byId.get(item.name)
         const adopted = reachedFrom(item, place.root)
@@ -527,8 +551,8 @@ export function useSkillLibrary(
           if (adopted) linkAt = "library"
           else if (linkAt === undefined) linkAt = place.id
         } else if (own !== undefined) {
-          /* A same-named skill the project wrote is not this one, and it holds the name. */
-          takenAt.push(place.id)
+          /* A same-named skill the project wrote holds the name there. */
+          takenAt.push({ id: place.id, scope: place.scope, dir: place.dir })
         }
       }
       return {
@@ -541,18 +565,14 @@ export function useSkillLibrary(
       }
     })
     /*
-     * A link the hub made, or a skill the library already reached through one,
-     * is on screen already; anything else a place holds is that place's own.
+     * A skill the library already holds is on screen as its library row; but a
+     * place's own skill under a name the library does not hold is that place's.
      */
     const own: Skill[] = []
     for (const place of roots) {
       for (const skill of held[place.id]?.skills ?? []) {
-        if (skill.origin === "hub") continue
-        if (items.some((item) => item.name === skill.name && reachedFrom(item, place.root))) continue
-        own.push({
-          ...placeRow(skill, place),
-          inLibrary: items.some((item) => item.name === skill.name),
-        })
+        if (!showsOwnRow(skill, items)) continue
+        own.push(placeRow(skill, place))
       }
     }
     return [...library, ...own]
@@ -571,12 +591,12 @@ export function useSkillLibrary(
   const adopt = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
-      /* The place keeps its files; the library reaches them through a link. */
-      const landed = await store.adoptFrom(id, ref, installMode)
+      /* The place keeps its files; the library takes its own copy. */
+      const landed = await store.adoptFrom(id, ref)
       await reload()
       return landed
     },
-    [store, reload, installMode]
+    [store, reload]
   )
 
   const deleteInPlace = React.useCallback(
@@ -685,7 +705,7 @@ export function useSkillLibrary(
     updates: rows.filter(outdated).length,
   }
   for (const [id] of targets) {
-    counts[id] = rows.filter((row) => holdsOf(row).some((hold) => hold.id === id)).length
+    counts[id] = rows.filter((row) => placedIn(row).some((hold) => hold.id === id)).length
   }
   return {
     store,

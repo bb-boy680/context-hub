@@ -18,7 +18,7 @@ import { createFsSkillStore } from "../src/host/skills-fs.ts"
 import {
   deleteSkillIn,
   installSkillInto,
-  linkSkillIntoLibrary,
+  copySkillIntoLibrary,
   readPlaceSkill,
   readPlaceSkillFile,
   readPlaceSkills,
@@ -123,15 +123,13 @@ describe("installing by copy", () => {
 })
 
 describe("copying a place skill into the library", () => {
-  it("keeps the library's own copy when asked to copy", async () => {
+  it("keeps the library's own copy", async () => {
     await writeSkill(
       path.join(placeSkillRoot(workspace, COPY_DIR), "copied-one"),
       "Copied",
       "From a place"
     )
-    expect(await linkSkillIntoLibrary(workspace, library, "copied-one", COPY_DIR, "copy")).toBe(
-      "copy"
-    )
+    expect(await copySkillIntoLibrary(workspace, library, "copied-one", COPY_DIR)).toBe("copy")
 
     const target = path.join(library, "copied-one")
     const stat = await fs.lstat(target)
@@ -276,8 +274,8 @@ describe("deleting a place skill", () => {
   })
 })
 
-/* The library links a place skill in, so the two are one skill. */
-describe("linking a place skill into the library", () => {
+/* The library takes its own copy of a place skill. */
+describe("adopting a place skill into the library", () => {
   let inLibrary: string
 
   beforeAll(async () => {
@@ -285,30 +283,48 @@ describe("linking a place skill into the library", () => {
     inLibrary = path.join(library, "linked-one")
   })
 
-  it("answers how it landed, and points at the place's own directory", async () => {
-    expect(await linkSkillIntoLibrary(workspace, library, "linked-one", SHARED)).toBe("link")
-    expect((await fs.lstat(inLibrary).catch(() => null))?.isSymbolicLink()).toBe(true)
-    expect(path.resolve(library, await fs.readlink(inLibrary))).toBe(linkedOne())
+  it("answers how it landed, and writes a directory of its own", async () => {
+    expect(await copySkillIntoLibrary(workspace, library, "linked-one", SHARED)).toBe("copy")
+    expect((await fs.lstat(inLibrary).catch(() => null))?.isSymbolicLink()).toBe(false)
+    expect(await fs.readFile(path.join(inLibrary, "SKILL.md"), "utf8")).toContain("Linked one")
   })
 
   it("leaves the files where the place keeps them", async () => {
     expect(await fs.readFile(path.join(linkedOne(), "SKILL.md"), "utf8")).toContain("Linked one")
   })
 
+  it("keeps the copy independent of the place's directory", async () => {
+    await fs.writeFile(path.join(linkedOne(), "notes.md"), "only here")
+    expect(await fs.readFile(path.join(inLibrary, "notes.md")).catch(() => null)).toBeNull()
+  })
+
+  it("copies the files a linked place skill points at", async () => {
+    const outside = path.join(home, "elsewhere", "linked-source")
+    const entry = path.join(sharedRoot(), "linked-source")
+    await writeSkill(outside, "Linked source", "Elsewhere")
+    await fs.symlink(outside, entry, process.platform === "win32" ? "junction" : "dir")
+
+    expect(await copySkillIntoLibrary(workspace, library, "linked-source", SHARED)).toBe("copy")
+    expect((await fs.lstat(path.join(library, "linked-source"))).isSymbolicLink()).toBe(false)
+    expect(await fs.readFile(path.join(library, "linked-source", "SKILL.md"), "utf8")).toContain(
+      "Linked source"
+    )
+  })
+
   it("refuses the same name twice", async () => {
-    await expect(linkSkillIntoLibrary(workspace, library, "linked-one", SHARED)).rejects.toThrow(
+    await expect(copySkillIntoLibrary(workspace, library, "linked-one", SHARED)).rejects.toThrow(
       /already in the library/
     )
   })
 
   it("refuses a skill the place does not have", async () => {
-    await expect(linkSkillIntoLibrary(workspace, library, "not-here", SHARED)).rejects.toThrow(
+    await expect(copySkillIntoLibrary(workspace, library, "not-here", SHARED)).rejects.toThrow(
       /not a skill in this place/
     )
   })
 
   it("refuses a name that would write outside the library", async () => {
-    await expect(linkSkillIntoLibrary(workspace, library, "..", SHARED)).rejects.toThrow(
+    await expect(copySkillIntoLibrary(workspace, library, "..", SHARED)).rejects.toThrow(
       /unusable skill name/
     )
     expect(await fs.lstat(path.join(library, "adopted-one")).catch(() => null)).toBeNull()
@@ -390,11 +406,11 @@ describe("the library's own list", () => {
     store.dispose()
   })
 
-  it("lists a linked skill, with where its files live", () => {
-    const linkedRow = rows.find((item) => item.name === "linked-one")
-    expect(linkedRow).toBeDefined()
-    expect(linkedRow?.link).toBe(linkedOne())
-    expect(linkedRow?.updatedAt, "a linked row carries no date").toBe("")
+  it("lists an adopted skill as the library's own copy, with its date", () => {
+    const adoptedRow = rows.find((item) => item.name === "linked-one")
+    expect(adoptedRow).toBeDefined()
+    expect(adoptedRow?.link).toBeUndefined()
+    expect(adoptedRow?.updatedAt).not.toBe("")
   })
 
   it("carries no link on a skill the library holds itself, and its files' own date", () => {
@@ -446,8 +462,8 @@ describe("adopting a place skill", () => {
   })
 })
 
-/* Removing a linked entry takes the link back and leaves those files alone. */
-describe("removing a linked entry", () => {
+/* Removing an adopted copy takes the library's directory and leaves the place's. */
+describe("removing an adopted entry", () => {
   it("takes the library's entry back and leaves the place's skill untouched", async () => {
     const store = await createFsSkillStore({ home, userHome })
     await store.remove("linked-one")

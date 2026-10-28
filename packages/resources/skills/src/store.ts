@@ -398,14 +398,14 @@ export interface SkillStore {
    */
   installInto(name: string, ref: SkillPlaceRef, mode?: InstallMode): Promise<SkillInstall>
   /**
-   * Link one skill of one place into the library; the place keeps its own
+   * Copy one skill of one place into the library; the place keeps its own
    * directory.
    *
    * @param name — the skill's directory name under that place.
    * @param ref — the place to read.
-   * @returns how it landed: a link, or a copy where the filesystem cannot hold one.
+   * @returns how it landed: always a copy.
    */
-  adoptFrom(name: string, ref: SkillPlaceRef, mode?: InstallMode): Promise<SkillInstall>
+  adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /**
    * Delete one skill from one place, its directory included. This is the
    * destructive one; `removeFrom` only takes back a link.

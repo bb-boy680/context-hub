@@ -52,7 +52,7 @@ import { readLockedUpstream, skillFolderHash } from "./upstream.ts"
 import {
   deleteSkillIn,
   installSkillInto,
-  linkSkillIntoLibrary,
+  copySkillIntoLibrary,
   readPlaceSkill,
   readPlaceSkillFile,
   readPlaceSkills,
@@ -952,13 +952,9 @@ export async function createFsSkillStore(
       return installSkillInto(base, root, name, ref.dir, mode)
     },
 
-    async adoptFrom(
-      name: string,
-      ref: SkillPlaceRef,
-      mode: InstallMode = "auto"
-    ): Promise<SkillInstall> {
+    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const base = await requiredBase(ref.scope)
-      const landed = await linkSkillIntoLibrary(base, root, name, ref.dir, mode)
+      const landed = await copySkillIntoLibrary(base, root, name, ref.dir)
       /* What the skills CLI installed this from, if it did: the lock beside
          the place's skills is the record, and its hash is what an update
          check compares against. Without it the skill is still listed, but

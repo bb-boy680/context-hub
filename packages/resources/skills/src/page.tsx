@@ -25,7 +25,7 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
-import { holdsOf, inLibrary, modified, outdated, placePath, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, modified, outdated, placePath, placedIn, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import type { SkillPlace } from "./provider.ts"
@@ -104,7 +104,7 @@ function rowsForTab(rows: Skill[], value: SkillTab, place: string | null): Skill
   if (value === "unstored") return rows.filter(unstored)
   if (value === "updates") return rows.filter(outdated)
   return rows.filter((row) =>
-    holdsOf(row).some(
+    placedIn(row).some(
       (hold) => hold.scope === value && (place === null || hold.id === place)
     )
   )
@@ -229,7 +229,6 @@ function SkillActionButton({
 
   /* A skill a place wrote: the library can take it over the same way. */
   if (!inLibrary(skill)) {
-    if (skill.inLibrary === true) return null
     return (
       <Button
         type="button"
@@ -287,7 +286,7 @@ function SkillActionButton({
               blocked:
                 (place.scope === "workspace" ? blocked : null) ??
                 (!holds.some((hold) => hold.id === place.id) &&
-                skill.takenAt?.includes(place.id) === true
+                skill.takenAt?.some((hold) => hold.id === place.id) === true
                   ? t("skills.workspace.taken")
                   : null),
             })),

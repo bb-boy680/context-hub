@@ -579,7 +579,7 @@ function PlacesSection({
         </Button>
       )
     }
-    const taken = skill.takenAt?.includes(place.id) === true
+    const taken = skill.takenAt?.some((hold) => hold.id === place.id) === true
     /* A workspace place has nothing to write into without a folder; a
        machine-wide one never needs one. */
     const unavailable = place.scope === "workspace" ? blocked : null
@@ -1146,6 +1146,9 @@ export function SkillDetailDialog({
   const inLib = skill !== null && inLibrary(skill)
   const placeOnly = skill !== null && !inLib && place !== null
   const placeRef = place?.ref ?? null
+  /* `placeOf` builds a new ref every render, so an effect must not depend on it. */
+  const placeScope = place?.ref.scope ?? null
+  const placeDir = place?.ref.dir ?? null
 
   /* Load the stored record whenever the lightbox opens on a library skill, and
      again after a write moves its timestamp. A skill no library record holds
@@ -1172,11 +1175,13 @@ export function SkillDetailDialog({
   /* A skill no library record holds lives outside the library, so its own
      manifest and files are read from the place that keeps them. */
   React.useEffect(() => {
-    if (store === null || name === null || !placeOnly || placeRef === null) return
+    if (store === null || name === null || !placeOnly || placeScope === null || placeDir === null) {
+      return
+    }
     let live = true
     void (async () => {
       try {
-        const found = await store.placeSkill(name, placeRef)
+        const found = await store.placeSkill(name, { scope: placeScope, dir: placeDir })
         if (live && found !== null) setHeld({ name, detail: found })
       } catch {
         /* An unreadable skill leaves the panel on the catalog row it came from. */
@@ -1185,7 +1190,7 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, name, placeOnly, placeRef])
+  }, [store, name, placeOnly, placeScope, placeDir])
 
   const workspace = held !== null && held.name === name ? held.detail : null
 
