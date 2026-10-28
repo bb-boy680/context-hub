@@ -12,5 +12,8 @@ export default defineProject({
     /* Spelled out rather than left to the runner's default, so "tests live
        under __test__" is a glob it enforces and not just a habit. */
     include: ["__test__/**/*.test.ts"],
+    /* The update tests drive the skills CLI, which clones a package per run.
+       Under the root suite that can cross the 5s default; a hang still fails. */
+    testTimeout: 60_000,
   },
 })

@@ -3,11 +3,11 @@
  *
  * The CLI writes `skills-lock.json` beside the folder it installed into: one
  * entry per skill, naming the package it came from and the hash of the
- * directory it wrote. Every hash a check compares is the CLI's own, taken
- * when the CLI ran — nothing here recomputes one for a skill it installed.
- * The single question the CLI cannot answer is whether the files here were
- * edited after that install, because it never hashes what is on disk, so
- * `skillFolderHash` repeats the same algorithm for exactly that.
+ * directory it wrote. The hash is what an edit is measured against: the CLI
+ * never hashes what is on disk after that install, so `skillFolderHash`
+ * repeats the same algorithm for exactly that. Whether the source moved on is
+ * a different question, answered by the source's commit through `git
+ * ls-remote` (see `git-source.ts`) and recorded next to this one.
  *
  * That algorithm lives in `@context-hub/core/host/folder-hash` — the plugin
  * library hashes its packs with it too, and one implementation is one place for

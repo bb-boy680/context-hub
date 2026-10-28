@@ -16,12 +16,12 @@ import {
   updateOutdated,
 } from "../src/update-settings.ts"
 
-/** One catalog row, with a recorded source and check answer when asked for. */
+/** One catalog row, with a recorded revision and check answer when asked for. */
 function row(
   name: string,
-  upstream?: string,
+  revision?: string,
   latest?: string,
-  current = latest
+  current: string | undefined = revision
 ): SkillSummary {
   return {
     name,
@@ -31,14 +31,16 @@ function row(
     enabled: true,
     assets: [],
     updatedAt: "",
-    ...(upstream === undefined
+    ...(revision === undefined
       ? {}
       : {
           upstream: {
             source: "owner/repo",
             sourceType: "git",
             skillPath: `skills/${name}/SKILL.md`,
-            hash: upstream,
+            /* The tests use the revision as the installed content too. */
+            hash: revision,
+            revision,
           },
         }),
     ...(latest === undefined
@@ -50,6 +52,24 @@ function row(
             currentHash: current ?? latest,
           },
         }),
+  }
+}
+
+/** An upstream written before checks compared commits: no revision recorded. */
+function legacyRow(name: string, latest: string): SkillSummary {
+  return {
+    ...row(name),
+    upstream: {
+      source: "owner/repo",
+      sourceType: "git",
+      skillPath: `skills/${name}/SKILL.md`,
+      hash: "installed",
+    },
+    checked: {
+      at: "2026-01-01T00:00:00.000Z",
+      latest,
+      currentHash: "installed",
+    },
   }
 }
 
@@ -199,6 +219,11 @@ describe("which skills an automatic update may replace", () => {
         row("e", "old"),
       ])
     ).toEqual(["a"])
+  })
+
+  it("starts tracking a row written before revisions were recorded", () => {
+    expect(updatableNames([legacyRow("old-row", "remote")])).toEqual(["old-row"])
+    expect(updatableNames([row("never-checked")]), "nothing was asked").toEqual([])
   })
 })
 

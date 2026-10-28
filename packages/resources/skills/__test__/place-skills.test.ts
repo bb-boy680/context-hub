@@ -420,14 +420,23 @@ describe("the library's own list", () => {
   })
 })
 
-/* Adopting carries the workspace's own CLI record into the library, so the row
-   knows which revision it holds and can be checked against the source. */
+/* Adopting carries the workspace's own CLI record into the library. Its lock
+   holds a hash, not a commit, so the row starts untracked rather than being
+   marked with whatever the remote holds now. */
 describe("adopting a place skill", () => {
   let tracked: Awaited<ReturnType<Awaited<ReturnType<typeof createFsSkillStore>>["list"]>>["items"][number] | undefined
   let store: Awaited<ReturnType<typeof createFsSkillStore>>
+  let revisionAsks = 0
 
   beforeAll(async () => {
-    store = await createFsSkillStore({ home, userHome })
+    store = await createFsSkillStore({
+      home,
+      userHome,
+      resolveRevision: async () => {
+        revisionAsks += 1
+        return "b".repeat(40)
+      },
+    })
     const sharedRef = { scope: "workspace", dir: SHARED } as const
     await writeSkill(path.join(sharedRoot(), "tracked-one"), "Tracked one", "From a package")
     await fs.writeFile(
@@ -456,9 +465,11 @@ describe("adopting a place skill", () => {
     store.dispose()
   })
 
-  it("keeps the source its lock recorded, and the revision", () => {
+  it("keeps the source its lock recorded, without guessing a revision", () => {
     expect(tracked?.upstream?.source).toBe("mattpocock/skills")
     expect(tracked?.upstream?.hash).toBe("a".repeat(64))
+    expect(tracked?.upstream?.revision).toBeUndefined()
+    expect(revisionAsks, "adopt has no commit to ask for").toBe(0)
   })
 })
 

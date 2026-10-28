@@ -15,7 +15,7 @@ import * as React from "react"
 
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { formatAge, holdsOf, inLibrary, placeOf, placePath, placedIn, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
+import { ahead, formatAge, holdsOf, inLibrary, modified as isModified, placeOf, placePath, placedIn, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
@@ -367,13 +367,13 @@ function SourceSection({
     const checked = skill.checked
     if (checked === undefined || upstream === undefined) return null
     return {
-      recordedHash: upstream.hash,
+      recordedRevision: upstream.revision ?? null,
+      latestRevision: checked.latest,
       currentHash: checked.currentHash,
-      latestHash: checked.latest,
-      outdated: checked.latest !== upstream.hash,
-      modified: checked.currentHash !== upstream.hash,
+      outdated: ahead(upstream, checked.latest),
+      modified: isModified(skill),
     }
-  }, [skill.checked, upstream])
+  }, [skill, upstream])
   const [state, setState] = React.useState<
     | { kind: "idle" }
     | { kind: "checking" }
@@ -431,7 +431,9 @@ function SourceSection({
         ? t("skills.update.applying")
         : state.kind === "checked"
           ? state.result.outdated
-            ? t("skills.update.available")
+            ? state.result.recordedRevision === null
+              ? t("skills.update.untracked")
+              : t("skills.update.available")
             : state.result.modified
               ? t("skills.update.edited")
               : t("skills.update.current")

@@ -14,7 +14,7 @@ import { createCatalog, type Catalog } from "@context-hub/extensions"
 import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
-import { modified, outdated } from "./store.ts"
+import { ahead, modified, outdated } from "./store.ts"
 import {
   DEFAULT_SKILL_UPDATE_SETTINGS,
   readSkillUpdateSettings,
@@ -216,7 +216,7 @@ export function nameTakenAt(skill: Skill, ref: SkillPlaceRef): boolean {
  * a check that recorded an answer says so: a row with no recorded source, or one
  * nobody has asked about, is not ahead of anything.
  */
-export { modified, outdated }
+export { ahead, modified, outdated }
 
 /**
  * How one place's directory reads to a person. A place is a directory inside a
@@ -645,8 +645,7 @@ export function useSkillLibrary(
         await reload()
         return {
           ...result,
-          recordedHash: result.latestHash,
-          currentHash: result.latestHash,
+          recordedRevision: result.latestRevision,
           outdated: false,
         }
       }

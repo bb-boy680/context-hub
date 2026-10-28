@@ -283,6 +283,7 @@ export const messages: Record<string, string> = {
   "skills.update.check": "检查更新",
   "skills.update.checking": "正在核对上游…",
   "skills.update.available": "上游有更新",
+  "skills.update.untracked": "更新一次后开始跟踪来源",
   "skills.update.current": "已是最新",
   "skills.update.apply": "更新",
   "skills.update.applying": "正在更新…",

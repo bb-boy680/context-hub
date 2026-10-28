@@ -93,6 +93,7 @@ export const skillsMessages: Record<string, string> = {
   "skills.update.check": "Check",
   "skills.update.checking": "Checking the source…",
   "skills.update.available": "A newer revision is available",
+  "skills.update.untracked": "Update once to track this source",
   "skills.update.current": "Up to date",
   "skills.update.apply": "Update",
   "skills.update.applying": "Updating…",
