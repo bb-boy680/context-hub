@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-28T11:00:44Z",
+  "updated_at": "2026-10-28T11:18:20Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "c55965863cab108cab5834a90c30e1af2fd5cef57759581269914bb721ed2a33",
-      "size": 144501,
-      "normalized_sha256": "c55965863cab108cab5834a90c30e1af2fd5cef57759581269914bb721ed2a33"
+      "sha256": "f821d0af8204d981d2a1a2aa242ff26853b7c0cadb91cb76d944f6ad8719bf74",
+      "size": 144621,
+      "normalized_sha256": "f821d0af8204d981d2a1a2aa242ff26853b7c0cadb91cb76d944f6ad8719bf74"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -2027,9 +2027,9 @@
     },
     "packages/resources/prompts/src/install-menu.tsx": {
       "role": "index",
-      "sha256": "04a955cc61f086712b58f8b658d16c133b16412fc706072e166625908d92c9e5",
-      "size": 13024,
-      "normalized_sha256": "04a955cc61f086712b58f8b658d16c133b16412fc706072e166625908d92c9e5"
+      "sha256": "dcb8fdd23d2c17aaaa4bde4e8136b645b3dd8cac37482e65e6a037a9bc43deb1",
+      "size": 13230,
+      "normalized_sha256": "dcb8fdd23d2c17aaaa4bde4e8136b645b3dd8cac37482e65e6a037a9bc43deb1"
     },
     "packages/resources/prompts/src/instruction.ts": {
       "role": "index",
