@@ -15,7 +15,7 @@ import * as React from "react"
 
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { formatAge, holdsOf, inLibrary, placeOf, placePath, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
+import { formatAge, holdsOf, inLibrary, placeOf, placePath, placedIn, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
@@ -527,7 +527,7 @@ function PlacesSection({
   onRemove: (ref: SkillPlaceRef) => void
 }) {
   const { t } = useI18n()
-  const holds = holdsOf(skill)
+  const holds = placedIn(skill)
   const own = inLibrary(skill)
   /* The library is one of the rows, so it is one of the count: a skill the hub
      holds is installed in one place even when no workspace link exists yet. */
@@ -559,8 +559,7 @@ function PlacesSection({
   const outlinePill = `${pill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`
 
   /* Held, the row offers the way out; not held, the way in — unless the place
-     cannot take it: a workspace with no folder to write into, or a name another
-     skill already holds there. */
+     cannot take it: a workspace with no folder to write into. */
   const rowAction = (id: string) => {
     const place = byId.get(id)
     if (place === undefined) return null
@@ -579,7 +578,6 @@ function PlacesSection({
         </Button>
       )
     }
-    const taken = skill.takenAt?.some((hold) => hold.id === place.id) === true
     /* A workspace place has nothing to write into without a folder; a
        machine-wide one never needs one. */
     const unavailable = place.scope === "workspace" ? blocked : null
@@ -588,8 +586,8 @@ function PlacesSection({
         type="button"
         variant="ghost"
         aria-label={`${t("skills.action.install")} ${skill.name}`}
-        disabled={taken || unavailable !== null}
-        title={taken ? t("skills.workspace.taken") : (unavailable ?? undefined)}
+        disabled={unavailable !== null}
+        title={unavailable ?? undefined}
         onClick={() => onInstall({ scope: place.scope, dir: place.dir })}
         className={soft}
       >

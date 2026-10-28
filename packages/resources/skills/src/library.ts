@@ -197,6 +197,21 @@ export function placedIn(skill: Skill): SkillHold[] {
 }
 
 /**
+ * Whether the place a ref names keeps its own skill under this row's name, so
+ * taking it back deletes that entry rather than a link the hub made.
+ *
+ * @param skill — the row.
+ * @param ref — the place an action names.
+ */
+export function nameTakenAt(skill: Skill, ref: SkillPlaceRef): boolean {
+  return (
+    skill.takenAt?.some(
+      (hold) => hold.scope === ref.scope && hold.dir === ref.dir
+    ) === true
+  )
+}
+
+/**
  * Whether the last check found the skill's source ahead of the files here. Only
  * a check that recorded an answer says so: a row with no recorded source, or one
  * nobody has asked about, is not ahead of anything.
@@ -551,7 +566,8 @@ export function useSkillLibrary(
           if (adopted) linkAt = "library"
           else if (linkAt === undefined) linkAt = place.id
         } else if (own !== undefined) {
-          /* A same-named skill the project wrote holds the name there. */
+          /* A same-named skill the project wrote holds the name there; the
+             library row above stands for it. */
           takenAt.push({ id: place.id, scope: place.scope, dir: place.dir })
         }
       }

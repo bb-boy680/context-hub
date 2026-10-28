@@ -5,8 +5,8 @@
  */
 import { describe, expect, it } from "vitest"
 
-import { placedIn, showsOwnRow } from "../src/library.ts"
-import type { PlaceSkill, SkillSummary } from "../src/store.ts"
+import { nameTakenAt, placedIn, showsOwnRow } from "../src/library.ts"
+import type { PlaceSkill, SkillPlaceRef, SkillSummary } from "../src/store.ts"
 import type { Skill, SkillHold } from "../src/types.ts"
 
 /** One library row, with only the name mattering to the merge rule. */
@@ -66,5 +66,22 @@ describe("the places a row is on screen under", () => {
 
   it("includes the places holding its files and the places holding a same name", () => {
     expect(placedIn(row({ places: [holding], takenAt: [taken] }))).toEqual([holding, taken])
+  })
+})
+
+describe("taking a row out of a place", () => {
+  const ref: SkillPlaceRef = { scope: "workspace", dir: ".claude/skills" }
+
+  it("deletes the entry where the place keeps its own copy under that name", () => {
+    expect(nameTakenAt(row({ takenAt: [{ id: "claude", ...ref }] }), ref)).toBe(true)
+  })
+
+  it("does not when the same directory sits under another scope", () => {
+    const taken = row({ takenAt: [{ id: "claude", scope: "global", dir: ref.dir }] })
+    expect(nameTakenAt(taken, ref)).toBe(false)
+  })
+
+  it("does not for a place holding the library's own files", () => {
+    expect(nameTakenAt(row({ places: [{ id: "claude", ...ref }] }), ref)).toBe(false)
   })
 })

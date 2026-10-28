@@ -25,7 +25,7 @@ import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { SearchSkillsDialog } from "./search-dialog.tsx"
-import { holdsOf, inLibrary, modified, outdated, placePath, placedIn, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import type { SkillPlace } from "./provider.ts"
@@ -196,7 +196,7 @@ function SkillActionButton({
   /* The places this build reads, which the row offers itself rather than having
      every list thread them down to it. */
   const places = useReadablePlaces()
-  const holds = holdsOf(skill)
+  const holds = placedIn(skill)
   /* A machine-wide place needs no workspace, so only the workspace ones depend
      on there being a folder to write into. */
   const writable = places.filter((place) => place.scope !== "workspace" || blocked === null)
@@ -257,8 +257,8 @@ function SkillActionButton({
             disabled={writable.length === 0}
             title={writable.length === 0 ? (blocked ?? undefined) : undefined}
             /* The word does not change with the row's state: installing into a
-               second place is still installing, and the menu says which places
-               are taken. */
+               second place is still installing, and the menu ticks the places
+               that already have it. */
             aria-label={`${t("skills.action.install")} ${skill.name}`}
             className={fill}
             onClick={(event) => event.stopPropagation()}
@@ -283,12 +283,7 @@ function SkillActionButton({
               label: t(place.labelKey),
               where: placePath(place),
               selected: holds.some((hold) => hold.id === place.id),
-              blocked:
-                (place.scope === "workspace" ? blocked : null) ??
-                (!holds.some((hold) => hold.id === place.id) &&
-                skill.takenAt?.some((hold) => hold.id === place.id) === true
-                  ? t("skills.workspace.taken")
-                  : null),
+              blocked: place.scope === "workspace" ? blocked : null,
             })),
         })).filter((group) => group.options.length > 0)}
         onPick={(id) => {
@@ -868,7 +863,7 @@ function SkillTable({
                 if (!checked.includes(skillKey(skill))) continue
                 /* A place already holding this skill is left alone: writing it
                    there again refuses instead of adding anything. */
-                if (holdsOf(skill).some((hold) => hold.id === place.id)) continue
+                if (placedIn(skill).some((hold) => hold.id === place.id)) continue
                 onInstall(skill, { scope: place.scope, dir: place.dir })
               }
               onCheck([])
@@ -1175,6 +1170,10 @@ export function SkillsPage() {
         /* The library linked the skill in; removing its entry takes the link. */
         await (library.store?.remove(skill.name) ?? Promise.resolve())
         await library.reload()
+      } else if (nameTakenAt(skill, ref)) {
+        /* The place keeps its own skill under this name; taking it back deletes
+           that entry — a link goes as an entry, a directory with its files. */
+        await library.deleteInPlace(skill.name, ref)
       } else {
         await library.remove(skill.name, ref)
       }

@@ -1444,3 +1444,21 @@ Electron 的 main/preload/server bundle，页面永远加载 `apps/web/dist`—�
 **规则**：任何 E2E 只允许一个 hub server 写同一个 home；验证构建形态前先停掉 dev server。
 看到 `workspaces.json` 行数无故减少，先查是不是还有另一个 server 在跑（`netstat` 看端口、
 `/hub/about` 看 home），不要先怀疑 store 的迁移逻辑。
+
+## 按名字去重不能顺手砍掉 Agent 的标记和卸载入口（2026-10-28）
+
+**问题模式**：skills 的“收录”从建链接改成复制后，库记录不再 link 到 place；同名但由
+place 自己持有的条目只进 `takenAt`，不进 `places`。上一版把这当成“名字被占”，于是列表行
+只剩 `holdsOf`（只读 `places`）：头像堆叠消失，安装菜单把该 Agent 标成不可点，也没有卸载
+入口。用户的原话是“这只是 skill 去重，不应该出现这种 BUG”。
+
+**规则**：去重只改变“一行代表哪个技能”，不改变“这个 Agent 有没有它”。凡是判断“哪些
+Agent 持有”的展示与交互（头像、菜单 selected、详情的位置列表、批量安装跳过）都用
+`placedIn`（`places + takenAt`）；`holdsOf` 只留给真正要读文件的路径（`placeOf`、
+`useSkillDocument`、`useSkillFiles`）。卸载要按归属分流：库链接走 `removeFrom`，place
+自有的同名条目走 `deleteInPlace`（symlink 只删条目，真实目录递归删除），并用
+`nameTakenAt` 这个纯函数把判定固定下来、加单测。
+
+**验证方式**：用真实的“库副本 + 全局 symlink”数据打开 `/skills`：行的 provenance 必须出现
+该 Agent 的头像，详情“位置”里该 Agent 行必须是“移除”而不是禁用的“安装”。不要在验收时
+真点“移除”，那会删掉用户已装好的 Agent 条目。

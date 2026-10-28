@@ -58,9 +58,10 @@ export type Skill = {
    */
   linkAt?: "library" | SkillPlaceId
   /**
-   * The places holding a skill of their own under this name, so the name is
-   * taken there: installing the library's copy into one of them is not possible.
-   * The library row still stands for the skill on those places' tabs.
+   * The places holding a skill of their own under this name. The library row
+   * still stands for it there — its marks and its places list count the place —
+   * and taking it out of that place deletes its entry. Installing the library's
+   * copy there is not possible while the name is taken.
    */
   takenAt?: SkillHold[]
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
