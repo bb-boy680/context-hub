@@ -441,7 +441,7 @@ vitest.config.ts[FQ5T]: F:variables 包的测试项目 | R:- | A:- | S:项目名
 
 ===D:/work-space/dsh-context-hub/packages/resources/variables/src/components/===
 variable-input.tsx[CU8L]: F:变量标签输入框 | R:code:packages/resources/variables/src/components/variable-picker.tsx,code:packages/resources/variables/src/store.ts | A:VariableInput | S:值仍是 ${NAME} 字符串，tag 是 contentEditable=false 的 span；退格在 tag 后、Delete 在 tag 前整块删除；纯文本里的 ${...} 在输入或粘贴后归一化为 tag 并保持光标；单行且隐藏滚动条
-variable-picker.tsx[CU8M]: F:$ 变量选择面板 | R:code:packages/resources/variables/src/components/variable-input.tsx,code:packages/resources/variables/src/remote-store.ts | A:VariablePicker | S:固定 440px 高；打开时自行读 /hub/variables；不抢焦点（modal=false、initialFocus=false），在 anchor 的捕获阶段处理 ↑↓/↵/Esc；鼠标按下 preventDefault 保住输入框焦点；点选只回传变量名
+variable-picker.tsx[CU8M]: F:$ 变量选择面板 | R:code:packages/resources/variables/src/components/variable-input.tsx,code:packages/resources/variables/src/remote-store.ts | A:VariablePicker | S:固定 440px 高；打开时自行读 /hub/variables；不抢焦点（modal=false、initialFocus=false），在 anchor 的捕获阶段处理 ↑↓/↵/Esc；面板整体对 mousedown preventDefault，保住 anchor 输入框焦点；落在 anchor 字段上的 outside-press 用 details.cancel() 忽略，只有面板和字段之外的点击才关闭；点选只回传变量名
 
 ===D:/work-space/dsh-context-hub/packages/resources/variables/src/host/===
 environment.ts[IG9M]: F:机器环境读写适配层 | R:code:packages/resources/variables/src/host/variables-fs.ts | A:createEnvironment,EnvironmentPort,escapeShell | S:Windows 用 PowerShell 写 HKCU 用户环境，启动时枚举 GetEnvironmentVariables('User') 成快照——只信 process.env 会在旧终端重启后读不到；POSIX 写 ~/.config/context-hub/env（600）并幂等 source 进 shell profile；fish 直接拒绝

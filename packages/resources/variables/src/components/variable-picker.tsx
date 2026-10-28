@@ -141,7 +141,25 @@ export function VariablePicker({
   const variables = document?.variables ?? []
 
   return (
-    <Popover open={open} onOpenChange={onOpenChange} modal={false}>
+    <Popover
+      open={open}
+      onOpenChange={(next, details) => {
+        /* Pressing the field the panel hangs from is not an outside press: the
+           field and its panel are one interaction. */
+        const target = details.event.target as Node | null
+        if (
+          !next &&
+          details.reason === "outside-press" &&
+          target !== null &&
+          anchor?.current?.contains(target) === true
+        ) {
+          details.cancel()
+          return
+        }
+        onOpenChange(next)
+      }}
+      modal={false}
+    >
       <PopoverContent
         anchor={anchor}
         side="bottom"
@@ -149,6 +167,9 @@ export function VariablePicker({
         sideOffset={6}
         initialFocus={false}
         finalFocus={false}
+        /* The field keeps focus for the whole interaction; a press on the
+           panel must not blur it, or the panel closes under the pointer. */
+        onMouseDown={(event) => event.preventDefault()}
         className="flex h-[440px] w-[560px] flex-col gap-0 overflow-clip rounded-xl border border-border bg-card p-0 shadow-lg ring-0"
       >
         <div className="flex h-11 shrink-0 items-center gap-2.5 border-b border-border px-3.5">
