@@ -52,9 +52,27 @@ hub.on("exit", (code) => {
   void stop(code ?? 1)
 })
 
+/**
+ * Wait until the hub answers. Vite starts serving as soon as it listens, and a
+ * page that loads before the hub has bound its port turns every `/hub` request
+ * into a proxy error.
+ */
+async function waitForHub(): Promise<void> {
+  const url = `http://127.0.0.1:${String(DEV_HUB_PORT)}/hub/about`
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    const ready = await fetch(url)
+      .then((response) => response.ok)
+      .catch(() => false)
+    if (ready) return
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  throw new Error(`hub server did not answer on ${url}`)
+}
+
 /* Both ports are pinned, so stopping this project's processes is never a guess
    about whose port a number is. Only the hub server has to be stopped by hand:
    it is a child of this process, and its exit takes Vite down with it. */
+await waitForHub()
 vite = await createServer({
   server: { port: DEV_APP_PORT, strictPort: true },
 })
