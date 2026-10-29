@@ -1,7 +1,8 @@
-import type { Skill } from "@context-hub/skills"
+import type { Skill, SkillPlaceRef, SkillStore } from "@context-hub/skills"
 import { describe, expect, it } from "vitest"
 
 import {
+  installMarketSkill,
   installedRow,
   nameConflict,
   refreshedRank,
@@ -45,6 +46,116 @@ describe("installedRow / nameConflict", () => {
   })
 })
 
+describe("installMarketSkill", () => {
+  const market = { source: "vercel-labs/skills", skillId: "find-skills" }
+  const ref: SkillPlaceRef = { scope: "workspace", dir: ".claude/skills" }
+
+  function storeOf(installPackage: SkillStore["installPackage"]): Pick<SkillStore, "installPackage"> {
+    return { installPackage }
+  }
+
+  it("installs the package first, then links the name it landed under", async () => {
+    const calls: string[] = []
+    const library = {
+      store: storeOf(async (source, skills) => {
+        calls.push(`package:${source}:${skills.join(",")}`)
+        return { installed: ["find-skills-copy"], failed: [] }
+      }),
+      rows: [],
+      install: async (id: string, at: SkillPlaceRef) => {
+        calls.push(`place:${id}:${at.dir}`)
+        return "link" as const
+      },
+    }
+    await installMarketSkill(library, market, [ref], "failed")
+    expect(calls).toEqual([
+      "package:vercel-labs/skills:find-skills",
+      "place:find-skills-copy:.claude/skills",
+    ])
+  })
+
+  it("links every selected place a skill the library already holds", async () => {
+    const seen: string[] = []
+    const library = {
+      store: storeOf(async () => {
+        throw new Error("should not install the package again")
+      }),
+      rows: [row({})],
+      install: async (id: string, at: SkillPlaceRef) => {
+        seen.push(`${id}:${at.scope}:${at.dir}`)
+        return "link" as const
+      },
+    }
+    await installMarketSkill(
+      library,
+      market,
+      [ref, { scope: "global", dir: ".claude/skills" }],
+      "failed"
+    )
+    expect(seen).toEqual([
+      "find-skills:workspace:.claude/skills",
+      "find-skills:global:.claude/skills",
+    ])
+  })
+
+  it("keeps going when one place refuses, and reports that place", async () => {
+    const seen: string[] = []
+    const library = {
+      store: storeOf(async () => {
+        throw new Error("should not install the package again")
+      }),
+      rows: [row({})],
+      install: async (id: string, at: SkillPlaceRef) => {
+        if (at.scope === "workspace") throw new Error("already in this place: find-skills")
+        seen.push(`${id}:${at.scope}:${at.dir}`)
+        return "link" as const
+      },
+    }
+    await expect(
+      installMarketSkill(
+        library,
+        market,
+        [ref, { scope: "global", dir: ".claude/skills" }],
+        "failed"
+      )
+    ).rejects.toThrow("already in this place: find-skills")
+    expect(seen).toEqual(["find-skills:global:.claude/skills"])
+  })
+
+  it("names the package's own failure and links nothing when nothing landed", async () => {
+    let linked = 0
+    const library = {
+      store: storeOf(async () => ({
+        installed: [],
+        failed: [{ name: "find-skills", reason: "npx is not on PATH" }],
+      })),
+      rows: [],
+      install: async () => {
+        linked += 1
+        return "link" as const
+      },
+    }
+    await expect(installMarketSkill(library, market, [ref], "failed")).rejects.toThrow(
+      "npx is not on PATH"
+    )
+    expect(linked).toBe(0)
+  })
+
+  it("falls back to the given words when there is no library at all", async () => {
+    let linked = 0
+    const library = {
+      store: null,
+      rows: [],
+      install: async () => {
+        linked += 1
+        return "link" as const
+      },
+    }
+    await expect(installMarketSkill(library, market, [ref], "failed")).rejects.toThrow("failed")
+    expect(linked).toBe(0)
+  })
+})
+
 describe("sparkPoints", () => {
   it("spreads the points across the box and keeps a flat line centered", () => {
     const points = sparkPoints([1, 2, 3, 4], 100, 40)
@@ -63,12 +174,12 @@ describe("treeFromFiles", () => {
     { path: "assets/logo.png", contents: "png" },
   ]
 
-  it("adds directories for every parent and keeps files after them", () => {
+  it("adds directories for every parent and lists folders before files", () => {
     const tree = treeFromFiles(files)
     expect(tree.map((entry) => entry.path)).toEqual([
-      "SKILL.md",
       "assets",
       "references",
+      "SKILL.md",
       "assets/logo.png",
       "references/design.md",
     ])

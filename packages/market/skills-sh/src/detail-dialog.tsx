@@ -267,7 +267,7 @@ export function MarketDetailDialog({
             </TabsTrigger>
           </TabsList>
 
-          <div className="flex min-h-0 flex-1 gap-10 px-10 pt-6 pb-6">
+          <div className="flex min-h-0 flex-1 gap-3 px-10 pt-6 pb-6">
             <div className="min-w-0 flex-1 overflow-y-auto">
               <TabsContent value="content" className="m-0">
                 <div className="flex max-w-[680px] flex-col gap-6">
@@ -340,55 +340,59 @@ export function MarketDetailDialog({
               </TabsContent>
             </div>
 
-            <aside className="w-[300px] shrink-0 self-start rounded-xl bg-muted/40 p-4">
-              <div className="flex items-center gap-1.5">
-                <DownloadIcon className="size-3.5 text-muted-foreground" aria-hidden />
-                <span className="font-mono text-2xl font-semibold">
-                  {row.installs.toLocaleString(state.active)}
-                </span>
-              </div>
-              {points === null ? null : (
-                <svg
-                  viewBox="0 0 260 48"
-                  className="mt-2 h-12 w-full text-muted-foreground"
-                  role="img"
-                  aria-label={t("market.column.installs")}
-                >
-                  <polyline
-                    points={points}
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              )}
-              <Separator className="my-4 bg-border" />
-              <a
-                href={page}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-1 font-mono text-[12.5px] font-medium text-foreground hover:underline"
-              >
-                <span className="min-w-0 truncate">{row.source}</span>
-                <ArrowUpRightIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-              </a>
-              <div className="mt-3 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
-                <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
-                {audit.state === "loading" ? (
-                  <Skeleton className="h-3 w-24" />
-                ) : auditValue === null ? (
-                  <span>{t("market.empty.audit")}</span>
-                ) : (
-                  <span>
-                    {t("market.detail.auditPassed")
-                      .replace("{passed}", String(passed))
-                      .replace("{total}", String(total))}
+            {/* The summary rail describes the skill's content; the file tree and
+                the audit list stand on their own and read wider without it. */}
+            {tab === "content" ? (
+              <aside className="w-[300px] shrink-0 self-start rounded-xl bg-muted/40 p-4">
+                <div className="flex items-center gap-1.5">
+                  <DownloadIcon className="size-3.5 text-muted-foreground" aria-hidden />
+                  <span className="font-mono text-2xl font-semibold">
+                    {row.installs.toLocaleString(state.active)}
                   </span>
+                </div>
+                {points === null ? null : (
+                  <svg
+                    viewBox="0 0 260 48"
+                    className="mt-2 h-12 w-full text-muted-foreground"
+                    role="img"
+                    aria-label={t("market.column.installs")}
+                  >
+                    <polyline
+                      points={points}
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
                 )}
-              </div>
-            </aside>
+                <Separator className="my-4 bg-border" />
+                <a
+                  href={page}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1 font-mono text-[12.5px] font-medium text-foreground hover:underline"
+                >
+                  <span className="min-w-0 truncate">{row.source}</span>
+                  <ArrowUpRightIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+                </a>
+                <div className="mt-3 flex items-center gap-1.5 text-[12.5px] text-muted-foreground">
+                  <ShieldCheckIcon className="size-3.5 shrink-0" aria-hidden />
+                  {audit.state === "loading" ? (
+                    <Skeleton className="h-3 w-24" />
+                  ) : auditValue === null ? (
+                    <span>{t("market.empty.audit")}</span>
+                  ) : (
+                    <span>
+                      {t("market.detail.auditPassed")
+                        .replace("{passed}", String(passed))
+                        .replace("{total}", String(total))}
+                    </span>
+                  )}
+                </div>
+              </aside>
+            ) : null}
           </div>
         </Tabs>
       </DialogContent>

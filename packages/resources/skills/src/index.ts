@@ -18,7 +18,7 @@ export { SkillsPage }
 export * from "./store.ts"
 export * from "./registry.ts"
 export * from "./provider.ts"
-export { useSkillAgents, useSkillLibrary, useReadablePlaces } from "./library.ts"
+export { placePath, useSkillAgents, useSkillLibrary, useReadablePlaces } from "./library.ts"
 export type { Skill } from "./types.ts"
 export { parseSkillFile } from "./frontmatter.ts"
 export { SkillFileTree, fileTreeKey } from "./file-tree.tsx"

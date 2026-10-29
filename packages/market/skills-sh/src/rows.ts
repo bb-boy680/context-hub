@@ -3,7 +3,13 @@
  * eight-point sparkline, and the in-memory file tree. None of this touches the
  * network or the disk.
  */
-import type { Skill, SkillFileEntry, SkillStore } from "@context-hub/skills"
+import type {
+  Skill,
+  SkillFileEntry,
+  SkillInstall,
+  SkillPlaceRef,
+  SkillStore,
+} from "@context-hub/skills"
 
 import type {
   MarketFile,
@@ -16,8 +22,10 @@ import type {
 export interface MarketLibrary {
   store: SkillStore | null
   rows: Skill[]
+  workspaceId: string | null
   reload(): Promise<void>
   update(id: string): Promise<void>
+  install(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
 }
 
 /** A row either ranking or search can open. */
@@ -70,6 +78,44 @@ export function nameConflict(
       row.name.toLowerCase() === skillId.toLowerCase() &&
       (row.upstream === undefined || !sameSource(row.upstream.source, source))
   )
+}
+
+/** The calls an install into one place needs; the market dialog passes its library. */
+export interface MarketInstallLibrary {
+  store: Pick<SkillStore, "installPackage"> | null
+  rows: readonly Skill[]
+  install(id: string, ref: SkillPlaceRef): Promise<SkillInstall>
+}
+
+/**
+ * Put a market skill into every chosen place, through the hub library when the
+ * library does not hold it yet. The directory the package landed under is the
+ * library's answer, not the market's id: the two can differ. One place failing
+ * does not stop the rest; their reasons are reported together.
+ */
+export async function installMarketSkill(
+  library: MarketInstallLibrary,
+  row: Pick<MarketRow, "source" | "skillId">,
+  refs: readonly SkillPlaceRef[],
+  failure: string
+): Promise<void> {
+  const held = installedRow(library.rows, row.source, row.skillId)
+  let name = held?.name
+  if (name === undefined) {
+    if (library.store === null) throw new Error(failure)
+    const result = await library.store.installPackage(row.source, [row.skillId])
+    name = result.installed[0]
+    if (name === undefined) throw new Error(result.failed[0]?.reason ?? failure)
+  }
+  const failed: string[] = []
+  for (const ref of refs) {
+    try {
+      await library.install(name, ref)
+    } catch (error) {
+      failed.push(error instanceof Error ? error.message : String(error))
+    }
+  }
+  if (failed.length > 0) throw new Error(failed.join(" · "))
 }
 
 /**
@@ -159,7 +205,10 @@ export function treeFromFiles(files: readonly MarketFile[]): SkillFileEntry[] {
     const leftDepth = left.path.split("/").length - 1
     const rightDepth = right.path.split("/").length - 1
     if (leftDepth !== rightDepth) return leftDepth - rightDepth
-    if (left.directory !== right.directory) return left.directory ? 1 : -1
+    /* Folders first at each level, the way a file list reads: a directory is a
+       place to go before it is a name to compare. Depth already keeps a folder
+       ahead of what it holds, so this only orders siblings. */
+    if (left.directory !== right.directory) return left.directory ? -1 : 1
     return left.path.localeCompare(right.path)
   })
 }

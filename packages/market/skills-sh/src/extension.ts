@@ -2,9 +2,9 @@
  * skills.sh as a built-in market plugin. The plugin owns its page, its read
  * service, and its sidebar row; the shell only supplies the "market" group.
  */
-import { StoreIcon } from "lucide-react"
+import { createElement } from "react"
 
-import type { ExtensionModule } from "@context-hub/extensions"
+import type { ExtensionIcon, ExtensionModule } from "@context-hub/extensions"
 
 import { marketEn, marketZh } from "./i18n/index.ts"
 import { SkillsMarketPage } from "./page.tsx"
@@ -12,6 +12,17 @@ import { MARKET_SKILLS_SERVICE, SkillMarket } from "./service.ts"
 
 /** This module's own id; the kernel matches it against the manifest. */
 export const MARKET_SKILLS_SH_ID = "hub.market.skills-sh"
+
+/** The mark this package ships, drawn wherever the plugin's icon is asked for. */
+const MARKET_ICON = new URL("../assets/icon.ico", import.meta.url).href
+
+const MarketIcon: ExtensionIcon = ({ className, "aria-hidden": ariaHidden }) =>
+  createElement("img", {
+    src: MARKET_ICON,
+    alt: "",
+    "aria-hidden": ariaHidden,
+    className,
+  })
 
 /** The built-in skills.sh market: locked, so it has no install or switch. */
 export const marketSkillsShExtension: ExtensionModule = {
@@ -22,7 +33,7 @@ export const marketSkillsShExtension: ExtensionModule = {
     kind: "code",
     category: "source",
     description: "Browse and install skills from the public skills.sh catalog.",
-    icon: StoreIcon,
+    icon: MarketIcon,
     defaultEnabled: true,
     locked: true,
     permissions: ["network", "assets.read", "assets.write"],
@@ -36,7 +47,7 @@ export const marketSkillsShExtension: ExtensionModule = {
     ctx.nav.register({
       path: "/market/skills",
       labelKey: "market.skillsSh",
-      icon: StoreIcon,
+      icon: MarketIcon,
       group: "market",
       order: 10,
     })
