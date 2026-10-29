@@ -1476,3 +1476,65 @@ dev 的 Electron 启动 0 秒就退出（exit 0，日志只有 `Unable to create
 `/hub/skills` 看返回的是新还是旧行为。运行 `pnpm dev` 前先从托盘“退出”安装版，否则
 dev Electron 会秒退并把旧窗口弹出来。新逻辑生效与否，用 dev hub 端口（5270）直接验证，
 不要用安装版端口（安装包的 server 是打包时的旧代码）。
+
+## 写给 agent 的规则必须点名工具（2026-10-29）
+
+**问题模式**：在 AGENTS.md 里写「先调研」时，只写了「用 GitHub 代码搜索」「上网查」这类
+抽象动作，没有指明具体是哪个 MCP、哪个工具、关键参数怎么给。用户的原话是「你这个提示词
+写得好垃圾呀，怎么写你就说要用哪些 MCP，然后你要去网上查找相关信息的话，要用要用什么工具」。
+
+**规则**：写给 agent 的流程规则必须落到可执行的工具名——MCP 写到 server 名即可（如
+`github-mcp-server`、`Context7 MCP`），内置工具写原名（`WebSearch`、`WebFetch`、`gh`），
+并写清关键参数和已知限制（`fields` 只取需要的字段、代码搜索 10 次/分钟、`WebFetch` 长页按
+offset 续读）。不要写成 `mcp__github-mcp-server__search_code` 这种调用全名，用户明确说过
+「只需要给 MCP 名称就可以了」。「调研」「搜索」「查一下」这类动词不构成可执行指令，必须换成
+「用 X 工具查 Y」。
+
+用户偏好的章节结构：**为什么这件事重要 → 可用的调用工具清单 → 硬性要求 → 边界**，最后再加
+一条「调研结束后必须告诉用户调研了什么、得到什么有用的信息」。
+
+**验证方式**：把规则逐条当执行清单读一遍，每一条都应能直接对应到一次具体的工具调用；
+对不上就重写。另外，规则里写的工具名要能在当前会话的工具列表里找到，不能写想象出来的名字。
+
+## `ctx.get()` 每次返回新 Proxy，组件里必须 useMemo，否则 effect 无限重跑（2026-10-29）
+
+**问题模式**：市场页点击「加载更多」后整个应用卡死，dev server 同时打出几十万次接口请求。
+根因不在 loadMore，而在 `page.tsx` 的
+
+```ts
+const market = ctx.get("market.skills-sh") ?? null
+```
+
+cordis 的 `ctx.get()` 走 `getTraceable()` → `createTraceable()`，**每次调用都 `new Proxy(...)`**，
+所以 `market` 每次 render 都是新对象。它正是榜单/搜索两个 `useEffect` 的依赖：
+render → effect 重跑 → `setStatus("loading")` → 再 render，无限循环；effect 里的
+`setVisible(10)` 顺带把「加载更多」展开的行收回去。已用 Node 验证：
+`ctx.get("demo") === ctx.get("demo")` 为 `false`。
+
+**规则**：组件里读服务一律写成仓库已有的形式
+`React.useMemo(() => ctx.get(name) ?? null, [ctx])`（`useChosenAgents`、`useSkillLibrary`、
+`useMcpLibrary` 都是这个写法）。凡是要进 `useEffect`/`useCallback` 依赖数组的服务对象，
+或者拿来比较引用的服务对象，都必须 memo；直接放在 render 体里读出来的 service proxy
+只能当一次性值用。
+
+**判断方式**：页面卡死 + 接口被打爆时，先检查 effect 依赖里有没有未 memo 的
+`ctx.get()` 结果，不要先怀疑网络层或按钮逻辑。
+
+**React Compiler 为什么没兜住**：它确实编译了这个组件（输出走 `react/compiler-runtime`），
+但对 `ctx.get(...)` 不能保证稳定：用 `oxc-transform-react@0.145.0` 直接编译原代码可以看到
+这一行**根本没被缓存**；把同一行单独放进小探针里时它又会缓存，且依赖推导成 `ctx.get`
+本身——而 cordis 的 Context 每次读取方法都返回新代理（`ctx.get !== ctx.get`，已实测），
+缓存永远不命中。结论是：基于 Proxy 的服务容器是编译器的盲区，这类身份必须用
+`useMemo(..., [ctx])` 明确固定，不能指望编译器自动推导。
+
+## 后台刷新不能重置用户已经翻到的分页（2026-10-29）
+
+**问题模式**：市场页从磁盘缓存先渲染，同时后台请求榜单第一页做刷新。刷新回来时直接
+`setRank(page)` + `setVisible(10)`，用户刚点「加载更多」展开的行被收回第一页——用户的原话是
+「我想要的只是替换当前分页的数据」。
+
+**规则**：缓存渲染 + 后台刷新的页面，刷新结果只替换它自己那一页的数据，不能动用户的
+分页位置。市场榜单的合并规则抽成了 `refreshedRank(current, page)`（`rows.ts`）：当前已是
+第一页就整体替换；已经翻过页就只替换前 `page.rows.length` 行、保留后续行，并按
+`source/skillId` 去掉新第一页里重复出现的行，分页位置和 `hasMore` 沿用当前值。
+只有用户显式切换榜单（Tabs）时才把 `visible` 重置为 10。

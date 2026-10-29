@@ -21,6 +21,7 @@ import {
   type StoragePort,
 } from "@context-hub/extensions"
 import { simplifiedChineseLocale } from "@context-hub/zh-cn"
+import { marketSkillsShExtension } from "@context-hub/market-skills-sh"
 import { mcpExtension } from "@context-hub/mcp"
 import { pluginsExtension } from "@context-hub/plugins"
 import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
@@ -207,6 +208,7 @@ export async function startHub(): Promise<HubKernel> {
     extensions: [
       ...builtinExtensions,
       skillsExtension,
+      marketSkillsShExtension,
       promptsExtension,
       mcpExtension,
       pluginsExtension,

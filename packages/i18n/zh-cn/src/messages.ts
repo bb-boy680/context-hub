@@ -5,6 +5,7 @@
  */
 export const messages: Record<string, string> = {
   "nav.group.assets": "资产",
+  "nav.group.market": "市场",
   "nav.group.operate": "运维",
   "nav.skills": "技能",
   "nav.mcpServers": "MCP 服务器",
@@ -13,6 +14,7 @@ export const messages: Record<string, string> = {
   "nav.extensions": "扩展",
   "nav.settings": "设置",
   "nav.variables": "环境变量",
+  "nav.soon": "即将推出",
   "settings.eyebrow": "CONTEXT HUB",
   "settings.title": "设置",
   "settings.subtitle": "这台机器上 Context Hub 的行为。改动即时生效，不需要保存。",

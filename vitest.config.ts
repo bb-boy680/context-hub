@@ -18,6 +18,7 @@ export default defineConfig({
       "packages/extensions/vitest.config.ts",
       "packages/shadcn-ui/vitest.config.ts",
       "packages/i18n/zh-cn/vitest.config.ts",
+      "packages/market/skills-sh/vitest.config.ts",
       "packages/resources/mcp/vitest.config.ts",
       "packages/resources/plugins/vitest.config.ts",
       "packages/resources/skills/vitest.config.ts",

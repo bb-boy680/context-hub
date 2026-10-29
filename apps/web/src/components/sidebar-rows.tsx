@@ -39,6 +39,7 @@ export function SidebarRow({
   label,
   hint,
   active,
+  disabled,
   icon,
   iconWrap,
   trailing,
@@ -50,6 +51,8 @@ export function SidebarRow({
   /** What the row points at, shown on hover rather than as a second line. */
   hint?: string | null
   active: boolean
+  /** A planned source: drawn, but with no destination and no interaction. */
+  disabled?: boolean
   icon: React.ReactNode
   /** Extra classes for the icon's 18px box — an agent mark sits on a plate. */
   iconWrap?: string
@@ -61,9 +64,11 @@ export function SidebarRow({
 }) {
   const className = cn(
     "group/row flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm ring-sidebar-ring outline-hidden transition-colors focus-visible:ring-2",
-    active
-      ? "bg-sidebar-accent font-semibold text-foreground"
-      : "font-medium text-copy hover:bg-sidebar-accent/60"
+    disabled === true
+      ? "cursor-default font-medium text-copy opacity-50"
+      : active
+        ? "bg-sidebar-accent font-semibold text-foreground"
+        : "font-medium text-copy hover:bg-sidebar-accent/60"
   )
   const body = (
     <>
@@ -91,6 +96,16 @@ export function SidebarRow({
     </>
   )
   const title = hint ?? undefined
+
+  if (disabled === true) {
+    return (
+      <li>
+        <div aria-disabled="true" title={title} className={className}>
+          {body}
+        </div>
+      </li>
+    )
+  }
 
   if (href !== undefined) {
     return (

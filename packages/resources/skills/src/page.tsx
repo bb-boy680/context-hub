@@ -24,7 +24,6 @@ import {
 import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
-import { SearchSkillsDialog } from "./search-dialog.tsx"
 import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
@@ -33,7 +32,7 @@ import { tagTone } from "./tags.ts"
 import type { SkillPlaceRef, SkillStore } from "./store.ts"
 import type { Skill } from "./types.ts"
 
-import { useContributions, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
+import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
 import {
   AutoplayVideo,
@@ -940,7 +939,6 @@ export function SkillsPage() {
   const search = useSearchPage()
   const [view, setView] = React.useState<"grid" | "list">(settings.layout)
   const [addTab, setAddTab] = React.useState<AddSkillTab | null>(null)
-  const [searchOpen, setSearchOpen] = React.useState(false)
   const [tag, setTag] = React.useState("All tags")
   /* Typing narrows the same list the category chips do; it is not a new view.
      The query lives in the address so the global search can seed it. */
@@ -965,9 +963,6 @@ export function SkillsPage() {
   const places = useReadablePlaces()
 
   const library = useSkillLibrary(places, needle)
-  /* A registry plugin answers the search; with none the dialog says so. */
-  const registries = useContributions("skillRegistry")
-  const registry = registries[0] ?? null
   /* Each scope tab names the places it holds by their marks, so the number of
      them is a count of places rather than of skills; the same list, with what
      each place holds, is what hovering the stack shows. */
@@ -1400,7 +1395,10 @@ export function SkillsPage() {
               <UploadIcon />
               {t("skills.action.import")}
             </Button>
-            <Button className="h-9 gap-2 rounded-full px-4" onClick={() => setSearchOpen(true)}>
+            <Button
+              className="h-9 gap-2 rounded-full px-4"
+              render={<a href="/market/skills" />}
+            >
               <CompassIcon />
               {t("skills.action.explore")}
             </Button>
@@ -1475,7 +1473,7 @@ export function SkillsPage() {
                     <Button
                       variant="outline"
                       className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
-                      onClick={() => setSearchOpen(true)}
+                      render={<a href="/market/skills" />}
                     >
                       <CompassIcon />
                       {t("skills.action.exploreRemote")}
@@ -1524,7 +1522,7 @@ export function SkillsPage() {
                     <Button
                       variant="outline"
                       className="h-10 rounded-full border-border bg-transparent px-4 dark:border-input dark:bg-transparent"
-                      onClick={() => setSearchOpen(true)}
+                      render={<a href="/market/skills" />}
                     >
                       <CompassIcon />
                       {t("skills.action.exploreRemote")}
@@ -1567,13 +1565,6 @@ export function SkillsPage() {
         onOpenChange={(open) => {
           if (!open) setAddTab(null)
         }}
-      />
-      <SearchSkillsDialog
-        open={searchOpen}
-        store={library.store}
-        registry={registry}
-        onOpenChange={setSearchOpen}
-        onInstalled={() => void library.reload()}
       />
       <SkillDetailDialog
         skill={detail}

@@ -75,7 +75,7 @@ export interface AgentTargetDescriptor {
 }
 
 /** Sidebar groups the shell renders, in order. */
-export type NavGroupId = "assets" | "operate"
+export type NavGroupId = "assets" | "market" | "operate"
 
 /** One sidebar entry contributed by an extension. */
 export interface NavContribution {
@@ -90,6 +90,12 @@ export interface NavContribution {
    * (20, 30 …) so a contributed entry can be inserted between them.
    */
   order: number
+  /**
+   * Drawn in the sidebar but not navigable: the source is planned. The shell
+   * excludes it from the route table, so its path cannot fall through to the
+   * placeholder page.
+   */
+  soon?: boolean
 }
 
 /** One control contributed to the shell's header row. */

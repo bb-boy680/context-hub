@@ -9,12 +9,14 @@ import type { ExtensionModule } from "../types.ts"
 /** Keys every pack resolves; the UI reads them through `ctx.i18n.t`. */
 const en: Record<string, string> = {
   "nav.group.assets": "Assets",
+  "nav.group.market": "Market",
   "nav.group.operate": "Operate",
   "nav.skills": "Skills",
   "nav.mcpServers": "MCP Servers",
   "nav.plugins": "Plugins",
   "nav.extensions": "Extensions",
   "nav.settings": "Settings",
+  "nav.soon": "Coming soon",
   "settings.eyebrow": "CONTEXT HUB",
   "settings.title": "Settings",
   "settings.subtitle": "How Context Hub behaves on this machine. Changes apply immediately; there is nothing to save.",

@@ -29,7 +29,9 @@ function NavGroup({ group }: { group: NavGroupData }) {
         <SidebarRow
           key={item.path}
           label={t(item.labelKey)}
+          hint={item.soon === true ? t("nav.soon") : undefined}
           active={pathname === item.path}
+          disabled={item.soon === true}
           href={item.path}
           icon={<item.icon className="size-[18px]" aria-hidden />}
         />
@@ -149,6 +151,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const navGroups = useNavGroups()
   const { version, updatesEnabled } = useDesktopInfo()
   const assets = navGroups.find((group) => group.id === "assets")
+  const market = navGroups.find((group) => group.id === "market")
   const operate = navGroups.find((group) => group.id === "operate")
 
   return (
@@ -174,6 +177,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent className="gap-5 px-4 pt-5 pb-5">
         {assets === undefined ? null : <NavGroup group={assets} />}
+        {market === undefined ? null : <NavGroup group={market} />}
         <WorkspaceGroup />
         <AgentGroup />
         {operate === undefined ? null : <NavGroup group={operate} />}
