@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest"
 
-import type { PluginRecord } from "@context-hub/plugins"
+import type { PackContents, PluginRecord } from "@context-hub/plugins"
 
 import type { MarketEntry, MarketSource } from "../src/contract.ts"
 import {
   groupedRows,
   installedRecord,
+  offeredTabs,
   rowsOf,
   visibleRows,
   type MarketRow,
@@ -123,6 +124,41 @@ describe("groupedRows", () => {
     const groups = groupedRows(same, (id) => id)
     expect(groups).toHaveLength(1)
     expect(groups[0]?.rows.map((row) => row.entry.name)).toEqual(["alpha", "beta"])
+  })
+})
+
+describe("offeredTabs", () => {
+  const item = { title: "one", description: "" }
+  const contents = (overrides: Partial<PackContents> = {}): PackContents => ({
+    skills: [],
+    commands: [],
+    mcp: null,
+    ...overrides,
+  })
+
+  it("offers content alone before the pack is read", () => {
+    expect(offeredTabs(null)).toEqual(["content"])
+  })
+
+  it("offers content alone when the pack carries nothing else", () => {
+    expect(offeredTabs(contents())).toEqual(["content"])
+  })
+
+  it("offers the tab the pack turned out to fill", () => {
+    expect(offeredTabs(contents({ skills: [item] }))).toEqual(["content", "skills"])
+    expect(offeredTabs(contents({ commands: [item] }))).toEqual(["content", "commands"])
+    expect(offeredTabs(contents({ mcp: "{}" }))).toEqual(["content", "mcp"])
+  })
+
+  it("orders content, skills, commands and mcp", () => {
+    expect(
+      offeredTabs(contents({ skills: [item], commands: [item], mcp: "{}" }))
+    ).toEqual(["content", "skills", "commands", "mcp"])
+  })
+
+  it("does not count an empty or blank .mcp.json", () => {
+    expect(offeredTabs(contents({ mcp: "" }))).toEqual(["content"])
+    expect(offeredTabs(contents({ mcp: "  \n" }))).toEqual(["content"])
   })
 })
 

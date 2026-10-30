@@ -3,7 +3,11 @@
  * them, and answering whether the library already holds one. None of this
  * touches the network or the disk.
  */
-import { sourceMatches, type PluginRecord } from "@context-hub/plugins"
+import {
+  sourceMatches,
+  type PackContents,
+  type PluginRecord,
+} from "@context-hub/plugins"
 
 import { normalizeCategory, type MarketEntry, type MarketSource } from "./contract.ts"
 
@@ -114,6 +118,26 @@ export function installPath(row: MarketRow): string | undefined {
 /** The commit the index pinned, when it published one. */
 export function installCommit(row: MarketRow): string | undefined {
   return row.entry.install.sha
+}
+
+/** The tabs a market entry's detail can show, in the order it reads them. */
+export type DetailTab = "content" | "skills" | "commands" | "mcp"
+
+/**
+ * The tabs one previewed entry offers.
+ *
+ * Content is always there — it is the index's own sentence and the pack's
+ * README. The other three only exist when the pack was read and turned out to
+ * carry something: a tab whose whole content is "none" is not a tab, and a
+ * preview still loading has read nothing yet.
+ */
+export function offeredTabs(contents: PackContents | null): DetailTab[] {
+  const tabs: DetailTab[] = ["content"]
+  if (contents === null) return tabs
+  if (contents.skills.length > 0) tabs.push("skills")
+  if (contents.commands.length > 0) tabs.push("commands")
+  if (contents.mcp !== null && contents.mcp.trim() !== "") tabs.push("mcp")
+  return tabs
 }
 
 /**

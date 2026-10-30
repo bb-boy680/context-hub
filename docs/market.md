@@ -38,6 +38,25 @@ The index is read once and cached for ten minutes; a refresh asks again.
 Enrichment runs only for rows that enter the viewport, and answers are kept for
 the session. A refresh of the index does not throw the marks away.
 
+## Details
+
+Opening a row reads the pack itself — a staging fetch the library never sees —
+so the dialog can show its README and what it carries. The panel beside the
+tabs always shows what the index already knows: source, home, and the action.
+
+- **Content** is always offered: the index's description, then the pack's
+  README rendered as markdown.
+- **Skills**, **Commands** and **MCP** appear only when the pack was read and
+  turned out to carry them.
+- While the read is out, Content stands alone under a progress line; a failed
+  read leaves Content with a retry and does not change anything the index
+  already said.
+- README pictures with an absolute address render; relative ones are left out,
+  because the pack's files are not served to the page.
+
+The preview is cached for ten minutes per address, and never writes to the
+library or to any agent.
+
 ## Installing
 
 A row that is not in the library offers install: choose an agent and a scope
