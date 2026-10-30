@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-30T10:07:32Z",
+  "updated_at": "2026-10-30T11:13:24Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "1da9b647aa74f957bcd41bf37054df4396be20e75391b5c064f21abea5c2e63d",
-      "size": 167456,
-      "normalized_sha256": "1da9b647aa74f957bcd41bf37054df4396be20e75391b5c064f21abea5c2e63d"
+      "sha256": "bceed9907d4a4683ff68da97cc95211f8f9e898731192fa560bff6c21dfd0c6c",
+      "size": 167596,
+      "normalized_sha256": "bceed9907d4a4683ff68da97cc95211f8f9e898731192fa560bff6c21dfd0c6c"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1517,9 +1517,9 @@
     },
     "packages/market/plugins/src/i18n/en.ts": {
       "role": "index",
-      "sha256": "db26561723c6437d456b4b28a62faa5598bc6f05b3153752b58767fae2a101ee",
-      "size": 3778,
-      "normalized_sha256": "db26561723c6437d456b4b28a62faa5598bc6f05b3153752b58767fae2a101ee"
+      "sha256": "be1048eac1abe0fc162b755f68aa401a3385e0dd44abb8ded9aad8bcef3eeed1",
+      "size": 3625,
+      "normalized_sha256": "be1048eac1abe0fc162b755f68aa401a3385e0dd44abb8ded9aad8bcef3eeed1"
     },
     "packages/market/plugins/src/i18n/index.ts": {
       "role": "index",
@@ -1529,9 +1529,9 @@
     },
     "packages/market/plugins/src/i18n/zh-cn.ts": {
       "role": "index",
-      "sha256": "97519d6cb75c10403e66f587d6a486d54528f14a14023ad21a9133bf7893d9b7",
-      "size": 3710,
-      "normalized_sha256": "97519d6cb75c10403e66f587d6a486d54528f14a14023ad21a9133bf7893d9b7"
+      "sha256": "8cbf7a3bbafd8537699b11d3cb20efa4368eff7062d3e05d7e049059e3588bc5",
+      "size": 3561,
+      "normalized_sha256": "8cbf7a3bbafd8537699b11d3cb20efa4368eff7062d3e05d7e049059e3588bc5"
     },
     "packages/market/plugins/src/icons.tsx": {
       "role": "index",
@@ -1547,9 +1547,9 @@
     },
     "packages/market/plugins/src/install-dialog.tsx": {
       "role": "index",
-      "sha256": "eb9aed22518811f6676e5e70da3e66761990a46797d2c488cf5ff5ef1f991e66",
-      "size": 9746,
-      "normalized_sha256": "eb9aed22518811f6676e5e70da3e66761990a46797d2c488cf5ff5ef1f991e66"
+      "sha256": "44010fb01cc38e24192342127cf9df320e28eb8221112be260b2ff7aba097a77",
+      "size": 14565,
+      "normalized_sha256": "44010fb01cc38e24192342127cf9df320e28eb8221112be260b2ff7aba097a77"
     },
     "packages/market/plugins/src/page.tsx": {
       "role": "index",
