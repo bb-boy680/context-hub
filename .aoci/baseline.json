@@ -1,7 +1,7 @@
 {
   "version": 1,
   "created_at": "2026-10-14T17:50:13Z",
-  "updated_at": "2026-10-29T16:51:34Z",
+  "updated_at": "2026-10-30T06:42:14Z",
   "files": {
     ".gitattributes": {
       "role": "index",
@@ -71,9 +71,9 @@
     },
     "aoci.code.txt": {
       "role": "index",
-      "sha256": "eb948d75d697510e15dcb22f0be06dd9527daf781af43f348aafa079ce5f4a77",
-      "size": 155482,
-      "normalized_sha256": "eb948d75d697510e15dcb22f0be06dd9527daf781af43f348aafa079ce5f4a77"
+      "sha256": "1ef15138182b9a8096e4197e5bda438e727a333a59522fc561119838aab1b94d",
+      "size": 155623,
+      "normalized_sha256": "1ef15138182b9a8096e4197e5bda438e727a333a59522fc561119838aab1b94d"
     },
     "aoci.meta.txt": {
       "role": "index",
@@ -1493,9 +1493,9 @@
     },
     "packages/market/skills-sh/src/page.tsx": {
       "role": "index",
-      "sha256": "a21de7591dfb73598c525cf6317e1abc8a45c9d25ba0eb3b4fb959ec77366d79",
-      "size": 21445,
-      "normalized_sha256": "88160ae3d781771ea04a1f63af3b2e6463db75b57262c81da7b8abc6db4ddc29"
+      "sha256": "6640bddd4868480c7409c8738dbb791851434ea193080e66ef2c683d2c998f6e",
+      "size": 21579,
+      "normalized_sha256": "5b15313a4293c6f6bde800164000c6fa78d46440af32982a97b948a925a10403"
     },
     "packages/market/skills-sh/src/rows.ts": {
       "role": "index",

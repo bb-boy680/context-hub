@@ -486,7 +486,10 @@ function MarketTableRow({
   const conflict = installed === undefined && nameConflict(library.rows, row.source, row.skillId)
 
   return (
-    <TableRow className="h-[54px] [contain-intrinsic-size:54px] [content-visibility:auto] hover:bg-muted/40">
+    <TableRow
+      className="h-[54px] cursor-pointer [contain-intrinsic-size:54px] [content-visibility:auto] hover:bg-muted/40"
+      onClick={() => onOpen(row)}
+    >
       {showRank ? (
         <TableCell className="w-10 pl-5 font-mono text-[13px] text-muted-foreground">
           {index + 1}
@@ -514,7 +517,10 @@ function MarketTableRow({
       <TableCell className="w-28 pr-5 text-right font-mono text-[13px] text-muted-foreground">
         {row.installs.toLocaleString(state.active)}
       </TableCell>
-      <TableCell className="w-24 pr-5 text-right">
+      <TableCell
+        className="w-24 pr-5 text-right"
+        onClick={(event) => event.stopPropagation()}
+      >
         {installed !== undefined ? (
           stale ? (
             <Button
