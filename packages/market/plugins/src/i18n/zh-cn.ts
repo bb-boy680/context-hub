@@ -62,9 +62,6 @@ export const marketPluginsZh: Record<string, string> = {
 
   "market.plugins.install.title": "安装 {name}",
   "market.plugins.install.to": "安装到",
-  "market.plugins.install.scope": "范围",
-  "market.plugins.install.thisRepo": "此仓库",
-  "market.plugins.install.thisMachine": "此机器",
   "market.plugins.install.source": "来源",
   "market.plugins.install.note": "Hub 会复制固定的提交，再交付给选中的 Agent。",
   "market.plugins.install.cancel": "取消",
@@ -73,5 +70,5 @@ export const marketPluginsZh: Record<string, string> = {
   "market.plugins.install.done": "已安装 {name}",
   "market.plugins.install.failed": "安装失败",
   "market.plugins.install.noAgent": "这台机器上没有可用的 Agent。",
-  "market.plugins.install.detected": "已检测到",
+  "market.plugins.install.installed": "已安装",
 }

@@ -1,17 +1,26 @@
 /**
- * Installing one market entry: choose the agent and the scope, then let the
- * plugin library collect the pack and deliver it.
+ * Installing one market entry: pick the places it goes into, then let the
+ * plugin library collect the pack and deliver it there.
  *
- * The dialog mounts only while it is open, which is what makes it the one
- * place that reads the whole plugin library — the directory above only needs
- * the names already collected.
+ * The places are the agents' own: each one declares where it keeps packs and
+ * what it calls that place, so this lists them the way the skills market lists
+ * its places — one row per agent and place, grouped by the root it belongs to.
+ * The library row on top is the copy every delivery is made from, which is why
+ * it is always the first thing checked.
  */
-import { XIcon } from "lucide-react"
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  LibraryIcon,
+  Loader2Icon,
+  XIcon,
+} from "lucide-react"
 import * as React from "react"
 
+import type { AssetScope } from "@context-hub/extensions"
 import { useI18n } from "@context-hub/extensions/react"
-import type { PluginInstallScope, PluginRecord } from "@context-hub/plugins"
-import { usePluginLibrary } from "@context-hub/plugins/library"
+import type { PluginPlace, PluginRecord } from "@context-hub/plugins"
+import { usePluginLibrary, type PluginClient } from "@context-hub/plugins/library"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Dialog,
@@ -33,10 +42,28 @@ import {
   type MarketRow,
 } from "./rows.ts"
 
-const SCOPES: readonly { value: PluginInstallScope; key: string }[] = [
-  { value: "project", key: "market.plugins.install.thisRepo" },
-  { value: "user", key: "market.plugins.install.thisMachine" },
-]
+/** The root groups a place belongs to, in the order the list reads them. */
+const SCOPES: readonly AssetScope[] = ["workspace", "global"]
+
+/** Past this many places a group folds, the same count the skills page uses. */
+const PLACES_VISIBLE = 8
+
+/** The library row and every place row wear the same surface, so a choice
+ * reads as one control whether it is the fixed target or a place to pick. */
+const ROW =
+  "flex w-full items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-3 py-2.5 text-left"
+
+/** An agent's own mark, the same 28px tile the skills page's place lists use. */
+const TILE =
+  "flex size-7 shrink-0 items-center justify-center overflow-clip rounded-lg bg-surface-raised ring-1 ring-border ring-inset"
+
+const CIRCLE =
+  "flex size-5 shrink-0 items-center justify-center rounded-full border border-border bg-background"
+
+/** The agent's own word for a place, which is what the row's second line says. */
+function scopeWordKey(place: PluginPlace): string {
+  return place.scopeWord === "user" ? "plugins.scope.user" : "plugins.scope.project"
+}
 
 function Heading({ children }: { children: React.ReactNode }) {
   return (
@@ -59,7 +86,7 @@ function MetaRow({ label, value }: { label: string; value: string }) {
  * The install dialog for one entry.
  *
  * @param records — what the page already read, so an entry already in the
- * library goes straight to delivery.
+ * library goes straight to delivery instead of being collected again.
  */
 export function MarketInstallDialog({
   row,
@@ -74,58 +101,140 @@ export function MarketInstallDialog({
 }) {
   const { t } = useI18n()
   const library = usePluginLibrary()
-  const [picked, setPicked] = React.useState<string | null>(null)
-  const [scope, setScope] = React.useState<PluginInstallScope>("project")
+  const [picked, setPicked] = React.useState<readonly string[]>([])
+  const [unfolded, setUnfolded] = React.useState<readonly string[]>([])
   const [running, setRunning] = React.useState(false)
   const [failure, setFailure] = React.useState<string | null>(null)
 
-  const client =
-    library.clients.find((one) => one.id === picked && one.available) ??
-    library.clients.find((one) => one.available)
   const record = installedRecord(records, row.entry)
   const path = installPath(row)
   const commit = installCommit(row)
   const category = t(`market.plugins.category.${normalizeCategory(row.entry.category)}`)
+  /* The folded rows are what say which places already hold the pack; the
+     records above only say whether the library has a copy at all. */
+  const held =
+    record === undefined
+      ? undefined
+      : library.rows.find((one) => one.name === record.name)
+  const belongs = (client: PluginClient, place: PluginPlace): boolean =>
+    held?.held
+      .find((one) => one.client === client.id)
+      ?.places.some((one) => one.group === place.scope && one.scope === place.scopeWord) ===
+    true
+  const targets = library.clients.flatMap((client) =>
+    client.places
+      .filter((place) => picked.includes(place.id) && !belongs(client, place))
+      .map((place) => ({ client, place }))
+  )
+  /* Already in the library and nothing picked: installing again would only
+     replace the same copy. */
+  const nothingToDo = record !== undefined && targets.length === 0
 
   const close = (next: boolean) => {
     if (running) return
     onOpenChange(next)
   }
 
+  const toggle = (id: string) => {
+    setPicked((current) =>
+      current.includes(id) ? current.filter((one) => one !== id) : [...current, id]
+    )
+  }
+
+  /* Each root folds on its own: the machine-wide list grows with every agent a
+     person enables, while a workspace holds only the places this hub knows. */
+  const fold = (scope: string) =>
+    setUnfolded((current) =>
+      current.includes(scope)
+        ? current.filter((one) => one !== scope)
+        : [...current, scope]
+    )
+
   const install = () => {
-    if (client === undefined || running) return
+    if (running || nothingToDo) return
     setRunning(true)
     setFailure(null)
-    Promise.resolve()
-      .then(async () => {
-        if (record !== undefined) return record.name
+    void (async () => {
+      /* Collect first: every delivery is made from the library's copy. */
+      let name = record?.name
+      if (name === undefined) {
         const collected = await collectMarketInstall(row.entry.install)
-        /* The collector wrote a record; the library has to read it before it
-           can be delivered by name. */
         await library.refresh()
-        return collected.record.name
+        name = collected.record.name
+      }
+      /* One refusal must not hide the places that did land, so each is tried
+         and the first reason is what the dialog keeps. */
+      let refused: string | null = null
+      for (const target of targets) {
+        try {
+          await library.install(name, target.client.id, target.place.scopeWord)
+        } catch (error: unknown) {
+          refused ??= error instanceof Error ? error.message : String(error)
+        }
+      }
+      if (refused !== null) {
+        setFailure(refused)
+        return
+      }
+      toast.add({
+        type: "success",
+        title: t("market.plugins.install.done").replace("{name}", row.entry.name),
       })
-      .then((name) => library.install(name, client.id, scope))
-      .then(() => {
-        toast.add({
-          type: "success",
-          title: t("market.plugins.install.done").replace("{name}", row.entry.name),
-        })
-        onOpenChange(false)
-      })
+      onOpenChange(false)
+    })()
       .catch((error: unknown) => {
         setFailure(error instanceof Error ? error.message : String(error))
       })
-      .finally(() => {
-        setRunning(false)
-      })
+      .finally(() => setRunning(false))
+  }
+
+  const placeRow = (client: PluginClient, place: PluginPlace) => {
+    const already = belongs(client, place)
+    const blocked =
+      client.error !== undefined
+        ? t("plugins.client.unread")
+        : client.available
+          ? undefined
+          : t("plugins.client.absent")
+    const checked = already || picked.includes(place.id)
+    const disabled = already || blocked !== undefined || running
+    const Mark = client.icon
+    return (
+      <button
+        key={place.id}
+        type="button"
+        role="checkbox"
+        aria-checked={checked}
+        aria-label={`${client.label} ${t(scopeWordKey(place))}`}
+        disabled={disabled}
+        title={blocked}
+        onClick={() => toggle(place.id)}
+        className={`${ROW} outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60`}
+      >
+        <span className={TILE}>
+          <Mark className="size-4" aria-hidden />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-sm font-medium">{client.label}</span>
+          <span className="truncate font-mono text-[11.5px] text-muted-foreground">
+            {t(scopeWordKey(place))}
+          </span>
+        </span>
+        {blocked === undefined ? null : (
+          <span className="shrink-0 text-[11.5px] text-muted-foreground">{blocked}</span>
+        )}
+        <span className={CIRCLE}>
+          {checked ? <CheckIcon className="size-3" aria-hidden /> : null}
+        </span>
+      </button>
+    )
   }
 
   return (
     <Dialog open={open} onOpenChange={close}>
       <DialogContent
         showCloseButton={false}
-        className="flex w-[min(540px,calc(100vw-32px))] flex-col gap-0 overflow-hidden rounded-xl bg-dialog p-0 shadow-soft ring-1 ring-border sm:max-w-[540px]"
+        className="flex max-h-[calc(100vh-2rem)] w-[min(540px,calc(100vw-32px))] flex-col gap-0 overflow-hidden rounded-xl bg-dialog p-0 shadow-soft ring-1 ring-border sm:max-w-[540px]"
       >
         <div className="flex min-w-0 items-start gap-2 px-6 pt-6 pb-4">
           <div className="flex min-w-0 flex-col gap-1">
@@ -150,67 +259,70 @@ export function MarketInstallDialog({
           </DialogClose>
         </div>
 
-        <div className="flex flex-col gap-5 px-6 pb-5">
-          <section className="flex flex-col gap-2">
+        <div className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 pb-5">
+          <section className="flex flex-col gap-2.5">
             <Heading>{t("market.plugins.install.to")}</Heading>
-            {library.clients.length === 0 ? (
-              <p className="text-[13px] text-muted-foreground">
+            {/* The library is the copy every place is delivered from, so it is
+                the one target that cannot be unpicked. */}
+            <div className={ROW}>
+              <span className={TILE}>
+                <LibraryIcon className="size-4" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1 text-sm font-medium">
+                {t("plugins.tab.library")}
+              </span>
+              <span className={CIRCLE}>
+                <CheckIcon className="size-3" aria-hidden />
+              </span>
+            </div>
+
+            {SCOPES.map((scope) => {
+              const group = library.clients.flatMap((client) =>
+                client.places
+                  .filter((place) => place.scope === scope)
+                  .map((place) => ({ client, place }))
+              )
+              if (group.length === 0) return null
+              const open = unfolded.includes(scope)
+              const rest = group.length - PLACES_VISIBLE
+              const shown = open || rest <= 0 ? group : group.slice(0, PLACES_VISIBLE)
+              return (
+                <div key={scope} className="flex flex-col gap-2">
+                  <span className="px-1 pt-1 text-[11.5px] font-semibold text-muted-soft">
+                    {t(`plugins.detail.group.${scope}`)}
+                  </span>
+                  {shown.map((one) => placeRow(one.client, one.place))}
+                  {rest <= 0 ? null : (
+                    <button
+                      type="button"
+                      aria-expanded={open}
+                      onClick={() => fold(scope)}
+                      className="flex h-10 w-full items-center gap-2.5 rounded-md pr-3 pl-[5px] text-left text-sm font-medium text-copy outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="flex size-[18px] shrink-0 items-center justify-center">
+                        <ChevronDownIcon
+                          className={`size-[18px] shrink-0 transition-transform ${
+                            open ? "rotate-180" : ""
+                          }`}
+                          aria-hidden
+                        />
+                      </span>
+                      {open
+                        ? t("plugins.place.collapse")
+                        : t("plugins.place.expand").replace("{count}", String(rest))}
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+
+            {library.failure !== null ? (
+              <p className="px-1 text-xs text-destructive">{library.failure}</p>
+            ) : library.clients.length === 0 && !library.busy ? (
+              <p className="px-1 text-xs text-muted-foreground">
                 {t("market.plugins.install.noAgent")}
               </p>
-            ) : (
-              <div role="radiogroup" className="flex flex-col gap-2">
-                {library.clients.map((one) => {
-                  const selected = client?.id === one.id
-                  return (
-                    <button
-                      key={one.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      disabled={!one.available || running}
-                      onClick={() => setPicked(one.id)}
-                      className={`flex items-center gap-3 rounded-lg border px-4 py-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
-                        selected
-                          ? "border-primary bg-primary/5 ring-1 ring-primary"
-                          : "border-border"
-                      }`}
-                    >
-                      <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-border">
-                        {selected ? <span className="size-2 rounded-full bg-primary" /> : null}
-                      </span>
-                      <span className="truncate">{one.label}</span>
-                      {one.available ? (
-                        <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
-                          {t("market.plugins.install.detected")}
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-          </section>
-
-          <section className="flex flex-col gap-2">
-            <Heading>{t("market.plugins.install.scope")}</Heading>
-            <div className="flex rounded-full bg-secondary p-1">
-              {SCOPES.map((item) => (
-                <button
-                  key={item.value}
-                  type="button"
-                  aria-pressed={scope === item.value}
-                  disabled={running}
-                  onClick={() => setScope(item.value)}
-                  className={`flex-1 rounded-full py-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    scope === item.value
-                      ? "bg-background font-medium text-foreground shadow-sm"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {t(item.key)}
-                </button>
-              ))}
-            </div>
+            ) : null}
           </section>
 
           <section className="flex flex-col gap-2">
@@ -248,8 +360,15 @@ export function MarketInstallDialog({
           <Button variant="secondary" disabled={running} onClick={() => close(false)}>
             {t("market.plugins.install.cancel")}
           </Button>
-          <Button disabled={client === undefined || running} onClick={install}>
-            {running ? t("market.plugins.install.running") : t("market.plugins.install.confirm")}
+          <Button disabled={running || nothingToDo} onClick={install}>
+            {running ? (
+              <Loader2Icon className="animate-spin" aria-hidden />
+            ) : null}
+            {running
+              ? t("market.plugins.install.running")
+              : nothingToDo
+                ? t("market.plugins.install.installed")
+                : t("market.plugins.install.confirm")}
           </Button>
         </div>
       </DialogContent>

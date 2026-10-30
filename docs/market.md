@@ -59,9 +59,11 @@ library or to any agent.
 
 ## Installing
 
-A row that is not in the library offers install: choose an agent and a scope
-(this repository, or this machine). The hub collects the pack into the plugin
-library first, then lets that agent's own installer deliver it.
+A row that is not in the library offers install: pick the places it goes into,
+grouped by the root each agent keeps them under (this workspace, or this
+machine). The library row is always the copy every delivery is made from, so
+the hub collects the pack there first, then lets each chosen agent's own
+installer deliver it.
 
 The address comes from the index, never from the page's own invention. When the
 index publishes a commit, the hub fetches that commit and verifies `HEAD`, so a

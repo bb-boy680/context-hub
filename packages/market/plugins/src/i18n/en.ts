@@ -63,9 +63,6 @@ export const marketPluginsEn: Record<string, string> = {
 
   "market.plugins.install.title": "Install {name}",
   "market.plugins.install.to": "Install to",
-  "market.plugins.install.scope": "Scope",
-  "market.plugins.install.thisRepo": "This repository",
-  "market.plugins.install.thisMachine": "This machine",
   "market.plugins.install.source": "Source",
   "market.plugins.install.note":
     "The hub copies the pinned commit, then delivers it to the selected agent.",
@@ -75,5 +72,5 @@ export const marketPluginsEn: Record<string, string> = {
   "market.plugins.install.done": "Installed {name}",
   "market.plugins.install.failed": "Install failed",
   "market.plugins.install.noAgent": "No agent is available on this machine.",
-  "market.plugins.install.detected": "Detected",
+  "market.plugins.install.installed": "Installed",
 }
