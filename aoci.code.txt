@@ -5,15 +5,15 @@
 .gitignore[FV7T]: F:声明 Git 忽略范围 | R:- | A:- | S:aoci*.txt 与 AGENTS.md 绝不可忽略，否则 scan 静默跳过；.mcp.json、.claude/skills、.agents、.codex 是机器本地 agent 集成或链接，release/dist/node_modules 是再生数据，designs 图片可重新导出。
 .prettierignore[FV3T]: F:声明 Prettier 忽略清单 | R:- | A:- | S:pnpm-lock.yaml 必须保持忽略，否则格式化会改动锁文件产生噪声提交
 .prettierrc[FV5T]: F:统一格式化规则 | R:code:.gitattributes | A:- | S:endOfLine=lf 与 .gitattributes 保持一致；tailwindStylesheet 指向 packages/shadcn-ui/src/styles/globals.css，组件迁包后这里不同步会让 Tailwind 类名排序失效
-AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:执行任务前用 create-plan 子智能体写计划并自审，用户明确批准前不动源码，获批后用 TaskCreate/TaskUpdate 逐阶段推进；指令优先级中最新明确请求高于仓库级说明；涉及安全、数据丢失、凭证、部署或重大架构决策必须停下询问；AOCI 与 design 说明区块由工具维护，不可手改；AOCI 说明按模块切片按需读取，收尾时调用一次 aoci_maintain。
+AGENTS.md[SG9M]: F:项目 agent 入口与协作规则 | R:- | A:- | S:计划直接在主上下文写，不建 create-plan 子智能体；计划放 docs/plans、自审待批准、完成后归档；执行用 TaskCreate/TaskUpdate 按阶段；纠正写入 docs/memory.md；不确定或依赖时效信息先验证；涉及数据丢失/凭证/部署先问；AOCI 与 design 区块由工具维护。
 DESIGN.md[SU7M]: F:设计 token 与组件规范 | R:- | A:- | S:唯一强调色 Coinbase Blue #0052ff 且克制使用；display 字重固定 400 不得加粗；圆角只有 pill 100px、xl 24px、full 9999px；交易绿红 #05b169 与 #cf202f 只作文本色不作背景
 README.md[SG8S]: F:面向 GitHub 的英文总入口：功能、桌面/CLI/源码安装、开发命令与文档链接 | R:code:README.zh-CN.md,code:docs/building.md,code:docs/extensions.md,code:docs/releasing.md | A:- | S:README.zh-CN.md 必须逐节镜像；发布包文件名、CLI 参数与 pnpm 版本是实际产物，改名要同步 docs/building.md；测试套件要求 git 在 PATH 上（更新用例会 clone 仓库）。
 package.json[FV8T]: F:monorepo 根脚本与工具链 | R:- | A:- | S:pnpm@10.33.4 且 node>=20；test 直接跑根 vitest，不经 turbo；dev 经 turbo 同起 web 与桌面；build 经 turbo，build:cli 先构建 web 再调 web build:cli，build:desktop 只 bundle 桌面端。
-pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:由 pnpm 生成，不得手改；lockfileVersion 9.0，含 electron 44.9、esbuild 0.28.2、oxc-transform-react 0.145.0、react 19.2.8、vite 8.2.4、vitest 5.0.5；workspace 含 market/skills-sh；改依赖后跑 pnpm install 并一并提交
+pnpm-lock.yaml[FV7L]: F:依赖锁定清单 | R:- | A:- | S:pnpm 生成不得手改；lockfileVersion 9.0；workspace 含 market/skills-sh、market/plugins、market/claude-plugins-official、market/codex-plugins；依赖版本以此文件为准，改依赖后 pnpm install 并一并提交
 pnpm-workspace.yaml[FV7T]: F:工作区与构建白名单 | R:- | A:- | S:packages 覆盖 apps/*、packages/* 与 packages/*/*；allowBuilds 控制安装脚本，electron 必须 true，否则不下载运行时且 dist 为空；msw 为 false
 tsconfig.json[FV5T]: F:仓库级编译基线 | R:- | A:- | S:只给 target/module/strict 等公共项，各包自己的 tsconfig 在此基础上加 include 与 jsx
 turbo.json[FV7T]: F:任务图与缓存 | R:- | A:- | S:dev 不缓存且 persistent；build 依赖 ^build 且输出 dist/**；lint/format/typecheck 都先跑依赖包的同名任务
-vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob；新增包必须在此登记；已移除 packages/agents/claude-code；市场插件测试登记为 packages/market/skills-sh；scripts、desktop、global-search 等已登记
+vitest.config.ts[FQ5T]: F:汇总全部包的测试入口 | R:- | A:- | S:projects 名单写死而非 glob；新增包必须在此登记；市场项目为 skills-sh、market/plugins、claude-plugins-official、codex-plugins；scripts/desktop/global-search 亦登记
 CHANGELOG.md[SV5T]: F:按版本记录由 conventional commit 生成的变更日志 | R:code:scripts/changelog.mjs | A:- | S:由 scripts/changelog.mjs 生成并把新 tag 段插到最前；同一 tag 不重复；不要手改，发布后由版本同步 PR 回写。
 LICENSE[SG3T]: F:MIT 许可证全文与版权归属 | R:- | A:- | S:版权行为 2026 bb-boy680；README 两语言版本的许可证段落都指向本文件。
 README.zh-CN.md[SG7S]: F:README.md 的简体中文镜像 | R:code:README.md | A:- | S:与 README.md 逐节对应，改结构或步骤时两边同改；文件名、命令与版本号保持原样不翻译。
@@ -22,7 +22,7 @@ README.zh-CN.md[SG7S]: F:README.md 的简体中文镜像 | R:code:README.md | A:
 components.json[FU5T]: F:shadcn 生成配置 | R:code:packages/shadcn-ui/src/styles/globals.css | A:- | S:aliases.utils 与 aliases.ui 指向 @context-hub/shadcn-ui，css 指向 packages/shadcn-ui/src/styles/globals.css；组件包改名后两处不同步会把 utils 重复内联进应用
 eslint.config.js[FQ3T]: F:web 应用 lint 规则 | R:- | A:- | S:忽略必须用 globalIgnores 而非 ignorePatterns
 index.html[EU5T]: F:页面宿主骨架与插件运行时的 import map | R:code:apps/web/src/main.tsx,code:packages/core/src/host/extension-runtime.ts | A:- | S:import map 必须在模块脚本之前；映射 react/react-dom/jsx-runtime/jsx-dev-runtime 到 /hub/extensions/_runtime/*.js；Vite 构建保留；<title> 必须是 Context Hub，Electron 标题栏取它，留模板名显示 vite-monorepo
-package.json[FV6T]: F:web 应用依赖与脚本 | R:code:apps/web/build-cli.ts,code:apps/web/vite.config.ts | A:- | S:build 先 tsc -b 再 vite build；start 是 server.ts --static dist；oxc-transform-react 0.145.0 供 React Compiler 经 plugin-react 启用；claude-code 已移出依赖；市场经 @context-hub/market-skills-sh 接入
+package.json[FV6T]: F:web 应用依赖与脚本 | R:code:apps/web/build-cli.ts,code:apps/web/vite.config.ts | A:- | S:build 先 tsc -b 再 vite build；start 是 server.ts --static dist；oxc-transform-react 0.145.0 供 React Compiler；市场依赖 skills-sh、market-plugins 与两个来源包；claude-code 已移出依赖
 tsconfig.app.json[FV7T]: F:应用编译选项 | R:code:apps/web/tsconfig.json | A:- | S:paths 必须同时映射 @/* 与 @context-hub/shadcn-ui/*，并与 vite alias 和 tsconfig.json 保持一致；types 只有 vite/client，浏览器代码不得混入 node 类型
 tsconfig.json[FV5T]: F:引用式工程根 | R:code:apps/web/tsconfig.app.json,code:apps/web/tsconfig.node.json,code:apps/web/tsconfig.test.json | A:- | S:files 为空靠 references 组合；paths 需与子配置重复声明，三处必须同步
 tsconfig.node.json[FV3T]: F:构建与宿主脚本编译选项 | R:code:apps/web/tsconfig.json | A:- | S:include 含 build-cli.ts 与 shutdown.ts；types=node
@@ -54,7 +54,7 @@ extension-update-settings.tsx[AE6T]: F:设置页的扩展更新控件：检查�
 ===D:/work-space/dsh-context-hub/apps/web/src/lib/===
 extensions.ts[CU5T]: F:扩展展示辅助表与共享卡片表面 | R:- | A:cardSurface,categoryOrder,categoryTile | S:cardSurface 同时服务页面和市场区块；categoryOrder 决定分区顺序且空分类会被跳过
 folder-picker.ts[IU5T]: F:系统目录选择封装：桌面桥返回绝对路径，浏览器只返回目录名 | R:code:apps/web/src/lib/desktop.ts,code:packages/core/src/workspace.ts | A:pickFolder,PickedFolder | S:只在用户手势中调用；桌面桥有 pickFolder 时优先，name 由 workspaceName(path) 得出；桥抛错返回 null 而不回退浏览器对话框；浏览器只拿目录名，host 按名字定位；无能力返回 unsupported
-hub.ts[AE9M]: F:页面形态内核装配，浏览器与桌面壳共用 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/preload.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts,code:apps/web/src/lib/desktop.ts,code:apps/web/src/lib/extension-updates.ts | A:startHub | S:/hub/about 取版本失败回退 0.0.0（fail closed）；discoverPlugins 必须带 hubVersion；startHub 首行装 React 运行时；preloadMarket 后启动更新调度；无 host 时 files 为 null；extensions 按内置、skills、market、prompts、mcp、plugins、variables 顺序装配
+hub.ts[AE9M]: F:页面形态内核装配，浏览器与桌面壳共用 | R:code:apps/web/src/lib/place-files.ts,code:apps/web/src/lib/preload.ts,code:apps/web/src/lib/ui-kit.ts,code:apps/web/src/lib/workspaces.ts,code:apps/web/src/lib/desktop.ts,code:apps/web/src/lib/extension-updates.ts | A:startHub | S:extensions 顺序：内置、skills、skills-sh、prompts、mcp、plugins、market-plugins、两个来源、variables、global-search、中文、已装插件；来源表须先于来源激活；/hub/about 失败回退 0.0.0；无 host 时 files 为 null；首行装 React 运行时；启动后 preloadMarket 与更新调度
 navigation.ts[CU7T]: F:导航表与扩展贡献合并 | R:code:packages/extensions/src/types.ts | A:navGroups,useNavGroups,useNavItem | S:assets 组只是资源扩展的注册位，空组不渲染；market 组由市场插件贡献；内置项 order 留 20/30 间隔；useNavItem 取最长匹配路径；soon 原样透传给侧栏
 place-files.ts[ID7T]: F:客户端配置文件远端读写 | R:code:apps/web/src/lib/hub.ts | A:placeFilesAvailable,createRemotePlaceFiles | S:无 host 时每个调用都抛错，调用方要如实报失败而不是凭空造出一个文件；可用性探测不带 ref，故拒绝任何 place 的宿主仍会被识别为在线
 ui-kit.ts[CE7T]: F:插件可用的 UI 组件集 | R:code:packages/shadcn-ui/src/components/button.tsx,code:packages/shadcn-ui/src/components/card.tsx | A:Badge,Button,Card,CardContent,Input,Spinner | S:插件模块不能解析包且必须复用同一 React 实例，UI 只能从此处取；新增组件要在此显式导出
@@ -227,8 +227,8 @@ records.ts[PD8S]: F:hub 自己的记录文件 | R:code:packages/resources/mcp/sr
 
 ===D:/work-space/dsh-context-hub/packages/resources/plugins/===
 eslint.config.js[FQ3T]: F:插件模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh；globals 只有 browser
-handlers.ts[IN9M]: F:插件库的宿主侧 HTTP 处理器 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/collect.ts,code:packages/resources/plugins/src/host/contents.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/resources/plugins/src/host/program.ts | A:createPluginHandler | S:一条路由承载全部动作：读在 query 里点名，写在 body 里带；响应都 no-store；读动作二选一收 name= 或 dir=；raw 发字节而不发文本；program 在工作区目录里跑，非零退出按 502 报；asset-stats 只读，localize-assets 替换成功项，asset-add 可带 download；同名冲突的 400 额外带 code/name/from，页面据此本地化
-package.json[FV8T]: F:插件模块清单 | R:- | A:- | S:exports 暴露 . 与 ./contract、./provider、./library、./handlers；依赖 @headless-tree 画文件树，shadcn 组件从 @context-hub/shadcn-ui 取
+handlers.ts[IN9M]: F:插件库的宿主侧 HTTP 处理器 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/collect.ts,code:packages/resources/plugins/src/host/contents.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/resources/plugins/src/host/preview.ts,code:packages/resources/plugins/src/market-install.ts | A:createPluginHandler | S:一条路由承载全部动作：读在 query 点名，写在 body 带；响应 no-store；market-install 与 market-preview 都在 host 侧重新 assertMarketInstall；preview 不写库；raw 发字节；program 在工作区目录里跑；同名冲突 400 带 code/name/from
+package.json[FV8T]: F:插件模块清单 | R:- | A:- | S:exports 暴露 .、./contract、./provider、./library、./market-install、./handlers；依赖 @headless-tree 画文件树；shadcn 组件从 @context-hub/shadcn-ui 取
 tsconfig.json[FV3T]: F:插件模块编译选项 | R:- | A:- | S:include 含 src、handlers.ts 与 __test__；types 用 node
 vitest.config.ts[FQ3T]: F:插件模块的 vitest 项目 | R:code:packages/resources/plugins/tsconfig.json | A:- | S:include 写死 __test__/**/*.test.ts，测试放在别处不会收集
 
@@ -238,7 +238,7 @@ contract.ts[CE9M]: F:插件包契约、清单判定与错误码 | R:code:package
 detail-dialog.tsx[DU7L]: F:插件详情弹窗与展示图 | R:code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/rows.ts,code:packages/resources/plugins/src/parts.tsx,code:packages/extensions/src/components/avatar-stack.tsx | A:PluginDetailDialog,PackPane,MediaPane,ContentList,PlacesSection,SourceSection | S:展示图 keepMounted，粘贴监听在 document，只认 onScreen，否则别页签会误改封面；未收录不给上传；标题行是「来源 · MarksLine」，版本与更新时间在底部，SourceSection 底边框即分隔
 file-tree.tsx[DU5S]: F:包文件树 | R:- | A:PluginFileTree,fileTreeKey | S:展开、焦点、方向键与 ARIA 树结构交给 headless-tree，本文件只画行；树在挂载时构建一次项目表，之后列表变化必须换 key 让它重新挂载
 index.ts[EE8S]: F:插件模块定义、设置区块与更新调度 | R:code:packages/resources/plugins/src/library-store.ts,code:packages/resources/plugins/src/provider.ts,code:packages/resources/plugins/src/search.ts,code:packages/resources/plugins/src/settings-section.tsx,code:packages/resources/plugins/src/update-settings.ts | A:pluginsExtension,PluginsPage | S:服务在任何事前发布；PluginLibrary 在此构造；不指名 agent；inject 含 i18n/search/settings/settingsSections；startUpdateSchedule 随插件回卷；locked=true，内置不可停用/移除
-inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/resources/plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 是同一件事的前后，故用同样四个词；本地路径必须绝对——宿主的工作目录对在浏览器里打字的人毫无意义；认不出的形式直接带理由拒绝
+inspect.ts[KE8M]: F:地址解析与来源匹配 | R:code:packages/resources/plugins/src/contract.ts | A:parsePluginSource,sourceMatches,originToSpec,formatPluginSource,isAbsolutePath,PluginSourceSpec | S:address 与它产生的 source 用同样四个词；本地路径必须绝对；git-subdir 只由市场或记录给出，不是人能输入的形式；认不出的形式带理由拒绝
 install-actions.tsx[DU5M]: F:插件更新与交付两个动作 | R:code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/rows.ts | A:PluginActions,UpdateAction | S:「已安装」不是一个状态：包可在本人配置、某仓库、或两者同时，故动作是菜单而非开关；菜单是行子节点，点击必须 stop，否则连带开灯箱；勾按 plugin.held 判；措辞从 rows.ts 取
 library-store.ts[DD9M]: F:插件库的共享读取，活在页面之外 | R:code:packages/extensions/src/agents.ts,code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/provider.ts,code:packages/resources/plugins/src/rows.ts,code:packages/resources/plugins/src/scan.ts,code:packages/extensions/src/contributions.ts | A:PluginLibrary,PLUGIN_LIBRARY_SERVICE,NOTHING_READ | S:构造即注册为 catalog.plugins 但不读；只在被人问过后才跟随扩展与工作区变化重读；一个客户端的失败只算它自己的答案；probeInstallers 只收被选中的 installer，未选的 agent 不跑它的命令行；订阅键是「文件夹+已选 agent」，比较后必须前移；client 图标按 installer id 从 targets 贡献点取，不能按扩展 manifest id 查——agent 插件的 target id 与目录名可以不同
 library.ts[AE9L]: F:页面用的插件库状态、写操作与自动更新 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/library-store.ts,code:packages/resources/plugins/src/rows.ts,code:packages/resources/plugins/src/update-settings.ts | A:usePluginLibrary,PluginClient,packContents,usePackReadme,packImageBase,pluginUpdateSource | S:桥持有文件与真相，共享读取在 library-store.ts，本侧只把写操作转发过去；每次写入后让库重读；uninstall 要先从折合后的答案里查客户端自己的 id；addAssets 把 downloadRemoteImages 随写入发出；同名冲突的 400 由 call() 还原成 PluginNameTakenError，页面据此本地化；autoDownload 开启时 checkUpdates/checkUpdate 在检查后只更新 outdated && !modified 的包，一次 pass 只在末尾 reload 一次，避免逐包触发客户端探测。
@@ -256,12 +256,13 @@ types.ts[CE7T]: F:插件页面渲染形状 | R:- | A:PluginRow,PluginHeldBy,Plug
 search.ts[DE7T]: F:插件搜索行 | R:code:packages/resources/plugins/src/library-store.ts,code:packages/resources/plugins/src/rows.ts | A:pluginSearch,searchPlugins | S:用页面同款 composeRows 折记录与客户端答案；匹配 name/description/tags；icon 已是 URL 直接作头像；path 的 q 取 row.name，不再带 view；语言与 t 在查询时现取
 settings-section.tsx[AE7T]: F:插件更新设置的设置页区块 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/update-settings.ts,code:packages/extensions/src/components/settings-row.tsx,code:packages/shadcn-ui/src/components/input.tsx | A:PluginsSettingsSection | S:lastCheckAt 是内部字段，写入先展开当前设置再覆盖一项；dailyAt 只在选每天时出现；控件值经 readPluginUpdateSettings 归一化，未知值回落 manual/14:00。
 update-settings.ts[DW7M]: F:插件更新检查的时机、自动下载与插件级调度 | R:code:packages/resources/plugins/src/revision.ts,code:packages/resources/plugins/src/index.ts,code:packages/resources/plugins/src/library.ts | A:PluginCheckTiming,PluginUpdateSettings/readPluginUpdateSettings,msUntilDue,updatableNames/updateOutdated/runScheduledCheck,PluginUpdateSource,startUpdateSchedule | S:默认 manual、不自动下载；startup 只跑一次；daily 按本地 dailyAt 运行、错过补跑；自动更新只碰 outdated && !modified；msUntilDue 从 extensions re-export，不再本地定义；定时器挂 ctx.effect
+market-install.ts[CE7T]: F:市场条目可收集地址的校验契约 | R:code:packages/resources/plugins/src/host/names.ts | A:MarketInstallSource,assertMarketInstall | S:只接受 url 与 git-subdir；必须 https、无凭证/查询/片段；ref 单词、sha 40 位；path 走 assertPackRelative；页面与 host 用同一套规则
 
 ===D:/work-space/dsh-context-hub/packages/resources/plugins/src/host/===
-collect.ts[PE8M]: F:把一个包收进库 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/resources/plugins/src/inspect.ts | A:createPluginCollector,PluginCollector,PackUpload | S:顺序固定且对每种来源相同：文件先落在库里不知道的暂存目录，在那里读包自己的清单，之后才移入并写行——任何一步失败在移动之前都让库原样，这就是可重试的原因；不读任何 marketplace；同名但来源不同抛 PluginNameTakenError，库不动
+collect.ts[PE8M]: F:把一个包收进库 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/resources/plugins/src/inspect.ts | A:createPluginCollector,PluginCollector,PackUpload | S:顺序固定：先落暂存目录读清单，再移入并写行，失败不动库；addSpec 按市场发布的 sha 与记录 revision 比对，不同则重新收集；同名异源抛 PluginNameTakenError；本地目录来源无法 restore
 contents.ts[PE6S]: F:读一个包目录里装了什么 | R:code:packages/resources/plugins/src/contract.ts | A:readPackContents | S:只认三种约定位置：skills/ 下带 SKILL.md 的子目录、commands/ 下递归的每个 .md、根目录 .mcp.json 的原文；frontmatter 只取 name 与 description，写成 `description: >` 的块标量要折成一行
 describe.ts[PE7S]: F:读包清单与标准组件布局 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/resources/plugins/src/host/logo.ts | A:describePack,readManifestFields,ManifestFields | S:读取顺序：plugin.json → 根市场 → 标准组件；市场未命名根时组件回退让路，避免整仓误收；describePack 缺清单答空字段；包图经资产库，行不指向 agent 安装目录
-fetch.ts[IE8M]: F:把包取到本机 | R:code:packages/resources/plugins/src/host/names.ts,code:packages/resources/plugins/src/inspect.ts | A:fetchPlugin,stagingDir,PluginFetchError | S:四种来源最终都落到同一个暂存目录，且只留包自己的文件：git 检出会丢掉 .git（客户端自己的缓存也是这样）；这里只产出目录，不判断包「是什么」
+fetch.ts[IE8M]: F:把包取到本机 | R:code:packages/resources/plugins/src/host/names.ts,code:packages/resources/plugins/src/inspect.ts | A:fetchPlugin,stagingDir,PluginFetchError | S:四种来源最终都落到暂存目录并丢掉 .git；有 sha 时按对象 id 浅取并校验 HEAD 等于该 sha；git-subdir 用 sparse checkout 只取一个目录；archive 上限 64MB；命令 120s 超时且禁止凭据弹窗
 library.ts[PE9L]: F:磁盘插件库与包清单读取 | R:code:packages/resources/plugins/src/records.ts,code:packages/resources/plugins/src/revision.ts,code:packages/resources/plugins/src/host/describe.ts,code:packages/core/src/host/remote-image.ts | A:createFsPluginLibrary,listDirectory,readInDirectory,readBytesInDirectory,readPackManifest,PackFileEntry | S:hub 存文件而不是指向来源；写入经单队列串行，索引先写、文件后删；越界路径在开文件前就被拒；无清单但有标准组件时用已有名字记为包，丢清单但组件仍在仍算在库；根市场未命名根则拒绝而不是整仓收录；addAssets 可先下载远程图，localizeAssets 一次写回成功替换，统计不含 icon
 logo.ts[PE5S]: F:找并保存包自己的图 | R:code:packages/resources/plugins/src/pictures.ts | A:findLogo,storePicture,assetPresent | S:找到的图是复制而不是引用包内路径——记录只持有一种引用，只在包装着时能解析的引用不算引用；遍历有深度与条数上限，因为包是别人的仓库，可能带着整站图片
 marketplace.ts[PE8S]: F:库根携带的市场索引 | R:code:packages/resources/plugins/src/contract.ts | A:writeMarketplaceIndex,marketplaceIndex,codexMarketplaceIndex | S:一个根同时服务多个客户端（Claude Code 读 .claude-plugin/marketplace.json，Codex 读 .agents/plugins/marketplace.json），各找自己的文件、忽略其他；索引是派生的，从当前库状态写出而不是手工同步
@@ -269,6 +270,7 @@ names.ts[PS7T]: F:库内路径安全校验 | R:- | A:assertSafeSegment,assertPac
 probe.ts[IE7S]: F:询问源是否前进 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/revision.ts | A:createPluginProbe,PluginProbe,CHECK_VERSION | S:问源自己：仓库用 git ls-remote 只读 refs 且问当初取的那个 ref；压缩包用 HEAD 取校验器；本机目录答问不了；单个包与整批走同一条问法、记在同一处，故答案要从记录上读
 program.ts[RE7T]: F:运行控制台程序 | R:- | A:runProgram,hasProgram,ProgramResult | S:参数以列表传递并在此加引号，带空格的路径仍是一个参数；客户端在 Windows 上是脚本，故经 shell 启动；cwd 可选，不给就落在宿主自己的目录，客户端的项目文件会写错地方
 update.ts[PE7S]: F:把包更新到源当前状态 | R:code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/host/library.ts | A:createPluginUpdater,PluginUpdater,PluginUpdateOutcome | S:下载本身不构成更新：落地文件可能逐字节相同（回退、只改 README、子目录没真变），故先对暂存求哈希，与记录相同就直接结束；确实变了才一步替换目录，记录在其后写
+preview.ts[IN7T]: F:收取前读取一个市场条目的内容 | R:code:packages/resources/plugins/src/host/contents.ts,code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/contract.ts | A:MarketPreview,previewMarket | S:暂存 fetch 后读 README、skills、commands、.mcp.json，finally 删除暂存目录，不写库；README 依次试 README.md/readme.md/Readme.md；结果缓存 10 分钟，同 key 并发共享
 
 ===D:/work-space/dsh-context-hub/packages/resources/prompts/===
 eslint.config.js[FQ3T]: F:提示词模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh；globals 只有 browser
@@ -539,4 +541,61 @@ service.ts[AE8S]: F:市场读取服务：TTL、单飞与磁盘缓存 | R:code:pa
 en.ts[FL5S]: F:英文文案默认值 | R:code:packages/market/skills-sh/src/i18n/zh-cn.ts | A:marketEn | S:键都在 market.* 命名空间；缺键时回退这里；新增键必须同步 zh-cn
 index.ts[LL3T]: F:文案出口 | R:code:packages/market/skills-sh/src/i18n/en.ts,code:packages/market/skills-sh/src/i18n/zh-cn.ts | A:marketEn,marketZh | S:-
 zh-cn.ts[FL5S]: F:简体中文文案 | R:code:packages/market/skills-sh/src/i18n/en.ts | A:marketZh | S:键与英文表一一对应；新增英文键必须同步，否则回退英文
+
+===D:/work-space/dsh-context-hub/packages/market/claude-plugins-official/===
+eslint.config.js[FQ3T]: F:Claude 市场包 lint 规则 | R:- | A:- | S:globalIgnores 排除 dist；react-hooks 规则对无 JSX 文件也无害
+package.json[FV5T]: F:Claude Code 官方市场扩展清单 | R:- | A:- | S:exports 只有 .；依赖 market-plugins 的 createMarketCache 与 plugins 的 assertMarketInstall；私有包 version 0.0.0
+tsconfig.json[FV3T]: F:Claude 市场包编译选项 | R:- | A:- | S:include 含 src/__test__；jsx react-jsx；types=node
+vitest.config.ts[FQ3T]: F:Claude 市场包的 vitest 项目 | R:- | A:- | S:name 与根 projects 一致；include 固定 __test__ 下测试
+
+===D:/work-space/dsh-context-hub/packages/market/claude-plugins-official/src/apis/===
+client.ts[IN6T]: F:一个市场清单的 JSON 读取 | R:- | A:MarketHttpError,createJsonReader | S:net 为 null 时抛错而非静默；非 200 抛 MarketHttpError 并带状态；解析失败单独报「不是 JSON」
+marketplace.ts[IN6S]: F:把 Claude 市场索引读成页面条目 | R:code:packages/market/claude-plugins-official/src/apis/types.ts,code:packages/resources/plugins/src/market-install.ts | A:CLAUDE_SOURCE_ID,CLAUDE_MARKET_REPO,CLAUDE_MARKET_INDEX,ownerAvatar,githubOwner,readClaudeMarketplace | S:相对路径按市场仓库展开成 git-subdir；url/git-subdir 原样带 ref/sha；未知来源与非法地址逐条跳过并写日志，一条坏行不能藏住其余；anthropics 条目不取头像
+types.ts[IN6T]: F:Claude 市场索引的宽松形状 | R:- | A:RawClaudePlugin,RawClaudeMarketplace | S:全部字段 optional/unknown；plugins 不是数组时整份索引被拒，单条坏行只跳过
+
+===D:/work-space/dsh-context-hub/packages/market/claude-plugins-official/src/===
+index.ts[EE7T]: F:把 Claude 官方市场注册为内置市场源 | R:code:packages/market/claude-plugins-official/src/source.ts | A:MARKET_CLAUDE_PLUGINS_OFFICIAL_ID,marketClaudePluginsOfficialExtension | S:defaultEnabled 但未 locked；inject 只有 marketSources；apply 把 ctx.host.net 与 log 传给 source；图标 GlobeIcon
+source.ts[AE7T]: F:Claude 市场源的清单读取与富化 | R:code:packages/market/claude-plugins-official/src/apis/client.ts,code:packages/market/claude-plugins-official/src/apis/marketplace.ts,code:packages/market/plugins/src/cache.ts | A:createClaudePluginsSource | S:createMarketCache 让并发 list 共享一个请求；enrich 只补 GitHub owner 头像，anthropics 自己的条目不补，让行回落分类图标
+
+===D:/work-space/dsh-context-hub/packages/market/codex-plugins/===
+eslint.config.js[FQ3T]: F:Codex 市场包 lint 规则 | R:- | A:- | S:globalIgnores 排除 dist；react-hooks 规则对无 JSX 文件也无害
+package.json[FV5T]: F:Codex 官方市场扩展清单 | R:- | A:- | S:exports 只有 .；依赖 market-plugins 的 createMarketCache 与 plugins 的 assertMarketInstall；私有包 version 0.0.0
+tsconfig.json[FV3T]: F:Codex 市场包编译选项 | R:- | A:- | S:include 含 src/__test__；jsx react-jsx；types=node
+vitest.config.ts[FQ3T]: F:Codex 市场包的 vitest 项目 | R:- | A:- | S:name 与根 projects 一致；include 固定 __test__ 下测试
+
+===D:/work-space/dsh-context-hub/packages/market/codex-plugins/src/apis/===
+client.ts[IN6T]: F:一个市场清单的 JSON 读取 | R:- | A:MarketHttpError,createJsonReader | S:net 为 null 时抛错而非静默；非 200 抛 MarketHttpError 并带状态；解析失败单独报「不是 JSON」
+manifest.ts[IN6T]: F:Codex 包清单的描述与 logo 读取 | R:code:packages/market/codex-plugins/src/apis/marketplace.ts,code:packages/resources/plugins/src/market-install.ts | A:manifestUrl,readCodexManifest,resolveLogo | S:只读市场自有仓库的 git-subdir 条目；manifest 地址固定 raw.githubusercontent 加 ref（默认 main）；相对 logo 不得含 ..；只取 description 与 interface.logo
+marketplace.ts[IN6S]: F:把 Codex 市场索引读成页面条目 | R:code:packages/market/codex-plugins/src/apis/types.ts,code:packages/resources/plugins/src/market-install.ts | A:CODEX_SOURCE_ID,CODEX_MARKET_REPO,CODEX_MARKET_INDEX,CODEX_MARKET_INDEX_URL,readCodexMarketplace | S:local 来源按市场仓库展开成 git-subdir 并固定 ref=main；url/git-subdir 原样保留 ref/sha；坏条目逐条跳过并写日志；索引本身无描述与图标
+types.ts[IN6T]: F:Codex 市场索引的宽松形状 | R:- | A:RawCodexPlugin,RawCodexMarketplace | S:字段可缺省；plugins 必须是数组，否则整份索引被拒
+
+===D:/work-space/dsh-context-hub/packages/market/codex-plugins/src/===
+index.ts[EE7T]: F:把 Codex 官方市场注册为内置市场源 | R:code:packages/market/codex-plugins/src/source.ts | A:MARKET_CODEX_PLUGINS_ID,marketCodexPluginsExtension | S:defaultEnabled 但未 locked；inject 只有 marketSources；apply 把 ctx.host.net 与 log 传给 source；图标 BoxesIcon
+source.ts[AE7T]: F:Codex 市场源：索引、缓存与按需富化 | R:code:packages/market/codex-plugins/src/apis/client.ts,code:packages/market/codex-plugins/src/apis/marketplace.ts,code:packages/market/codex-plugins/src/apis/manifest.ts,code:packages/market/plugins/src/cache.ts | A:createCodexPluginsSource | S:索引不带宽高与描述；enrich 读每个可见行自己的 .codex-plugin/plugin.json，失败返回空而不报错；logo 相对路径按市场仓库解析
+
+===D:/work-space/dsh-context-hub/packages/market/plugins/===
+eslint.config.js[FQ3T]: F:插件市场包 lint 规则 | R:- | A:- | S:globalIgnores 排除 dist；react-hooks 规则覆盖 tsx
+package.json[FV5T]: F:插件市场页清单 | R:- | A:- | S:exports 暴露 . 与 ./contract；依赖 extensions/plugins/shadcn-ui；两个来源包反过来依赖本包的 cache 与类型
+tsconfig.json[FV3T]: F:插件市场包编译选项 | R:- | A:- | S:include 含 src/__test__；jsx react-jsx；types=node
+vitest.config.ts[FQ3T]: F:插件市场包的 vitest 项目 | R:- | A:- | S:name 与根 projects 一致；include 固定 __test__ 下测试
+
+===D:/work-space/dsh-context-hub/packages/market/plugins/src/apis/===
+library.ts[IN7T]: F:插件桥的三次调用 | R:code:packages/resources/plugins/src/library.ts,code:packages/resources/plugins/src/market-install.ts | A:listLibraryRecords,collectMarketInstall,previewMarketEntry,MarketPreview | S:全部走 PLUGIN_ROUTE；preview 只读暂存目录、不写库；collect 返回库记录，交付另走 library.install
+
+===D:/work-space/dsh-context-hub/packages/market/plugins/src/===
+cache.ts[RP5T]: F:市场索引的 TTL 缓存与单飞 | R:- | A:MarketCache,MarketCacheOptions,createMarketCache | S:默认 TTL 10 分钟；同一时刻只有一个请求在飞，后来的调用加入它；refresh=true 时忽略缓存；clear 只清值不动进行中的请求
+contract.ts[CE8S]: F:市场页契约与来源注册表 | R:code:packages/resources/plugins/src/market-install.ts | A:MARKET_SOURCE_SERVICE,MarketEntry,MarketSource,MarketSourceRegistry,normalizeCategory | S:注册是原型方法，ctx.effect 负责扩展卸载时注销；snapshot 只在来源变化时换身份；分类未知一律归 other；页面按服务名取注册表
+detail-dialog.tsx[AE8L]: F:市场条目详情：标签页、README 与安装 | R:code:packages/market/plugins/src/apis/library.ts,code:packages/market/plugins/src/rows.ts,code:packages/market/plugins/src/icons.tsx,code:packages/extensions/src/components/code-view.tsx | A:MarketDetailDialog | S:打开时 staging 预览一次，失败不影响索引数据；Content 恒在，Skills/Commands/MCP 只在扫描到才出现；骨架用 bg-border，因为左栏底色是 surface-raised；README 相对图不代理；重试复用 action.retry
+extension.ts[EE8T]: F:插件市场内置扩展与来源注册表 | R:code:packages/market/plugins/src/contract.ts,code:packages/market/plugins/src/i18n/index.ts,code:packages/market/plugins/src/page.tsx | A:MARKET_PLUGINS_ID,marketPluginsExtension | S:locked 且 defaultEnabled；provides marketSources；inject nav/routes/locales/plugins/catalog.plugins；导航组 market、order 20；页面先注册服务，来源激活后才能注册
+hooks.ts[AE7S]: F:市场页的来源订阅与目录读取 | R:code:packages/market/plugins/src/apis/library.ts,code:packages/market/plugins/src/contract.ts | A:useMarketSources,useMarketCatalog,useLibraryRecords,SourceRead,SourceStatus | S:registry 用 useSyncExternalStore 订阅，快照按身份比较；每轮 refresh 对全部来源各读一次，失败只留给自己；库记录只读名字列表，不在页级读整个插件库
+icons.tsx[AU7S]: F:市场行的图标与富化缓存 | R:code:packages/market/plugins/src/contract.ts,code:packages/market/plugins/src/rows.ts | A:categoryIcon,enrichmentOf,readEnrichment,useEntryEnrichment,MarketMark | S:富化按 entry.id 缓存且跨刷新保留；同一 id 的并发读共享一个 Promise；行只在进入视口时才读；图标失败回退分类图标
+index.ts[LE6T]: F:插件市场的公开出口 | R:code:packages/market/plugins/src/extension.ts,code:packages/market/plugins/src/contract.ts,code:packages/market/plugins/src/cache.ts,code:packages/market/plugins/src/page.tsx | A:MARKET_PLUGINS_ID,marketPluginsExtension,MARKET_SOURCE_SERVICE,MarketSourceRegistry,normalizeCategory,createMarketCache | S:页面与类型只从这里取；来源扩展依赖 ./contract 与 cache；新增公开符号必须在此登记
+install-dialog.tsx[AE7M]: F:市场条目的安装确认 | R:code:packages/market/plugins/src/apis/library.ts,code:packages/market/plugins/src/rows.ts | A:MarketInstallDialog | S:已入库只交付不重复收集；收集后必须 library.refresh 再按名字 install；运行中禁止关闭；失败留在弹窗内；安装成功关闭并触发页面重读库
+page.tsx[AE9L]: F:插件市场目录页 | R:code:packages/market/plugins/src/hooks.ts,code:packages/market/plugins/src/icons.tsx,code:packages/market/plugins/src/rows.ts,code:packages/market/plugins/src/detail-dialog.tsx,code:packages/market/plugins/src/install-dialog.tsx | A:PluginsMarketPage | S:来源为空时给打开扩展的入口；查询时不显示分类分组；refresh 让所有来源重新读；已入库行的加号换成详情；安装弹窗关闭后重读库记录；目录最多四列
+rows.ts[DE8S]: F:市场行派生与安装地址 | R:code:packages/resources/plugins/src/market-install.ts,code:packages/resources/plugins/src/library.ts | A:rowsOf,visibleRows,groupedRows,installedRecord,installPath,offeredTabs | S:rowsOf 按 entry.id 去重；搜索先按来源收窄；来源匹配用 install 地址而非名字；Content 恒在，空或空白 .mcp.json 不算 MCP 页签
+
+===D:/work-space/dsh-context-hub/packages/market/plugins/src/i18n/===
+en.ts[FL5S]: F:英文文案默认值 | R:code:packages/market/plugins/src/i18n/zh-cn.ts | A:marketPluginsEn | S:键都在 market.plugins.*；新增键必须同步 zh-cn；detail 的 tab/README/preview 键用于详情弹窗
+index.ts[LL3T]: F:文案出口 | R:code:packages/market/plugins/src/i18n/en.ts,code:packages/market/plugins/src/i18n/zh-cn.ts | A:marketPluginsEn,marketPluginsZh | S:-
+zh-cn.ts[FL5S]: F:简体中文文案 | R:code:packages/market/plugins/src/i18n/en.ts | A:marketPluginsZh | S:键集合必须与 en 完全一致；缺键回退英文
 
