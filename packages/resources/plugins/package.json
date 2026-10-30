@@ -35,6 +35,7 @@
     "./contract": "./src/contract.ts",
     "./provider": "./src/provider.ts",
     "./library": "./src/library.ts",
+    "./market-install": "./src/market-install.ts",
     "./handlers": "./handlers.ts"
   }
 }

@@ -90,6 +90,17 @@ export interface PluginCollector {
    */
   add(source: string): Promise<PluginCollected>
   /**
+   * Collect one pack from an address a market index named.
+   *
+   * The address arrives already read and validated, because a market's own
+   * row is not a string a person typed. A commit the market published pins
+   * the pack: a record from another commit is collected again rather than
+   * answered with.
+   *
+   * @param spec — a repository or one directory of one, optionally at a commit.
+   */
+  addSpec(spec: PluginSourceSpec): Promise<PluginCollected>
+  /**
    * Collect one pack from a folder a page read.
    *
    * A page cannot name a directory on this machine — it is given the files and
@@ -173,9 +184,15 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
   const collect = async (spec: PluginSourceSpec): Promise<PluginCollected> => {
     for (const one of await library.list()) {
       if (!sourceMatches(spec, one.source)) continue
+      /* A market pins a commit. A record from a different commit is a different
+         pack where the person is concerned, so it is collected again instead of
+         answered with; a record from the same commit is this pack already. */
+      const pinned = "sha" in spec ? spec.sha : undefined
+      const revision = "revision" in one.source ? one.source.revision : undefined
+      const moved = pinned !== undefined && revision !== pinned
       /* A record whose files are gone is a memory of a pack rather than the pack,
          so it is collected again rather than answered with. */
-      if (await library.has(one.name)) return { record: one, already: true }
+      if (!moved && (await library.has(one.name))) return { record: one, already: true }
       break
     }
 
@@ -246,6 +263,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
 
   return {
     add: (source) => collect(parsePluginSource(source)),
+    addSpec: collect,
     addFolder: (from, files) => collectUpload(assertPackRelative(from.trim()), files),
     restore,
   }

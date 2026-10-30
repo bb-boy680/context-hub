@@ -29,10 +29,10 @@ import type { PluginOrigin } from "./contract.ts"
 
 /** An address read into the form the host fetches it by. */
 export type PluginSourceSpec =
-  /** A git repository, optionally at a ref. */
-  | { kind: "url"; url: string; ref?: string }
+  /** A git repository, optionally at a ref or pinned to a commit. */
+  | { kind: "url"; url: string; ref?: string; sha?: string }
   /** One directory of a git repository: `path` is where the pack sits inside it. */
-  | { kind: "git-subdir"; url: string; path: string; ref?: string }
+  | { kind: "git-subdir"; url: string; path: string; ref?: string; sha?: string }
   /** A zip or tarball over HTTP. */
   | { kind: "archive"; url: string }
   /** A directory on this machine, absolute. */

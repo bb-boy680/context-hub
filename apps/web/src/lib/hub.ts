@@ -22,6 +22,9 @@ import {
 } from "@context-hub/extensions"
 import { simplifiedChineseLocale } from "@context-hub/zh-cn"
 import { marketSkillsShExtension } from "@context-hub/market-skills-sh"
+import { marketPluginsExtension } from "@context-hub/market-plugins"
+import { marketClaudePluginsOfficialExtension } from "@context-hub/market-claude-plugins-official"
+import { marketCodexPluginsExtension } from "@context-hub/market-codex-plugins"
 import { mcpExtension } from "@context-hub/mcp"
 import { pluginsExtension } from "@context-hub/plugins"
 import { PROMPT_ROUTE, createRemotePromptStore, promptsExtension } from "@context-hub/prompts"
@@ -212,6 +215,12 @@ export async function startHub(): Promise<HubKernel> {
       promptsExtension,
       mcpExtension,
       pluginsExtension,
+      /* The page provides the source registry, and the two market sources
+         register into it as they activate. The page comes first so its service
+         is there when a source asks for it. */
+      marketPluginsExtension,
+      marketClaudePluginsOfficialExtension,
+      marketCodexPluginsExtension,
       variablesExtension,
       /* The palette last among the shipped modules, so the settings and
          extensions groups follow the asset groups in the result list. */

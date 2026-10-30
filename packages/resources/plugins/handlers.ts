@@ -28,6 +28,7 @@ import {
 } from "@context-hub/core/host/http"
 
 import { PLUGIN_ROUTE, PluginNameTakenError } from "./src/contract.ts"
+import { assertMarketInstall } from "./src/market-install.ts"
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
 import { readPackContents } from "./src/host/contents.ts"
 import { describePack } from "./src/host/describe.ts"
@@ -39,6 +40,7 @@ import {
 } from "./src/host/library.ts"
 import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
 import { hasProgram, runProgram } from "./src/host/program.ts"
+import { previewMarket } from "./src/host/preview.ts"
 import { createPluginProbe } from "./src/host/probe.ts"
 import { createPluginUpdater } from "./src/host/update.ts"
 
@@ -248,6 +250,17 @@ export function createPluginHandler(
       switch (action) {
         case "add":
           sendJson(response, 200, await collector.add(requiredString(body.source, "source")))
+          return
+        /* A pack a market index named. The spec is validated here again: the
+           page's copy of the rules is a courtesy, the host's is the boundary. */
+        case "market-install":
+          sendJson(response, 200, await collector.addSpec(assertMarketInstall(body.spec)))
+          return
+        /* A pack's own contents before it is collected: a staging fetch the
+           library never sees, so the detail can show a README and what the
+           pack carries without putting it in the library. */
+        case "market-preview":
+          sendJson(response, 200, await previewMarket(assertMarketInstall(body.spec)))
           return
         /* A folder a person chose, as the files in it. A page cannot name a
            directory on this machine, so this is the only way a pack that
