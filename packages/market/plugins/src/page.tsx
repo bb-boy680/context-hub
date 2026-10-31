@@ -407,10 +407,9 @@ export function PluginsMarketPage() {
           open
           onOpenChange={closeDetail}
           installed={installedRecord(records, selected.entry)}
-          onInstall={(row) => {
-            setSelected(null)
-            setInstalling(row)
-          }}
+          /* The install dialog stacks over the detail, so closing it — or a
+             failed install — leaves the person where they were. */
+          onInstall={setInstalling}
         />
       )}
       {installing === null ? null : (

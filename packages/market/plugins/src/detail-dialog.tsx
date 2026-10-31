@@ -143,7 +143,7 @@ type Preview =
  * The detail of one entry.
  *
  * @param installed — the library record that is this entry, when the library holds it.
- * @param onInstall — opens the install dialog; the page closes this one first.
+ * @param onInstall — opens the install dialog over this one.
  */
 export function MarketDetailDialog({
   row,
