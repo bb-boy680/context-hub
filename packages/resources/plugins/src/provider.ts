@@ -31,11 +31,21 @@ export const PLUGIN_SERVICE = "plugins"
  * lets it be written once and drive every form of the app.
  */
 /** Roots an installer declares without exposing the host's environment. */
+export interface PluginRootScope {
+  write: string[]
+  read: string[]
+}
+
 export interface PluginDiskDeclaration {
-  configDir: string
-  configEnv: string
-  pluginsDir: string
-  pluginsEnv: string
+  home: string
+  homeEnv?: string
+  state: string
+  stateEnv?: string
+  config: PluginRootScope
+  stateFiles: PluginRootScope
+  workspace: PluginRootScope
+  library: PluginRootScope
+  external: string[]
 }
 
 /** The roots captured for one operation. */
@@ -71,8 +81,9 @@ export interface PluginDisk {
   commit(
     roots: PluginDiskRoots,
     changes: readonly PluginDiskChange[],
-    copy?: { name: string; destination: string }
+    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean }
   ): Promise<void>
+  removeDirectory(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<void>
   run<T>(declaration: PluginDiskDeclaration, work: (roots: PluginDiskRoots) => Promise<T>): Promise<T>
 }
 
@@ -85,12 +96,9 @@ export interface PluginTools {
    * a path.
    */
   root(): Promise<string>
-  /**
-   * Write every marketplace index the library root carries. A caller does this
-   * before registering the root, because an index that does not list a pack the
-   * person just collected would make that pack invisible to the agent.
-   */
-  syncMarketplace(): Promise<void>
+  /** List the library's packs and write extension-supplied marketplace indexes. */
+  packs(): Promise<{ name: string; description: string; version: string }[]>
+  syncMarketplace(indexes: readonly { path: string; document: unknown }[]): Promise<void>
   /**
    * Run one console program with structured arguments.
    *

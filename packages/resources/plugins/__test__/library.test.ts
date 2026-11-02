@@ -2070,6 +2070,7 @@ describe("delivering", () => {
   const stubHeld: PluginHeld[] = []
   const tools: PluginTools = {
     root: async () => libraryRoot,
+    packs: async () => [],
     syncMarketplace: async () => {
       ran.push(["sync-marketplace"])
     },

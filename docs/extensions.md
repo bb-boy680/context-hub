@@ -126,15 +126,17 @@ Do not import any other package. UI components come from `scope.ui`; icons from
 ## Plugin installer file access
 
 An agent installer receives optional `tools.disk` through the plugins service.
-The file channel captures the configured roots and workspace for an operation,
-reads plugin metadata, copies a collected pack into its versioned cache, and
-commits file replacements after comparing their original contents. Installers
-serialize read-modify-write operations with `disk.run`; a stale snapshot or a
-changed workspace is refused. The host restricts writable files and never exposes
-plugin data directories through this channel. The current host allowlist recognizes
-Claude Code's roots and plugin state paths; another agent needs explicit host
-support before it can use this channel. Older hosts lack this capability; an
-extension must report that clearly instead of silently falling back to a CLI.
+The installer declares its configuration and state roots, the workspace and library
+paths it needs, and read and write patterns. `*` matches one path segment and
+`**` matches multiple segments. Environment overrides must be absolute paths.
+The host checks paths and refuses symbolic links, compares snapshots and uses
+`disk.run` to serialize read-modify-write operations. Marketplace index documents
+are supplied by the extension and written under the library root.
+
+The declaration is supplied by enabled extension code; it is not a sandbox against
+malicious extensions. Manifest `permissions` are informational, not enforced.
+Older hosts lack the current file contract; extensions must report that rather
+than silently falling back to a CLI.
 
 File replacement is atomic per file. A multi-file operation uses compensating
 writes on failure and reports any file it could not restore. This is not a

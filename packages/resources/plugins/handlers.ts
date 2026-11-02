@@ -38,7 +38,7 @@ import {
   readBytesInDirectory,
   readInDirectory,
 } from "./src/host/library.ts"
-import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
+import { writeMarketplaceIndexes } from "./src/host/marketplace.ts"
 import { createInstallerFiles } from "./src/host/installer-files.ts"
 import type { PluginDiskChange, PluginDiskDeclaration, PluginDiskRef, PluginDiskRoots } from "./src/provider.ts"
 import { hasProgram, runProgram } from "./src/host/program.ts"
@@ -276,6 +276,10 @@ export function createPluginHandler(
         case "disk-read-external":
           sendJson(response, 200, { text: await disk.readExternal(body.roots as PluginDiskRoots, requiredString(body.directory, "directory"), requiredString(body.relative, "relative")) })
           return
+        case "disk-remove-directory":
+          await disk.removeDirectory(body.roots as PluginDiskRoots, body.ref as PluginDiskRef)
+          sendJson(response, 200, {})
+          return
         case "disk-commit":
           await disk.commit(body.roots as PluginDiskRoots, body.changes as PluginDiskChange[], body.copy as { name: string; destination: string } | undefined)
           sendJson(response, 200, {})
@@ -362,7 +366,7 @@ export function createPluginHandler(
           return
         /* The indexes a client reads, written from the library as it stands. */
         case "sync-marketplace":
-          await writeMarketplaceIndex(library.root, await library.list())
+          await writeMarketplaceIndexes(library.root, body.indexes)
           sendJson(response, 200, { root: library.root })
           return
         /* One program an installer asked for, started in the workspace in

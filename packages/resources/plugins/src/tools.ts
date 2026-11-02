@@ -72,6 +72,9 @@ export function createRemotePluginTools(base = ""): PluginBridgeTools {
     async readExternal(roots, directory, relative) {
       return (await call<{ text: string | null }>(base, { action: "disk-read-external", roots, directory, relative })).text
     },
+    async removeDirectory(roots, ref) {
+      await call(base, { action: "disk-remove-directory", roots, ref })
+    },
     async commit(roots, changes, copy) {
       await call(base, { action: "disk-commit", roots, changes, copy })
     },
@@ -91,8 +94,13 @@ export function createRemotePluginTools(base = ""): PluginBridgeTools {
       return answer.root
     },
 
-    async syncMarketplace() {
-      await call(base, { action: "sync-marketplace" })
+    async packs() {
+      const answer = await callGet<{ plugins: { name: string; description: string; version: string }[] }>(base, "?action=list")
+      return answer.plugins.map(({ name, description, version }) => ({ name, description, version }))
+    },
+
+    async syncMarketplace(indexes) {
+      await call(base, { action: "sync-marketplace", indexes })
     },
 
     async run(program, args) {

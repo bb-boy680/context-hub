@@ -4,7 +4,6 @@ import { homedir } from "node:os"
 import path from "node:path"
 
 import { writeFileAtomic } from "@context-hub/core/host/atomic"
-import { readJsonObject } from "../../../mcp/src/jsonc.ts"
 
 import type {
   PluginDisk,
@@ -26,19 +25,22 @@ interface Options {
 
 const queues = new Map<string, Promise<unknown>>()
 
-/** Environment overrides are directory names, never arbitrary environment values. */
-const CONFIG_OVERRIDES = new Set(["CLAUDE_CONFIG_DIR"])
-const PLUGIN_OVERRIDES = new Set(["CLAUDE_CODE_PLUGIN_CACHE_DIR"])
+function matches(pattern: string, relative: string): boolean {
+  const parts = pattern.split("/")
+  const target = relative.split("/")
+  const test = (i: number, j: number): boolean => {
+    if (i === parts.length) return j === target.length
+    if (parts[i] === "**") return test(i + 1, j) || (j < target.length && test(i, j + 1))
+    return j < target.length && (parts[i] === "*" || parts[i] === target[j]) && test(i + 1, j + 1)
+  }
+  return test(0, 0)
+}
 
-/** The bridge only carries plugin metadata and settings, never plugin data. */
-function allowedRef(ref: PluginDiskRef, write: boolean): boolean {
-  const file = ref.path
-  if (ref.root === "config") return file === "settings.json" || (!write && /^skills\/[^/]+\/\.claude-plugin\/plugin\.json$/.test(file))
-  if (ref.root === "workspace") return /^\.claude\/settings(?:\.local)?\.json$/.test(file) ||
-    (!write && /^\.claude\/skills\/[^/]+\/\.claude-plugin\/plugin\.json$/.test(file))
-  if (ref.root === "plugins") return file === "installed_plugins.json" || file === "known_marketplaces.json" ||
-    /^cache\/[^/]+\/[^/]+\/[^/]+\/\.orphaned_at$/.test(file)
-  return !write && (file === ".claude-plugin/marketplace.json" || /^[^/]+\/(?:\.claude-plugin\/plugin\.json|\.claude-plugin\/marketplace\.json|plugin\.json)$/.test(file))
+function allowedRef(roots: PluginDiskRoots, ref: PluginDiskRef, write: boolean): boolean {
+  if (typeof ref !== "object" || ref === null || typeof ref.path !== "string") return false
+  const scope = ref.root === "plugins" ? roots.declaration.stateFiles : roots.declaration[ref.root]
+  if (typeof scope !== "object" || scope === null || !("write" in scope)) return false
+  return [...scope.write, ...(write ? [] : scope.read)].some((pattern) => matches(pattern, ref.path))
 }
 
 function missing(error: unknown): boolean {
@@ -47,21 +49,25 @@ function missing(error: unknown): boolean {
 
 function declarationOf(value: PluginDiskDeclaration): PluginDiskDeclaration {
   if (typeof value !== "object" || value === null) throw new Error("missing file root declaration")
-  const { configDir, configEnv, pluginsDir, pluginsEnv } = value
-  if (typeof configDir !== "string" || typeof pluginsDir !== "string") {
-    throw new Error("invalid file root declaration")
+  const segment = (part: unknown): string => {
+    if (typeof part !== "string" || part === "." || part === ".." || !/^[^/\\:]+$/.test(part)) throw new Error("invalid file root declaration")
+    return part
   }
-  if (typeof configEnv !== "string" || typeof pluginsEnv !== "string" ||
-      !CONFIG_OVERRIDES.has(configEnv) || !PLUGIN_OVERRIDES.has(pluginsEnv) ||
-      configDir !== ".claude" || pluginsDir !== "plugins") {
-    throw new Error("unsupported plugin file root declaration")
+  const variable = (name: unknown): string | undefined => {
+    if (name === undefined) return undefined
+    if (typeof name !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) throw new Error("invalid environment variable name")
+    return name
   }
-  return {
-    configDir: assertPackRelative(configDir),
-    configEnv,
-    pluginsDir: assertPackRelative(pluginsDir),
-    pluginsEnv,
+  const patterns = (input: unknown): string[] => {
+    if (!Array.isArray(input) || input.some((pattern) => typeof pattern !== "string" || pattern === "" || pattern.split("/").some((part: string) => part === "" || part === "." || part === ".." || (part.includes("*") && part !== "*" && part !== "**") || /[\\:]/.test(part)))) throw new Error("invalid file scope pattern")
+    return input as string[]
   }
+  const scope = (input: unknown) => {
+    if (typeof input !== "object" || input === null) throw new Error("invalid file scope")
+    const entry = input as { write?: unknown; read?: unknown }
+    return { write: patterns(entry.write), read: patterns(entry.read) }
+  }
+  return { home: segment(value.home), homeEnv: variable(value.homeEnv), state: segment(value.state), stateEnv: variable(value.stateEnv), config: scope(value.config), stateFiles: scope(value.stateFiles), workspace: scope(value.workspace), library: scope(value.library), external: patterns(value.external) }
 }
 
 function environmentRoot(value: string | undefined, fallback: string): string {
@@ -104,14 +110,17 @@ async function readText(file: string): Promise<string | null> {
   })
 }
 
-/** Hash every copied file, including empty directories and excluding the orphan marker. */
+/** Markers a client writes into its own cache copy; they are not part of the pack. */
+const CACHE_MARKERS = new Set([".orphaned_at", ".in_use"])
+
+/** Hash every copied file, including empty directories and excluding the client's own markers. */
 async function treeHash(root: string, ignoreMarker = false): Promise<string> {
   const hash = createHash("sha256")
   const visit = async (dir: string, relative: string): Promise<void> => {
     const entries = await fs.readdir(dir, { withFileTypes: true })
     entries.sort((a, b) => a.name.localeCompare(b.name))
     for (const entry of entries) {
-      if (ignoreMarker && relative === "" && entry.name === ".orphaned_at") continue
+      if (ignoreMarker && relative === "" && CACHE_MARKERS.has(entry.name)) continue
       const name = relative === "" ? entry.name : `${relative}/${entry.name}`
       const full = path.join(dir, entry.name)
       if (entry.isSymbolicLink()) throw new Error(`symbolic link in plugin pack: ${name}`)
@@ -141,8 +150,8 @@ export function createInstallerFiles(options: Options): InstallerFiles {
 
   const roots = async (input: PluginDiskDeclaration): Promise<PluginDiskRoots> => {
     const declaration = declarationOf(input)
-    const config = environmentRoot(env[declaration.configEnv], path.join(options.userHome ?? homedir(), declaration.configDir))
-    const plugins = environmentRoot(env[declaration.pluginsEnv], path.join(config, declaration.pluginsDir))
+    const config = environmentRoot(declaration.homeEnv === undefined ? undefined : env[declaration.homeEnv], path.join(options.userHome ?? homedir(), declaration.home))
+    const plugins = environmentRoot(declaration.stateEnv === undefined ? undefined : env[declaration.stateEnv], path.join(config, declaration.state))
     const workspace = await options.workspace()
     return {
       declaration,
@@ -181,51 +190,13 @@ export function createInstallerFiles(options: Options): InstallerFiles {
   const external = async (captured: PluginDiskRoots, directory: string, relative: string): Promise<string> => {
     await validate(captured)
     if (typeof directory !== "string" || !path.isAbsolute(directory)) throw new Error("marketplace directory must be absolute")
-    const resolved = path.resolve(directory)
-    const declared = new Set<string>([captured.library, path.join(captured.plugins, "cache")])
-    const refs: PluginDiskRef[] = [
-      { root: "plugins", path: "known_marketplaces.json" },
-      { root: "config", path: "settings.json" },
-      ...(captured.workspace === null ? [] : [
-        { root: "workspace" as const, path: ".claude/settings.json" },
-        { root: "workspace" as const, path: ".claude/settings.local.json" },
-      ]),
-    ]
-    for (const ref of refs) {
-      const text = await readText(await target(captured, ref))
-      if (text === null) continue
-      const document = readJsonObject(text)
-      const entries = ref.root === "plugins" ? document : document?.extraKnownMarketplaces
-      if (typeof entries !== "object" || entries === null || Array.isArray(entries)) continue
-      for (const entry of Object.values(entries)) {
-        if (typeof entry !== "object" || entry === null) continue
-        const source = (entry as { source?: { source?: unknown; path?: unknown } }).source
-        if (source?.source === "directory" && typeof source.path === "string" && path.isAbsolute(source.path)) {
-          declared.add(path.resolve(source.path))
-        }
-      }
-    }
-    const indexText = await readText(await target(captured, { root: "plugins", path: "installed_plugins.json" }))
-    const installed = indexText === null ? null : readJsonObject(indexText)?.plugins
-    if (typeof installed === "object" && installed !== null && !Array.isArray(installed)) {
-      for (const value of Object.values(installed)) {
-        for (const record of Array.isArray(value) ? value : [value]) {
-          if (typeof record !== "object" || record === null) continue
-          const directory = (record as { installPath?: unknown }).installPath
-          if (typeof directory === "string" && path.isAbsolute(directory)) declared.add(path.resolve(directory))
-        }
-      }
-    }
-    if (![...declared].some((root) => inside(root, resolved))) {
-      throw new Error("marketplace directory was not declared in plugin state")
-    }
-    return safePath(resolved, relative)
+    return safePath(path.resolve(directory), relative)
   }
 
   const commit = async (
     captured: PluginDiskRoots,
     changes: readonly PluginDiskChange[],
-    copy?: { name: string; destination: string }
+    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean }
   ): Promise<void> => {
     if (!Array.isArray(changes)) throw new Error("invalid file changes")
     if (typeof captured !== "object" || captured === null || typeof captured.token !== "string" || !tokens.has(captured.token)) {
@@ -239,7 +210,7 @@ export function createInstallerFiles(options: Options): InstallerFiles {
         if (typeof change !== "object" || change === null ||
             !(change.before === null || typeof change.before === "string") ||
             !(change.after === null || typeof change.after === "string")) throw new Error("invalid file change")
-        if (!allowedRef(change.ref, true)) throw new Error("file is outside the plugin state allowlist")
+        if (!allowedRef(captured, change.ref, true)) throw new Error("file is outside the plugin state allowlist")
         const file = await target(captured, change.ref)
         if (seen.has(file)) throw new Error(`duplicate file change: ${file}`)
         seen.add(file)
@@ -249,6 +220,8 @@ export function createInstallerFiles(options: Options): InstallerFiles {
 
       let staged: string | null = null
       let destination: string | null = null
+      let backup: string | null = null
+      let activated = false
       try {
         if (copy !== undefined) {
           if (typeof copy !== "object" || copy === null || typeof copy.name !== "string" || typeof copy.destination !== "string") {
@@ -256,7 +229,7 @@ export function createInstallerFiles(options: Options): InstallerFiles {
           }
           const name = assertSafeSegment(copy.name, "plugin name")
           const parts = assertPackRelative(copy.destination).split("/")
-          if (parts.length !== 4 || parts[0] !== "cache" || parts[2] !== name) throw new Error("invalid plugin cache destination")
+          if (parts.length !== 4 || parts[0] !== "cache" || parts[2] !== name || !allowedRef(captured, { root: "plugins", path: copy.destination }, true)) throw new Error("invalid plugin cache destination")
           assertSafeSegment(parts[1]!, "marketplace name")
           assertSafeSegment(parts[3]!, "plugin version")
           if (!(await options.library.list()).some((record) => record.name === name) || !(await options.library.has(name))) {
@@ -269,11 +242,10 @@ export function createInstallerFiles(options: Options): InstallerFiles {
             if (missing(error)) return null
             throw error
           })
-          if (destinationStat !== null) {
-            if (!destinationStat.isDirectory() || await treeHash(destination, true) !== sourceHash) {
-              throw new Error(`plugin cache already contains different files: ${destination}`)
-            }
-          } else {
+          if (destinationStat !== null && !destinationStat.isDirectory()) throw new Error(`plugin cache is not a directory: ${destination}`)
+          const different = destinationStat !== null && await treeHash(destination, true) !== sourceHash
+          if (different && !copy.replace) throw new Error(`plugin cache already contains different files: ${destination}`)
+          if (destinationStat === null || different) {
             await fs.mkdir(path.dirname(destination), { recursive: true })
             staged = path.join(path.dirname(destination), `.tmp-plugin-${randomUUID()}`)
             await fs.cp(source, staged, { recursive: true, errorOnExist: true, force: false })
@@ -287,7 +259,12 @@ export function createInstallerFiles(options: Options): InstallerFiles {
           if (await readText(item.file) !== item.before) throw new Error(`file changed; retry: ${item.file}`)
         }
         if (staged !== null && destination !== null) {
+          if (await fs.lstat(destination).catch((error: unknown) => { if (missing(error)) return null; throw error })) {
+            backup = `${destination}.backup-${randomUUID()}`
+            await fs.rename(destination, backup)
+          }
           await fs.rename(staged, destination)
+          activated = true
           staged = null
         }
         const written: typeof files = []
@@ -327,6 +304,22 @@ export function createInstallerFiles(options: Options): InstallerFiles {
           }
           throw new Error(reason, { cause: error })
         }
+        if (backup !== null) { await fs.rm(backup, { recursive: true, force: true }); backup = null }
+        activated = false
+        if (copy?.pruneVersions && destination !== null) {
+          const parent = path.dirname(destination)
+          for (const entry of await fs.readdir(parent, { withFileTypes: true })) {
+            if (entry.isDirectory() && entry.name !== path.basename(destination)) {
+              const relative = `cache/${copy.destination.split("/")[1]}/${copy.name}/${entry.name}`
+              if (!allowedRef(captured, { root: "plugins", path: relative }, true)) throw new Error("directory is outside the plugin cache allowlist")
+              await fs.rm(await safePath(captured.plugins, relative), { recursive: true, force: true })
+            }
+          }
+        }
+      } catch (error) {
+        if (activated && destination !== null) await fs.rm(destination, { recursive: true, force: true })
+        if (backup !== null && destination !== null) await fs.rename(backup, destination)
+        throw error
       } finally {
         if (staged !== null) await fs.rm(staged, { recursive: true, force: true })
       }
@@ -389,12 +382,11 @@ export function createInstallerFiles(options: Options): InstallerFiles {
     begin,
     end,
     async read(captured, ref) {
-      if (!allowedRef(ref, false)) throw new Error("file is outside the plugin state allowlist")
+      if (!allowedRef(captured, ref, false)) throw new Error("file is outside the plugin state allowlist")
       return readText(await target(captured, ref))
     },
     async list(captured, ref) {
-      if (!((ref.root === "config" && ref.path === "skills") ||
-        (ref.root === "workspace" && ref.path === ".claude/skills"))) throw new Error("directory is outside the plugin state allowlist")
+      if (!allowedRef(captured, ref, false)) throw new Error("directory is outside the plugin state allowlist")
       const dir = await target(captured, ref)
       const entries = await fs.readdir(dir, { withFileTypes: true }).catch((error: unknown) => {
         if (missing(error)) return []
@@ -403,17 +395,17 @@ export function createInstallerFiles(options: Options): InstallerFiles {
       return entries.filter((entry) => !entry.isSymbolicLink()).map((entry) => ({ name: entry.name, directory: entry.isDirectory() }))
     },
     async path(captured, ref) {
-      if (!((ref.root === "config" && /^skills\/[^/]+$/.test(ref.path)) ||
-        (ref.root === "workspace" && /^\.claude\/skills\/[^/]+$/.test(ref.path)))) {
-        throw new Error("directory is outside the plugin state allowlist")
-      }
+      if (!allowedRef(captured, ref, false)) throw new Error("directory is outside the plugin state allowlist")
       return target(captured, ref)
+    },
+    async removeDirectory(captured, ref) {
+      if (!captured.token || !tokens.has(captured.token)) throw new Error("file operation lease required")
+      if (ref.root !== "plugins" || !/^cache\/[^/]+\/[^/]+(?:\/[^/]+)?$/.test(ref.path) || !allowedRef(captured, ref, true)) throw new Error("directory is outside the plugin cache allowlist")
+      await fs.rm(await target(captured, ref), { recursive: true, force: true })
     },
     external,
     async readExternal(captured, directory, relative) {
-      if (relative !== ".claude-plugin/marketplace.json" && relative !== ".claude-plugin/plugin.json") {
-        throw new Error("only marketplace and plugin metadata may be read externally")
-      }
+      if (!captured.declaration.external.some((pattern) => matches(pattern, relative))) throw new Error("external path is outside the file scope")
       const file = await external(captured, directory, relative)
       const text = await readText(file)
       return text

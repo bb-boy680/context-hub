@@ -153,7 +153,7 @@ const CALLS: readonly Call[] = [
   {
     label: "writing the marketplace indexes",
     path: "",
-    init: post({ action: "sync-marketplace" }),
+    init: post({ action: "sync-marketplace", indexes: [{ path: ".agents/plugins/marketplace.json", document: { name: "context-hub" } }] }),
     keys: ["root"],
   },
 ]
@@ -268,10 +268,9 @@ describe("the tools an installer is handed", () => {
   it("carries file snapshots and commits through the real socket", async () => {
     const disk = tools().disk!
     const declaration = {
-      configDir: ".claude",
-      configEnv: "CLAUDE_CONFIG_DIR",
-      pluginsDir: "plugins",
-      pluginsEnv: "CLAUDE_CODE_PLUGIN_CACHE_DIR",
+      home: ".claude", homeEnv: "CLAUDE_CONFIG_DIR", state: "plugins", stateEnv: "CLAUDE_CODE_PLUGIN_CACHE_DIR",
+      config: { write: ["settings.json"], read: [] }, stateFiles: { write: ["cache/*/*/*"], read: [] },
+      workspace: { write: [], read: [] }, library: { write: [], read: [] }, external: [],
     }
     const oldConfig = process.env.CLAUDE_CONFIG_DIR
     const oldPlugins = process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
