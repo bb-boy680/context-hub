@@ -265,6 +265,38 @@ describe("the tools an installer is handed", () => {
     )
   })
 
+  it("carries file snapshots and commits through the real socket", async () => {
+    const disk = tools().disk!
+    const declaration = {
+      configDir: ".claude",
+      configEnv: "CLAUDE_CONFIG_DIR",
+      pluginsDir: "plugins",
+      pluginsEnv: "CLAUDE_CODE_PLUGIN_CACHE_DIR",
+    }
+    const oldConfig = process.env.CLAUDE_CONFIG_DIR
+    const oldPlugins = process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
+    process.env.CLAUDE_CONFIG_DIR = path.join(home, "agent-config")
+    process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR = path.join(home, "agent-plugins")
+    try {
+      await disk.run(declaration, async (roots) => {
+        const ref = { root: "config" as const, path: "settings.json" }
+        const before = await disk.read(roots, ref)
+        expect(before).toBeNull()
+        await disk.commit(roots, [{ ref, before, after: '{"enabled":true}\n' }], {
+          name: PACK,
+          destination: `cache/context-hub/${PACK}/0.0.1`,
+        })
+        expect(await disk.read(roots, ref)).toContain('"enabled":true')
+        expect(await fs.readFile(path.join(roots.plugins, "cache", "context-hub", PACK, "0.0.1", "README.md"), "utf8")).toBe(README)
+      })
+    } finally {
+      if (oldConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR
+      else process.env.CLAUDE_CONFIG_DIR = oldConfig
+      if (oldPlugins === undefined) delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
+      else process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR = oldPlugins
+    }
+  })
+
   it("runs a program and hands back what it printed", async () => {
     /* A real one, so this proves the arguments reached it as a list rather than
        as one string that was re-parsed. */

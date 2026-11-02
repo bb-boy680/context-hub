@@ -77,9 +77,12 @@ function ScopeMenu({
       /* What this agent holds, in its own words — not what this hub delivered to
          it. A pack the agent got from some other marketplace is just as
          installed, and its row has to offer the way out. */
-      const at = (plugin.held.find((one) => one.client === client.id)?.places ?? []).some(
+      const matches = (plugin.held.find((one) => one.client === client.id)?.places ?? []).filter(
         (one) => one.scope === place.scopeWord
       )
+      const at = matches.length > 0
+      const readOnly = at && matches.every((one) => one.readOnly)
+      const ambiguous = new Set(matches.filter((one) => !one.readOnly).map((one) => one.id)).size > 1
       return {
         id: `${client.id}:${place.scopeWord}`,
         client: client.id,
@@ -90,7 +93,9 @@ function ScopeMenu({
         note: t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord),
         selected: at,
         blocked:
-          client.error !== undefined
+          readOnly || ambiguous
+            ? t("plugins.place.selfManaged")
+            : client.error !== undefined
             ? t("plugins.client.unread")
             : !client.available
               ? t("plugins.client.absent")

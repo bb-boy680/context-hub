@@ -123,6 +123,25 @@ export fails that test rather than the first plugin that uses it.
 Do not import any other package. UI components come from `scope.ui`; icons from
 `scope.icons` and `scope.icon(name)`.
 
+## Plugin installer file access
+
+An agent installer receives optional `tools.disk` through the plugins service.
+The file channel captures the configured roots and workspace for an operation,
+reads plugin metadata, copies a collected pack into its versioned cache, and
+commits file replacements after comparing their original contents. Installers
+serialize read-modify-write operations with `disk.run`; a stale snapshot or a
+changed workspace is refused. The host restricts writable files and never exposes
+plugin data directories through this channel. The current host allowlist recognizes
+Claude Code's roots and plugin state paths; another agent needs explicit host
+support before it can use this channel. Older hosts lack this capability; an
+extension must report that clearly instead of silently falling back to a CLI.
+
+File replacement is atomic per file. A multi-file operation uses compensating
+writes on failure and reports any file it could not restore. This is not a
+cross-process lock: a client or another application can still edit the same files
+between checks. Agent-specific document formats and dependency semantics remain
+in the agent extension.
+
 ## Prompt providers
 
 An agent extension that takes prompts declares where and how it takes them by

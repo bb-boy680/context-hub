@@ -39,6 +39,8 @@ import {
   readInDirectory,
 } from "./src/host/library.ts"
 import { writeMarketplaceIndex } from "./src/host/marketplace.ts"
+import { createInstallerFiles } from "./src/host/installer-files.ts"
+import type { PluginDiskChange, PluginDiskDeclaration, PluginDiskRef, PluginDiskRoots } from "./src/provider.ts"
 import { hasProgram, runProgram } from "./src/host/program.ts"
 import { previewMarket } from "./src/host/preview.ts"
 import { createPluginProbe } from "./src/host/probe.ts"
@@ -119,12 +121,13 @@ export function createPluginHandler(
    * the dev server's own package becomes the project, and the pack lands in
    * `apps/web` rather than in the folder a person picked.
    */
-  const startFolder = async (): Promise<string> => {
+  const workspace = async (): Promise<string | null> => {
     store ??= createFsWorkspaceStore(home, { folder: await hostFolder() })
     const page = await store.page()
-    const current = page.folders.find((folder) => folder.id === page.current)
-    return current?.path ?? (await hostFolder())
+    return page.folders.find((folder) => folder.id === page.current)?.path ?? null
   }
+  const startFolder = async (): Promise<string> => (await workspace()) ?? (await hostFolder())
+  const disk = createInstallerFiles({ library, workspace })
 
   return async (request, response, next) => {
     const url = new URL(request.url ?? "/", "http://localhost")
@@ -248,6 +251,35 @@ export function createPluginHandler(
 
       const body = sent ?? {}
       switch (action) {
+        case "disk-roots":
+          sendJson(response, 200, await disk.roots(body.declaration as PluginDiskDeclaration))
+          return
+        case "disk-begin":
+          sendJson(response, 200, await disk.begin(body.declaration as PluginDiskDeclaration))
+          return
+        case "disk-end":
+          disk.end(requiredString(body.token, "token"))
+          sendJson(response, 200, {})
+          return
+        case "disk-read":
+          sendJson(response, 200, { text: await disk.read(body.roots as PluginDiskRoots, body.ref as PluginDiskRef) })
+          return
+        case "disk-list":
+          sendJson(response, 200, { entries: await disk.list(body.roots as PluginDiskRoots, body.ref as PluginDiskRef) })
+          return
+        case "disk-path":
+          sendJson(response, 200, { path: await disk.path(body.roots as PluginDiskRoots, body.ref as PluginDiskRef) })
+          return
+        case "disk-external":
+          sendJson(response, 200, { path: await disk.external(body.roots as PluginDiskRoots, requiredString(body.directory, "directory"), requiredString(body.relative, "relative")) })
+          return
+        case "disk-read-external":
+          sendJson(response, 200, { text: await disk.readExternal(body.roots as PluginDiskRoots, requiredString(body.directory, "directory"), requiredString(body.relative, "relative")) })
+          return
+        case "disk-commit":
+          await disk.commit(body.roots as PluginDiskRoots, body.changes as PluginDiskChange[], body.copy as { name: string; destination: string } | undefined)
+          sendJson(response, 200, {})
+          return
         case "add":
           sendJson(response, 200, await collector.add(requiredString(body.source, "source")))
           return

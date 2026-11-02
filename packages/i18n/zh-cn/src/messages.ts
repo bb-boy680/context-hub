@@ -540,7 +540,7 @@ export const messages: Record<string, string> = {
   "plugins.detail.delete": "删除插件",
   "plugins.delete.title": "删除 {name}？",
   "plugins.delete.text":
-    "它的文件夹和 hub 为它保存的资源都会被删除，且无法撤销。Agent 里装的副本是它自己的，不会被动。",
+    "它的文件夹和 hub 为它保存的资源都会被删除，且无法撤销。直接从该文件夹加载的 Agent 将无法再加载这个插件。",
   "plugins.delete.agentText":
     "hub 手上没有这个包的副本，所以这是让 {names} 把它撤下来。无法撤销。",
   "plugins.delete.confirm": "删除",

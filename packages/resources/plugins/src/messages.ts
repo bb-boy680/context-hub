@@ -153,7 +153,7 @@ export const pluginsMessages: Record<string, string> = {
   "plugins.detail.delete": "Delete plugin",
   "plugins.delete.title": "Delete {name}?",
   "plugins.delete.text":
-    "Its folder and everything the hub keeps for it will be deleted, and that cannot be undone. Copies an agent holds are its own and are left alone.",
+    "Its folder and everything the hub keeps for it will be deleted, and that cannot be undone. Agents loading this folder directly will no longer be able to load the plugin.",
   "plugins.delete.agentText":
     "The hub holds no copy of its own, so this is {names} taking it back out. That cannot be undone.",
   "plugins.delete.confirm": "Delete",

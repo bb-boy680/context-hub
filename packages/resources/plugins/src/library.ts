@@ -576,8 +576,15 @@ export function usePluginLibrary(): PluginLibrary {
    * what it holds, so this side never has to guess at it.
    */
   const heldId = React.useCallback(
-    (name: string, client: string): string | undefined =>
-      scanned.find((one) => one.name === name)?.held.find((one) => one.client === client)?.id,
+    (name: string, client: string, scope: string): string | undefined => {
+      const hold = scanned.find((one) => one.name === name)?.held.find((one) => one.client === client)
+      if (hold === undefined) return undefined
+      const matching = hold.places.filter((place) => place.scope === scope && !place.readOnly)
+      const candidates = matching.length > 0 ? matching : hold.places.filter((place) => !place.readOnly)
+      const ids = [...new Set(candidates.map((place) => place.id ?? hold.id))]
+      if (ids.length > 1) throw new Error(`multiple plugin identities match ${name}; select an exact installation`)
+      return ids[0]
+    },
     [scanned]
   )
 
@@ -683,14 +690,14 @@ export function usePluginLibrary(): PluginLibrary {
          marketplace the pack really came from, and an agent holds packs this hub
          never delivered. It answered with that id when it was asked what it
          holds, so this side never has to guess at it. */
-      const own = heldId(name, client)
+      const own = heldId(name, client, scope)
       if (own === undefined) {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }
       return deliver(client, (installer, tools) => installer.remove(own, scope, tools))
     },
     setEnabled: (name, client, scope, on) => {
-      const own = heldId(name, client)
+      const own = heldId(name, client, scope)
       if (own === undefined) {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }

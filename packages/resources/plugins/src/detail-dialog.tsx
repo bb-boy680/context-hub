@@ -866,7 +866,7 @@ function PlacesSection({
      installed, and its row has to say so and offer the way out. */
   const heldIn = (client: PluginClient, scope: AssetScope): string[] =>
     (plugin.held.find((one) => one.client === client.id)?.places ?? [])
-      .filter((one) => one.group === scope)
+      .filter((one) => one.group === scope && !one.readOnly)
       .map((one) => one.scope)
   /* Why this row cannot be taken at all: an agent that is not on this machine,
      or one whose own list could not be read — the second holds an unknown set of
@@ -932,6 +932,13 @@ function PlacesSection({
     }
 
     const held = heldIn(client, at.scope)
+    const heldPlaces = (plugin.held.find((one) => one.client === client.id)?.places ?? [])
+      .filter((one) => one.group === at.scope)
+    const readOnly = heldPlaces.some((one) => one.readOnly)
+    const ambiguous = new Set(heldPlaces.filter((one) => !one.readOnly).map((one) => one.id)).size > 1
+    if ((held.length === 0 && readOnly) || ambiguous) {
+      return <span className="text-xs text-muted-foreground">{t("plugins.place.selfManaged")}</span>
+    }
     if (held.length > 0) {
       return (
         <Button
@@ -1197,7 +1204,7 @@ function InfoPanel({
             return (async () => {
               for (const hold of plugin.held) {
                 for (const place of hold.places) {
-                  await onUninstall(hold.client, place.scope as PluginInstallScope)
+                  if (!place.readOnly) await onUninstall(hold.client, place.scope as PluginInstallScope)
                 }
               }
             })()
@@ -1205,6 +1212,7 @@ function InfoPanel({
         >
           <Button
             variant="outline"
+            disabled={!plugin.stored && plugin.held.some((hold) => hold.places.some((place) => place.readOnly) || new Set(hold.places.map((place) => place.id)).size > 1)}
             className="h-10 shrink-0 gap-[7px] rounded-full border-destructive/35 bg-transparent px-4 text-[13.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
           >
             <Trash2Icon className="size-[15px]" />

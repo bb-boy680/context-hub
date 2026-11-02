@@ -30,7 +30,55 @@ export const PLUGIN_SERVICE = "plugins"
  * these rather than reaching for a disk or a process itself, which is also what
  * lets it be written once and drive every form of the app.
  */
+/** Roots an installer declares without exposing the host's environment. */
+export interface PluginDiskDeclaration {
+  configDir: string
+  configEnv: string
+  pluginsDir: string
+  pluginsEnv: string
+}
+
+/** The roots captured for one operation. */
+export interface PluginDiskRoots {
+  declaration: PluginDiskDeclaration
+  config: string
+  plugins: string
+  workspace: string | null
+  library: string
+  platform: "win32" | "posix"
+  token?: string
+}
+
+export interface PluginDiskRef {
+  root: "config" | "plugins" | "workspace" | "library"
+  path: string
+}
+
+export interface PluginDiskChange {
+  ref: PluginDiskRef
+  before: string | null
+  after: string | null
+}
+
+/** Narrow file operations for an installer; paths are relative to captured roots. */
+export interface PluginDisk {
+  roots(declaration: PluginDiskDeclaration): Promise<PluginDiskRoots>
+  read(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string | null>
+  list(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<{ name: string; directory: boolean }[]>
+  path(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string>
+  external(roots: PluginDiskRoots, directory: string, relative: string): Promise<string>
+  readExternal(roots: PluginDiskRoots, directory: string, relative: string): Promise<string | null>
+  commit(
+    roots: PluginDiskRoots,
+    changes: readonly PluginDiskChange[],
+    copy?: { name: string; destination: string }
+  ): Promise<void>
+  run<T>(declaration: PluginDiskDeclaration, work: (roots: PluginDiskRoots) => Promise<T>): Promise<T>
+}
+
 export interface PluginTools {
+  /** File access for clients supported by a recent host. */
+  readonly disk?: PluginDisk
   /**
    * The directory packs are collected into. Registering it with the agent is
    * what makes them installable, so an installer reads it rather than assuming
@@ -148,6 +196,9 @@ export interface PluginHeld {
    * Whether the client currently switches it on.
    */
   enabled: boolean
+  /** A discovered or policy-owned entry may not be modified through this installer. */
+  readOnly?: boolean
+  origin?: "record" | "declaration" | "skills-dir"
   /** The marketplace it came from; `null` when the client names none. */
   marketplace: string | null
   /**

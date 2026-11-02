@@ -7,7 +7,7 @@
  * calls its main process.
  */
 import { PLUGIN_ROUTE, type PackDescription } from "./contract.ts"
-import { PluginInstallError, type PluginBridgeTools } from "./provider.ts"
+import { PluginInstallError, type PluginBridgeTools, type PluginDisk, type PluginDiskRoots } from "./provider.ts"
 
 /** The route the plugin library answers on. */
 const ENDPOINT = PLUGIN_ROUTE
@@ -55,7 +55,37 @@ function call<T>(base: string, body: Record<string, unknown>): Promise<T> {
  * @param base — the origin the route is reached on; empty means this one.
  */
 export function createRemotePluginTools(base = ""): PluginBridgeTools {
+  const disk: PluginDisk = {
+    roots: (declaration) => call(base, { action: "disk-roots", declaration }),
+    async read(roots, ref) {
+      return (await call<{ text: string | null }>(base, { action: "disk-read", roots, ref })).text
+    },
+    async list(roots, ref) {
+      return (await call<{ entries: { name: string; directory: boolean }[] }>(base, { action: "disk-list", roots, ref })).entries
+    },
+    async path(roots, ref) {
+      return (await call<{ path: string }>(base, { action: "disk-path", roots, ref })).path
+    },
+    async external(roots, directory, relative) {
+      return (await call<{ path: string }>(base, { action: "disk-external", roots, directory, relative })).path
+    },
+    async readExternal(roots, directory, relative) {
+      return (await call<{ text: string | null }>(base, { action: "disk-read-external", roots, directory, relative })).text
+    },
+    async commit(roots, changes, copy) {
+      await call(base, { action: "disk-commit", roots, changes, copy })
+    },
+    async run(declaration, work) {
+      const roots = await call<PluginDiskRoots>(base, { action: "disk-begin", declaration })
+      try {
+        return await work(roots)
+      } finally {
+        await call(base, { action: "disk-end", token: roots.token })
+      }
+    },
+  }
   return {
+    disk,
     async root() {
       const answer = await callGet<{ root: string }>(base, "?action=root")
       return answer.root

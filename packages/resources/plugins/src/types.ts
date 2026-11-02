@@ -28,6 +28,10 @@ export interface PluginHeldPlace {
    * still lands in the right group.
    */
   group: AssetScope
+  /** The exact installation identity and whether its owner allows changes. */
+  id?: string
+  readOnly?: boolean
+  origin?: "record" | "declaration" | "skills-dir"
   /** Whether the file that records this place switches the pack on there. */
   enabled: boolean
 }

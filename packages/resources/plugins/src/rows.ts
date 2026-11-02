@@ -191,11 +191,14 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
       /* The file's own answer where it names the pack, and the client's single
          answer where the file is silent: that is the value the place sees. */
       const here = answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
-      const already = found.places.find((one) => one.scope === pack.scope)
+      const already = found.places.find((one) => one.scope === pack.scope && one.id === pack.id)
       if (already === undefined) {
         found.places.push({
           scope: pack.scope,
-          group: declared?.scope ?? "workspace",
+          group: declared?.scope ?? (pack.scope === "managed" || pack.scope === "user" ? "global" : "workspace"),
+          id: pack.id,
+          readOnly: pack.readOnly === true || declared === undefined,
+          origin: pack.origin,
           enabled: here,
         })
       } else {
@@ -351,12 +354,14 @@ export function placesShown(
   return plugin.held.flatMap((hold) => {
     const client = clients.find((one) => one.id === hold.client)
     if (client === undefined) return []
-    const sits = new Set(hold.places.map((one) => one.scope))
+    const sits = new Set(hold.places.filter((one) => !one.readOnly).map((one) => one.scope))
     return client.places.flatMap((declared) => {
       const here = sits.has(declared.scopeWord)
       const over = (declared.overrides ?? []).some((one) => sits.has(one))
       if (!here && !over) return []
-      const recorded = client.switches[declared.scopeWord]?.[hold.id]
+      const ids = new Set(hold.places.filter((place) => !place.readOnly).map((place) => place.id ?? hold.id))
+      if (ids.size !== 1) return []
+      const recorded = client.switches[declared.scopeWord]?.[[...ids][0]!]
       return [
         {
           id: `${hold.client}:${declared.scopeWord}`,

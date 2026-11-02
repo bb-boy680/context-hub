@@ -149,6 +149,20 @@ const codex: ScannedAnswer = {
   ],
 }
 
+it("keeps marketplace identities and marks undeclared places read-only", () => {
+  const pack = claudeCode.packs[0]!
+  const result = collectScanned([{ ...claudeCode, packs: [
+    pack,
+    { ...pack, id: "hud@other", marketplace: "other" },
+    { ...pack, scope: "local", readOnly: true },
+  ] }])[0]!
+  expect(result.held[0]?.places).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: "hud@hud", scope: "user", readOnly: false }),
+    expect.objectContaining({ id: "hud@other", scope: "user", readOnly: false }),
+    expect.objectContaining({ id: "hud@hud", scope: "local", readOnly: true }),
+  ]))
+})
+
 const answers: ScannedAnswer[] = [claudeCode, codex]
 const scanned = collectScanned(answers)
 const rows = composeRows([record("stored")], scanned, "en", plain)
