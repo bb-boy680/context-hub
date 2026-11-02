@@ -14,6 +14,7 @@ import type { PlaceFiles } from "@context-hub/core/place-files"
 import type { ExtensionIcon } from "@context-hub/extensions"
 
 import { buildCatalog, placesOf, scanPlaces } from "../src/catalog.ts"
+import { placeServerCount, selectedMcpPlace, serverHeldAt } from "../src/installs.ts"
 import type { McpScan, ScannedPlace } from "../src/catalog.ts"
 import { McpError } from "../src/contract.ts"
 import type {
@@ -160,6 +161,33 @@ beforeAll(async () => {
     files,
     () => undefined
   )
+})
+
+describe("the installation location filter", () => {
+  it("counts and filters each client file independently, including disabled and unreadable entries", () => {
+    const catalog = buildCatalog(records, read, places, [], Date.now())
+    const github = catalog.servers.find((server) => server.name === "github")
+    const odd = catalog.servers.find((server) => server.name === "odd")
+    expect(github).toBeDefined()
+    expect(odd).toBeDefined()
+    expect(serverHeldAt(github as McpServer, "a-project")).toBe(true)
+    expect(serverHeldAt(github as McpServer, "a-global")).toBe(true)
+    expect(serverHeldAt(odd as McpServer, "a-project")).toBe(true)
+    expect(serverHeldAt(odd as McpServer, "a-global")).toBe(false)
+    const readable = new Set(read.entries.keys())
+    expect(placeServerCount(catalog.servers, "a-project", readable)).toBe(2)
+    expect(placeServerCount(catalog.servers, "a-global", readable)).toBe(1)
+    expect(placeServerCount(catalog.servers, "unread", readable)).toBeNull()
+    expect(placeServerCount(catalog.servers, "empty", new Set(["empty"]))).toBe(0)
+  })
+
+  it("drops a selected place when its agent no longer offers it", () => {
+    const available = places.map((item) => item.place)
+    expect(selectedMcpPlace(available, "a-project")?.id).toBe("a-project")
+    expect(selectedMcpPlace(available, "a-global")?.id).toBe("a-global")
+    expect(selectedMcpPlace(available.filter((place) => place.id !== "a-project"), "a-project")).toBeNull()
+    expect(selectedMcpPlace(available, null)).toBeNull()
+  })
 })
 
 describe("the service", () => {

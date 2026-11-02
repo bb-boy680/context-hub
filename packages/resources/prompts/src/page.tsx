@@ -4,17 +4,16 @@
  *
  * It is the shape the other asset pages have — the same toolbar, the same
  * filter row, the same two views. The tab row carries one dimension: where a
- * prompt has been written out. Everything is the library itself; the two scope
- * tabs are the places an agent reads from, each narrowing to one place the way
- * the skills page's scopes do. What a prompt has besides that is the copy
- * beside it, which needs no agent at all.
+ * prompt has been written out. Everything is the library itself; choosing a
+ * place narrows the list to what that place holds. What a prompt has besides
+ * that is the copy beside it, which needs no agent at all.
  */
 import {
   CheckIcon,
+  ChevronDownIcon,
   ContainerIcon,
   CopyIcon,
   FileTextIcon,
-  GlobeIcon,
   LayoutGridIcon,
   ListIcon,
   PlusIcon,
@@ -32,7 +31,7 @@ import {
   Ledger,
   MarksLine,
   PageBody,
-  PlaceScopePicker,
+  PlaceMenu,
   TablePagination,
   knownAspect,
   mediaKind,
@@ -43,13 +42,14 @@ import {
 import type { AssetScope } from "@context-hub/extensions"
 import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
+import { DropdownMenu, DropdownMenuTrigger } from "@context-hub/shadcn-ui/components/dropdown-menu"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui/components/tabs"
 
 import { AddPromptDialog } from "./add-prompt-dialog.tsx"
 import { failureText, promptFailure, PromptError } from "./failure.ts"
-import { heldMarks, holdsSomething } from "./held.ts"
+import { heldCount, heldMarks, promptsAtPlace, selectedPromptPlace } from "./held.ts"
 import { BatchActions, cardActionShell, PromptActions, usePlaceWords } from "./install-menu.tsx"
 import {
   formatAge,
@@ -399,14 +399,13 @@ export function PromptsPage() {
   /* Raised after a delivery, so the page and the detail dialog re-read where the
      prompt is. */
   const [stamp, setStamp] = React.useState(0)
-  /* Which tab is on screen, and — inside a scope tab — the one place it is
-     narrowed to. Both are page state: the tab row and the list are one screen. */
-  const [tab, setTab] = React.useState<"all" | AssetScope>("all")
+  /* A chosen place is the only alternative to the whole library. */
+  const [tab, setTab] = React.useState<"all" | "place">("all")
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
 
-  /* One scan for the page: a card reads its own row from here, and the scope
-     tabs count and filter by the same answer. */
-  const holdsMap = useHoldsMap(library.rows, places, files, stamp)
+  /* One scan for the page: a card reads its own row from here, and the place
+     menu counts and filters by the same answer. */
+  const { held: holdsMap, failed: failedPlaces } = useHoldsMap(library.rows, places, files, stamp)
 
   const placeWords = usePlaceWords()
 
@@ -431,31 +430,25 @@ export function PromptsPage() {
     [offered, tag]
   )
 
-  /** Whether a row has been written out in a scope — or in one place of it. */
-  const heldIn = React.useCallback(
-    (row: StoredPrompt, scope: AssetScope, place: string | null) =>
-      places.some(
-        (one) =>
-          one.scope === scope &&
-          (place === null || one.id === place) &&
-          holdsSomething(holdsMap[row.id]?.[one.id])
-      ),
-    [places, holdsMap]
-  )
-
-  /* The scope tabs filter what the library holds by where it has been written;
-     "all" is the library itself, which is why the query and tag filters above
-     come first and the tab narrows that answer rather than replacing it. */
+  const chosen = selectedPromptPlace(places, narrowed)
+  const placeIds = JSON.stringify(places.map((place) => place.id))
+  const [previousPlaceIds, setPreviousPlaceIds] = React.useState(placeIds)
+  if (previousPlaceIds !== placeIds) {
+    setPreviousPlaceIds(placeIds)
+    if (tab === "place" && chosen === null) {
+      setTab("all")
+      setNarrowed(null)
+      setPage(0)
+      setChecked([])
+    }
+  }
+  const screenTab = tab === "place" && chosen !== null ? "place" : "all"
   const scoped = React.useMemo(
-    () =>
-      tab === "all"
-        ? matching
-        : matching.filter((row) => heldIn(row, tab, narrowed)),
-    [matching, tab, narrowed, heldIn]
+    () => promptsAtPlace(matching, screenTab === "place" ? chosen?.id ?? null : null, holdsMap),
+    [matching, screenTab, chosen, holdsMap]
   )
 
-  /* What each place holds, for the scope pills' menus: the count is a number of
-     prompts, which is what a person scanning the list is counting too. */
+  /* Each prompt counts once, even when a place holds several of its forms. */
   const scopePlaces = React.useMemo(() => {
     const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
     for (const place of places) {
@@ -463,13 +456,15 @@ export function PromptsPage() {
         id: place.id,
         icon: place.icon,
         label: t(place.labelKey),
-        where: place.where ?? "",
-        count: library.rows.filter((row) => holdsSomething(holdsMap[row.id]?.[place.id]))
-          .length,
+        ...(place.where === undefined ? {} : { where: place.where }),
+        count: library.loading || library.error !== null || library.store === null
+          ? null
+          : heldCount(library.rows, place.id, holdsMap, failedPlaces),
+        selected: screenTab === "place" && chosen?.id === place.id,
       })
     }
     return byScope
-  }, [places, library.rows, holdsMap, t])
+  }, [places, library.loading, library.error, library.store, library.rows, holdsMap, failedPlaces, screenTab, chosen, t])
 
   const pageCount = Math.max(1, Math.ceil(scoped.length / pageSize))
   const shownPage = Math.min(page, pageCount - 1)
@@ -752,7 +747,7 @@ export function PromptsPage() {
         <span className="text-[13px] text-muted-foreground">
           {t("prompts.footer.count")
             .replace("{shown}", String(rows.length))
-            .replace("{total}", String(matching.length))}
+            .replace("{total}", String(scoped.length))}
         </span>
         {pagination}
       </div>
@@ -768,17 +763,17 @@ export function PromptsPage() {
       </div>
 
       <Tabs
-        value={tab}
-        onValueChange={(value) => {
-          setTab(value as "all" | AssetScope)
+        value={screenTab}
+        onValueChange={() => {
+          setTab("all")
           setNarrowed(null)
           setPage(0)
           setChecked([])
         }}
         className="flex-1 gap-8"
       >
-        <div className="flex items-center justify-between gap-6">
-          <TabsList className="h-11! gap-1 rounded-full bg-secondary p-1">
+        <div className="flex min-w-0 flex-wrap items-center justify-between gap-6">
+          <TabsList className="h-11! min-w-0 max-w-full gap-1 overflow-x-auto rounded-full bg-secondary p-1">
             <TabsTrigger
               value="all"
               className="h-9 flex-none gap-1.5 rounded-full px-4 text-[length:var(--text-body)] text-muted-foreground data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-accent dark:data-active:text-foreground"
@@ -789,28 +784,41 @@ export function PromptsPage() {
                 {library.error === null ? matching.length : "—"}
               </span>
             </TabsTrigger>
-            {/* A scope stands for the places it spans, so a scope holding no
-                place is not a tab at all: with no agent chosen the machine-wide
-                one has nothing to open. */}
-            {SCOPES.filter((scope) => scopePlaces[scope].length > 0).map((scope) => (
-              <PlaceScopePicker
-                key={scope}
-                scopeIcon={scope === "workspace" ? ContainerIcon : GlobeIcon}
-                scopeLabel={t(`prompts.tab.${scope}`)}
-                places={scopePlaces[scope]}
-                chosen={tab === scope ? narrowed : null}
-                active={tab === scope}
-                allLabel={t("prompts.place.all")}
-                title={t("prompts.place.which")}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={places.length === 0}
+                render={
+                  <button
+                    type="button"
+                    disabled={places.length === 0}
+                    aria-label={chosen !== null && screenTab === "place"
+                      ? `${t("prompts.tab.places")}: ${t(chosen.labelKey)} · ${t(`prompts.group.${chosen.scope}`)}${chosen.where === undefined ? "" : ` · ${chosen.where}`}`
+                      : `${t("prompts.tab.places")}: ${t("prompts.tab.all")}`}
+                    aria-current={screenTab === "place" ? "true" : undefined}
+                    className={`flex h-9 flex-none items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${screenTab === "place" ? "bg-foreground text-background dark:bg-accent dark:text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <ContainerIcon className="size-3.5 shrink-0" aria-hidden />
+                    {t("prompts.tab.places")}
+                    <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
+                  </button>
+                }
+              />
+              <PlaceMenu
                 words={placeWords}
-                onChoose={(id) => {
-                  setTab(scope)
+                currentSelection
+                groups={SCOPES.map((scope) => ({
+                  label: t(`prompts.group.${scope}`),
+                  options: scopePlaces[scope],
+                }))}
+                onPick={(id) => {
+                  if (selectedPromptPlace(places, id) === null) return
                   setNarrowed(id)
+                  setTab("place")
                   setPage(0)
                   setChecked([])
                 }}
               />
-            ))}
+            </DropdownMenu>
           </TabsList>
           <div className="flex shrink-0 items-center gap-2">
             <div className={viewToggleSurface}>
@@ -856,7 +864,7 @@ export function PromptsPage() {
           }}
         />
 
-        <TabsContent value={tab} className="flex flex-col">
+        <TabsContent value={screenTab} aria-label={screenTab === "place" ? t("prompts.tab.places") : undefined} className="flex flex-col">
           <PageBody footer={footer}>
             {library.store === null ? (
               /* No library at all is a different answer from an empty one: the
@@ -899,7 +907,7 @@ export function PromptsPage() {
                     </Button>
                   }
                 />
-              ) : tab === "all" ? (
+              ) : screenTab === "all" ? (
                 <EmptyState
                   icon={FileTextIcon}
                   title={t("prompts.empty.none")}
@@ -912,8 +920,8 @@ export function PromptsPage() {
                   }
                 />
               ) : (
-                /* A scope tab is a question about where a prompt has been
-                   written, so an empty one is not an empty library. */
+                /* A place asks where a prompt has been written, so an empty one
+                   is not an empty library. */
                 <EmptyState
                   icon={FileTextIcon}
                   title={t("prompts.empty.scope")}

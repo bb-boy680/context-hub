@@ -62,6 +62,8 @@ export interface McpLibrary {
   catalog: McpCatalog | null
   /** Every client file an enabled extension described. */
   places: McpAgentPlace[]
+  /** Files whose latest scan has answered successfully. */
+  readPlaces: ReadonlySet<string>
   /**
    * The hub's own records file, as a person reads it; empty while this form
    * cannot reach a host, which is the only source that knows it.
@@ -262,6 +264,7 @@ export function useMcpLibrary(): McpLibrary {
     failure: actionFailure ?? readFailure ?? value.failure,
     catalog,
     places,
+    readPlaces: new Set(value.scan?.answer.entries.keys() ?? []),
     recordsFile: value.recordsFile,
     testing: value.testing,
 

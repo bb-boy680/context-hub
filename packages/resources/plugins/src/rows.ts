@@ -266,7 +266,7 @@ export function composeRows(
 }
 
 /** Which rows a tab shows. */
-export type PluginTab = "all" | "library" | "unstored" | "updates" | AssetScope
+export type PluginTab = "all" | "library" | "unstored" | "updates" | "place"
 
 /**
  * The install scopes each grouped tab stands for, in a client's own words.
@@ -403,13 +403,38 @@ export function scopeWords(scopes: readonly string[], t: (key: string) => string
     .join(" · ")
 }
 
-/** Whether a client — one agent, or any of them — holds the pack in this group. */
-function holdsIn(row: PluginRow, group: AssetScope, place: string | null): boolean {
-  return row.held.some(
-    (hold) =>
-      (place === null || hold.client === place) &&
-      hold.places.some((one) => one.group === group)
+/** One agent's places within a scope are one option in the filter. */
+export interface PluginFilterPlace {
+  scope: AssetScope
+  client: string
+}
+
+/** A stable menu key that distinguishes both the agent and its scope. */
+export function pluginPlaceKey(place: PluginFilterPlace): string {
+  return JSON.stringify([place.scope, place.client])
+}
+
+/** Drop a selection whose agent no longer offers the selected scope. */
+export function selectedPluginPlace(
+  clients: readonly PluginClient[],
+  selected: PluginFilterPlace | null
+): PluginFilterPlace | null {
+  return selected !== null && clients.some((client) =>
+    client.id === selected.client && client.places.some((place) => place.scope === selected.scope)
   )
+    ? selected
+    : null
+}
+
+/** The size of a place's full set, or unknown when its agent could not be read. */
+export function pluginPlaceCount(
+  rows: readonly PluginRow[],
+  client: PluginClient,
+  scope: AssetScope
+): number | null {
+  return client.error === undefined
+    ? rowsForTab(rows, "place", { scope, client: client.id }).length
+    : null
 }
 
 /**
@@ -421,13 +446,13 @@ function holdsIn(row: PluginRow, group: AssetScope, place: string | null): boole
  *
  * @param rows — the catalog.
  * @param value — the tab on screen.
- * @param place — the one client a scope tab is narrowed to; `null` leaves it whole.
+ * @param place — the agent and scope selected in the place menu.
  * @returns the rows the tab shows.
  */
 export function rowsForTab(
   rows: readonly PluginRow[],
   value: PluginTab,
-  place: string | null = null
+  place: PluginFilterPlace | null = null
 ): PluginRow[] {
   switch (value) {
     case "all":
@@ -440,8 +465,11 @@ export function rowsForTab(
        keeps a pack no client ever fetched out of this set. */
     case "updates":
       return rows.filter((row) => row.outdated === true)
-    case "workspace":
-    case "global":
-      return rows.filter((row) => holdsIn(row, value, place))
+    case "place":
+      return place === null
+        ? []
+        : rows.filter((row) => row.held.some(
+          (hold) => hold.client === place.client && hold.places.some((one) => one.group === place.scope)
+        ))
   }
 }

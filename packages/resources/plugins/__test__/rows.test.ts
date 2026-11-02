@@ -19,7 +19,10 @@ import type { PluginRecord } from "../src/revision.ts"
 import {
   collectScanned,
   composeRows,
+  pluginPlaceCount,
+  pluginPlaceKey,
   rowsForTab,
+  selectedPluginPlace,
   placeReached,
   placesShown,
   scopeWords,
@@ -157,9 +160,8 @@ const behind: PluginRecord = {
 }
 const checkedCatalog = composeRows([record("stored"), behind], scanned, "en", plain)
 
-/* A roster of its own, for the two scope tabs, so that a pack held in the
-   repository and one held only machine-wide are both on it: the tabs have to tell
-   them apart rather than agree because every pack happens to be in both. */
+/* A roster of its own, so one agent's repository and machine-wide places,
+   and another agent's machine-wide place, hold distinguishable packs. */
 const scopePlaces = composeRows(
   [],
   collectScanned([
@@ -813,53 +815,71 @@ describe("which tab a row lands in, once a source has moved", () => {
   })
 })
 
-describe("which tab a row lands in, by the place it sits in", () => {
-  it("puts a pack an agent holds inside the repository in the workspace tab", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace").map((one) => one.name),
-      "a pack an agent holds inside the repository is the workspace tab"
-    ).toEqual(["here"])
+describe("which rows a selected place holds", () => {
+  const ccWorkspace = { scope: "workspace", client: "hub.target.claude-code" } as const
+  const ccGlobal = { scope: "global", client: "hub.target.claude-code" } as const
+  const codexGlobal = { scope: "global", client: "hub.target.codex" } as const
+  const clients: PluginClient[] = [
+    {
+      id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: {}, available: true,
+    },
+    {
+      id: codex.client, label: codex.label, icon: mark,
+      places: codex.places, switches: {}, available: true,
+    },
+  ]
+
+  it("selects only that agent's repository packs", () => {
+    const names = rowsForTab(scopePlaces, "place", ccWorkspace).map((one) => one.name)
+    expect(names).toEqual(["here"])
+    expect(names).not.toContain("everywhere")
+    expect(names).not.toContain("away")
   })
 
-  it("leaves a pack held only machine-wide out of the workspace tab", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace").map((one) => one.name),
-      "one held only machine-wide is not, whoever holds it"
-    ).not.toContain("away")
+  it("selects the same agent's machine-wide packs separately", () => {
+    const names = rowsForTab(scopePlaces, "place", ccGlobal).map((one) => one.name)
+    expect(names).toEqual(["everywhere"])
+    expect(names).not.toContain("here")
   })
 
-  it("puts every pack an agent holds machine-wide in the global tab", () => {
-    expect(
-      rowsForTab(scopePlaces, "global").map((one) => one.name),
-      "every pack an agent holds machine-wide is the global tab"
-    ).toEqual(["everywhere", "away"])
+  it("selects only the other agent's machine-wide packs", () => {
+    expect(rowsForTab(scopePlaces, "place", codexGlobal).map((one) => one.name)).toEqual(["away"])
+    expect(rowsForTab(scopePlaces, "place", { ...codexGlobal, scope: "workspace" })).toHaveLength(0)
   })
 
-  it("leaves a pack held only inside the repository out of the global tab", () => {
+  it("includes an unstored pack in both of the agent's locations", () => {
+    expect(rowsForTab(catalog, "place", ccWorkspace).map((one) => one.name)).toEqual(["hud"])
+    expect(rowsForTab(catalog, "place", ccGlobal).map((one) => one.name)).toEqual(["hud"])
+    expect(rowsForTab(catalog, "place", codexGlobal).map((one) => one.name)).toEqual(["hud"])
+    expect(catalog.find((one) => one.name === "hud")?.stored).toBe(false)
     expect(
-      rowsForTab(scopePlaces, "global").map((one) => one.name),
-      "and one held only inside the repository is not"
-    ).not.toContain("here")
+      catalog.find((one) => one.name === "hud")?.held.find((one) => one.client === codex.client)?.enabled
+    ).toBe(false)
   })
 
-  it("keeps a pack for the tab narrowed to the agent that holds it there", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace", "hub.target.claude-code").map((one) => one.name),
-      "narrowed to the agent that holds it here, the workspace tab keeps it"
-    ).toEqual(["here"])
+  it("uses a different key for each scope, even for the same agent", () => {
+    const keys = [ccWorkspace, ccGlobal, codexGlobal].map(pluginPlaceKey)
+    expect(new Set(keys).size).toBe(3)
   })
 
-  it("empties the workspace tab for a narrowing to an agent that holds nothing there", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace", "hub.target.codex"),
-      "narrowed to the one that only holds machine-wide, the workspace tab is empty"
-    ).toHaveLength(0)
+  it("counts the unfiltered catalog and distinguishes a failed read from zero", () => {
+    const client = clients[0] as PluginClient
+    expect(pluginPlaceCount(scopePlaces, client, "workspace")).toBe(1)
+    expect(pluginPlaceCount(scopePlaces, client, "global")).toBe(1)
+    expect(pluginPlaceCount(catalog, clients[1] as PluginClient, "global")).toBe(1)
+    expect(pluginPlaceCount([], client, "workspace")).toBe(0)
+    expect(pluginPlaceCount([], { ...client, available: false }, "workspace")).toBe(0)
+    expect(pluginPlaceCount(scopePlaces, { ...client, error: "failed" }, "workspace")).toBeNull()
+    expect(pluginPlaceCount(scopePlaces, clients[1] as PluginClient, "global")).toBe(1)
   })
 
-  it("keeps the pack the global tab does hold when narrowed to that agent", () => {
-    expect(
-      rowsForTab(scopePlaces, "global", "hub.target.codex").map((one) => one.name),
-      "while the global tab narrowed to it keeps the one it does hold"
-    ).toEqual(["away"])
+  it("drops a selection when its agent or scope disappears", () => {
+    expect(selectedPluginPlace(clients, ccWorkspace)).toEqual(ccWorkspace)
+    expect(selectedPluginPlace(clients.slice(1), ccWorkspace)).toBeNull()
+    const withoutWorkspace = { ...clients[0] as PluginClient, places: codex.places }
+    expect(selectedPluginPlace([withoutWorkspace], ccWorkspace)).toBeNull()
+    expect(selectedPluginPlace(clients, null)).toBeNull()
+    expect(rowsForTab(catalog, "place", null)).toHaveLength(0)
   })
 })

@@ -194,6 +194,18 @@ export function tokenLabel(body: string): string {
 /** What each place already holds of one prompt, keyed by place id. */
 export type Holds = Readonly<Record<string, PromptHeld>>
 
+/** The previous scan belongs only to the workspace, places and file port it read. */
+export function heldInWorkspace<T>(
+  scan: { workspace: string | null; places: readonly PromptPlace[]; files: PlaceFiles; held: T } | null,
+  workspace: string | null,
+  places: readonly PromptPlace[],
+  files: PlaceFiles | null
+): T | null {
+  return scan !== null && scan.workspace === workspace && scan.places === places && scan.files === files
+    ? scan.held
+    : null
+}
+
 /**
  * What every place already holds of this prompt, read from the files.
  *
@@ -257,7 +269,7 @@ export function useHolds(
  *
  * @param rows — every prompt the library holds.
  * @param places — every place a delivery can go to.
- * @param files — the form's client-file port; `null` answers with nothing held.
+ * @param files — the form's client-file port; `null` leaves answers unknown.
  * @param stamp — changes whenever a delivery may have happened.
  */
 export function useHoldsMap(
@@ -265,14 +277,30 @@ export function useHoldsMap(
   places: readonly PromptPlace[],
   files: PlaceFiles | null,
   stamp: number
-): Readonly<Record<string, Holds>> {
+): {
+  held: Readonly<Record<string, Holds>>
+  failed: ReadonlySet<string> | null
+} {
   const ctx = useHub()
   const service = usePromptService()
-  const [held, setHeld] = React.useState<Readonly<Record<string, Holds>>>({})
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? (() => undefined),
+    [workspaces]
+  )
+  const readWorkspace = React.useCallback(() => workspaces?.current()?.current ?? null, [workspaces])
+  const workspace = React.useSyncExternalStore(subscribe, readWorkspace)
+  const [scan, setScan] = React.useState<{
+    rows: readonly StoredPrompt[]
+    places: readonly PromptPlace[]
+    files: PlaceFiles
+    stamp: number
+    workspace: string | null
+    held: Readonly<Record<string, Holds>>
+    failed: ReadonlySet<string>
+  } | null>(null)
 
   React.useEffect(() => {
-    /* Nothing to ask, so nothing is asked: a lookup for a row that is gone finds
-       no entry, which reads as "nothing held" without clearing the last answer. */
     if (files === null || places.length === 0 || rows.length === 0) return
     const io: PromptIo = { files, workspace: () => files.workspace() }
     let live = true
@@ -282,26 +310,43 @@ export function useHoldsMap(
           const answers = await Promise.all(
             places.map(async (place) => {
               const provider = service?.providerOf(place.id)
-              if (provider === undefined) return [place.id, {}] as const
+              if (provider === undefined) return [place.id, undefined] as const
               try {
                 return [place.id, await provider.held(io, place.id, row)] as const
               } catch (failure) {
                 ctx.host.log("warn", `prompts: could not read ${place.id}: ${why(failure)}`)
-                return [place.id, {}] as const
+                return [place.id, undefined] as const
               }
             })
           )
-          return [row.id, Object.fromEntries(answers)] as const
+          const held: Record<string, PromptHeld> = {}
+          for (const [id, answer] of answers) held[id] = answer ?? {}
+          return [row.id, held, answers.filter(([, answer]) => answer === undefined).map(([id]) => id)] as const
         })
       )
-      if (live) setHeld(Object.fromEntries(entries))
+      if (live) {
+        setScan({
+          rows,
+          places,
+          files,
+          stamp,
+          workspace,
+          held: Object.fromEntries(entries.map(([id, held]) => [id, held])),
+          failed: new Set(entries.flatMap(([, , failures]) => failures)),
+        })
+      }
     })()
     return () => {
       live = false
     }
-  }, [ctx, service, rows, places, files, stamp])
+  }, [ctx, service, rows, places, files, stamp, workspace])
 
-  return held
+  const current = scan !== null && scan.rows === rows && scan.places === places &&
+    scan.files === files && scan.stamp === stamp && scan.workspace === workspace
+  return {
+    held: heldInWorkspace(scan, workspace, places, files) ?? {},
+    failed: current ? scan.failed : null,
+  }
 }
 
 /** A caught value as one line for the host log. */
