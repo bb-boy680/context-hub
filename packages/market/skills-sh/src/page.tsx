@@ -12,6 +12,7 @@ import * as React from "react"
 import { useHub, useI18n } from "@context-hub/extensions/react"
 import {
   useReadablePlaces,
+  useSelectablePlaces,
   useSkillLibrary,
   outdated,
 } from "@context-hub/skills"
@@ -85,6 +86,7 @@ export function SkillsMarketPage() {
   const ctx = useHub()
   const { t, state } = useI18n()
   const places = useReadablePlaces()
+  const targets = useSelectablePlaces()
   const library: MarketLibrary = useSkillLibrary(places)
   /* ctx.get() returns a fresh proxy on every call; the effects key on it. */
   const market = React.useMemo(() => ctx.get("market.skills-sh") ?? null, [ctx])
@@ -456,7 +458,7 @@ export function SkillsMarketPage() {
                 if (!open) setInstallTarget(null)
               }}
               library={library}
-              places={places}
+              places={targets}
             />
           )}
         </>

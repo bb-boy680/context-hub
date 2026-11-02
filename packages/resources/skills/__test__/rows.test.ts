@@ -5,7 +5,8 @@
  */
 import { describe, expect, it } from "vitest"
 
-import { nameTakenAt, placedIn, showsOwnRow } from "../src/library.ts"
+import { nameTakenAt, placedIn, selectedSkillPlace, showsOwnRow, skillHeldAt, skillPlaceKey } from "../src/library.ts"
+import type { SkillPlace } from "../src/provider.ts"
 import type { PlaceSkill, SkillPlaceRef, SkillSummary } from "../src/store.ts"
 import type { Skill, SkillHold } from "../src/types.ts"
 
@@ -66,6 +67,30 @@ describe("the places a row is on screen under", () => {
 
   it("includes the places holding its files and the places holding a same name", () => {
     expect(placedIn(row({ places: [holding], takenAt: [taken] }))).toEqual([holding, taken])
+  })
+})
+
+describe("the installation location filter", () => {
+  const workspace: SkillPlace = {
+    id: "codex", scope: "workspace", dir: ".codex/skills", labelKey: "codex.tab", icon: () => null, order: 1,
+  }
+  const global: SkillPlace = { ...workspace, scope: "global" }
+  const workspaceRow = row({ places: [{ id: workspace.id, scope: workspace.scope, dir: workspace.dir }] })
+  const globalRow = row({ places: [{ id: global.id, scope: global.scope, dir: global.dir }] })
+
+  it("keeps the same agent's workspace and global skills separate", () => {
+    expect(skillHeldAt(workspaceRow, workspace)).toBe(true)
+    expect(skillHeldAt(workspaceRow, global)).toBe(false)
+    expect(skillHeldAt(globalRow, global)).toBe(true)
+    expect(skillHeldAt(globalRow, workspace)).toBe(false)
+    expect(selectedSkillPlace([workspace, global], global)).toBe(global)
+    expect(skillPlaceKey(workspace)).not.toBe(skillPlaceKey(global))
+  })
+
+  it("drops the selected place when its agent or scope disappears", () => {
+    expect(selectedSkillPlace([workspace], global)).toBeNull()
+    expect(selectedSkillPlace([], workspace)).toBeNull()
+    expect(selectedSkillPlace([workspace, global], null)).toBeNull()
   })
 })
 

@@ -15,7 +15,7 @@ import * as React from "react"
 
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { ahead, formatAge, holdsOf, inLibrary, modified as isModified, placeOf, placePath, placedIn, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
+import { ahead, formatAge, holdsOf, inLibrary, modified as isModified, placeOf, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, useSelectablePlaces, type SkillPlaceView } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
@@ -531,19 +531,19 @@ function PlacesSection({
   const { t } = useI18n()
   const holds = placedIn(skill)
   const own = inLibrary(skill)
-  /* The library is one of the rows, so it is one of the count: a skill the hub
-     holds is installed in one place even when no workspace link exists yet. */
-  const installed = holds.length + (own ? 1 : 0)
   /* The icon and the label are the contribution's, since only the extension
      that knows a place can draw it. */
-  const contributed = useReadablePlaces()
+  const contributed = useSelectablePlaces()
+  const visiblePlaces = places.filter((place) => selectedSkillPlace(contributed, place) !== null)
+  /* Count only the rows this section shows; the library is one row too. */
+  const installed = visiblePlaces.filter((place) => skillHeldAt(skill, place)).length + (own ? 1 : 0)
   const icons = React.useMemo(
-    () => new Map(contributed.map((place) => [place.id, place.icon])),
+    () => new Map(contributed.map((place) => [skillPlaceKey(place), place.icon])),
     [contributed]
   )
   const byId = React.useMemo(
-    () => new Map(places.map((place) => [place.id, place])),
-    [places]
+    () => new Map(visiblePlaces.map((place) => [skillPlaceKey(place), place])),
+    [visiblePlaces]
   )
 
   /* Rows are told apart by their marks and names; the one rule in this list
@@ -565,7 +565,7 @@ function PlacesSection({
   const rowAction = (id: string) => {
     const place = byId.get(id)
     if (place === undefined) return null
-    const held = holds.some((hold) => hold.id === place.id)
+    const held = skillHeldAt(skill, place)
     if (held) {
       return (
         <Button
@@ -643,14 +643,14 @@ function PlacesSection({
         <PlaceList
           groups={SCOPES.map((scope) => ({
             label: t(`skills.group.${scope}`),
-            options: places
+            options: visiblePlaces
               .filter((place) => place.scope === scope)
               .map((place) => ({
-                id: place.id,
-                icon: icons.get(place.id) ?? LibraryIcon,
+                id: skillPlaceKey(place),
+                icon: icons.get(skillPlaceKey(place)) ?? LibraryIcon,
                 label: t(place.labelKey),
                 where: placePath(place),
-                selected: holds.some((hold) => hold.id === place.id),
+                selected: skillHeldAt(skill, place),
               })),
           }))}
           words={{

@@ -12,6 +12,8 @@ import { Context } from "@deepseek-ai/cordis"
 import { describe, expect, it } from "vitest"
 
 import { SKILL_LIBRARY_SERVICE, SkillLibrary } from "../src/library-store.ts"
+import { selectablePlaces } from "../src/library.ts"
+import { SKILLS_ID } from "../src/extension.ts"
 import { SkillService, type SkillPlace } from "../src/provider.ts"
 import type { PlaceSkillsView, SkillPage } from "../src/store.ts"
 
@@ -60,6 +62,39 @@ function formWorkspaces(agents: string[]) {
 }
 
 describe("the skill library a form starts", () => {
+  it("reads the shared place without offering it as an agent target", async () => {
+    const { store, asked } = libraryOver()
+    const ctx = new Context()
+    const chosen = ["hub.target.codex", "hub.target.claude"]
+    ctx.provide("hub.skills", store as never)
+    ctx.provide("hub.workspaces", formWorkspaces(chosen) as never)
+    const registry = new SkillService(ctx)
+    registry.register({
+      id: SKILLS_ID,
+      shared: true,
+      places: [{ ...place("workspace", "workspace"), dir: ".agents/skills" }],
+    })
+    registry.register({
+      id: "hub.target.codex",
+      places: [
+        { ...place("codex-workspace", "workspace"), dir: ".agents/skills" },
+        place("codex-global", "global"),
+      ],
+    })
+    registry.register({ id: "hub.target.claude", places: [place("claude-workspace", "workspace")] })
+    registry.register({ id: "hub.target.other", places: [place("other", "workspace")] })
+
+    const library = new SkillLibrary(ctx)
+    await library.load()
+
+    expect(asked).toContain(".agents/skills")
+    expect(library.state().value?.held.workspace).toMatchObject({ display: ".agents/skills" })
+    expect(selectablePlaces(registry.providers(), chosen).map((target) => target.id)).toEqual([
+      "codex-workspace", "codex-global", "claude-workspace",
+    ])
+    expect(selectablePlaces(registry.providers(), [])).toEqual([])
+  })
+
   it("is under the name the form reads it by", () => {
     const ctx = new Context()
     new SkillLibrary(ctx)

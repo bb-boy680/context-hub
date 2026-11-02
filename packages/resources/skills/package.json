@@ -18,7 +18,8 @@
     "@headless-tree/react": "^1.7.0",
     "js-yaml": "^5.5.0",
     "lucide-react": "^1.48.0",
-    "react": "^19.2.8"
+    "react": "^19.2.8",
+    "react-responsive-masonry": "2.9.0"
   },
   "devDependencies": {
     "@eslint/js": "^10",

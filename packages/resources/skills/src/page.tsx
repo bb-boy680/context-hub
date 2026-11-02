@@ -22,9 +22,10 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
+import Masonry from "react-responsive-masonry"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
-import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, skillKey, tokenLabel, unstored, useReadablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, tokenLabel, unstored, useReadablePlaces, useSelectablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import type { SkillPlace } from "./provider.ts"
@@ -45,10 +46,8 @@ import {
   Ledger,
   PageBody,
   PlaceMenu,
-  PlaceScopePicker,
   TablePagination,
   type LedgerColumn,
-  type PlaceOption,
   type PlaceWords,
 } from "@context-hub/extensions/components"
 import { Button } from "@context-hub/shadcn-ui/components/button"
@@ -67,46 +66,25 @@ import {
 /** The two scopes, in the order a list of places reads them. */
 const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
-/* The tab row carries one dimension: where a skill's files are. Two entries are
-   the shell's own — everything, and the hub's library — and two group the places
-   by scope: the ones in the workspace in use, and the machine-wide ones of the
-   agents chosen in the sidebar. A scope can hold several places, so it says
-   which with an icon stack rather than a count: the count is what the stack
-   answers, and printing both would say it twice.
-
-   The last two entries stand for what is missing rather than for where anything
-   is: a skill a place holds that the library does not, and one whose source has
-   moved on. Each carries the one batch action its set is for, so the toolbar
-   stays about the page as a whole. */
+/* The remaining location choices share one menu beside these tabs. */
 const SHELL_TABS: { value: SkillTab; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "skills.tab.all", icon: LayoutGridIcon },
   { value: "library", labelKey: "skills.tab.library", icon: LibraryIcon },
   { value: "unstored", labelKey: "skills.tab.unstored", icon: InboxIcon },
   { value: "updates", labelKey: "skills.tab.updates", icon: CircleArrowUpIcon },
-  /* Not a folder: the stack beside this label already draws the places' own
-     marks, and the workspace place among them IS a folder. */
-  { value: "workspace", labelKey: "skills.tab.workspace", icon: ContainerIcon },
-  { value: "global", labelKey: "skills.tab.global", icon: GlobeIcon },
 ]
 
-/** The tabs that group places by scope, which are the ones that open a menu. */
-const SCOPE_TABS: SkillTab[] = ["workspace", "global"]
-
 /** Which rows a tab shows. */
-type SkillTab = "all" | "library" | "unstored" | "updates" | AssetScope
+type SkillTab = "all" | "library" | "unstored" | "updates" | "place"
 
 /** Which rows one tab holds, before the category filter. A place narrows a
     scope to that one place; the shell's own tabs have no places to narrow. */
-function rowsForTab(rows: Skill[], value: SkillTab, place: string | null): Skill[] {
+function rowsForTab(rows: Skill[], value: SkillTab, place: SkillPlace | null): Skill[] {
   if (value === "all") return rows
   if (value === "library") return rows.filter(inLibrary)
   if (value === "unstored") return rows.filter(unstored)
   if (value === "updates") return rows.filter(outdated)
-  return rows.filter((row) =>
-    placedIn(row).some(
-      (hold) => hold.scope === value && (place === null || hold.id === place)
-    )
-  )
+  return place === null ? [] : rows.filter((row) => skillHeldAt(row, place))
 }
 
 /**
@@ -192,9 +170,8 @@ function SkillActionButton({
   onRemove: (ref: SkillPlaceRef) => void
 }) {
   const { t } = useI18n()
-  /* The places this build reads, which the row offers itself rather than having
-     every list thread them down to it. */
-  const places = useReadablePlaces()
+  /* Targets exclude the shared read-only choice. */
+  const places = useSelectablePlaces()
   const holds = placedIn(skill)
   /* A machine-wide place needs no workspace, so only the workspace ones depend
      on there being a folder to write into. */
@@ -478,7 +455,7 @@ function SkillCard({
         event.preventDefault()
         onOpen()
       }}
-      className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
+      className="mb-5 w-full min-w-0 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="relative w-full overflow-hidden bg-surface-raised"
@@ -584,6 +561,69 @@ function EmptyState({
   )
 }
 
+/* The plugin can move its wrappers between columns, so watch each card's
+   current wrapper as well when an image or video changes its height later. */
+function MasonryItem({ children, onResize }: {
+  children: React.ReactNode
+  onResize: () => void
+}) {
+  const ref = React.useRef<HTMLDivElement>(null)
+
+  React.useLayoutEffect(() => {
+    const item = ref.current
+    if (item === null || typeof ResizeObserver === "undefined") return
+    let height = item.getBoundingClientRect().height
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry === undefined || entry.contentRect.height === height) return
+      height = entry.contentRect.height
+      onResize()
+    })
+    observer.observe(item)
+    return () => observer.disconnect()
+  }, [onResize])
+
+  return <div ref={ref} className="flow-root w-full min-w-0">{children}</div>
+}
+
+/** Column widths follow the content area, including when only a few cards exist. */
+function SkillMasonry({ children }: { children: React.ReactNode }) {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [columns, setColumns] = React.useState(1)
+  const [, refresh] = React.useReducer((revision: number) => revision + 1, 0)
+
+  React.useLayoutEffect(() => {
+    const container = ref.current
+    if (container === null || typeof ResizeObserver === "undefined") return
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry === undefined) return
+      const width = entry.contentRect.width
+      setColumns(width >= 1426 ? 5 : width >= 1136 ? 4 : width >= 846 ? 3 : width >= 556 ? 2 : 1)
+    })
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={ref} className="min-w-0">
+      <Masonry
+        columnsCount={columns}
+        sequential
+        gutter="24px"
+        style={{ justifyContent: "flex-start" }}
+        itemStyle={{
+          flex: `0 0 calc(${100 / columns}% - ${(24 * (columns - 1)) / columns}px)`,
+          minWidth: 0,
+          gap: 0,
+        }}
+      >
+        {React.Children.map(children, (child) => (
+          <MasonryItem onResize={refresh}>{child}</MasonryItem>
+        ))}
+      </Masonry>
+    </div>
+  )
+}
+
 /**
  * What the grid looks like while the library is being read. Cards, not a
  * spinner: a spinner is about as tall as its own line, so the content area
@@ -593,23 +633,21 @@ function GridSkeleton() {
   const covers = [292, 342, 276, 342, 292, 276, 292, 342]
 
   return (
-    <div className="@container">
-      <div className="columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4">
-        {covers.map((height, index) => (
-          <div
-            key={index}
-            className="mb-5 break-inside-avoid overflow-hidden rounded-xl bg-card ring-1 ring-border"
-          >
-            <div className="w-full animate-pulse bg-muted" style={{ height }} />
-            <div className="flex flex-col gap-2 px-[18px] py-3.5">
-              <span className="h-4 w-1/2 animate-pulse rounded-full bg-muted" />
-              <span className="h-3 w-5/6 animate-pulse rounded-full bg-muted" />
-              <span className="h-3 w-2/3 animate-pulse rounded-full bg-muted" />
-            </div>
+    <SkillMasonry>
+      {covers.map((height, index) => (
+        <div
+          key={index}
+          className="mb-5 w-full min-w-0 break-inside-avoid overflow-hidden rounded-xl bg-card ring-1 ring-border"
+        >
+          <div className="w-full animate-pulse bg-muted" style={{ height }} />
+          <div className="flex flex-col gap-2 px-[18px] py-3.5">
+            <span className="h-4 w-1/2 animate-pulse rounded-full bg-muted" />
+            <span className="h-3 w-5/6 animate-pulse rounded-full bg-muted" />
+            <span className="h-3 w-2/3 animate-pulse rounded-full bg-muted" />
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      ))}
+    </SkillMasonry>
   )
 }
 
@@ -635,26 +673,24 @@ function SkillGrid({
   /*
    * Masonry with a responsive column count, capped at five so a wide window
    * does not keep adding columns. A column needs a 266px card plus the 24px
-   * gutter, so each step is 290n - 24; container queries, so the sidebar
-   * width does not shift them.
+   * gutter, so each step is 290n - 24; the content area's width decides the
+   * count, so the sidebar width does not shift them.
    */
   return (
-    <div className="@container">
-      <div className="columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4 @min-[1426px]:columns-5">
-        {skills.map((skill) => (
-          <SkillCard
-            key={skillKey(skill)}
-            skill={skill}
-            store={store}
-            blocked={blocked}
-            onInstall={(ref) => onInstall(skill, ref)}
-            onAdopt={(ref) => onAdopt(skill, ref)}
-            onRemove={(ref) => onRemove(skill, ref)}
-            onOpen={() => onOpen(skill)}
-          />
-        ))}
-      </div>
-    </div>
+    <SkillMasonry>
+      {skills.map((skill) => (
+        <SkillCard
+          key={skillKey(skill)}
+          skill={skill}
+          store={store}
+          blocked={blocked}
+          onInstall={(ref) => onInstall(skill, ref)}
+          onAdopt={(ref) => onAdopt(skill, ref)}
+          onRemove={(ref) => onRemove(skill, ref)}
+          onOpen={() => onOpen(skill)}
+        />
+      ))}
+    </SkillMasonry>
   )
 }
 
@@ -701,7 +737,7 @@ function BatchInstall({
   onInstall: (place: SkillPlace) => void
 }) {
   const { t } = useI18n()
-  const places = useReadablePlaces()
+  const places = useSelectablePlaces()
   /* A machine-wide place needs no workspace, so only the workspace ones depend
      on there being a folder to write into. */
   const writable = places.filter((place) => place.scope !== "workspace" || blocked === null)
@@ -932,9 +968,7 @@ function ViewButton({
 export function SkillsPage() {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<SkillTab>("all")
-  /* One place inside the current scope, once a person picked one from the tab's
-     menu; `null` leaves the scope whole. */
-  const [narrowed, setNarrowed] = React.useState<string | null>(null)
+  const [narrowed, setNarrowed] = React.useState<Pick<SkillPlace, "id" | "scope" | "dir"> | null>(null)
   const settings = useSettings()
   const search = useSearchPage()
   const [view, setView] = React.useState<"grid" | "list">(settings.layout)
@@ -961,35 +995,9 @@ export function SkillsPage() {
   /* The places this build reads: every workspace one a registered provider
      names, and the machine-wide ones of the agents the sidebar chose. */
   const places = useReadablePlaces()
+  const selectable = useSelectablePlaces()
 
   const library = useSkillLibrary(places, needle)
-  /* Each scope tab names the places it holds by their marks, so the number of
-     them is a count of places rather than of skills; the same list, with what
-     each place holds, is what hovering the stack shows. */
-  const scopePlaces = React.useMemo(() => {
-    const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
-    for (const place of places) {
-      const view = library.places.find((held) => held.id === place.id)?.view ?? null
-      byScope[place.scope].push({
-        id: place.id,
-        icon: place.icon,
-        label: t(place.labelKey),
-        where: placePath(place),
-        count: view === null ? null : view.skills.length,
-      })
-    }
-    return byScope
-  }, [places, library.places, t])
-
-  /* A scope tab stands for the places it spans, so a scope holding none is not a
-     tab at all: with no agent chosen the machine-wide one has nothing to open,
-     and the row says only what this hub can actually read. */
-  const scopeHasPlaces = React.useCallback(
-    (value: SkillTab) =>
-      value === "workspace" || value === "global" ? scopePlaces[value].length > 0 : true,
-    [scopePlaces]
-  )
-
   /* The page filters and pages what the hook hands it: rows come from the
      library and the places both, and only the library has a server page. */
   const rows = library.rows
@@ -1004,7 +1012,7 @@ export function SkillsPage() {
      machine-wide place needs no workspace, so only the workspace ones have
      nothing to write into without one. */
   const blocked =
-    library.workspaceId === null && places.some((place) => place.scope === "workspace")
+    library.workspaceId === null && selectable.some((place) => place.scope === "workspace")
       ? t("skills.workspace.none")
       : null
 
@@ -1025,75 +1033,35 @@ export function SkillsPage() {
     [onTag]
   )
 
-  /* A screen holding nothing leaves the row rather than opening empty, and the
-     row is read before the filters: a category that happens to match none of
-     them must not make the tab itself disappear under the pointer. A scope with
-     no places left — the last agent chosen for it was un-chosen — is one of
-     those screens too. */
+  const chosen = selectedSkillPlace(selectable, narrowed)
+  const selectableKey = JSON.stringify(selectable.map(skillPlaceKey))
+  const [previousSelectableKey, setPreviousSelectableKey] = React.useState(selectableKey)
+  if (previousSelectableKey !== selectableKey) {
+    setPreviousSelectableKey(selectableKey)
+    /* Re-enabling an agent must not revive a stale location filter. */
+    if (tab === "place" && chosen === null) {
+      setTab("all")
+      setNarrowed(null)
+      setPage(0)
+      setChecked([])
+    }
+  }
+
   const screenTab: SkillTab =
     (tab === "unstored" && library.counts.unstored === 0) ||
     (tab === "updates" && library.counts.updates === 0) ||
-    !scopeHasPlaces(tab)
+    (tab === "place" && chosen === null)
       ? "all"
       : tab
 
-  /* A choice from the tab's menu only means something while the scope it belongs
-     to is the one on screen; anywhere else the scope is whole. */
-  const chosen =
-    narrowed !== null && places.some((place) => place.scope === screenTab && place.id === narrowed)
-      ? narrowed
-      : null
   const matching = React.useMemo(
     () => rowsForTab(onTag, screenTab, chosen),
     [onTag, screenTab, chosen]
   )
 
-  /* A scope tab holds nothing for one of four reasons, and each needs its own
-     words: a workspace the hub cannot read, one holding no skills, a
-     machine-wide scope with no agent chosen, or one whose agents hold nothing. */
-  const scopeEmpty = ((): { icon: LucideIcon; title: string; hint: string; note: string | null } | null => {
-    if (!SCOPE_TABS.includes(screenTab)) return null
-    const tab = screenTab as AssetScope
-    const held = library.places.filter((place) => place.scope === tab)
-    /* Narrowed to one place, only that place's own directory answers. */
-    if (chosen !== null) {
-      const only = scopePlaces[tab].find((place) => place.id === chosen)
-      return {
-        icon: tab === "workspace" ? FolderOpenIcon : GlobeIcon,
-        title: t("skills.place.empty"),
-        hint: t("skills.place.emptyHint"),
-        note: only?.where ?? null,
-      }
-    }
-    const readable = held.some((place) => place.view !== null)
-    const note = held.map(placePath).join(" · ") || null
-    if (tab === "global") {
-      return held.length === 0
-        ? { icon: GlobeIcon, title: t("skills.global.unread"), hint: t("skills.global.unreadHint"), note }
-        : { icon: GlobeIcon, title: t("skills.global.empty"), hint: t("skills.global.emptyHint"), note }
-    }
-    if (library.workspaceId === null) {
-      return {
-        icon: FolderOpenIcon,
-        title: t("skills.workspace.none"),
-        hint: t("skills.workspace.noneHint"),
-        note,
-      }
-    }
-    return readable
-      ? {
-          icon: FolderOpenIcon,
-          title: t("skills.workspace.empty"),
-          hint: t("skills.workspace.emptyHint"),
-          note,
-        }
-      : {
-          icon: FolderOpenIcon,
-          title: t("skills.workspace.noPath"),
-          hint: t("skills.workspace.noPathHint"),
-          note,
-        }
-  })()
+  const placeEmpty = screenTab === "place" && chosen !== null
+    ? { icon: chosen.scope === "workspace" ? FolderOpenIcon : GlobeIcon, note: placePath(chosen) }
+    : null
 
   /* A filter, an agent switch, or a shorter list can leave the page past the
      end; the page shown is clamped rather than an empty stretch of rows. */
@@ -1279,6 +1247,7 @@ export function SkillsPage() {
         value={screenTab}
         onValueChange={(value) => {
           setTab(SHELL_TABS.find((item) => item.value === value)?.value ?? "all")
+          setNarrowed(null)
           setPage(0)
           setChecked([])
         }}
@@ -1291,16 +1260,10 @@ export function SkillsPage() {
             {SHELL_TABS.filter(
               (item) =>
                 (item.value !== "unstored" || library.counts.unstored > 0) &&
-                (item.value !== "updates" || library.counts.updates > 0) &&
-                scopeHasPlaces(item.value)
+                (item.value !== "updates" || library.counts.updates > 0)
             ).map((item) => {
-              const scope = SCOPE_TABS.includes(item.value) ? (item.value as AssetScope) : null
-              const stack = scope === null ? null : scopePlaces[scope]
               const count = counts[item.value as keyof typeof counts]
               const active = screenTab === item.value
-              /* A scope opens through its place list, and the two screens that
-                 stand for a missing set open through the one action that set is
-                 for; the rest are screens already and open on the press. */
               if (item.value === "unstored" || item.value === "updates") {
                 const own = item.value === "unstored" ? "adopt" : "update"
                 return (
@@ -1316,6 +1279,7 @@ export function SkillsPage() {
                     active={active}
                     onTab={() => {
                       setTab(item.value)
+                      setNarrowed(null)
                       setPage(0)
                       setChecked([])
                     }}
@@ -1323,45 +1287,63 @@ export function SkillsPage() {
                   />
                 )
               }
-              if (scope === null || stack === null) {
-                return (
-                  <TabsTrigger
-                    key={item.value}
-                    value={item.value}
-                    className="h-9 flex-none gap-1.5 rounded-full px-4 text-[length:var(--text-body)] text-muted-foreground data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-accent dark:data-active:text-foreground"
-                  >
-                    <item.icon className="size-3.5 shrink-0" aria-hidden />
-                    {t(item.labelKey)}
-                    <span
-                      className={`font-mono text-[13px] ${
-                        library.error !== null || count === 0 ? "opacity-45" : ""
-                      }`}
-                    >
-                      {library.error === null ? count : "—"}
-                    </span>
-                  </TabsTrigger>
-                )
-              }
               return (
-                <PlaceScopePicker
+                <TabsTrigger
                   key={item.value}
-                  scopeIcon={item.icon}
-                  scopeLabel={t(item.labelKey)}
-                  places={stack}
-                  chosen={active ? chosen : null}
-                  active={active}
-                  allLabel={t("skills.place.all")}
-                  title={t("skills.place.which")}
-                  words={placeWords(t)}
-                  onChoose={(id) => {
-                    setTab(scope)
-                    setNarrowed(id)
-                    setPage(0)
-                    setChecked([])
-                  }}
-                />
+                  value={item.value}
+                  className="h-9 flex-none gap-1.5 rounded-full px-4 text-[length:var(--text-body)] text-muted-foreground data-active:bg-foreground data-active:text-background data-active:hover:text-background dark:data-active:bg-accent dark:data-active:text-foreground"
+                >
+                  <item.icon className="size-3.5 shrink-0" aria-hidden />
+                  {t(item.labelKey)}
+                  <span className={`font-mono text-[13px] ${library.error !== null || count === 0 ? "opacity-45" : ""}`}>
+                    {library.error === null ? count : "—"}
+                  </span>
+                </TabsTrigger>
               )
             })}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={selectable.length === 0}
+                render={
+                  <button
+                    type="button"
+                    disabled={selectable.length === 0}
+                    aria-label={chosen !== null && screenTab === "place"
+                      ? `${t("skills.tab.places")}: ${t(chosen.labelKey)} · ${t(`skills.group.${chosen.scope}`)} · ${placePath(chosen)}`
+                      : `${t("skills.tab.places")}: ${t("skills.tab.all")}`}
+                    aria-current={screenTab === "place" ? "true" : undefined}
+                    className={`flex h-9 flex-none items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${screenTab === "place" ? "bg-foreground text-background dark:bg-accent dark:text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <ContainerIcon className="size-3.5 shrink-0" aria-hidden />
+                    {t("skills.tab.places")}
+                    <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
+                  </button>
+                }
+              />
+              <PlaceMenu
+                words={placeWords(t)}
+                currentSelection
+                groups={SCOPES.map((scope) => ({
+                  label: t(`skills.group.${scope}`),
+                  options: selectable.filter((place) => place.scope === scope).map((place) => ({
+                    id: skillPlaceKey(place),
+                    icon: place.icon,
+                    label: t(place.labelKey),
+                    where: placePath(place),
+                    count: library.places.find((held) => skillPlaceKey(held) === skillPlaceKey(place))?.view?.skills.length ?? null,
+                    selected: screenTab === "place" && chosen !== null && skillPlaceKey(chosen) === skillPlaceKey(place),
+                  })),
+                }))}
+                onPick={(id) => {
+                  const place = selectable.find((item) => skillPlaceKey(item) === id)
+                  if (place === undefined) return
+                  setNarrowed({ id: place.id, scope: place.scope, dir: place.dir })
+                  setTab("place")
+                  setPage(0)
+                  setChecked([])
+                }}
+              />
+            </DropdownMenu>
           </TabsList>
           <div className="flex shrink-0 items-center gap-2">
             <div className={viewToggleSurface}>
@@ -1423,7 +1405,7 @@ export function SkillsPage() {
             all: t("skills.allTags"),
           }}
         />
-        <TabsContent value={screenTab} className="flex flex-col">
+        <TabsContent value={screenTab} aria-label={screenTab === "place" ? t("skills.tab.places") : undefined} className="flex flex-col">
           <PageBody footer={footer}>
             {library.store === null ? (
               /* No library at all is a different answer from an empty one: the
@@ -1480,27 +1462,21 @@ export function SkillsPage() {
                     </Button>
                   }
                 />
-              ) : scopeEmpty !== null ? (
+              ) : placeEmpty !== null ? (
                 <EmptyState
-                  icon={scopeEmpty.icon}
-                  title={scopeEmpty.title}
-                  hint={scopeEmpty.hint}
-                  note={scopeEmpty.note}
+                  icon={placeEmpty.icon}
+                  title={t("skills.place.empty")}
+                  hint={t("skills.place.emptyHint")}
+                  note={placeEmpty.note}
                   action={
-                    /* Narrowed to one place, the way out is the scope it came
-                       from; otherwise the whole library is. */
-                    chosen === null ? (
-                      <Button className="h-10 rounded-full px-4" onClick={() => setTab("all")}>
-                        {t("skills.tab.all")}
-                      </Button>
-                    ) : (
-                      <Button
-                        className="h-10 rounded-full px-4"
-                        onClick={() => setNarrowed(null)}
-                      >
-                        {t("skills.place.all")}
-                      </Button>
-                    )
+                    <Button className="h-10 rounded-full px-4" onClick={() => {
+                      setTab("all")
+                      setNarrowed(null)
+                      setPage(0)
+                      setChecked([])
+                    }}>
+                      {t("skills.tab.all")}
+                    </Button>
                   }
                 />
               ) : (

@@ -126,6 +126,23 @@ export function useReadablePlaces(): SkillPlace[] {
   return readablePlaces(providers, chosen)
 }
 
+/** Places offered as targets, without hiding the module's shared read. */
+export function selectablePlaces(
+  providers: readonly SkillProvider[],
+  chosen: readonly string[]
+): SkillPlace[] {
+  return readablePlaces(
+    providers.filter((provider) => provider.id !== SKILLS_ID || provider.shared !== true),
+    chosen
+  )
+}
+
+export function useSelectablePlaces(): SkillPlace[] {
+  const providers = useSkillProviders()
+  const chosen = useChosenAgents()
+  return selectablePlaces(providers, chosen)
+}
+
 /**
  * The agents this hub reads skills from: one id per registered provider. A
  * `target` reads as an agent row while its own id is one of these, because a
@@ -194,6 +211,26 @@ export function showsOwnRow(
  */
 export function placedIn(skill: Skill): SkillHold[] {
   return [...holdsOf(skill), ...(skill.takenAt ?? [])]
+}
+
+/** A selected place remains valid only while that exact target is available. */
+export function selectedSkillPlace(
+  places: readonly SkillPlace[],
+  selected: Pick<SkillPlace, "id" | "scope" | "dir"> | null
+): SkillPlace | null {
+  return selected === null ? null : places.find((place) =>
+    place.id === selected.id && place.scope === selected.scope && place.dir === selected.dir
+  ) ?? null
+}
+
+export function skillPlaceKey(place: Pick<SkillPlace, "id" | "scope" | "dir">): string {
+  return JSON.stringify([place.scope, place.id, place.dir])
+}
+
+export function skillHeldAt(skill: Skill, place: Pick<SkillPlace, "id" | "scope" | "dir">): boolean {
+  return placedIn(skill).some((hold) =>
+    hold.id === place.id && hold.scope === place.scope && hold.dir === place.dir
+  )
 }
 
 /**
