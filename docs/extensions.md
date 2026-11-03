@@ -209,6 +209,13 @@ rollback preserves a directory backup when it detects an intervening change.
 Agent-specific document formats and dependency semantics remain in the agent
 extension.
 
+## MCP providers
+
+An MCP provider may mark a place `installable: false` to scan and show existing
+server declarations without offering that file as a new installation target.
+Existing declarations can still be removed or updated. When omitted, `installable`
+defaults to `true`.
+
 ## Prompt providers
 
 An agent extension that takes prompts declares where and how it takes them by

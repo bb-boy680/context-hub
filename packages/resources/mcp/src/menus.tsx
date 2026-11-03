@@ -99,7 +99,7 @@ export function InstallToMenu({
         groups={MCP_SCOPES.map((scope) => ({
           label: t(`mcp.detail.group.${scope}`),
           options: places
-            .filter((place) => place.scope === scope)
+            .filter((place) => place.scope === scope && place.installable !== false)
             .map((place) => ({
               id: place.id,
               icon: place.icon,

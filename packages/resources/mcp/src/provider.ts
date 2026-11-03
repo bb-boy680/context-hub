@@ -27,6 +27,8 @@ export interface McpPlace extends PlaceRef {
   id: string
   /** The client's name, as a menu row lists it. */
   label: string
+  /** Whether this place is offered as a new installation target. Defaults to true. */
+  installable?: boolean
   /**
    * Whether the hub may write this client's on/off state for this place.
    *

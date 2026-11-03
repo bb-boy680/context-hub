@@ -201,7 +201,7 @@ function DeleteBubble({ name, onDelete }: { name: string; onDelete: () => Promis
  * column somewhere else, so a server the hub holds and a server only a client
  * file declares read the same way — the first row says which it is.
  */
-function Places({
+export function Places({
   server,
   recordsFile,
   states,
@@ -284,13 +284,15 @@ function Places({
         <PlaceList
           groups={MCP_SCOPES.map((scope) => ({
             label: t(`mcp.detail.group.${scope}`),
-            options: placesInScope(states, scope).map((state) => ({
-              id: state.place.id,
-              icon: state.place.icon,
-              label: state.place.label,
-              where: state.place.path,
-              selected: state.install?.installed === true,
-            })),
+            options: placesInScope(states, scope)
+              .filter((state) => state.place.installable !== false || state.install?.installed === true)
+              .map((state) => ({
+                id: state.place.id,
+                icon: state.place.icon,
+                label: state.place.label,
+                where: state.place.path,
+                selected: state.install?.installed === true,
+              })),
           })).filter((group) => group.options.length > 0)}
           words={{
             expand: (rest) => t("mcp.place.expand").replace("{count}", String(rest)),
