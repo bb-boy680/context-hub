@@ -18,6 +18,7 @@
     ".agents",
     ".claude",
     ".github",
+    ".opencode",
     "designs",
     "docs"
   ],
@@ -37,7 +38,10 @@
   "exclude_files": [
     "*.backup.*",
     "*.bak",
-    ".coverage"
+    ".coverage",
+    "opencode.json",
+    "opencode.jsonc",
+    "wtest-*.txt"
   ],
   "exclude_exts": [],
   "curation_exclude": [],
