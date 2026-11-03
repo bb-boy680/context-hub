@@ -22,7 +22,6 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import * as React from "react"
-import Masonry from "react-responsive-masonry"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
 import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, tokenLabel, unstored, useReadablePlaces, useSelectablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
@@ -46,6 +45,7 @@ import {
   Ledger,
   PageBody,
   PlaceMenu,
+  ResourceMasonry,
   TablePagination,
   type LedgerColumn,
   type PlaceWords,
@@ -455,7 +455,7 @@ function SkillCard({
         event.preventDefault()
         onOpen()
       }}
-      className="mb-5 w-full min-w-0 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
+      className="w-full min-w-0 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="relative w-full overflow-hidden bg-surface-raised"
@@ -561,69 +561,6 @@ function EmptyState({
   )
 }
 
-/* The plugin can move its wrappers between columns, so watch each card's
-   current wrapper as well when an image or video changes its height later. */
-function MasonryItem({ children, onResize }: {
-  children: React.ReactNode
-  onResize: () => void
-}) {
-  const ref = React.useRef<HTMLDivElement>(null)
-
-  React.useLayoutEffect(() => {
-    const item = ref.current
-    if (item === null || typeof ResizeObserver === "undefined") return
-    let height = item.getBoundingClientRect().height
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry === undefined || entry.contentRect.height === height) return
-      height = entry.contentRect.height
-      onResize()
-    })
-    observer.observe(item)
-    return () => observer.disconnect()
-  }, [onResize])
-
-  return <div ref={ref} className="flow-root w-full min-w-0">{children}</div>
-}
-
-/** Column widths follow the content area, including when only a few cards exist. */
-function SkillMasonry({ children }: { children: React.ReactNode }) {
-  const ref = React.useRef<HTMLDivElement>(null)
-  const [columns, setColumns] = React.useState(1)
-  const [, refresh] = React.useReducer((revision: number) => revision + 1, 0)
-
-  React.useLayoutEffect(() => {
-    const container = ref.current
-    if (container === null || typeof ResizeObserver === "undefined") return
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry === undefined) return
-      const width = entry.contentRect.width
-      setColumns(width >= 1426 ? 5 : width >= 1136 ? 4 : width >= 846 ? 3 : width >= 556 ? 2 : 1)
-    })
-    observer.observe(container)
-    return () => observer.disconnect()
-  }, [])
-
-  return (
-    <div ref={ref} className="min-w-0">
-      <Masonry
-        columnsCount={columns}
-        sequential
-        gutter="24px"
-        style={{ justifyContent: "flex-start" }}
-        itemStyle={{
-          flex: `0 0 calc(${100 / columns}% - ${(24 * (columns - 1)) / columns}px)`,
-          minWidth: 0,
-          gap: 0,
-        }}
-      >
-        {React.Children.map(children, (child) => (
-          <MasonryItem onResize={refresh}>{child}</MasonryItem>
-        ))}
-      </Masonry>
-    </div>
-  )
-}
-
 /**
  * What the grid looks like while the library is being read. Cards, not a
  * spinner: a spinner is about as tall as its own line, so the content area
@@ -633,11 +570,11 @@ function GridSkeleton() {
   const covers = [292, 342, 276, 342, 292, 276, 292, 342]
 
   return (
-    <SkillMasonry>
+    <ResourceMasonry>
       {covers.map((height, index) => (
         <div
           key={index}
-          className="mb-5 w-full min-w-0 break-inside-avoid overflow-hidden rounded-xl bg-card ring-1 ring-border"
+          className="w-full min-w-0 overflow-hidden rounded-xl bg-card ring-1 ring-border"
         >
           <div className="w-full animate-pulse bg-muted" style={{ height }} />
           <div className="flex flex-col gap-2 px-[18px] py-3.5">
@@ -647,7 +584,7 @@ function GridSkeleton() {
           </div>
         </div>
       ))}
-    </SkillMasonry>
+    </ResourceMasonry>
   )
 }
 
@@ -677,7 +614,7 @@ function SkillGrid({
    * count, so the sidebar width does not shift them.
    */
   return (
-    <SkillMasonry>
+    <ResourceMasonry>
       {skills.map((skill) => (
         <SkillCard
           key={skillKey(skill)}
@@ -690,7 +627,7 @@ function SkillGrid({
           onOpen={() => onOpen(skill)}
         />
       ))}
-    </SkillMasonry>
+    </ResourceMasonry>
   )
 }
 

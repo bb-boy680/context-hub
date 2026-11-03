@@ -1633,6 +1633,12 @@ render → effect 重跑 → `setStatus("loading")` → 再 render，无限循�
 子项（深度排序保证）。改这类共享排法时，`grep` 出所有产出 `SkillFileEntry` 的地方
 一起改，并同步断言（`market-rows.test.ts` 的 `treeFromFiles` 用例）。
 
+## 用户指定直接写计划时，不进入 Plan 模式（2026-11-03）
+
+**问题模式**：创建实施计划时，我先进入了 Plan 模式；用户明确要求直接读取 `.claude/agents/create-plan.md` 的计划规范并创建计划。
+
+**规则**：用户指定这种流程时，在主上下文读取规范和相关源码，直接写 `docs/plans/` 并交用户审批，不进入 Plan 模式，也不为计划创建子智能体。用户未批准前不修改源码。
+
 ## 创建计划/任务时不要起子 Agent（2026-10-30）
 
 **问题模式**：`AGENTS.md` 原来要求执行任务前先让 `create-plan` 子智能体写计划。

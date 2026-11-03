@@ -32,6 +32,7 @@ import {
   MarksLine,
   PageBody,
   PlaceMenu,
+  ResourceMasonry,
   TablePagination,
   knownAspect,
   mediaKind,
@@ -318,7 +319,7 @@ function PromptCard({ prompt, updated, busy, store, places, holds, onOpen, onGen
         event.preventDefault()
         onOpen()
       }}
-      className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
+      className="w-full min-w-0 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
       {/* The cover box takes the picture's own ratio when there is one, so a
           portrait screenshot is not cropped and the columns keep the differing
@@ -929,13 +930,11 @@ export function PromptsPage() {
                 />
               )
             ) : view === "grid" ? (
-              <div className="@container">
-                <div className="columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4 @min-[1426px]:columns-5">
-                  {rows.map((prompt) => (
-                    <PromptCard key={prompt.id} {...cardProps(prompt)} />
-                  ))}
-                </div>
-              </div>
+              <ResourceMasonry>
+                {rows.map((prompt) => (
+                  <PromptCard key={prompt.id} {...cardProps(prompt)} />
+                ))}
+              </ResourceMasonry>
             ) : (
               <Ledger
                 columns={columns}

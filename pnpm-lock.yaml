@@ -221,6 +221,9 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
+      react-responsive-masonry:
+        specifier: 2.9.0
+        version: 2.9.0(react@19.2.8)
       react-router:
         specifier: ^8.4.0
         version: 8.4.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -701,9 +704,6 @@ importers:
       react:
         specifier: ^19.2.8
         version: 19.2.8
-      react-responsive-masonry:
-        specifier: 2.9.0
-        version: 2.9.0(react@19.2.8)
     devDependencies:
       '@eslint/js':
         specifier: ^10
