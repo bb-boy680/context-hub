@@ -120,12 +120,10 @@ export interface ScannedPack {
   description: string
   /** The pack's own picture, as a reference into the hub's asset library. */
   icon?: string
-  /**
-   * Where a client says the pack sits, read as the source recording it would
-   * name. One answers for the pack: the clients hold copies of the same pack,
-   * and the first one that names a directory is as good as any.
-   */
+  /** The first source the client names, including one it reports unavailable. */
   source?: { kind: "local"; path: string }
+  /** A readable candidate selected separately from the displayed source. */
+  directory?: string
   /** The clients holding it, in the order they were read. */
   held: PluginHeldBy[]
 }
@@ -139,7 +137,7 @@ interface HeldBuilder {
   id: string
   places: PluginHeldPlace[]
   /** The client's own answer for the pack, its file chain already resolved. */
-  enabled: boolean
+  enabled: boolean | undefined
 }
 
 /**
@@ -171,6 +169,7 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
       if (entry.description === "") entry.description = pack.pack.description
       if (entry.icon === undefined && pack.pack.icon !== undefined) entry.icon = pack.pack.icon
       if (entry.source === undefined && pack.source !== undefined) entry.source = pack.source
+      if (entry.directory === undefined && pack.source !== undefined && pack.sourceAvailable !== false) entry.directory = pack.source.path
       const found: HeldBuilder = entry.at.get(answer.client) ?? {
         client: answer.client,
         label: answer.label,
@@ -179,18 +178,19 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
            holds it in. It is what that client's own commands take back. */
         id: pack.id,
         places: [],
-        enabled: false,
+        enabled: pack.enabled,
       }
-      /* The agent's own answer is one per pack however many of its places hold
-         one, so any of them answers for all. */
-      if (pack.enabled) found.enabled = true
+      /* True wins; false requires every reported value to be false. */
+      if (found.places.length > 0) {
+        found.enabled = found.enabled === true || pack.enabled === true ? true
+          : found.enabled === false && pack.enabled === false ? false : undefined
+      }
       /* One entry per place, each with the answer that place itself gives. The
          group comes from the client's own declaration of the place, so an agent
          naming its scopes its own way still lands where it says it does. */
       const declared = answer.places.find((one) => one.scopeWord === pack.scope)
-      /* The file's own answer where it names the pack, and the client's single
-         answer where the file is silent: that is the value the place sees. */
-      const here = answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
+      /* An explicit setting cannot resolve a client's unknown effective state. */
+      const here = pack.enabled === undefined ? undefined : answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
       const already = found.places.find((one) => one.scope === pack.scope && one.id === pack.id)
       if (already === undefined) {
         found.places.push({
@@ -199,10 +199,15 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
           id: pack.id,
           readOnly: pack.readOnly === true || declared === undefined,
           origin: pack.origin,
+          sourceAvailable: pack.sourceAvailable,
+          source: pack.source,
           enabled: here,
         })
       } else {
-        already.enabled = here
+        already.readOnly = already.readOnly || pack.readOnly === true || declared === undefined
+        already.enabled = already.enabled === undefined || here === undefined ? undefined : here
+        already.sourceAvailable = already.sourceAvailable === false || pack.sourceAvailable === false ? false : already.sourceAvailable ?? pack.sourceAvailable
+        if (pack.sourceAvailable === false) already.source = pack.source
       }
       entry.at.set(answer.client, found)
       byName.set(pack.name, entry)
@@ -227,7 +232,7 @@ export function heldRow(pack: ScannedPack): PluginRow {
     /* The directory the agent named, which is the only address this side knows —
        and is what adopting it would collect from. */
     sourceAddress: pack.source?.path ?? "",
-    ...(pack.source === undefined ? {} : { directory: pack.source.path }),
+    ...(pack.directory === undefined ? {} : { directory: pack.directory }),
     updated: "",
     /* Nothing has asked this pack about any source. */
     checkedAge: "",
@@ -328,7 +333,7 @@ export interface PluginPlaceStatus {
    */
   recorded: boolean | undefined
   /** What the row shows and what its switch moves: the file's answer, else the agent's. */
-  on: boolean
+  on: boolean | undefined
 }
 
 /**
@@ -361,7 +366,10 @@ export function placesShown(
       if (!here && !over) return []
       const ids = new Set(hold.places.filter((place) => !place.readOnly).map((place) => place.id ?? hold.id))
       if (ids.size !== 1) return []
-      const recorded = client.switches[declared.scopeWord]?.[[...ids][0]!]
+      const own = hold.places.filter((place) => !place.readOnly && place.scope === declared.scopeWord)
+      const affected = own.length > 0 ? own : hold.places.filter((place) => !place.readOnly && (declared.overrides ?? []).includes(place.scope))
+      const hasUnknown = affected.some((place) => place.enabled === undefined)
+      const recorded = hasUnknown ? undefined : client.switches[declared.scopeWord]?.[[...ids][0]!]
       return [
         {
           id: `${hold.client}:${declared.scopeWord}`,
@@ -370,7 +378,7 @@ export function placesShown(
           icon: client.icon,
           declared,
           recorded,
-          on: recorded ?? hold.enabled,
+          on: hasUnknown ? undefined : recorded ?? hold.enabled,
         },
       ]
     })
@@ -386,6 +394,13 @@ export function placesShown(
 export const SCOPE_LABELS: Record<string, string> = {
   user: "plugins.scope.user",
   project: "plugins.scope.project",
+}
+
+export function placeSourceNote(places: readonly PluginHeldPlace[], scope: AssetScope, reached: PluginPlace, t: (key: string) => string): string {
+  const here = places.filter((place) => place.group === scope)
+  if (here.some((place) => place.sourceAvailable === false)) return t("plugins.place.sourceUnavailable")
+  const declared = here.some((place) => place.origin === "declaration") ? ` · ${t("plugins.place.declared")}` : ""
+  return `${scopeWords([reached.scopeWord], t)}${declared}`
 }
 
 /**

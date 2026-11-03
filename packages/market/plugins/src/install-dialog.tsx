@@ -18,7 +18,8 @@ import {
 import * as React from "react"
 
 import type { AssetScope } from "@context-hub/extensions"
-import { useI18n } from "@context-hub/extensions/react"
+import { useHub, useI18n } from "@context-hub/extensions/react"
+import { PLUGIN_SERVICE } from "@context-hub/plugins/provider"
 import type { PluginPlace, PluginRecord } from "@context-hub/plugins"
 import { usePluginLibrary, type PluginClient } from "@context-hub/plugins/library"
 import { Button } from "@context-hub/shadcn-ui/components/button"
@@ -100,6 +101,7 @@ export function MarketInstallDialog({
   records: readonly PluginRecord[]
 }) {
   const { t } = useI18n()
+  const ctx = useHub()
   const library = usePluginLibrary()
   const [picked, setPicked] = React.useState<readonly string[]>([])
   const [unfolded, setUnfolded] = React.useState<readonly string[]>([])
@@ -158,7 +160,7 @@ export function MarketInstallDialog({
       /* Collect first: every delivery is made from the library's copy. */
       let name = record?.name
       if (name === undefined) {
-        const collected = await collectMarketInstall(row.entry.install)
+        const collected = await collectMarketInstall(row.entry.install, ctx.get(PLUGIN_SERVICE)?.manifestPaths() ?? [])
         await library.refresh()
         name = collected.record.name
       }

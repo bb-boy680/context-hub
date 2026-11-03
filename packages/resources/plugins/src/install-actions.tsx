@@ -230,6 +230,7 @@ function EnabledMenu({
              and one this hub cannot reach has nothing it may write: each says
              whose business it is rather than showing a control that would move
              something nobody chose. */
+          if (place.on === undefined) return null
           if (!place.declared.switchable || !reachable.has(place.client)) {
             return (
               <span className="flex h-5 shrink-0 items-center rounded-full bg-secondary px-2 text-[11.5px] leading-[1.3] text-muted-foreground">
@@ -258,7 +259,7 @@ function EnabledMenu({
           options: places
             .filter((one) => one.declared.scope === group)
             .map((one) => {
-              const shown = one.declared.switchable && reachable.has(one.client)
+              const shown = one.on === undefined || (one.declared.switchable && reachable.has(one.client))
               return {
                 id: one.id,
                 icon: one.icon,
@@ -273,7 +274,7 @@ function EnabledMenu({
                       )
                       .replace(
                         "{state}",
-                        t(one.on ? "plugins.place.on" : "plugins.place.off")
+                        t(one.on === undefined ? "plugins.place.unknown" : one.on ? "plugins.place.on" : "plugins.place.off")
                       )
                   : t("plugins.place.selfManaged"),
               }

@@ -43,6 +43,18 @@ function allowedRef(roots: PluginDiskRoots, ref: PluginDiskRef, write: boolean):
   return [...scope.write, ...(write ? [] : scope.read)].some((pattern) => matches(pattern, ref.path))
 }
 
+function directoryAllowed(roots: PluginDiskRoots, relative: string, name?: string): boolean {
+  const parts = assertPackRelative(relative).split("/")
+  for (const part of parts) assertSafeSegment(part, "plugin directory")
+  const templates = ["cache/*/:name/*", ...(roots.declaration.directories ?? [])]
+  return templates.some((template) => {
+    const expected = template.split("/")
+    return expected.length === parts.length && expected.every((part, index) =>
+      part === "*" || (part === ":name" ? name === undefined || parts[index] === name : parts[index] === part)
+    )
+  })
+}
+
 function missing(error: unknown): boolean {
   return (error as NodeJS.ErrnoException).code === "ENOENT"
 }
@@ -67,7 +79,19 @@ function declarationOf(value: PluginDiskDeclaration): PluginDiskDeclaration {
     const entry = input as { write?: unknown; read?: unknown }
     return { write: patterns(entry.write), read: patterns(entry.read) }
   }
-  return { home: segment(value.home), homeEnv: variable(value.homeEnv), state: segment(value.state), stateEnv: variable(value.stateEnv), config: scope(value.config), stateFiles: scope(value.stateFiles), workspace: scope(value.workspace), library: scope(value.library), external: patterns(value.external) }
+  const directories = value.directories === undefined ? [] : value.directories
+  if (!Array.isArray(directories) || directories.some((template) => {
+    if (typeof template !== "string") return true
+    const parts = template.split("/")
+    if (parts.length < 2 || parts.filter((part) => part === ":name").length !== 1) return true
+    return parts.some((part) => {
+      if (part === ":name" || part === "*") return false
+      try { assertSafeSegment(part, "directory template"); return false } catch { return true }
+    })
+  })) throw new Error("invalid plugin directory template")
+  if (typeof value.state !== "string") throw new Error("invalid file root declaration")
+  const state = value.state.split("/").map(segment).join("/")
+  return { home: segment(value.home), homeEnv: variable(value.homeEnv), state, stateEnv: variable(value.stateEnv), config: scope(value.config), stateFiles: scope(value.stateFiles), directories, workspace: scope(value.workspace), library: scope(value.library), external: patterns(value.external) }
 }
 
 function environmentRoot(value: string | undefined, fallback: string): string {
@@ -134,6 +158,35 @@ async function treeHash(root: string, ignoreMarker = false): Promise<string> {
   return hash.digest("hex")
 }
 
+async function directorySnapshot(root: string): Promise<string | null> {
+  const stat = await fs.lstat(root).catch((error: unknown) => {
+    if (missing(error)) return null
+    throw error
+  })
+  if (stat === null) return null
+  if (stat.isSymbolicLink()) throw new Error(`symbolic link in plugin directory: ${root}`)
+  if (!stat.isDirectory()) throw new Error(`plugin path is not a directory: ${root}`)
+  const hash = createHash("sha256")
+  const visit = async (dir: string, relative: string): Promise<void> => {
+    const entries = await fs.readdir(dir, { withFileTypes: true })
+    entries.sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)
+    for (const entry of entries) {
+      const name = relative === "" ? entry.name : `${relative}/${entry.name}`
+      const full = path.join(dir, entry.name)
+      if (entry.isSymbolicLink()) throw new Error(`symbolic link in plugin directory: ${name}`)
+      if (entry.isDirectory()) {
+        hash.update(JSON.stringify(["directory", name]))
+        await visit(full, name)
+      } else if (entry.isFile()) {
+        const digest = createHash("sha256").update(await fs.readFile(full)).digest("hex")
+        hash.update(JSON.stringify(["file", name, digest]))
+      } else throw new Error(`unsupported file in plugin directory: ${name}`)
+    }
+  }
+  await visit(root, "")
+  return hash.digest("hex")
+}
+
 export interface InstallerFiles extends PluginDisk {
   begin(declaration: PluginDiskDeclaration): Promise<PluginDiskRoots>
   end(token: string): void
@@ -151,7 +204,10 @@ export function createInstallerFiles(options: Options): InstallerFiles {
   const roots = async (input: PluginDiskDeclaration): Promise<PluginDiskRoots> => {
     const declaration = declarationOf(input)
     const config = environmentRoot(declaration.homeEnv === undefined ? undefined : env[declaration.homeEnv], path.join(options.userHome ?? homedir(), declaration.home))
-    const plugins = environmentRoot(declaration.stateEnv === undefined ? undefined : env[declaration.stateEnv], path.join(config, declaration.state))
+    const override = declaration.stateEnv === undefined ? undefined : env[declaration.stateEnv]
+    const plugins = override === undefined || override.trim() === ""
+      ? await safePath(config, declaration.state)
+      : environmentRoot(override, config)
     const workspace = await options.workspace()
     return {
       declaration,
@@ -193,10 +249,18 @@ export function createInstallerFiles(options: Options): InstallerFiles {
     return safePath(path.resolve(directory), relative)
   }
 
+  const directory = async (captured: PluginDiskRoots, ref: PluginDiskRef): Promise<string> => {
+    if (ref?.root !== "plugins" || typeof ref.path !== "string" || !directoryAllowed(captured, ref.path) || !allowedRef(captured, ref, true)) {
+      throw new Error("directory is outside the plugin directory allowlist")
+    }
+    return target(captured, ref)
+  }
+
   const commit = async (
     captured: PluginDiskRoots,
     changes: readonly PluginDiskChange[],
-    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean }
+    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean; manifests?: readonly string[]; before?: string | null; sourceSnapshot?: string },
+    remove?: { ref: PluginDiskRef; before: string | null }
   ): Promise<void> => {
     if (!Array.isArray(changes)) throw new Error("invalid file changes")
     if (typeof captured !== "object" || captured === null || typeof captured.token !== "string" || !tokens.has(captured.token)) {
@@ -222,34 +286,50 @@ export function createInstallerFiles(options: Options): InstallerFiles {
       let destination: string | null = null
       let backup: string | null = null
       let activated = false
+      let expected: string | null | undefined
+      let activatedSnapshot: string | null = null
       try {
+        if (copy !== undefined && remove !== undefined) throw new Error("cannot copy and remove a directory in one operation")
+        if (remove !== undefined) {
+          if (typeof remove !== "object" || remove === null || !(remove.before === null || typeof remove.before === "string")) throw new Error("invalid directory removal")
+          destination = await directory(captured, remove.ref)
+          expected = remove.before
+        }
         if (copy !== undefined) {
           if (typeof copy !== "object" || copy === null || typeof copy.name !== "string" || typeof copy.destination !== "string") {
             throw new Error("invalid plugin copy")
           }
+          if (copy.before !== undefined && copy.before !== null && typeof copy.before !== "string") throw new Error("invalid directory snapshot")
+          if (copy.sourceSnapshot !== undefined && (typeof copy.sourceSnapshot !== "string" || copy.before === undefined)) throw new Error("invalid source snapshot")
+          if (copy.before !== undefined && copy.pruneVersions) throw new Error("snapshot-protected copy cannot prune versions")
+          expected = copy.before
           const name = assertSafeSegment(copy.name, "plugin name")
-          const parts = assertPackRelative(copy.destination).split("/")
-          if (parts.length !== 4 || parts[0] !== "cache" || parts[2] !== name || !allowedRef(captured, { root: "plugins", path: copy.destination }, true)) throw new Error("invalid plugin cache destination")
-          assertSafeSegment(parts[1]!, "marketplace name")
-          assertSafeSegment(parts[3]!, "plugin version")
-          if (!(await options.library.list()).some((record) => record.name === name) || !(await options.library.has(name))) {
+          if (!directoryAllowed(captured, copy.destination, name) || !allowedRef(captured, { root: "plugins", path: copy.destination }, true)) throw new Error("invalid plugin directory destination")
+          if (copy.pruneVersions && !/^cache\/[^/]+\/[^/]+\/[^/]+$/.test(copy.destination)) throw new Error("version pruning requires a cache destination")
+          if (!(await options.library.list()).some((record) => record.name === name) || !(await options.library.has(name, copy.manifests))) {
             throw new Error(`${name} is not in this library`)
           }
           const source = await safePath(captured.library, name)
           destination = await safePath(captured.plugins, copy.destination)
+          if (expected !== undefined && await directorySnapshot(destination) !== expected) throw new Error(`directory changed; retry: ${destination}`)
           const sourceHash = await treeHash(source)
+          const sourceSnapshot = expected === undefined ? null : await directorySnapshot(source)
+          if (copy.sourceSnapshot !== undefined && sourceSnapshot !== copy.sourceSnapshot) throw new Error("plugin pack changed; retry")
           const destinationStat = await fs.lstat(destination).catch((error: unknown) => {
             if (missing(error)) return null
             throw error
           })
           if (destinationStat !== null && !destinationStat.isDirectory()) throw new Error(`plugin cache is not a directory: ${destination}`)
-          const different = destinationStat !== null && await treeHash(destination, true) !== sourceHash
+          const different = destinationStat !== null && (expected === undefined
+            ? await treeHash(destination, true) !== sourceHash
+            : expected !== sourceSnapshot)
           if (different && !copy.replace) throw new Error(`plugin cache already contains different files: ${destination}`)
           if (destinationStat === null || different) {
             await fs.mkdir(path.dirname(destination), { recursive: true })
             staged = path.join(path.dirname(destination), `.tmp-plugin-${randomUUID()}`)
             await fs.cp(source, staged, { recursive: true, errorOnExist: true, force: false })
-            if (await treeHash(staged) !== sourceHash || await treeHash(source) !== sourceHash) {
+            if (await treeHash(staged) !== sourceHash || await treeHash(source) !== sourceHash ||
+                (expected !== undefined && (await directorySnapshot(staged) !== sourceSnapshot || await directorySnapshot(source) !== sourceSnapshot))) {
               throw new Error("plugin pack changed while copying; retry")
             }
           }
@@ -258,14 +338,28 @@ export function createInstallerFiles(options: Options): InstallerFiles {
         for (const item of files) {
           if (await readText(item.file) !== item.before) throw new Error(`file changed; retry: ${item.file}`)
         }
-        if (staged !== null && destination !== null) {
-          if (await fs.lstat(destination).catch((error: unknown) => { if (missing(error)) return null; throw error })) {
-            backup = `${destination}.backup-${randomUUID()}`
-            await fs.rename(destination, backup)
+        if (destination !== null && expected !== undefined) {
+          if (files.some((item) => inside(destination!, item.file) || inside(item.file, destination!))) throw new Error("file change overlaps plugin directory")
+          const ref = remove?.ref ?? { root: "plugins" as const, path: copy!.destination }
+          if (await directory(captured, ref) !== destination || await directorySnapshot(destination) !== expected) {
+            throw new Error(`directory changed; retry: ${destination}`)
           }
-          await fs.rename(staged, destination)
-          activated = true
-          staged = null
+        }
+        if (destination !== null && (staged !== null || remove !== undefined)) {
+          const present = await fs.lstat(destination).catch((error: unknown) => { if (missing(error)) return null; throw error })
+          if (expected === null && present !== null) throw new Error(`directory changed; retry: ${destination}`)
+          if (present !== null) {
+            const backupPath = `${destination}.backup-${randomUUID()}`
+            await fs.rename(destination, backupPath)
+            backup = backupPath
+            if (expected !== undefined && await directorySnapshot(backup) !== expected) throw new Error(`directory changed; retry: ${destination}`)
+          } else if (typeof expected === "string") throw new Error(`directory changed; retry: ${destination}`)
+          if (staged !== null) {
+            activatedSnapshot = expected === undefined ? null : await directorySnapshot(staged)
+            await fs.rename(staged, destination)
+            activated = true
+            staged = null
+          }
         }
         const written: typeof files = []
         try {
@@ -304,7 +398,23 @@ export function createInstallerFiles(options: Options): InstallerFiles {
           }
           throw new Error(reason, { cause: error })
         }
-        if (backup !== null) { await fs.rm(backup, { recursive: true, force: true }); backup = null }
+        if (backup !== null) {
+          if (expected !== undefined) {
+            try {
+              if (await directorySnapshot(backup) !== expected) throw new Error("backup changed")
+            } catch (error) {
+              const kept = backup
+              backup = null
+              activated = false
+              throw new Error(`operation committed; backup preserved at ${kept}: ${String(error)}`, { cause: error })
+            }
+          }
+          const completedBackup = backup
+          backup = null
+          activated = false
+          try { await fs.rm(completedBackup, { recursive: true, force: true }) }
+          catch (error) { throw new Error(`operation committed; could not remove backup ${completedBackup}: ${String(error)}`, { cause: error }) }
+        }
         activated = false
         if (copy?.pruneVersions && destination !== null) {
           const parent = path.dirname(destination)
@@ -317,8 +427,17 @@ export function createInstallerFiles(options: Options): InstallerFiles {
           }
         }
       } catch (error) {
+        if (expected !== undefined && destination !== null) {
+          const current = await directorySnapshot(destination).catch(() => "changed")
+          if ((activated && current !== activatedSnapshot) || (!activated && backup !== null && current !== null)) {
+            throw new Error(`${String(error)}; directory changed during rollback${backup === null ? "" : `; original saved at ${backup}`}`, { cause: error })
+          }
+        }
         if (activated && destination !== null) await fs.rm(destination, { recursive: true, force: true })
-        if (backup !== null && destination !== null) await fs.rename(backup, destination)
+        if (backup !== null && destination !== null) {
+          try { await fs.rename(backup, destination) }
+          catch (restoreError) { throw new Error(`${String(error)}; original saved at ${backup}; restore failed: ${String(restoreError)}`, { cause: restoreError }) }
+        }
         throw error
       } finally {
         if (staged !== null) await fs.rm(staged, { recursive: true, force: true })
@@ -398,9 +517,17 @@ export function createInstallerFiles(options: Options): InstallerFiles {
       if (!allowedRef(captured, ref, false)) throw new Error("directory is outside the plugin state allowlist")
       return target(captured, ref)
     },
+    async snapshotDirectory(captured, ref) {
+      if (ref?.root === "library") {
+        if (!allowedRef(captured, ref, false)) throw new Error("directory is outside the plugin library allowlist")
+        return directorySnapshot(await target(captured, ref))
+      }
+      return directorySnapshot(await directory(captured, ref))
+    },
     async removeDirectory(captured, ref) {
       if (!captured.token || !tokens.has(captured.token)) throw new Error("file operation lease required")
-      if (ref.root !== "plugins" || !/^cache\/[^/]+\/[^/]+(?:\/[^/]+)?$/.test(ref.path) || !allowedRef(captured, ref, true)) throw new Error("directory is outside the plugin cache allowlist")
+      const cacheParent = /^cache\/[^/]+\/[^/]+$/.test(ref.path) && ref.path.split("/").every((part) => { try { assertSafeSegment(part, "plugin directory"); return true } catch { return false } })
+      if (ref.root !== "plugins" || !(cacheParent || directoryAllowed(captured, ref.path)) || !allowedRef(captured, ref, true)) throw new Error("directory is outside the plugin directory allowlist")
       await fs.rm(await target(captured, ref), { recursive: true, force: true })
     },
     external,

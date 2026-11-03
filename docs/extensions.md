@@ -123,6 +123,57 @@ export fails that test rather than the first plugin that uses it.
 Do not import any other package. UI components come from `scope.ui`; icons from
 `scope.icons` and `scope.icon(name)`.
 
+## Plugin pack manifests and installer directories
+
+An agent extension can contribute manifest paths for native-only plugin packs:
+
+```ts
+ctx.plugins.registerManifests([".example-plugin/plugin.json"])
+```
+
+The registration lasts for the extension's lifetime. Paths are relative to the
+pack root, use `/`, and cannot contain empty, `.` or `..` segments, drive
+prefixes or backslashes. The host validates them again and refuses symbolic
+links. Built-in manifest paths remain available. Collection, descriptions,
+market previews and the contents pane use the currently registered paths.
+Manifest `name`, `version`, `description` and a relative `icon` are read; the
+contents pane supports `skills` and `commands` paths and `mcpServers` inline or
+as relative paths. Explicit paths replace the corresponding defaults.
+
+A file installer may declare additional destination templates in its existing
+`PluginDiskDeclaration`:
+
+```ts
+const declaration = {
+  home: ".example",
+  state: "cli/plugins",
+  directories: ["local/:name"],
+  config: { read: [], write: [] },
+  stateFiles: { read: [], write: ["local/*"] },
+  workspace: { read: [], write: [] },
+  library: { read: [], write: [] },
+  external: [],
+}
+```
+
+A template contains exactly one `:name`, which must match the copied library
+pack; `*` matches one safe segment. The destination also needs a matching
+`stateFiles.write` pattern. `disk.run` and `disk.commit` still take snapshots,
+check the source tree and compensate for failed writes. The existing four-part
+cache destination remains available. A multi-segment `state` path is relative to
+`home` and every segment is checked for symbolic links; an explicitly declared
+absolute `stateEnv` override is a separate root.
+
+`PluginHeld.enabled` may be omitted when the agent cannot determine whether a
+pack is enabled. The hub shows an unknown state without an on/off switch.
+Aggregate status is on if any answer is true, off only when every answer is
+false, and unknown otherwise. An explicit setting does not make a reported
+unknown status known. A provider may set `PluginHeld.sourceAvailable` to
+`false` only when it has verified that the named source cannot be used; omit it
+when availability was not checked. The source path and availability are shown
+per agent location. The minimum Hub engine version providing these
+contracts must be set after that version is released.
+
 ## Plugin installer file access
 
 An agent installer receives optional `tools.disk` through the plugins service.
@@ -139,10 +190,24 @@ Older hosts lack the current file contract; extensions must report that rather
 than silently falling back to a CLI.
 
 File replacement is atomic per file. A multi-file operation uses compensating
-writes on failure and reports any file it could not restore. This is not a
-cross-process lock: a client or another application can still edit the same files
-between checks. Agent-specific document formats and dependency semantics remain
-in the agent extension.
+writes on failure and reports any file it could not restore. For a directory
+whose contents must be protected, declare the destination template and read the
+library pack directory (`library.read: ["*"]`). Inside `disk.run`, obtain its
+`snapshotDirectory(roots, { root: "library", path: name })`, store that digest
+in the install record in the same `commit`, and pass it as `sourceSnapshot` on
+`copy`. Set `before: null` when the destination must be absent, or set it to the
+previously recorded digest when replacing. For uninstall, pass
+`{ ref: destinationRef, before: recordedDigest }` as the fourth `commit`
+argument together with the state-file changes. A freshly read destination
+snapshot alone cannot establish that it has not been modified since installation.
+Snapshots include binary files, empty directories and cache markers, and reject
+links. Snapshot-protected copies cannot use `pruneVersions`.
+
+These checks and compensating writes are not a cross-process lock: a client or
+another application can still edit the same files between checks. A failed
+rollback preserves a directory backup when it detects an intervening change.
+Agent-specific document formats and dependency semantics remain in the agent
+extension.
 
 ## Prompt providers
 

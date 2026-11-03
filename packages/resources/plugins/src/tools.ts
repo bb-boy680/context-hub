@@ -54,7 +54,7 @@ function call<T>(base: string, body: Record<string, unknown>): Promise<T> {
  *
  * @param base — the origin the route is reached on; empty means this one.
  */
-export function createRemotePluginTools(base = ""): PluginBridgeTools {
+export function createRemotePluginTools(base = "", manifests: () => readonly string[] = () => []): PluginBridgeTools {
   const disk: PluginDisk = {
     roots: (declaration) => call(base, { action: "disk-roots", declaration }),
     async read(roots, ref) {
@@ -66,6 +66,9 @@ export function createRemotePluginTools(base = ""): PluginBridgeTools {
     async path(roots, ref) {
       return (await call<{ path: string }>(base, { action: "disk-path", roots, ref })).path
     },
+    async snapshotDirectory(roots, ref) {
+      return (await call<{ snapshot: string | null }>(base, { action: "disk-snapshot-directory", roots, ref })).snapshot
+    },
     async external(roots, directory, relative) {
       return (await call<{ path: string }>(base, { action: "disk-external", roots, directory, relative })).path
     },
@@ -75,8 +78,8 @@ export function createRemotePluginTools(base = ""): PluginBridgeTools {
     async removeDirectory(roots, ref) {
       await call(base, { action: "disk-remove-directory", roots, ref })
     },
-    async commit(roots, changes, copy) {
-      await call(base, { action: "disk-commit", roots, changes, copy })
+    async commit(roots, changes, copy, remove) {
+      await call(base, { action: "disk-commit", roots, changes, copy: copy === undefined ? undefined : { ...copy, manifests: manifests() }, remove })
     },
     async run(declaration, work) {
       const roots = await call<PluginDiskRoots>(base, { action: "disk-begin", declaration })
@@ -121,7 +124,7 @@ export function createRemotePluginTools(base = ""): PluginBridgeTools {
     },
 
     async describe(directory, name) {
-      return call<PackDescription>(base, { action: "describe", path: directory, name })
+      return call<PackDescription>(base, { action: "describe", path: directory, name, manifests: manifests() })
     },
   }
 }

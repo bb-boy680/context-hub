@@ -13,7 +13,8 @@ import {
 } from "lucide-react"
 import * as React from "react"
 
-import { useI18n } from "@context-hub/extensions/react"
+import { useHub, useI18n } from "@context-hub/extensions/react"
+import { PLUGIN_SERVICE } from "@context-hub/plugins/provider"
 import type { PackContentItem, PluginRecord } from "@context-hub/plugins"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
@@ -159,6 +160,7 @@ export function MarketDetailDialog({
   onInstall: (row: MarketRow) => void
 }) {
   const { t } = useI18n()
+  const ctx = useHub()
   const [enriched, setEnriched] = React.useState<Enriched | undefined>(() =>
     enrichmentOf(row.entry.id)
   )
@@ -187,7 +189,7 @@ export function MarketDetailDialog({
     queueMicrotask(() => {
       if (!live) return
       setPreview({ state: "loading" })
-      void previewMarketEntry(row.entry.install)
+      void previewMarketEntry(row.entry.install, ctx.get(PLUGIN_SERVICE)?.manifestPaths() ?? [])
         .then((value) => {
           if (live) setPreview({ state: "ready", value })
         })
@@ -198,7 +200,7 @@ export function MarketDetailDialog({
     return () => {
       live = false
     }
-  }, [row, attempt])
+  }, [ctx, row, attempt])
 
   const contents = preview.state === "ready" ? preview.value.contents : null
   const tabs = offeredTabs(contents)

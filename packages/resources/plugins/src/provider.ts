@@ -17,6 +17,7 @@ import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope, PlaceFiles } from "@context-hub/core/place-files"
 
+import { pluginManifestPaths } from "./contract.ts"
 import type { PackDescription, PluginInstallReport, PluginInstallScope } from "./contract.ts"
 
 /** The service name the plugins module publishes and every agent plugin requires. */
@@ -43,6 +44,8 @@ export interface PluginDiskDeclaration {
   stateEnv?: string
   config: PluginRootScope
   stateFiles: PluginRootScope
+  /** Additional plugin directory templates; :name is the collected pack name. */
+  directories?: string[]
   workspace: PluginRootScope
   library: PluginRootScope
   external: string[]
@@ -76,12 +79,14 @@ export interface PluginDisk {
   read(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string | null>
   list(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<{ name: string; directory: boolean }[]>
   path(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string>
+  snapshotDirectory(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string | null>
   external(roots: PluginDiskRoots, directory: string, relative: string): Promise<string>
   readExternal(roots: PluginDiskRoots, directory: string, relative: string): Promise<string | null>
   commit(
     roots: PluginDiskRoots,
     changes: readonly PluginDiskChange[],
-    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean }
+    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean; manifests?: readonly string[]; before?: string | null; sourceSnapshot?: string },
+    remove?: { ref: PluginDiskRef; before: string | null }
   ): Promise<void>
   removeDirectory(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<void>
   run<T>(declaration: PluginDiskDeclaration, work: (roots: PluginDiskRoots) => Promise<T>): Promise<T>
@@ -203,10 +208,12 @@ export interface PluginHeld {
   /**
    * Whether the client currently switches it on.
    */
-  enabled: boolean
+  enabled?: boolean
   /** A discovered or policy-owned entry may not be modified through this installer. */
   readOnly?: boolean
   origin?: "record" | "declaration" | "skills-dir"
+  /** Whether the named source was verified available; absent when not checked. */
+  sourceAvailable?: boolean
   /** The marketplace it came from; `null` when the client names none. */
   marketplace: string | null
   /**
@@ -313,6 +320,22 @@ export class PluginService extends Service {
   readonly tools: PluginBridgeTools
 
   private readonly held: PluginInstaller[] = []
+  private readonly manifests: string[][] = []
+
+  /** Paths contributed by currently enabled extensions. */
+  manifestPaths(): string[] {
+    return pluginManifestPaths(this.manifests.flat())
+  }
+
+  /** Register relative manifest paths for the lifetime of the calling extension. */
+  registerManifests(paths: readonly string[]): () => void {
+    const declared = pluginManifestPaths(paths).filter((path) => !pluginManifestPaths().includes(path))
+    this.manifests.push(declared)
+    return this.ctx.effect(() => () => {
+      const at = this.manifests.indexOf(declared)
+      if (at >= 0) this.manifests.splice(at, 1)
+    })
+  }
 
   constructor(ctx: Context, tools: PluginBridgeTools) {
     super(ctx, PLUGIN_SERVICE)

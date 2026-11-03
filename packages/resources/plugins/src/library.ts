@@ -125,13 +125,13 @@ export async function packFileIn(dir: string, path: string): Promise<string | nu
  * library records, so this is a read of the disk each time it is asked — which
  * is why the dialog asks once as it opens rather than on every render.
  */
-export async function packContents(name: string): Promise<PackContents> {
-  return call<PackContents>(`${ENDPOINT}?action=contents&name=${encodeURIComponent(name)}`)
+export async function packContents(name: string, manifests: readonly string[] = []): Promise<PackContents> {
+  return call<PackContents>(`${ENDPOINT}?action=contents&name=${encodeURIComponent(name)}&manifests=${encodeURIComponent(JSON.stringify(manifests))}`)
 }
 
 /** What one pack carries, read out of the directory an agent keeps it in. */
-export async function packContentsIn(dir: string): Promise<PackContents> {
-  return call<PackContents>(`${ENDPOINT}?action=contents&dir=${encodeURIComponent(dir)}`)
+export async function packContentsIn(dir: string, manifests: readonly string[] = []): Promise<PackContents> {
+  return call<PackContents>(`${ENDPOINT}?action=contents&dir=${encodeURIComponent(dir)}&manifests=${encodeURIComponent(JSON.stringify(manifests))}`)
 }
 
 /** The file a pack says what it is for in, which is what a cover falls back to. */
@@ -400,7 +400,8 @@ export interface PluginUpdateOutcome {
  * pass ends by refreshing every page watching the library.
  */
 export function pluginUpdateSource(
-  reload: () => Promise<void>
+  reload: () => Promise<void>,
+  manifests: () => readonly string[] = () => []
 ): PluginUpdateSource {
   return {
     list: async () => {
@@ -412,7 +413,7 @@ export function pluginUpdateSource(
     checkUpdates: () =>
       call<PluginUpdateSummary>(ENDPOINT, { action: "check-updates" }),
     update: async (name) => {
-      await call<PluginUpdateOutcome>(ENDPOINT, { action: "update", name })
+      await call<PluginUpdateOutcome>(ENDPOINT, { action: "update", name, manifests: manifests() })
     },
     reload,
   }
@@ -479,14 +480,14 @@ export function usePluginLibrary(): PluginLibrary {
 
   /* The actions a check pass makes, shared with the schedule; its reload is this
      read's, so a pass refreshes every page watching the library. */
-  const source = React.useMemo(() => pluginUpdateSource(reload), [reload])
+  const source = React.useMemo(() => pluginUpdateSource(reload, () => service?.manifestPaths() ?? []), [reload, service])
 
   /** Run one write, then read everything again: any write can change more than it named. */
   const write = React.useCallback(
     async <T,>(body: Record<string, unknown>): Promise<T> => {
       setBusy(true)
       try {
-        const answer = await call<T>(ENDPOINT, body)
+        const answer = await call<T>(ENDPOINT, { ...body, manifests: service?.manifestPaths() ?? [] })
         await reload()
         setWriteFailure(null)
         return answer
@@ -494,7 +495,7 @@ export function usePluginLibrary(): PluginLibrary {
         setBusy(false)
       }
     },
-    [reload]
+    [reload, service]
   )
 
   /**
@@ -541,7 +542,7 @@ export function usePluginLibrary(): PluginLibrary {
    * @returns the record as it stands once the files are back.
    */
   const restore = async (name: string): Promise<PluginRecord> =>
-    call<PluginRecord>(ENDPOINT, { action: "restore", name })
+    call<PluginRecord>(ENDPOINT, { action: "restore", name, manifests: service?.manifestPaths() ?? [] })
 
   /* What the clients hold, as the read folded it; every write that acts on a
      client's own record reads it from here. */
@@ -562,8 +563,8 @@ export function usePluginLibrary(): PluginLibrary {
   const adopt = React.useCallback(
     (name: string): Promise<PluginCollected> => {
       const pack = scanned.find((one) => one.name === name)
-      if (pack?.source === undefined) return Promise.reject(new Error(t("plugins.adopt.unknown")))
-      return write<PluginCollected>({ action: "add", source: pack.source.path })
+      if (pack?.directory === undefined) return Promise.reject(new Error(t("plugins.adopt.unknown")))
+      return write<PluginCollected>({ action: "add", source: pack.directory })
     },
     [scanned, write, t]
   )

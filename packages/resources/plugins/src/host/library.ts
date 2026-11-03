@@ -31,7 +31,7 @@ import { resolveHubHome } from "@context-hub/core/host/home"
 
 import { PLUGIN_INDEX_FILE, PLUGIN_LIBRARY_DIR } from "../contract.ts"
 import { emptyIndex, readIndex, serializeIndex } from "../records.ts"
-import { readManifestFields } from "./describe.ts"
+import { readManifestFields, safePackPath } from "./describe.ts"
 import { assertSafeSegment } from "./names.ts"
 import { findLogo, assetPresent, storePicture } from "./logo.ts"
 import type { PluginCheck, PluginOrigin } from "../contract.ts"
@@ -80,7 +80,7 @@ export interface PluginLibrary {
    * The index is a file a person may edit, so a record can outlive the directory
    * it names; asking the disk is what separates a pack from a memory of one.
    */
-  has(name: string): Promise<boolean>
+  has(name: string, manifests?: readonly string[]): Promise<boolean>
   /**
    * The records whose files are gone, by name.
    *
@@ -88,7 +88,7 @@ export interface PluginLibrary {
    * names is worth fetching again rather than dropping; this is what tells a
    * caller there is something to fetch.
    */
-  missing(): Promise<string[]>
+  missing(manifests?: readonly string[]): Promise<string[]>
   /**
    * Take a staged directory as one pack: move it in, read its manifest, hash it,
    * and record it.
@@ -102,9 +102,9 @@ export interface PluginLibrary {
    *
    * @throws {Error} when the name belongs to a record that still has its files.
    */
-  add(name: string, staged: string, source: PluginOrigin, hash: string): Promise<PluginRecord>
+  add(name: string, staged: string, source: PluginOrigin, hash: string, manifests?: readonly string[]): Promise<PluginRecord>
   /** Replace one pack's files with a staged directory, keeping its record's own fields. */
-  replace(name: string, staged: string, source: PluginOrigin, hash: string): Promise<PluginRecord>
+  replace(name: string, staged: string, source: PluginOrigin, hash: string, manifests?: readonly string[]): Promise<PluginRecord>
   /** Drop one pack, its record, and the assets the hub holds for it. */
   remove(name: string): Promise<void>
   /** Keep one check's answer. */
@@ -152,9 +152,9 @@ export interface PluginLibrary {
  * @param fallbackName — the name to read the manifest under when it gives none.
  * @returns whether a pack is there.
  */
-async function holdsPack(dir: string, fallbackName: string): Promise<boolean> {
+async function holdsPack(dir: string, fallbackName: string, manifests: readonly string[] = []): Promise<boolean> {
   if ((await fs.stat(dir).catch(() => null)) === null) return false
-  return await readPackManifest(dir, fallbackName).then(
+  return await readPackManifest(dir, fallbackName, manifests).then(
     () => true,
     () => false
   )
@@ -174,8 +174,8 @@ async function holdsPack(dir: string, fallbackName: string): Promise<boolean> {
  * @returns the pack's own name, version, and description.
  * @throws {Error} when the directory is a market of several plugins, or carries neither a manifest nor a component layout.
  */
-export async function readPackManifest(dir: string, fallbackName: string): Promise<PackManifest> {
-  const fields = await readManifestFields(dir)
+export async function readPackManifest(dir: string, fallbackName: string, manifests: readonly string[] = []): Promise<PackManifest> {
+  const fields = await readManifestFields(dir, manifests)
   if (fields.name === undefined && fields.version === "") {
     if (fields.marketplace) {
       throw new Error("this directory is a marketplace of plugins, not one plugin")
@@ -373,11 +373,13 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
     name: string,
     source: PluginOrigin,
     hash: string,
-    previous?: PluginRecord
+    previous?: PluginRecord,
+    manifests: readonly string[] = []
   ): Promise<PluginRecord> => {
     const dir = packDir(name)
-    const manifest = await readPackManifest(dir, name)
-    const logo = await findLogo(dir)
+    const manifest = await readPackManifest(dir, name, manifests)
+    const fields = await readManifestFields(dir, manifests)
+    const logo = fields.icon === undefined ? await findLogo(dir) : (await safePackPath(dir, fields.icon), fields.icon)
     const picture = logo === undefined ? undefined : await storePicture(store, dir, name, logo)
     const icon = picture ?? ""
     /* The same picture read again is the same file, and dropping it here would
@@ -422,13 +424,13 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
      * is what says a pack is here, so its absence is what makes the address
      * worth fetching again.
      */
-    has: (name) => run(() => holdsPack(packDir(name), name)),
+    has: (name, manifests) => run(() => holdsPack(packDir(name), name, manifests)),
 
-    missing: () =>
+    missing: (manifests) =>
       run(async () => {
         const gone: string[] = []
         for (const one of await readDocument()) {
-          if (!(await holdsPack(packDir(one.name), one.name))) gone.push(one.name)
+          if (!(await holdsPack(packDir(one.name), one.name, manifests))) gone.push(one.name)
         }
         return gone
       }),
@@ -441,12 +443,12 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
 
     hash: (name) => folderHash(packDir(name)),
 
-    add(name, staged, source, hash) {
+    add(name, staged, source, hash, manifests) {
       return run(async () => {
         const records = await readDocument()
         const known = records.find((one) => one.name === name)
         const target = packDir(name)
-        const here = await holdsPack(target, name)
+        const here = await holdsPack(target, name, manifests)
 
         if (known !== undefined && here) {
           /* Two collections of one address can be in flight at once, and the
@@ -476,7 +478,7 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
           await moveInto(staged, target)
         }
 
-        const record = await recordOf(name, source, hash, known)
+        const record = await recordOf(name, source, hash, known, manifests)
         await save(
           known === undefined
             ? [...records, record]
@@ -486,7 +488,7 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
       })
     },
 
-    replace(name, staged, source, hash) {
+    replace(name, staged, source, hash, manifests) {
       return run(async () => {
         const records = await readDocument()
         const previous = records.find((one) => one.name === name)
@@ -498,7 +500,7 @@ export function createFsPluginLibrary(home?: string, assets?: AssetStore): Plugi
         await fs.rm(aside, { recursive: true, force: true })
         await moveInto(target, aside)
         await moveInto(staged, target)
-        const record = await recordOf(name, source, hash, previous)
+        const record = await recordOf(name, source, hash, previous, manifests)
         try {
           await save(records.map((one) => (one.name === name ? record : one)))
         } catch (error) {

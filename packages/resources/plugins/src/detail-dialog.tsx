@@ -56,7 +56,8 @@ import {
   usePackReadme,
   type PluginClient,
 } from "./library.ts"
-import { placeReached, SCOPES, scopeWords } from "./rows.ts"
+import { placeReached, placeSourceNote, SCOPE_LABELS, SCOPES } from "./rows.ts"
+import { PLUGIN_SERVICE } from "./provider.ts"
 import { NO_CONTENTS } from "./contract.ts"
 import type { PackContentItem, PackContents } from "./contract.ts"
 import type { PluginInstallScope } from "./contract.ts"
@@ -74,7 +75,7 @@ import {
   type MediaItem,
   type PlaceOption,
 } from "@context-hub/extensions/components"
-import { useI18n } from "@context-hub/extensions/react"
+import { useHub, useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Dialog,
@@ -564,6 +565,7 @@ function PackPane({
   onRemoveAsset: (ref: string) => Promise<void>
 }) {
   const { t } = useI18n()
+  const ctx = useHub()
   const [tab, setTab] = React.useState<PackTab>("media")
   const [contents, setContents] = React.useState<PackContents>(NO_CONTENTS)
 
@@ -575,7 +577,8 @@ function PackPane({
     let alive = true
     queueMicrotask(() => {
       if (!alive) return
-      void (dir === null ? packContents(plugin.id) : packContentsIn(dir))
+      const manifests = ctx.get(PLUGIN_SERVICE)?.manifestPaths() ?? []
+      void (dir === null ? packContents(plugin.id, manifests) : packContentsIn(dir, manifests))
         .then((found) => {
           if (alive) setContents(found)
         })
@@ -588,7 +591,7 @@ function PackPane({
     return () => {
       alive = false
     }
-  }, [dir, plugin.id])
+  }, [ctx, dir, plugin.id])
 
   const offered: { id: PackTab; key: string; count?: number }[] = [
     { id: "media", key: "plugins.detail.tab.media" },
@@ -892,9 +895,7 @@ function PlacesSection({
           id: `${scope}:${client.id}`,
           icon: client.icon,
           label: client.label,
-          /* The agent's own word for that one place: this hub has no path to
-             show, because an installer never names one. */
-          note: scopeWords([reached.scopeWord], t),
+          note: placeSourceNote(plugin.held.find((one) => one.client === client.id)?.places ?? [], scope, reached, t),
         },
       ]
     }),
@@ -974,6 +975,10 @@ function PlacesSection({
     )
   }
 
+  const unavailable = plugin.held.flatMap((hold) => hold.places
+    .filter((place) => place.sourceAvailable === false)
+    .map((place) => ({ client: hold.client, label: hold.label, scope: place.scope, id: place.id, path: place.source?.path })))
+
   return (
     <section className="flex flex-col gap-2.5">
       <div className="flex items-center gap-1.5">
@@ -1011,7 +1016,7 @@ function PlacesSection({
             <Button
               type="button"
               variant="ghost"
-              disabled={busy}
+              disabled={busy || plugin.directory === undefined}
               aria-label={`${t("plugins.action.adopt")} ${plugin.name}`}
               onClick={onAdopt}
               className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
@@ -1029,6 +1034,12 @@ function PlacesSection({
           }}
           action={rowAction}
         />
+        {unavailable.map((place) => (
+          <li key={`${place.client}:${place.scope}:${place.id ?? ""}`} className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            <span>{place.label} · {t(SCOPE_LABELS[place.scope] ?? place.scope)} · {t("plugins.place.sourceUnavailable")}</span>
+            {place.path === undefined ? null : <span className="break-all font-mono">{place.path}</span>}
+          </li>
+        ))}
       </ul>
     </section>
   )

@@ -36,24 +36,25 @@ const cached = new Map<string, { at: number; value: MarketPreview }>()
 const pending = new Map<string, Promise<MarketPreview>>()
 
 /** One address as the cache key: every part that names different bytes. */
-function keyOf(spec: PluginSourceSpec): string {
+function keyOf(spec: PluginSourceSpec, manifests: readonly string[]): string {
   return JSON.stringify([
     spec.kind,
     "url" in spec ? spec.url : "",
     "path" in spec ? spec.path : "",
     "ref" in spec ? spec.ref : "",
     "sha" in spec ? spec.sha : "",
+    manifests,
   ])
 }
 
 /** Fetch one pack into a staging directory, read it, and remove the directory. */
-async function readPreview(spec: PluginSourceSpec): Promise<MarketPreview> {
+async function readPreview(spec: PluginSourceSpec, manifests: readonly string[]): Promise<MarketPreview> {
   const work = await stagingDir()
   const stage = path.join(work, "pack")
   try {
     await fs.mkdir(stage, { recursive: true })
     await fetchPlugin(spec, stage, work)
-    const contents = await readPackContents(stage)
+    const contents = await readPackContents(stage, manifests)
     let readme: string | null = null
     for (const name of README_NAMES) {
       readme = await fs.readFile(path.join(stage, name), "utf8").catch(() => null)
@@ -71,15 +72,15 @@ async function readPreview(spec: PluginSourceSpec): Promise<MarketPreview> {
  * @param spec — a validated market address.
  * @throws {Error} when the pack cannot be fetched or read.
  */
-export function previewMarket(spec: PluginSourceSpec): Promise<MarketPreview> {
-  const key = keyOf(spec)
+export function previewMarket(spec: PluginSourceSpec, manifests: readonly string[] = []): Promise<MarketPreview> {
+  const key = keyOf(spec, manifests)
   const hit = cached.get(key)
   if (hit !== undefined && Date.now() - hit.at < PREVIEW_TTL) {
     return Promise.resolve(hit.value)
   }
   const running = pending.get(key)
   if (running !== undefined) return running
-  const job = readPreview(spec)
+  const job = readPreview(spec, manifests)
     .then((value) => {
       cached.set(key, { at: Date.now(), value })
       return value

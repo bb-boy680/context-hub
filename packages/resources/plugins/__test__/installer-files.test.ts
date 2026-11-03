@@ -81,6 +81,19 @@ describe("installer file roots and boundaries", () => {
     expect(await disk.read(roots, { root: "config", path: "config.toml" })).toBe("test = true")
     await expect(disk.read(roots, { root: "plugins", path: "installed_plugins.json" })).rejects.toThrow(/allowlist/)
   })
+  it("validates each segment of a nested state root and rejects intermediate links", async () => {
+    const disk = files()
+    const nested = { ...declaration, state: "cli/plugins", stateEnv: undefined }
+    const roots = await disk.roots(nested)
+    expect(roots.plugins).toBe(path.join(roots.config, "cli", "plugins"))
+    for (const state of ["", "/plugins", "cli//plugins", "cli/../plugins", "cli/./plugins", "C:/plugins", "cli\\plugins"]) {
+      await expect(disk.roots({ ...nested, state })).rejects.toThrow()
+    }
+    await fs.mkdir(roots.config, { recursive: true })
+    await fs.symlink(root, path.join(roots.config, "cli"), "junction")
+    await expect(disk.roots(nested)).rejects.toThrow(/symbolic link/)
+  })
+
   it("resolves independent overrides and preserves absence", async () => {
     const disk = files()
     const roots = await disk.roots(declaration)
@@ -181,6 +194,122 @@ describe("installer file roots and boundaries", () => {
       await expect(disk.removeDirectory(roots, { root: "config", path: "settings.json" })).rejects.toThrow()
       await disk.removeDirectory(roots, { root: "plugins", path: "cache/context-hub/demo/1.0.0" })
       expect(await fs.stat(dir).catch(() => null)).toBeNull()
+    })
+  })
+
+  it("copies and removes only declared named directories and rolls back failures", async () => {
+    await collect()
+    const disk = files(async () => { throw new Error("injected failure") })
+    const scoped = { ...declaration, directories: ["local/:name"], stateFiles: { write: ["local/*"], read: [] } }
+    await disk.run(scoped, async (roots) => {
+      const copy = { name: "demo", destination: "local/demo" }
+      await disk.commit(roots, [], copy)
+      const target = path.join(roots.plugins, "local", "demo", "skills", "one", "SKILL.md")
+      expect(await fs.readFile(target, "utf8")).toBe("one")
+      await fs.writeFile(target, "old")
+      await expect(disk.commit(roots, [{ ref: { root: "config", path: "settings.json" }, before: null, after: "new" }], { ...copy, replace: true })).rejects.toThrow(/injected/)
+      expect(await fs.readFile(target, "utf8")).toBe("old")
+      await expect(disk.commit(roots, [], { ...copy, destination: "local/other" })).rejects.toThrow()
+      await expect(disk.commit(roots, [], { ...copy, destination: "local/../demo" })).rejects.toThrow()
+      await expect(disk.commit(roots, [], { ...copy, pruneVersions: true })).rejects.toThrow()
+      await disk.removeDirectory(roots, { root: "plugins", path: "local/demo" })
+      expect(await fs.stat(target).catch(() => null)).toBeNull()
+      const outside = path.join(root, "outside")
+      await fs.mkdir(outside)
+      await fs.symlink(outside, path.join(roots.plugins, "local", "demo"), "junction")
+      await expect(disk.commit(roots, [], copy)).rejects.toThrow(/symbolic link/)
+      await expect(disk.removeDirectory(roots, { root: "plugins", path: "local/demo" })).rejects.toThrow(/symbolic link/)
+    })
+    for (const template of ["local/*", "../:name", "local/:name/:name", "local/:name/..", "/:name"]) {
+      await expect(disk.roots({ ...scoped, directories: [template] })).rejects.toThrow()
+    }
+  })
+
+  it("protects complete directory snapshots and rolls back directory and state changes", async () => {
+    await collect()
+    const disk = files(async (file, text) => {
+      if (file.endsWith("known_marketplaces.json")) throw new Error("injected failure")
+      await writeFileAtomic(file, text)
+    })
+    const scoped = { ...declaration, directories: ["local/:name"], stateFiles: { write: ["local/*", "known_marketplaces.json"], read: [] }, library: { write: [], read: ["*"] } }
+    const ref = { root: "plugins" as const, path: "local/demo" }
+    const config = { root: "config" as const, path: "settings.json" }
+    const failing = { root: "plugins" as const, path: "known_marketplaces.json" }
+    await disk.run(scoped, async (roots) => {
+      const copy = { name: "demo", destination: ref.path, replace: true }
+      const sourceSnapshot = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      expect(sourceSnapshot).toMatch(/^[0-9a-f]{64}$/)
+      await expect(disk.commit(roots, [], { ...copy, before: null, sourceSnapshot: "stale" })).rejects.toThrow(/pack changed/)
+      expect(await disk.snapshotDirectory(roots, ref)).toBeNull()
+      await disk.commit(roots, [], { ...copy, before: null, sourceSnapshot: sourceSnapshot! })
+      const dir = path.join(roots.plugins, "local", "demo")
+      const initial = await disk.snapshotDirectory(roots, ref)
+      expect(initial).toBe(sourceSnapshot)
+      await fs.writeFile(path.join(dir, "binary"), Buffer.from([0, 255, 1]))
+      const binary = await disk.snapshotDirectory(roots, ref)
+      expect(binary).not.toBe(initial)
+      await fs.mkdir(path.join(dir, "empty"))
+      const changed = await disk.snapshotDirectory(roots, ref)
+      expect(changed).not.toBe(binary)
+      await expect(disk.commit(roots, [], { ...copy, before: initial })).rejects.toThrow(/directory changed/)
+      await expect(disk.commit(roots, [], { ...copy, before: null })).rejects.toThrow(/directory changed/)
+      await expect(disk.commit(roots, [{ ref: config, before: null, after: "state" }], undefined, { ref, before: initial })).rejects.toThrow(/directory changed/)
+      expect(await disk.read(roots, config)).toBeNull()
+      await expect(disk.commit(roots, [
+        { ref: config, before: null, after: "state" },
+        { ref: failing, before: null, after: "fail" },
+      ], undefined, { ref, before: changed })).rejects.toThrow(/injected failure/)
+      expect(await disk.snapshotDirectory(roots, ref)).toBe(changed)
+      expect(await disk.read(roots, config)).toBeNull()
+      await expect(disk.commit(roots, [
+        { ref: config, before: null, after: "state" },
+        { ref: failing, before: null, after: "fail" },
+      ], { ...copy, before: changed })).rejects.toThrow(/injected failure/)
+      expect(await disk.snapshotDirectory(roots, ref)).toBe(changed)
+      expect(await disk.read(roots, config)).toBeNull()
+      await disk.commit(roots, [{ ref: config, before: null, after: "state" }], undefined, { ref, before: changed })
+      expect(await disk.snapshotDirectory(roots, ref)).toBeNull()
+      expect(await disk.read(roots, config)).toBe("state")
+    })
+  })
+
+  it("preserves the backup if a client edits the installed directory during rollback", async () => {
+    await collect()
+    let destination = ""
+    const disk = files(async () => {
+      await fs.writeFile(path.join(destination, "client-edit"), "keep")
+      throw new Error("injected failure")
+    })
+    const scoped = { ...declaration, directories: ["local/:name"], stateFiles: { write: ["local/*"], read: [] } }
+    await disk.run(scoped, async (roots) => {
+      const ref = { root: "plugins" as const, path: "local/demo" }
+      const copy = { name: "demo", destination: ref.path, replace: true }
+      await disk.commit(roots, [], { ...copy, before: null })
+      destination = path.join(roots.plugins, "local", "demo")
+      await fs.writeFile(path.join(destination, "original"), "preserve")
+      const before = await disk.snapshotDirectory(roots, ref)
+      await expect(disk.commit(roots, [{ ref: { root: "config", path: "settings.json" }, before: null, after: "x" }], { ...copy, before })).rejects.toThrow(/original saved at/)
+      expect(await fs.readFile(path.join(destination, "client-edit"), "utf8")).toBe("keep")
+      const backup = (await fs.readdir(path.dirname(destination))).find((entry) => entry.startsWith("demo.backup-"))
+      expect(backup).toBeDefined()
+      expect(await fs.readFile(path.join(path.dirname(destination), backup!, "original"), "utf8")).toBe("preserve")
+    })
+  })
+
+  it("rejects links and unsafe directory snapshots", async () => {
+    await collect()
+    const disk = files()
+    const scoped = { ...declaration, directories: ["local/:name"], stateFiles: { write: ["local/*"], read: [] } }
+    await disk.run(scoped, async (roots) => {
+      const ref = { root: "plugins" as const, path: "local/demo" }
+      await disk.commit(roots, [], { name: "demo", destination: ref.path, before: null })
+      const dir = path.join(roots.plugins, "local", "demo")
+      const snapshot = await disk.snapshotDirectory(roots, ref)
+      await fs.symlink(root, path.join(dir, "linked"), "junction")
+      await expect(disk.snapshotDirectory(roots, ref)).rejects.toThrow(/symbolic link/)
+      await expect(disk.commit(roots, [], undefined, { ref, before: snapshot })).rejects.toThrow(/symbolic link/)
+      await expect(disk.snapshotDirectory(roots, { root: "plugins", path: "local/../demo" })).rejects.toThrow()
+      await expect(disk.snapshotDirectory(roots, { root: "config", path: "settings.json" })).rejects.toThrow()
     })
   })
 

@@ -26,9 +26,10 @@ export async function listLibraryRecords(): Promise<PluginRecord[]> {
  * library's own install, not this call.
  */
 export async function collectMarketInstall(
-  spec: MarketInstallSource
+  spec: MarketInstallSource,
+  manifests: readonly string[] = []
 ): Promise<PluginCollected> {
-  return call<PluginCollected>(PLUGIN_ROUTE, { action: "market-install", spec })
+  return call<PluginCollected>(PLUGIN_ROUTE, { action: "market-install", spec, manifests })
 }
 
 /** What one market entry carries, read before the library holds it. */
@@ -44,7 +45,8 @@ export interface MarketPreview {
  * leaves the library and every agent exactly as they were.
  */
 export async function previewMarketEntry(
-  spec: MarketInstallSource
+  spec: MarketInstallSource,
+  manifests: readonly string[] = []
 ): Promise<MarketPreview> {
-  return call<MarketPreview>(PLUGIN_ROUTE, { action: "market-preview", spec })
+  return call<MarketPreview>(PLUGIN_ROUTE, { action: "market-preview", spec, manifests })
 }

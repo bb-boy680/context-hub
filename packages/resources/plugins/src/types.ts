@@ -32,8 +32,10 @@ export interface PluginHeldPlace {
   id?: string
   readOnly?: boolean
   origin?: "record" | "declaration" | "skills-dir"
+  sourceAvailable?: boolean
+  source?: { kind: "local"; path: string }
   /** Whether the file that records this place switches the pack on there. */
-  enabled: boolean
+  enabled: boolean | undefined
 }
 
 export interface PluginHeldBy {
@@ -53,7 +55,7 @@ export interface PluginHeldBy {
    * read from that place's file. This is what a place whose file is silent falls
    * back to: saying nothing there means the chain decides, and this is it.
    */
-  enabled: boolean
+  enabled: boolean | undefined
   /**
    * The agent's own id for the pack, `<name>@<marketplace>`, which is what that
    * agent's own commands take back. It names the marketplace the pack actually

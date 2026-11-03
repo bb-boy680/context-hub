@@ -2154,6 +2154,13 @@ describe("delivering", () => {
     ).toEqual(["hub.target.stub"])
   })
 
+  it("removes contributed manifest paths when disposed", () => {
+    const remove = registry.registerManifests([".fixture-plugin/plugin.json"])
+    expect(registry.manifestPaths()).toContain(".fixture-plugin/plugin.json")
+    remove()
+    expect(registry.manifestPaths()).not.toContain(".fixture-plugin/plugin.json")
+  })
+
   it("records both scopes an installer was given", async () => {
     const [only] = registry.installers()
     if (only === undefined) throw new Error("the registry lost the installer it was given")

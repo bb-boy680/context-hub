@@ -313,6 +313,16 @@ export const PLUGIN_MANIFESTS = [
   ".codex-plugin/plugin.json",
 ]
 
+/** Validate extension-supplied paths again at the host boundary. */
+export function pluginManifestPaths(value: unknown = []): string[] {
+  if (!Array.isArray(value) || value.some((item) =>
+    typeof item !== "string" || item === "" || item.split("/").some((part: string) =>
+      part === "" || part === "." || part === ".." || /[\\:]/.test(part)
+    )
+  )) throw new Error("invalid plugin manifest path")
+  return [...new Set([...PLUGIN_MANIFESTS, ...value as string[]])]
+}
+
 /** The index inside the library root: one row per collected pack. */
 export const PLUGIN_INDEX_FILE = "plugins.json"
 

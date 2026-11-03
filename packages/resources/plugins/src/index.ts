@@ -68,7 +68,7 @@ export const pluginsExtension: ExtensionModule = {
        constructing the service publishes it, before anything else runs, so an
        agent plugin enabled in the same pass can register as soon as it
        activates. */
-    new PluginService(ctx, createRemotePluginTools())
+    const registry: PluginService = new PluginService(ctx, createRemotePluginTools("", () => registry.manifestPaths()))
 
     /* The shared read of the library. Constructed here and read by name from the
        form's own startup, so the rows are already there when a page opens rather
@@ -85,7 +85,7 @@ export const pluginsExtension: ExtensionModule = {
       descriptionKey: "plugins.settings.description",
       Component: PluginsSettingsSection,
     })
-    startUpdateSchedule(ctx, PLUGINS_ID, pluginUpdateSource(() => library.reload()))
+    startUpdateSchedule(ctx, PLUGINS_ID, pluginUpdateSource(() => library.reload(), () => registry.manifestPaths()))
 
     /* The palette reaches this module through one function rather than by
        knowing how a record and a client's answer fold into a row. */

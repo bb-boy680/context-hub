@@ -207,7 +207,8 @@ export class PluginLibrary extends Service {
        so this joins that one question instead of asking a second. */
     await this.owner.get("hub.workspaces")?.refresh()
 
-    const answer = await call<ListAnswer>(`${PLUGIN_ROUTE}?action=list`)
+    const manifests = encodeURIComponent(JSON.stringify(service?.manifestPaths() ?? []))
+    const answer = await call<ListAnswer>(`${PLUGIN_ROUTE}?action=list&manifests=${manifests}`)
     commit((draft) => {
       draft.records = answer.plugins
       draft.root = answer.root

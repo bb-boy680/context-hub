@@ -184,6 +184,7 @@ describe("which clients a read asks", () => {
       remove: async () => ({ message: "" }),
     })
     ctx.provide(PLUGIN_SERVICE, {
+      manifestPaths: () => [],
       installers: () => [installer("hub.target.one"), installer("hub.target.two")],
       tools: {
         root: async () => "/library",

@@ -88,7 +88,7 @@ export interface PluginCollector {
    * @throws {InvalidPluginSourceError} when the address names nothing this hub takes.
    * @throws {Error} when the address cannot be read, holds no plugin manifest, or names a pack whose name another address already took.
    */
-  add(source: string): Promise<PluginCollected>
+  add(source: string, manifests?: readonly string[]): Promise<PluginCollected>
   /**
    * Collect one pack from an address a market index named.
    *
@@ -99,7 +99,7 @@ export interface PluginCollector {
    *
    * @param spec — a repository or one directory of one, optionally at a commit.
    */
-  addSpec(spec: PluginSourceSpec): Promise<PluginCollected>
+  addSpec(spec: PluginSourceSpec, manifests?: readonly string[]): Promise<PluginCollected>
   /**
    * Collect one pack from a folder a page read.
    *
@@ -115,7 +115,7 @@ export interface PluginCollector {
    * @returns the record that is there now, and whether it was already there.
    * @throws {Error} for an empty folder, a file path that would escape it, or a folder larger than this hub takes.
    */
-  addFolder(from: string, files: readonly PackUpload[]): Promise<PluginCollected>
+  addFolder(from: string, files: readonly PackUpload[], manifests?: readonly string[]): Promise<PluginCollected>
   /**
    * Fetch one pack again from the address its record carries.
    *
@@ -128,7 +128,7 @@ export interface PluginCollector {
    * @returns the record as it stands once the files are back.
    * @throws {Error} when no record names that pack, or when it came from a directory on this machine — that directory is the pack, so there is nothing to fetch away from it.
    */
-  restore(name: string): Promise<PluginRecord>
+  restore(name: string, manifests?: readonly string[]): Promise<PluginRecord>
 }
 
 /** Create the collector over one library. */
@@ -156,32 +156,33 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
     stage: string,
     spec: PluginSourceSpec,
     source: PluginOrigin,
-    hash: string
+    hash: string,
+    manifests: readonly string[]
   ): Promise<PluginCollected> => {
-    const manifest = await readPackManifest(stage, fallbackName(spec))
+    const manifest = await readPackManifest(stage, fallbackName(spec), manifests)
     const name = assertSafeSegment(manifest.name, "plugin name")
     const held = (await library.list()).find((one) => one.name === name)
     if (held !== undefined && !samePack(spec, held.source)) {
       throw new PluginNameTakenError(name, whereFrom(held.source))
     }
     if (held === undefined) {
-      return { record: await library.add(name, stage, source, hash), already: false }
+      return { record: await library.add(name, stage, source, hash, manifests), already: false }
     }
     /* The same pack, handed over again. Nothing changed when the files hash the
        same, and saying so is the answer rather than a rewrite: a record that
        moved its `updatedAt` for a folder nobody edited would read as a change
        that did not happen. */
-    if ((await library.has(name)) && held.hash === hash) return { record: held, already: true }
+    if ((await library.has(name, manifests)) && held.hash === hash) return { record: held, already: true }
     return {
-      record: (await library.has(name))
-        ? await library.replace(name, stage, source, hash)
-        : await library.add(name, stage, source, hash),
+      record: (await library.has(name, manifests))
+        ? await library.replace(name, stage, source, hash, manifests)
+        : await library.add(name, stage, source, hash, manifests),
       already: false,
     }
   }
 
   /** Fetch one address into a staging directory and record what landed. */
-  const collect = async (spec: PluginSourceSpec): Promise<PluginCollected> => {
+  const collect = async (spec: PluginSourceSpec, manifests: readonly string[] = []): Promise<PluginCollected> => {
     for (const one of await library.list()) {
       if (!sourceMatches(spec, one.source)) continue
       /* A market pins a commit. A record from a different commit is a different
@@ -192,7 +193,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
       const moved = pinned !== undefined && revision !== pinned
       /* A record whose files are gone is a memory of a pack rather than the pack,
          so it is collected again rather than answered with. */
-      if (!moved && (await library.has(one.name))) return { record: one, already: true }
+      if (!moved && (await library.has(one.name, manifests))) return { record: one, already: true }
       break
     }
 
@@ -201,7 +202,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
     try {
       await fs.mkdir(stage, { recursive: true })
       const source = await fetchPlugin(spec, stage, work)
-      return await take(stage, spec, source, await folderHash(stage))
+      return await take(stage, spec, source, await folderHash(stage), manifests)
     } finally {
       await fs.rm(work, { recursive: true, force: true })
     }
@@ -210,7 +211,8 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
   /** Write an uploaded pack into a staging directory and collect it there. */
   const collectUpload = async (
     from: string,
-    files: readonly PackUpload[]
+    files: readonly PackUpload[],
+    manifests: readonly string[] = []
   ): Promise<PluginCollected> => {
     if (files.length === 0) throw new Error("that folder holds no file")
     const work = await stagingDir()
@@ -235,7 +237,8 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
         stage,
         { kind: "local", path: from },
         { kind: "local", path: from },
-        await folderHash(stage)
+        await folderHash(stage),
+        manifests
       )
     } finally {
       await fs.rm(work, { recursive: true, force: true })
@@ -250,7 +253,7 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
    * through, which is what keeps a restored pack indistinguishable from a
    * collected one.
    */
-  const restore = async (name: string): Promise<PluginRecord> => {
+  const restore = async (name: string, manifests: readonly string[] = []): Promise<PluginRecord> => {
     const record = (await library.list()).find((one) => one.name === name)
     if (record === undefined) throw new Error(`${name} is not in this library`)
     /* A directory on this machine *is* the pack: nothing was copied away from it,
@@ -258,13 +261,13 @@ export function createPluginCollector(library: PluginLibrary): PluginCollector {
     if (record.source.kind === "local") {
       throw new Error(`${name} came from a folder on this machine, so there is nothing to fetch it from`)
     }
-    return (await collect(originToSpec(record.source))).record
+    return (await collect(originToSpec(record.source), manifests)).record
   }
 
   return {
-    add: (source) => collect(parsePluginSource(source)),
+    add: (source, manifests) => collect(parsePluginSource(source), manifests),
     addSpec: collect,
-    addFolder: (from, files) => collectUpload(assertPackRelative(from.trim()), files),
+    addFolder: (from, files, manifests) => collectUpload(assertPackRelative(from.trim()), files, manifests),
     restore,
   }
 }

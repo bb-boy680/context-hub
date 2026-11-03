@@ -24,6 +24,7 @@ import {
   rowsForTab,
   selectedPluginPlace,
   placeReached,
+  placeSourceNote,
   placesShown,
   scopeWords,
   type ScannedAnswer,
@@ -163,6 +164,51 @@ it("keeps marketplace identities and marks undeclared places read-only", () => {
   ]))
 })
 
+it("shows a missing declaration source without trusting settings or read-only", () => {
+  const missing = { ...held("demo", "user"), id: "demo@context-hub", enabled: undefined as undefined,
+    readOnly: true, origin: "declaration" as const, sourceAvailable: false,
+    source: { kind: "local" as const, path: "/library/demo" },
+    pack: { name: "", version: "", description: "" } }
+  const answer: ScannedAnswer = { ...claudeCode, switches: { user: { "demo@context-hub": true } },
+    packs: [missing] }
+  const scanned = collectScanned([answer])[0]!
+  const row = composeRows([], [scanned], "en", plain)[0]!
+  const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+    places: claudeCode.places, switches: { user: { "demo@context-hub": true } }, available: true }
+  expect(row.held[0]?.places[0], "a setting does not resolve the client's unknown state").toMatchObject({
+    id: "demo@context-hub", enabled: undefined, readOnly: true, origin: "declaration",
+    sourceAvailable: false, source: { path: "/library/demo" },
+  })
+  expect(row.sourceAddress, "the declared path stays readable").toBe("/library/demo")
+  expect(row.directory, "but a missing source is not read").toBeUndefined()
+  expect(placeSourceNote(row.held[0]!.places, "global", claudeCode.places[0]!, plain)).toBe("plugins.place.sourceUnavailable")
+  expect(placesShown(row, [client]), "a read-only declaration has no switch").toEqual([])
+})
+
+it("retains verified source availability and each installation path", () => {
+  const missing = { ...held("hud", "user"), origin: "declaration" as const, readOnly: true,
+    enabled: undefined, sourceAvailable: false, source: { kind: "local" as const, path: "/missing/hud" },
+    pack: { name: "", version: "", description: "" } }
+  const available = { ...held("hud", "project"), origin: "declaration" as const, sourceAvailable: true,
+    source: { kind: "local" as const, path: "/present/hud" } }
+  const result = collectScanned([{ ...claudeCode, packs: [missing, available] }])[0]!
+  expect(result.held[0]?.places).toEqual(expect.arrayContaining([
+    expect.objectContaining({ scope: "user", sourceAvailable: false, source: missing.source, origin: "declaration" }),
+    expect.objectContaining({ scope: "project", sourceAvailable: true, source: available.source, origin: "declaration" }),
+  ]))
+  const row = composeRows([], [result], "en", plain)[0]!
+  expect(row.sourceAddress).toBe("/missing/hud")
+  expect(row.directory).toBe("/present/hud")
+  const missingOnly = composeRows([], collectScanned([{ ...claudeCode, packs: [missing] }]), "en", plain)[0]!
+  expect(missingOnly.sourceAddress).toBe("/missing/hud")
+  expect(missingOnly.directory).toBeUndefined()
+  expect(placeSourceNote(result.held[0]!.places, "global", claudeCode.places[0]!, plain)).toBe("plugins.place.sourceUnavailable")
+  expect(placeSourceNote(result.held[0]!.places, "workspace", claudeCode.places[1]!, plain)).toContain("plugins.place.declared")
+  const unverified = collectScanned([codex])[0]!.held[0]!.places
+  expect(unverified[0]?.sourceAvailable).toBeUndefined()
+  expect(placeSourceNote(unverified, "global", codex.places[0]!, plain)).not.toContain("plugins.place.sourceUnavailable")
+})
+
 const answers: ScannedAnswer[] = [claudeCode, codex]
 const scanned = collectScanned(answers)
 const rows = composeRows([record("stored")], scanned, "en", plain)
@@ -218,6 +264,49 @@ const scopePlaces = composeRows(
 )
 
 describe("folding the agents' answers", () => {
+  it.each([
+    [[false, false], false],
+    [[false, undefined], undefined],
+    [[undefined, false], undefined],
+    [[undefined, undefined], undefined],
+    [[undefined, true], true],
+    [[true, undefined], true],
+  ] as const)("combines %j as %s", (values, expected) => {
+    const packs = values.map((enabled, index) => ({ ...held("tri-state", index === 0 ? "user" : "project"), enabled }))
+    const result = collectScanned([{ ...claudeCode, switches: {}, packs }])
+    expect(result[0]?.held[0]?.enabled).toBe(expected)
+    expect(result[0]?.held[0]?.places.map((place) => place.enabled)).toEqual(values)
+  })
+  it.each([true, false])("keeps an unknown effective state unknown with an explicit %s setting", (setting) => {
+    const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: { user: { "hud@curated": setting } }, available: true }
+    const scanned = collectScanned([{ ...claudeCode, places: client.places, switches: client.switches,
+      packs: [{ ...held("hud", "user"), enabled: undefined }] }])
+    const row = composeRows([], scanned, "en", plain)[0]!
+    expect(row.held[0]?.places[0]?.enabled).toBeUndefined()
+    expect(placesShown(row, [client])).toMatchObject([{ on: undefined, recorded: undefined }])
+  })
+
+  it("keeps a duplicate place unknown if either report is unknown", () => {
+    const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: { user: { "hud@curated": true } }, available: true }
+    for (const values of [[undefined, true], [true, undefined]] as const) {
+      const packs = values.map((enabled) => ({ ...held("hud", "user"), enabled }))
+      const row = composeRows([], collectScanned([{ ...claudeCode, switches: client.switches, packs }]), "en", plain)[0]!
+      expect(row.held[0]?.places[0]?.enabled).toBeUndefined()
+      expect(placesShown(row, [client])[0]?.on).toBeUndefined()
+    }
+  })
+
+  it("preserves a known place when a different place is unknown", () => {
+    const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: { user: { "hud@curated": false }, project: { "hud@curated": true } }, available: true }
+    const scanned = collectScanned([{ ...claudeCode, switches: client.switches,
+      packs: [{ ...held("hud", "user"), enabled: false }, { ...held("hud", "project"), enabled: undefined }] }])
+    const row = composeRows([], scanned, "en", plain)[0]!
+    expect(placesShown(row, [client]).map(({ on }) => on)).toEqual([false, undefined])
+  })
+
   it("keeps one pack as one entry", () => {
     expect(scanned, "one pack stays one entry").toHaveLength(1)
   })
