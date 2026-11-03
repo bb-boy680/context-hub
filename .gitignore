@@ -17,6 +17,7 @@ dist-ssr
 /apps/web/release/
 /apps/desktop/release/
 /apps/desktop/release-*/
+/out/
 
 # machine-local agent skill links
 /.claude/skills/

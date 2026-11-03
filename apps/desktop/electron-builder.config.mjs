@@ -54,6 +54,7 @@ export default {
   },
   mac: {
     target: ["dmg", "zip"],
+    icon: "build/icon.icns",
     category: "public.app-category.developer-tools",
     /* The workflow defines CSC_LINK even when the secret is empty, and
        importCertificate resolves an empty path to the project directory. Only
@@ -63,6 +64,7 @@ export default {
   },
   linux: {
     target: ["AppImage"],
+    icon: "build/icon.png",
     category: "Development",
     /* The package name is @context-hub/desktop, and AppImage rejects @ and / in
        the executable name. */

@@ -55,15 +55,11 @@ const STYLE = `
     flex: 0 0 28px;
   }
   .brand-mark {
-    display: grid;
-    place-items: center;
+    display: block;
     width: 22px;
     height: 22px;
-    border-radius: 6px;
-    background: var(--primary, #0a0b0d);
-    color: var(--primary-foreground, #ffffff);
+    object-fit: contain;
   }
-  .brand-mark svg { width: 14px; height: 14px; }
   [role=menubar] { display: flex; gap: 2px; -webkit-app-region: no-drag; }
   [role=menuitem] {
     height: 28px;
@@ -122,23 +118,18 @@ function icon(path: string): SVGElement {
   return svg
 }
 
-/** The same Waypoints mark the sidebar uses, without pulling React into preload. */
+/** 与侧栏共享品牌资源，避免 preload 维护第二份图形。 */
 function brandMark(): HTMLElement {
   const slot = document.createElement("span")
   slot.className = "brand-slot"
   slot.setAttribute("aria-hidden", "true")
-  const mark = document.createElement("span")
+  const mark = document.createElement("img")
   mark.className = "brand-mark"
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg")
-  svg.setAttribute("viewBox", "0 0 24 24")
-  svg.setAttribute("fill", "none")
-  svg.setAttribute("stroke", "currentColor")
-  svg.setAttribute("stroke-width", "2")
-  svg.setAttribute("stroke-linecap", "round")
-  svg.setAttribute("stroke-linejoin", "round")
-  svg.innerHTML =
-    '<path d="m10.586 5.414-5.172 5.172"/><path d="m18.586 13.414-5.172 5.172"/><path d="M6 12h12"/><circle cx="12" cy="20" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="4" cy="12" r="2"/>'
-  mark.append(svg)
+  mark.src = "/icon-32.png"
+  mark.srcset = "/icon-64.png 2x"
+  mark.width = 22
+  mark.height = 22
+  mark.alt = ""
   slot.append(mark)
   return slot
 }

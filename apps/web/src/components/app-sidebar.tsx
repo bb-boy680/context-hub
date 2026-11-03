@@ -3,7 +3,7 @@
  * the agents it delivers to. Every group is a list of the same row, so the
  * column reads as one thing rather than three widgets stacked together.
  */
-import { CheckIcon, ChevronDownIcon, WaypointsIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon } from "lucide-react"
 import * as React from "react"
 import { useLocation } from "react-router"
 
@@ -161,9 +161,15 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     >
       <SidebarHeader className="px-4 pt-5 pb-0">
         <div className="flex items-center gap-2.5">
-          <span className="flex size-7 shrink-0 items-center justify-center rounded-sm bg-primary text-primary-foreground">
-            <WaypointsIcon className="size-4" aria-hidden />
-          </span>
+          <img
+            src="/icon-32.png"
+            srcSet="/icon-64.png 2x"
+            width={28}
+            height={28}
+            className="size-7 shrink-0 object-contain"
+            alt=""
+            aria-hidden
+          />
           <div className="flex min-w-0 flex-col">
             <span className="text-[15px] leading-[19px] font-semibold">Context Hub</span>
             {version === null ? null : (
