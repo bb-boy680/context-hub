@@ -2,5 +2,5 @@
   "env": {
     "CLAUDE_CODE_ENABLE_TODO_TOOLS": "true"
   },
-  "enabledPlugins": {}
+  "enabledPlugins": {"ponytail@context-hub": true}
 }
