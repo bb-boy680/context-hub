@@ -67,7 +67,7 @@ const CALLS: readonly Call[] = [
   { label: "the whole catalog", run: (s) => s.list(), keys: ["items", "total", "counts", "root"] },
   {
     label: "the catalog one page at a time",
-    run: (s) => s.list({ offset: 0, limit: 2, sort: "name" }),
+    run: (s) => s.list({ offset: 0, limit: 2 }),
     keys: ["items", "total"],
   },
   { label: "a filtered catalog", run: (s) => s.list({ q: "bridge", tag: "one" }), keys: ["items"] },

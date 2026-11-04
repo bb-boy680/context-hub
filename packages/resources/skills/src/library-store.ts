@@ -144,9 +144,10 @@ export class SkillLibrary extends Service {
        one request. */
     await this.ctx.get("hub.workspaces")?.refresh()
 
+    const key = this.key()
     const targets = this.targets()
     const [page, ...views] = await Promise.all([
-      store.list({ sort: "updated" }),
+      store.list(),
       ...targets.map(([, scope, dir]) => store.placeSkills({ scope, dir })),
     ])
     /* A place that could not be read must not fail the whole read: the rows the

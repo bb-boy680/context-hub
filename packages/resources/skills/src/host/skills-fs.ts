@@ -713,13 +713,8 @@ export async function createFsSkillStore(
         query.source === undefined
           ? matching
           : matching.filter((row) => row.source === query.source)
-      rows.sort((a, b) => {
-        if (query.sort === "name") return a.name.localeCompare(b.name)
-        /* Newest first, name as the tiebreaker so paging never drifts. */
-        return (
-          b.updatedAt.localeCompare(a.updatedAt) || a.name.localeCompare(b.name)
-        )
-      })
+      /* The catalog is written in name order, and a read keeps that order: an
+         edit changes one row's values, never where the row sits. */
       const offset = Math.max(0, query.offset ?? 0)
       const limit = query.limit ?? rows.length
       return {

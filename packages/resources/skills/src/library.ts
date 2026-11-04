@@ -463,7 +463,7 @@ export function useSkillLibrary(
   React.useEffect(() => {
     if (store === null || needle === "") return
     let live = true
-    void store.list({ sort: "updated", q: needle }).then(
+    void store.list({ q: needle }).then(
       (answer) => {
         if (!live) return
         setMatched(answer)

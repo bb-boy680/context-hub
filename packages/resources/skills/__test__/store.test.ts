@@ -149,10 +149,10 @@ describe("a directory added outside the hub", () => {
 /* Paging is stable and total counts the whole match set. */
 describe("paging", () => {
   it("slices the rows, orders them by name, and reports the root it read", async () => {
-    const page = await store.list({ offset: 1, limit: 1, sort: "name" })
+    const page = await store.list({ offset: 1, limit: 1 })
     expect(page.items, "paging slices the rows").toHaveLength(1)
     expect(page.total).toBe(2)
-    expect(page.items[0]?.name, "sort by name orders the first page").toBe("pdf-extract")
+    expect(page.items[0]?.name, "the stored name order decides the page").toBe("pdf-extract")
     expect(page.root, "a page reports the root it read").toContain("skills")
   })
 
