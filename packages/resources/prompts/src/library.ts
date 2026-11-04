@@ -13,7 +13,7 @@ import * as React from "react"
 
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import { createCatalog, type Catalog } from "@context-hub/extensions"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub } from "@context-hub/extensions/react"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useGlobalWorkspace, useHub } from "@context-hub/extensions/react"
 
 import type { PromptLibraryValue } from "./library-store.ts"
 import {
@@ -67,11 +67,12 @@ export function usePromptPlaces(): readonly PromptPlace[] {
   const { revision } = useExtensionSnapshot()
   const service = React.useMemo(() => ctx.get("prompts") ?? null, [ctx])
   const chosen = useChosenAgents()
+  const globalOnly = useGlobalWorkspace()
 
   return React.useMemo(() => {
     void revision
-    return service === null ? [] : promptPlaces(service.providers(), chosen)
-  }, [service, revision, chosen])
+    return service === null ? [] : promptPlaces(service.providers(), chosen, globalOnly)
+  }, [service, revision, chosen, globalOnly])
 }
 
 /** The prompts service, or `null` when this form does not carry this module. */
@@ -194,6 +195,17 @@ export function tokenLabel(body: string): string {
 /** What each place already holds of one prompt, keyed by place id. */
 export type Holds = Readonly<Record<string, PromptHeld>>
 
+function useWorkspaceId(): string | null {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? (() => undefined),
+    [workspaces]
+  )
+  const read = React.useCallback(() => workspaces?.current()?.current ?? null, [workspaces])
+  return React.useSyncExternalStore(subscribe, read)
+}
+
 /** The previous scan belongs only to the workspace, places and file port it read. */
 export function heldInWorkspace<T>(
   scan: { workspace: string | null; places: readonly PromptPlace[]; files: PlaceFiles; held: T } | null,
@@ -227,7 +239,14 @@ export function useHolds(
 ): Holds {
   const ctx = useHub()
   const service = usePromptService()
-  const [held, setHeld] = React.useState<Holds>({})
+  const workspace = useWorkspaceId()
+  const [scan, setScan] = React.useState<{
+    prompt: StoredPrompt
+    workspace: string | null
+    places: readonly PromptPlace[]
+    files: PlaceFiles
+    held: Holds
+  } | null>(null)
 
   React.useEffect(() => {
     if (prompt === null || files === null || places.length === 0) return
@@ -249,14 +268,14 @@ export function useHolds(
           }
         })
       )
-      if (live) setHeld(Object.fromEntries(answers))
+      if (live) setScan({ prompt, workspace, places, files, held: Object.fromEntries(answers) })
     })()
     return () => {
       live = false
     }
-  }, [ctx, service, prompt, places, files, stamp])
+  }, [ctx, service, prompt, places, files, stamp, workspace])
 
-  return held
+  return scan?.prompt === prompt ? heldInWorkspace(scan, workspace, places, files) ?? {} : {}
 }
 
 /**
@@ -283,13 +302,7 @@ export function useHoldsMap(
 } {
   const ctx = useHub()
   const service = usePromptService()
-  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
-  const subscribe = React.useCallback(
-    (listener: () => void) => workspaces?.subscribe(listener) ?? (() => undefined),
-    [workspaces]
-  )
-  const readWorkspace = React.useCallback(() => workspaces?.current()?.current ?? null, [workspaces])
-  const workspace = React.useSyncExternalStore(subscribe, readWorkspace)
+  const workspace = useWorkspaceId()
   const [scan, setScan] = React.useState<{
     rows: readonly StoredPrompt[]
     places: readonly PromptPlace[]

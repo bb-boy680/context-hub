@@ -150,10 +150,13 @@ interface HeldBuilder {
  * @param answers — what each client reported, in the order they were asked.
  * @returns one entry per pack, in the order the clients named them.
  */
-export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[] {
+export function collectScanned(answers: readonly ScannedAnswer[], globalOnly = false): ScannedPack[] {
   const byName = new Map<string, ScannedPack & { at: Map<string, HeldBuilder> }>()
   for (const answer of answers) {
     for (const pack of answer.packs) {
+      const declared = answer.places.find((one) => pack.placeId !== undefined ? one.id === pack.placeId : one.scopeWord === pack.scope)
+      const group = declared?.scope ?? (pack.scope === "managed" || pack.scope === "user" ? "global" : "workspace")
+      if (globalOnly && group !== "global") continue
       const entry = byName.get(pack.name) ?? {
         name: pack.name,
         version: "",
@@ -188,7 +191,6 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
       /* One entry per place, each with the answer that place itself gives. The
          group comes from the client's own declaration of the place, so an agent
          naming its scopes its own way still lands where it says it does. */
-      const declared = answer.places.find((one) => pack.placeId !== undefined ? one.id === pack.placeId : one.scopeWord === pack.scope)
       /* An explicit setting cannot resolve a client's unknown effective state. */
       const here = pack.enabled === undefined ? undefined : answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
       const already = found.places.find((one) => one.scope === pack.scope && one.id === pack.id && one.placeId === pack.placeId)
@@ -196,7 +198,7 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
         found.places.push({
           scope: pack.scope,
           ...(pack.placeId === undefined ? {} : { placeId: pack.placeId }),
-          group: declared?.scope ?? (pack.scope === "managed" || pack.scope === "user" ? "global" : "workspace"),
+          group,
           id: pack.id,
           readOnly: pack.readOnly === true || declared === undefined,
           origin: pack.origin,

@@ -8,7 +8,7 @@ import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/w
 
 import type { Context } from "./cordis.ts"
 
-import { chosenAgentsOf } from "./agents.ts"
+import { chosenAgentsOf, isGlobalWorkspace } from "./agents.ts"
 import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
@@ -87,6 +87,18 @@ export function useChosenAgents(): readonly string[] {
     [workspaces]
   )
   const read = React.useCallback(() => chosenAgentsOf(ctx), [ctx])
+  return React.useSyncExternalStore(subscribe, read)
+}
+
+/** 订阅当前入口的作用域；默认行只提供全局位置。 */
+export function useGlobalWorkspace(): boolean {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(() => isGlobalWorkspace(workspaces?.current()), [workspaces])
   return React.useSyncExternalStore(subscribe, read)
 }
 

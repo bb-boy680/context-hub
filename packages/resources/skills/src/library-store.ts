@@ -16,7 +16,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope } from "@context-hub/core/place-files"
-import { chosenAgents, createCatalog, type Catalog, type CatalogState } from "@context-hub/extensions"
+import { chosenAgents, createCatalog, isGlobalWorkspace, type Catalog, type CatalogState } from "@context-hub/extensions"
 
 import { readablePlaces } from "./provider.ts"
 import type { PlaceSkillsView, SkillPage, SkillStore } from "./store.ts"
@@ -123,8 +123,15 @@ export class SkillLibrary extends Service {
    */
   targets(): [string, AssetScope, string][] {
     const providers = this.ctx.get("skills")?.providers() ?? []
-    const chosen = chosenAgents(this.ctx.get("hub.workspaces"))
-    return readablePlaces(providers, chosen).map((place) => [place.id, place.scope, place.dir])
+    const workspaces = this.ctx.get("hub.workspaces")
+    const chosen = chosenAgents(workspaces)
+    return readablePlaces(providers, chosen, isGlobalWorkspace(workspaces?.current()))
+      .map((place) => [place.id, place.scope, place.dir])
+  }
+
+  private key(): string {
+    const page = this.ctx.get("hub.workspaces")?.current()
+    return JSON.stringify([page?.current, isGlobalWorkspace(page), page?.agents])
   }
 
   private async read(): Promise<SkillLibraryValue> {
@@ -148,7 +155,9 @@ export class SkillLibrary extends Service {
 
     return {
       page,
-      held: Object.fromEntries(targets.map(([id], at) => [id, views[at] ?? null])),
+      held: key === this.key()
+        ? Object.fromEntries(targets.map(([id], at) => [id, views[at] ?? null]))
+        : {},
       tags,
     }
   }
@@ -169,7 +178,17 @@ export class SkillLibrary extends Service {
     this.ctx.effect(() => {
       const stops: (() => void)[] = []
       const workspaces = this.ctx.get("hub.workspaces")
-      if (workspaces !== undefined) stops.push(workspaces.subscribe(again))
+      if (workspaces !== undefined) {
+        let seen = this.key()
+        stops.push(workspaces.subscribe(() => {
+          const now = this.key()
+          if (now === seen) return
+          seen = now
+          // 位置快照属于上一个工作区，切换后立即撤下。
+          this.catalog.update((draft) => { draft.held = {} })
+          again()
+        }))
+      }
       const store = this.store()
       /* A form whose store reports its own changes gets read again; the browser's
          reports none, and is read after each write instead. */

@@ -190,6 +190,19 @@ describe("dynamic places and unknown status", () => {
     expect(available.find((entry) => entry.place.id === "a-project")?.place.switchable).toBe(true)
   })
 
+  it("在扫描前过滤静态和动态工作区位置，保留只读全局位置", async () => {
+    const asked: string[] = []
+    const client = provider({ id: "filtered", places: PLACES, entries })
+    client.read = async (_io, id) => { asked.push(id); return [] }
+    expect(placesOf([client], () => MARK, true).map((one) => one.place.id)).toEqual(["a-global"])
+    client.placesFor = async () => PLACES.map((place) => ({ ...place, installable: false }))
+    const resolved = await resolvePlaces([client], () => MARK, files, () => undefined, true)
+    expect(resolved.map((one) => one.place.id)).toEqual(["a-global"])
+    expect(resolved[0]?.place.installable).toBe(false)
+    await scanPlaces(resolved, files, () => undefined)
+    expect(asked).toEqual(["a-global"])
+  })
+
   it("fails when dynamic positions cannot be resolved", async () => {
     const client = provider({ id: "dynamic-client", places: [PLACES[0]!], entries: {} })
     client.placesFor = async () => { throw new Error("directory unavailable") }

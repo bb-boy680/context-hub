@@ -65,11 +65,13 @@ export interface McpScan {
  */
 export function placesOf(
   providers: readonly McpProvider[],
-  iconFor: (id: string) => ExtensionIcon
+  iconFor: (id: string) => ExtensionIcon,
+  globalOnly = false
 ): ScannedPlace[] {
   const places: ScannedPlace[] = []
   for (const provider of providers) {
     for (const place of provider.places) {
+      if (globalOnly && place.scope !== "global") continue
       places.push({
         provider,
         place: {
@@ -89,7 +91,8 @@ export async function resolvePlaces(
   providers: readonly McpProvider[],
   iconFor: (id: string) => ExtensionIcon,
   files: PlaceFiles,
-  log: McpLog
+  log: McpLog,
+  globalOnly = false
 ): Promise<ScannedPlace[]> {
   const io: McpIo = { files, log }
   const resolved = await Promise.all(providers.map(async (provider) => ({
@@ -102,6 +105,7 @@ export async function resolvePlaces(
     for (const place of entries) {
       if (ids.has(place.id)) throw new Error(`duplicate MCP place: ${place.id}`)
       ids.add(place.id)
+      if (globalOnly && place.scope !== "global") continue
       const display = place.root !== undefined
         ? await files.display?.(place) ?? (() => { throw new Error("client path display is not supported") })()
         : place.scope === "global" ? `~/${place.file}` : place.file

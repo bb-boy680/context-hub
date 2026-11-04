@@ -11,7 +11,7 @@ import type { WorkspaceView } from "@context-hub/core/workspace"
 import { renameSubmission, workspaceLabel } from "../src/lib/workspaces.ts"
 
 const translated = (key: string): string =>
-  key === DEFAULT_WORKSPACE_NAME ? "Default workspace" : key
+  key === DEFAULT_WORKSPACE_NAME ? "Global" : key
 
 const view = (patch: Partial<WorkspaceView> = {}): WorkspaceView => ({
   id: "id",
@@ -26,7 +26,7 @@ const view = (patch: Partial<WorkspaceView> = {}): WorkspaceView => ({
 describe("the workspace row label", () => {
   it("translates a system name", () => {
     expect(workspaceLabel(view({ nameKey: DEFAULT_WORKSPACE_NAME }), translated)).toBe(
-      "Default workspace"
+      "Global"
     )
   })
 
@@ -42,7 +42,7 @@ describe("what the rename field submits", () => {
   })
 
   it("restores the system name when it is typed as-is", () => {
-    expect(renameSubmission(true, "Default workspace", translated)).toBe("")
+    expect(renameSubmission(true, "Global", translated)).toBe("")
   })
 
   it("keeps the name the person typed, on any row", () => {

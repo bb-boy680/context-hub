@@ -11,7 +11,12 @@
  */
 import type { Context } from "./cordis.ts"
 
-import type { WorkspaceService } from "@context-hub/core/workspace"
+import type { WorkspacePage, WorkspaceService } from "@context-hub/core/workspace"
+
+/** 全局入口由持久化标记识别，重命名不改变其作用域。 */
+export function isGlobalWorkspace(page: WorkspacePage | null | undefined): boolean {
+  return page?.folders.find((folder) => folder.id === page.current)?.default === true
+}
 
 /** Nothing chosen, as a stable value: a subscription must not see a new array. */
 const NONE: string[] = []

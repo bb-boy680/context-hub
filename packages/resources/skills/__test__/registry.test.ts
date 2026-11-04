@@ -78,6 +78,12 @@ describe("which places a set of chosen agents makes readable", () => {
     expect(idsOf(["hub.target.two"])).not.toContain("one-global")
   })
 
+  it("全局入口排除工作区与共享工作区位置，保留所选 Agent 的全局位置", () => {
+    expect(readablePlaces(providers, ["hub.target.one", "hub.target.two"], true).map((each) => each.id))
+      .toEqual(["two-global", "one-global"])
+    expect(readablePlaces(providers, [], true)).toEqual([])
+  })
+
   it("orders the places by their own rank", () => {
     expect(idsOf(["hub.target.one", "hub.target.two"])).toEqual([
       "shared",

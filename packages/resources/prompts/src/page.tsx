@@ -40,8 +40,8 @@ import {
   type LedgerColumn,
   type PlaceOption,
 } from "@context-hub/extensions/components"
-import type { AssetScope } from "@context-hub/extensions"
-import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
+import { chosenAgents, isGlobalWorkspace, type AssetScope } from "@context-hub/extensions"
+import { useHub, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { DropdownMenu, DropdownMenuTrigger } from "@context-hub/shadcn-ui/components/dropdown-menu"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
@@ -64,7 +64,7 @@ import {
 } from "./library.ts"
 import { PromptMarks, PromptMeta, PromptTile } from "./parts.tsx"
 import { PromptDetailDialog } from "./prompt-detail-dialog.tsx"
-import type { PromptPlace } from "./provider.ts"
+import { promptPlaces, type PromptPlace } from "./provider.ts"
 import type { PromptDraft, PromptPatch, PromptStore, StoredPrompt } from "./store.ts"
 
 /* The canvas spends its one accent on actions, so a category chip is neutral
@@ -378,6 +378,7 @@ function PromptCard({ prompt, updated, busy, store, places, holds, onOpen, onGen
 }
 
 export function PromptsPage() {
+  const ctx = useHub()
   const { t, state } = useI18n()
   const library = usePromptLibrary()
   const places = usePromptPlaces()
@@ -514,7 +515,9 @@ export function PromptsPage() {
       }
       /* The menu was built from a list that may have changed while it was open:
          an agent switched off underneath it must not still be written to. */
-      if (!places.some((one) => one.id === place.id)) {
+      const workspaces = ctx.get("hub.workspaces")
+      const allowed = promptPlaces(service?.providers() ?? [], chosenAgents(workspaces), isGlobalWorkspace(workspaces?.current()))
+      if (!allowed.some((one) => one.id === place.id && one.scope === place.scope)) {
         refuseDelivery(new PromptError("prompts.error.unknownPlace", { place: place.id }))
         return
       }
@@ -557,7 +560,7 @@ export function PromptsPage() {
         setBusy(false)
       }
     },
-    [files, places, service, refuseDelivery, t]
+    [ctx, files, service, refuseDelivery, t]
   )
 
   const submit = React.useCallback(

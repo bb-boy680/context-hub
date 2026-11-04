@@ -95,6 +95,71 @@ describe("the skill library a form starts", () => {
     expect(selectablePlaces(registry.providers(), [])).toEqual([])
   })
 
+  it("全局扫描只请求全局位置，普通工作区仍读取两种作用域", async () => {
+    const { store, asked } = libraryOver()
+    const ctx = new Context()
+    let global = true
+    const listeners = new Set<() => void>()
+    ctx.provide("hub.skills", store as never)
+    ctx.provide("hub.workspaces", {
+      current: () => ({ current: "home", agents: ["agent"], folders: [{ id: "home", default: global }] }),
+      refresh: async () => undefined,
+      subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) },
+    } as never)
+    const registry = new SkillService(ctx)
+    registry.register({ id: SKILLS_ID, shared: true, places: [place("shared", "workspace")] })
+    registry.register({ id: "agent", places: [place("project", "workspace"), place("user", "global")] })
+    const library = new SkillLibrary(ctx)
+    await library.load()
+    expect(asked).toEqual(["list", ".user/skills"])
+    expect(Object.keys(library.state().value!.held)).toEqual(["user"])
+    expect(selectablePlaces(registry.providers(), ["agent"], true).map((one) => one.id)).toEqual(["user"])
+
+    global = false
+    for (const listener of listeners) listener()
+    expect(library.state().value!.held).toEqual({})
+    await library.load()
+    expect(Object.keys(library.state().value!.held)).toEqual(["shared", "project", "user"])
+
+    global = true
+    for (const listener of listeners) listener()
+    expect(library.state().value!.held).toEqual({})
+    await library.load()
+    expect(Object.keys(library.state().value!.held)).toEqual(["user"])
+  })
+
+  it("切换后不发布延迟返回的旧工作区扫描", async () => {
+    const { store } = libraryOver()
+    const ctx = new Context()
+    let global = false
+    const listeners = new Set<() => void>()
+    let entered!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    let finish!: (view: PlaceSkillsView | null) => void
+    const delayed = new Promise<PlaceSkillsView | null>((resolve) => { finish = resolve })
+    ctx.provide("hub.skills", { ...store, placeSkills: async ({ scope }: { scope: string }) => {
+      if (scope === "workspace") { entered(); return delayed }
+      return null
+    } } as never)
+    ctx.provide("hub.workspaces", {
+      current: () => ({ current: "home", agents: ["agent"], folders: [{ id: "home", default: global }] }),
+      refresh: async () => undefined,
+      subscribe: (listener: () => void) => { listeners.add(listener); return () => listeners.delete(listener) },
+    } as never)
+    new SkillService(ctx).register({ id: "agent", places: [place("project", "workspace"), place("user", "global")] })
+    const library = new SkillLibrary(ctx)
+    const running = library.load()
+    await started
+    global = true
+    const publications: string[][] = []
+    library.subscribe(() => publications.push(Object.keys(library.state().value?.held ?? {})))
+    for (const listener of listeners) listener()
+    finish({ root: "/project", display: "/project", skills: [] })
+    await running
+    expect(publications.some((ids) => ids.includes("project"))).toBe(false)
+    expect(Object.keys(library.state().value!.held)).toEqual(["user"])
+  })
+
   it("is under the name the form reads it by", () => {
     const ctx = new Context()
     new SkillLibrary(ctx)

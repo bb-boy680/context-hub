@@ -64,6 +64,12 @@ describe("the places a prompt can be delivered to", () => {
     expect(idsOf(["hub.target.one"])).toEqual(["one-global", "own", "one-workspace"])
   })
 
+  it("全局入口不提供共享生成目录与 Agent 的工作区目标", () => {
+    expect(promptPlaces(providers, ["hub.target.one", "hub.target.two"], true).map((one) => one.id))
+      .toEqual(["one-global", "two-global"])
+    expect(promptPlaces(providers, [], true)).toEqual([])
+  })
+
   it("stops offering an agent's places when it is un-chosen", () => {
     expect(idsOf([])).not.toContain("one-global")
     expect(idsOf([])).not.toContain("one-workspace")

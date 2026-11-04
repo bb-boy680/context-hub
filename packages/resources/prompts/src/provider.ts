@@ -252,10 +252,12 @@ function assertProvider(provider: PromptProvider): void {
  */
 export function promptPlaces(
   providers: readonly PromptProvider[],
-  chosen: readonly string[]
+  chosen: readonly string[],
+  globalOnly = false
 ): readonly PromptPlace[] {
   return chosenProviders(providers, chosen)
     .flatMap((provider) => provider.places)
+    .filter((place) => !globalOnly || place.scope === "global")
     .slice()
     .sort((a, b) => a.scope.localeCompare(b.scope) || a.order - b.order)
 }

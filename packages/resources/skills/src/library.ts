@@ -6,10 +6,10 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
+import { useCatalog, useChosenAgents, useExtensionSnapshot, useGlobalWorkspace, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
-import { createCatalog, type Catalog } from "@context-hub/extensions"
+import { chosenAgents, createCatalog, isGlobalWorkspace, type Catalog } from "@context-hub/extensions"
 import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
@@ -123,24 +123,28 @@ function useSkillProviders(): readonly SkillProvider[] {
 export function useReadablePlaces(): SkillPlace[] {
   const providers = useSkillProviders()
   const chosen = useChosenAgents()
-  return readablePlaces(providers, chosen)
+  const globalOnly = useGlobalWorkspace()
+  return readablePlaces(providers, chosen, globalOnly)
 }
 
 /** Places offered as targets, without hiding the module's shared read. */
 export function selectablePlaces(
   providers: readonly SkillProvider[],
-  chosen: readonly string[]
+  chosen: readonly string[],
+  globalOnly = false
 ): SkillPlace[] {
   return readablePlaces(
     providers.filter((provider) => provider.id !== SKILLS_ID || provider.shared !== true),
-    chosen
+    chosen,
+    globalOnly
   )
 }
 
 export function useSelectablePlaces(): SkillPlace[] {
   const providers = useSkillProviders()
   const chosen = useChosenAgents()
-  return selectablePlaces(providers, chosen)
+  const globalOnly = useGlobalWorkspace()
+  return selectablePlaces(providers, chosen, globalOnly)
 }
 
 /**
@@ -398,7 +402,7 @@ export function useSkillLibrary(
   query = ""
 ): SkillLibrary {
   const ctx = useHub()
-  const { state } = useI18n()
+  const { state, t } = useI18n()
   const { installMode } = useSettings()
   const updateSettings = usePluginSettings(
     SKILLS_ID,
@@ -563,43 +567,56 @@ export function useSkillLibrary(
     return [...library, ...own]
   }, [store, page, held, targets, locale])
 
+  const assertPlace = React.useCallback((ref: SkillPlaceRef) => {
+    const current = ctx.get("hub.workspaces")
+    const allowed = readablePlaces(ctx.get("skills")?.providers() ?? [], chosenAgents(current), isGlobalWorkspace(current?.current()))
+    if ((current?.current()?.current ?? null) !== workspaceId ||
+      !allowed.some((place) => place.scope === ref.scope && place.dir === ref.dir)) {
+      throw new Error(t("skills.workspace.none"))
+    }
+  }, [ctx, workspaceId, t])
+
   const install = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       const landed = await store.installInto(id, ref, installMode)
       await reload()
       return landed
     },
-    [store, reload, installMode]
+    [store, reload, installMode, assertPlace]
   )
 
   const adopt = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       /* The place keeps its files; the library takes its own copy. */
       const landed = await store.adoptFrom(id, ref)
       await reload()
       return landed
     },
-    [store, reload]
+    [store, reload, assertPlace]
   )
 
   const deleteInPlace = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       await store.deleteInPlace(id, ref)
       await reload()
     },
-    [store, reload]
+    [store, reload, assertPlace]
   )
 
   const remove = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       await store.removeFrom(id, ref)
       await reload()
     },
-    [store, reload]
+    [store, reload, assertPlace]
   )
 
   const checkUpdate = React.useCallback(

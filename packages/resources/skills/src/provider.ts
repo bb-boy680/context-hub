@@ -110,9 +110,11 @@ export class SkillService extends Service {
  */
 export function readablePlaces(
   providers: readonly SkillProvider[],
-  chosen: readonly string[]
+  chosen: readonly string[],
+  globalOnly = false
 ): SkillPlace[] {
   const places = chosenProviders(providers, chosen).flatMap((provider) => provider.places)
+    .filter((place) => !globalOnly || place.scope === "global")
   return places.sort((left, right) => left.order - right.order)
 }
 

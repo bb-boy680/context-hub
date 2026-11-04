@@ -15,7 +15,7 @@
  */
 import * as React from "react"
 
-import { createCatalog, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
+import { chosenAgents, createCatalog, isGlobalWorkspace, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
 import { useCatalog, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 
 import {
@@ -476,6 +476,7 @@ export function usePluginLibrary(): PluginLibrary {
   }, [shared])
 
   const value = useCatalog(catalog, (snapshot) => snapshot.value ?? NOTHING_READ)
+  const workspaceId = ctx.get("hub.workspaces")?.current()?.current ?? null
   const readFailure = useCatalog(catalog, (snapshot) => snapshot.failure)
 
   /** Read the library again: what every write ends with, and what the person's own refresh button asks for. */
@@ -512,8 +513,17 @@ export function usePluginLibrary(): PluginLibrary {
   const deliver = React.useCallback(
     async (
       client: string,
+      scope: PluginInstallScope,
+      placeId: string | undefined,
       act: (installer: PluginInstaller, tools: PluginTools) => Promise<PluginInstallReport>
     ) => {
+      const workspaces = ctx.get("hub.workspaces")
+      const declared = shared?.state().value?.clients.find((one) => one.id === client)?.places.find((place) =>
+        place.scopeWord === scope && (placeId === undefined || place.id === placeId))
+      if ((workspaces?.current()?.current ?? null) !== workspaceId || !chosenAgents(workspaces).includes(client) ||
+        declared === undefined || (isGlobalWorkspace(workspaces?.current()) && declared.scope !== "global")) {
+        throw new Error(t("plugins.scope.unsupported"))
+      }
       if (service === null) throw new Error("the plugin library is not running")
       const installer = service.installers().find((one) => one.id === client)
       if (installer === undefined) throw new Error(`no installer named ${client}`)
@@ -535,7 +545,7 @@ export function usePluginLibrary(): PluginLibrary {
         setBusy(false)
       }
     },
-    [service, tools, reload]
+    [ctx, shared, workspaceId, service, tools, reload, t]
   )
 
   /**
@@ -696,7 +706,7 @@ export function usePluginLibrary(): PluginLibrary {
       }),
     removeAsset: (name, ref) => write<void>({ action: "asset-remove", name, ref }),
     install: (name, client, scope, placeId) =>
-      deliver(client, (installer, tools) => {
+      deliver(client, scope, placeId, (installer, tools) => {
         const hasArtifact = scanned.some((pack) => pack.name === name && pack.held.some((hold) => hold.client === client && hold.places.length > 0))
         const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
           placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
@@ -718,7 +728,7 @@ export function usePluginLibrary(): PluginLibrary {
       if (own === undefined) {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }
-      return deliver(client, (installer, tools) => {
+      return deliver(client, scope, placeId, (installer, tools) => {
         const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
           placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
         if (declared === undefined || declared.installable === false) {
@@ -736,7 +746,7 @@ export function usePluginLibrary(): PluginLibrary {
       if (own === undefined) {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }
-      return deliver(client, (installer, tools) => {
+      return deliver(client, scope, placeId, (installer, tools) => {
         const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
           placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
         /* An agent that keeps no such switch is refused here rather than left
@@ -755,7 +765,7 @@ export function usePluginLibrary(): PluginLibrary {
     clearEnabled: (name, client, scope, placeId) => {
       const own = heldId(name, client, scope, true, placeId)
       if (own === undefined) return Promise.reject(new Error(t("plugins.uninstall.unknown")))
-      return deliver(client, (installer, tools) => {
+      return deliver(client, scope, placeId, (installer, tools) => {
         const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
           placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
         if (declared?.clearable !== true) return Promise.reject(new Error(t("plugins.enable.selfManaged")))

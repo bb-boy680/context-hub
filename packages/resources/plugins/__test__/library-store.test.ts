@@ -35,7 +35,7 @@ const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 30))
  *   folder, `choose` is which agents this hub delivers to, and `announce` is any
  *   of the changes that keep both.
  */
-function formWorkspaces(ctx: Context) {
+function formWorkspaces(ctx: Context, global = false) {
   const listeners = new Set<() => void>()
   let folder: string | null = null
   let agents: string[] = []
@@ -43,7 +43,7 @@ function formWorkspaces(ctx: Context) {
     for (const listener of [...listeners]) listener()
   }
   const service = {
-    current: () => ({ folders: [], current: folder, agents }),
+    current: () => ({ folders: global ? [{ id: folder ?? "home", name: "Home", path: "/home", display: "~", default: true, nameKey: null }] : [], current: folder, agents }),
     subscribe: (listener: () => void) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
@@ -62,6 +62,7 @@ function formWorkspaces(ctx: Context) {
       agents = on ? [...agents, id] : agents.filter((one) => one !== id)
       tell()
     },
+    setGlobal: (on: boolean) => { global = on; tell() },
     announce: tell,
   }
   ctx.provide("hub.workspaces", service)
@@ -162,6 +163,45 @@ describe("watching the folder in use", () => {
 })
 
 describe("which clients a read asks", () => {
+  it("全局视图同步过滤动态位置、开关和持有记录，切换后恢复", async () => {
+    const ctx = new Context()
+    const form = formWorkspaces(ctx, true)
+    form.move("home")
+    form.choose("agent")
+    ctx.provide("host", { files: null } as never)
+    const installer: PluginInstaller = {
+      id: "agent", label: "Agent", places: [],
+      placesFor: async () => [
+        { id: "project", label: "Agent", scope: "workspace", scopeWord: "project", switchable: true },
+        { id: "user", label: "Agent", scope: "global", scopeWord: "user", switchable: true },
+      ],
+      available: async () => true,
+      held: async () => ["project", "user"].map((scope) => ({
+        name: "demo", id: "demo@market", version: "1", scope, enabled: true, marketplace: "market",
+        pack: { name: "demo", version: "1", description: scope },
+      })),
+      switches: async () => ({ project: { "demo@market": false }, user: { "demo@market": true } }),
+      install: async () => ({ message: "" }), remove: async () => ({ message: "" }),
+    }
+    ctx.provide(PLUGIN_SERVICE, {
+      manifestPaths: () => [], installers: () => [installer], tools: {},
+    } as never)
+    countReads()
+    const library = new PluginLibrary(ctx)
+    await library.load()
+    expect(library.state().value!.clients[0]!.places.map((one) => one.id)).toEqual(["user"])
+    expect(Object.keys(library.state().value!.clients[0]!.switches)).toEqual(["user"])
+    expect(library.state().value!.scanned[0]!.description).toBe("user")
+    expect(library.state().value!.scanned[0]!.held[0]!.places.map((one) => one.group)).toEqual(["global"])
+
+    form.setGlobal(false)
+    expect(library.state().value!.clients).toEqual([])
+    expect(library.state().value!.scanned).toEqual([])
+    await library.load()
+    expect(library.state().value!.clients[0]!.places.map((one) => one.id)).toEqual(["project", "user"])
+    expect(library.state().value!.scanned[0]!.held[0]!.places).toHaveLength(2)
+  })
+
   it("asks the chosen agents and no others", async () => {
     const ctx = new Context()
     const form = formWorkspaces(ctx)
