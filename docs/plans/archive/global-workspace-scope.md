@@ -1,7 +1,7 @@
 # 全局入口与资源位置作用域统一
 
 - 日期：2026-11-04
-- 状态：已实施，用户验收通过；AOCI 维护受阻
+- 状态：已实施，用户验收通过；AOCI 已对齐
 - 验收：2026-11-04 用户确认「我验证了，任务通过，收尾」。
 - 执行：主会话完成开发与验证；不创建子 Agent。
 
@@ -220,6 +220,6 @@ pnpm --filter web build
 - 最终自动验证：`pnpm exec vitest run --project extensions --project web --project zh-cn --project skills --project prompts --project mcp --project plugins --project market-skills-sh --project market-plugins`，75 个测试文件、1219 项测试通过；本计划列出的 9 个包 `typecheck` 与 `lint` 均通过；`pnpm --filter web build` 通过；`git diff --check` 通过。
 - 构建仍有 Vite 配置 `__dirname` 和大于 500 kB chunk 的提示，本任务未更改相关配置。
 - 用户已自行验证并确认通过。按用户最新指示直接收尾，不再启动浏览器或隔离服务，因此未由本会话执行完整浏览器矩阵、真实目录写入或桌面载体验收；未启动需要回收的应用或浏览器进程。
-- AOCI：最终调用一次 `aoci_maintain`，返回 `stopped/blocked`，有 11 项 observe 待审查和包含其他任务改动的 37 个目标，未签发可提交候选。本次不确认其他任务的批次、不改正式索引；尝试 `aoci_report` 返回 `volume_read_only`，未登记成功。后续需在工作树稳定、完成 scope review 后统一维护。
+- AOCI：用户验收后执行收尾。先确认 11 项测试文件观察变更，再分两批更新 37 个条目（30 + 7，含本次作用域改动与历史 stale 条目），`aoci_maintain` 返回 `remaining: 0`；随后 `verify`、`check` 与 `index agent guide` 均为 `aligned`、`complete: true`、`next_action: none`。仍有 36 个条目存在 E 规模档位与文件行数错配的既有警告，不阻塞对齐。
 - 原有与其他会话的未提交修改保留；未创建分支、未提交或推送 Git。用户已明确确认任务完成，本计划归档至 `docs/plans/archive/`。
 
