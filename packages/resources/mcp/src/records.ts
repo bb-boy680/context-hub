@@ -119,7 +119,9 @@ export function recordsFromState(stored: unknown): McpRecord[] {
 
 /** The records with one added, replacing the one that carried its name. */
 export function upsert(records: readonly McpRecord[], next: McpRecord): McpRecord[] {
-  return [...records.filter((record) => record.name !== next.name), next]
+  const at = records.findIndex((record) => record.name === next.name)
+  if (at < 0) return [...records, next]
+  return records.map((record, index) => index === at ? next : record)
 }
 
 /** What the hub's own records file answers with. */

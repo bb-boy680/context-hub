@@ -17,6 +17,23 @@ import type { ContributionMap, ExtensionPointId } from "./types.ts"
 
 const HubContext = React.createContext<Context | null>(null)
 
+export interface AgentOrderValue {
+  order: readonly string[]
+  saving: boolean
+  reorder(ids: readonly string[]): void
+}
+
+const AgentOrderContext = React.createContext<AgentOrderValue | null>(null)
+
+/** Share the shell's effective Agent display order with resource pages. */
+export function AgentOrderProvider({ value, children }: { value: AgentOrderValue; children: React.ReactNode }) {
+  return <AgentOrderContext.Provider value={value}>{children}</AgentOrderContext.Provider>
+}
+
+export function useAgentOrder(): AgentOrderValue | null {
+  return React.useContext(AgentOrderContext)
+}
+
 /** Nothing to follow when this form provides no workspace list. */
 const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
 

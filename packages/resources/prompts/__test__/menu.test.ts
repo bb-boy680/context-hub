@@ -13,7 +13,6 @@ const place: PromptPlace = {
   labelKey: "one.tab",
   icon: () => null,
   scope: "workspace",
-  order: 20,
   where: ".one",
   forms: [
     {

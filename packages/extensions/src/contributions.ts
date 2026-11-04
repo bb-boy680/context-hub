@@ -36,6 +36,35 @@ export interface Placement<T> {
   readonly value: T
 }
 
+/** Read owned values in catalog order, retaining declaration order within each owner. */
+export function orderPlacements<T>(placements: readonly Placement<T>[], owners: readonly string[]): T[] {
+  const groups = new Map<string, T[]>()
+  for (const { owner, value } of placements) {
+    const group = groups.get(owner) ?? []
+    group.push(value)
+    groups.set(owner, group)
+  }
+  const values: T[] = []
+  for (const owner of owners) {
+    const group = groups.get(owner)
+    if (group === undefined) continue
+    values.push(...group)
+    groups.delete(owner)
+  }
+  for (const { owner, value } of placements) {
+    if (groups.has(owner)) values.push(value)
+  }
+  return values
+}
+
+/** Read a registry using the active kernel's catalog, or registration order in isolation. */
+export function orderedRegistry<T>(ctx: Context, placements: readonly Placement<T>[]): T[] {
+  const extensions = ctx.get("extensions")
+  return extensions === undefined
+    ? placements.map((placement) => placement.value)
+    : orderPlacements(placements, extensions.snapshot().entries.map((entry) => entry.manifest.id))
+}
+
 /**
  * One contribution point.
  *

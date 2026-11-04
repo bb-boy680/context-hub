@@ -19,7 +19,7 @@ import type { PlaceSkillsView, SkillPage } from "../src/store.ts"
 
 /** One place an agent reads skills in, as its extension declares it. */
 function place(id: string, scope: "workspace" | "global"): SkillPlace {
-  return { id, labelKey: `${id}.tab`, icon: () => null, scope, dir: `.${id}/skills`, order: 10 }
+  return { id, labelKey: `${id}.tab`, icon: () => null, scope, dir: `.${id}/skills` }
 }
 
 /**

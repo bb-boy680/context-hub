@@ -294,7 +294,6 @@ ctx.prompts.register({
       labelKey: "example.tab",
       icon,
       scope: "global",
-      order: 20,
       where: "~/.example",
       forms: [
         { id: "commands", labelKey: "prompts.menu.commands" },

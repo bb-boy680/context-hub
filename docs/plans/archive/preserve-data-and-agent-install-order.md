@@ -7,9 +7,9 @@
 
 ## 目标与范围
 
-移除 Agent 和 Hub 扩展列表中的固定展示排序。Agent 侧边栏默认按安装顺序显示，支持拖拽调整，手动顺序刷新后保持；资源页的 Agent 头像堆叠同步遵循侧边栏顺序。扩展页沿用市场数据顺序。
+移除 Agent、Hub 扩展列表及 Skills、Prompts、Plugins、MCP 资源列表中的固定展示排序。Agent 侧边栏默认按安装顺序显示，支持拖拽调整，手动顺序刷新后保持；资源页的 Agent 头像堆叠同步遵循侧边栏顺序。扩展页沿用市场数据顺序。四类资源遵循本地记录原序，扫描到 Agent 持有的资源展示在未扫描到的收录资源之前。
 
-**范围修正**：资源条目排序与 Agent 排序没有直接关系。此前计划把 Skills、Prompts、Plugins、MCP、Variables 的资源条目顺序一起纳入，属于扩大范围，现已移除。上一轮已做的 Skills 时间排序修改保持现状，本计划不继续改其读写、扫描和名称排序。
+**2026-11-04 范围更新**：用户明确要求 Skills、Prompts、Plugins、MCP 的资源条目也按记录原序及 Agent 扫描结果排序，替代此前不改资源条目的约定。Variables 仍不在范围内。此处“安装顺序”暂按 Agent 扩展的安装顺序解释；每个 Agent 内部保留实际读取到的顺序，不将目录枚举、修改时间或扫描完成时间声称为资源的真实安装时间。
 
 用户截图中的 Agent 是 Hub 的 Agent 集成扩展；资源页交付给 Agent 的 plugin pack 属于另一类数据，不能混用安装记录。
 
@@ -17,13 +17,14 @@
 | --- | --- |
 | Agent 侧边栏 | 默认按所属扩展安装顺序，允许对单个 Agent 拖拽；保存后优先采用手动顺序，刷新、重启及切换工作区后保持。勾选、停用再启用和更新不改变相对位置；有手动记录的 Agent 卸载后重装恢复该位置，未手动记录的按新安装追加。 |
 | Agent 头像堆叠 | Skills、Prompts、Plugins、MCP 中展示 Agent 的卡片、列表、详情及位置筛选堆叠，按侧边栏可见 Agent 的有效顺序从左到右排列；现有去重、显示数量上限、提示标签和图标保持原有语义。未能关联到侧边栏的标记保留在后面并保持相对顺序。 |
-| 资源页 Agent 选项 | 安装菜单、详情位置和批量入口中的 Agent 使用侧边栏有效顺序；同一 Agent 的多个 place 保留声明顺序。移除与 Agent 选项相关的数字权重排序，保留作用域分组、可安装范围、数量和选择状态。资源条目本身的顺序不在本次范围。 |
+| 资源页 Agent 选项 | 安装菜单、详情位置和批量入口中的 Agent 使用侧边栏有效顺序；同一 Agent 的多个 place 保留声明顺序。移除与 Agent 选项相关的数字权重排序，保留作用域分组、可安装范围、数量和选择状态。 |
+| 四类资源条目 | Agent 扫描中出现的行优先，按 Agent 扩展安装顺序、每个 Agent 的读取原序排列；仅收录未被扫描到的行随后按记录文件原序排列。重合项仍保留原有去重和库记录优先语义。排序不等同于改变数据来源或覆盖规则。 |
 | 扩展页 | 保留分类卡片；分类按合并数据首次出现顺序生成，组内保留输入原序。移除固定 `categoryOrder`；市场条目安装后原位更新状态，不因已安装而被前置。 |
 | 扩展市场索引生成 | 移除目录名和插件 id 的两次排序，按目录发现结果生成 `plugins` 数组，消费者保留该数组原序。 |
 
 不在本次范围：
 
-- Skills、Prompts、Plugins、MCP、Variables 的资源条目排序，以及插件资源市场的分类/插件包排序。
+- Variables 的资源条目排序，以及插件资源市场的分类/插件包排序；不将资源行拖拽排序或按时间排序。
 - 文件树、上游榜单、版本选择、缓存淘汰、配置覆盖优先级、哈希规范化和逆序文本 patch。
 - 应用导航/header 的布局优先级、Agent 以外列表的拖拽排序和排序切换设置。唯一计划新增的生产依赖是 Web 包的拖拽 SDK，理由和版本见下方调研。
 
@@ -49,13 +50,17 @@
 | `packages/extensions/src/plugin.ts`：discoverPlugins；`apps/web/src/lib/hub.ts`：installedPlugins、startHub | 按 `source.list()` 顺序发现，内置模块在前、磁盘扩展在后进入内核。 |
 | `packages/extensions/src/service.ts`：entries、replaceNow、contributions | Map 保留目录原序，replace 原位 set；contributions 按 owner 目录 rank 排序，用于抵抗重新激活造成的注册顺序变化。不能直接返回裸注册数组，否则停用/更新会让 Agent 跳位。 |
 | `packages/extensions/src/contributions.ts`：Placement、register | 已按调用方 `ctx.fiber?.name` 记录 owner，并以 effect 回卷。注册必须保持原型方法。 |
-| `apps/web/src/components/app-sidebar.tsx`：AgentGroup；`sidebar-rows.tsx` | 消费 `useContributions("target")` 且按 `useSkillAgents()` 过滤；没有独立 comparator。通用 SidebarRow 已支持点击和键盘选择，新增拖拽手柄不能触发选择；保留默认 8 行折叠及勾选行为。 |
+| `apps/web/src/components/app-sidebar.tsx`：AgentGroup；`sidebar-rows.tsx` | 消费 `useContributions("target")` 且按 `useSkillAgents()` 过滤；没有独立 comparator。通用 SidebarRow 支持点击和键盘选择；按用户后续要求，在已有 Agent 行上直接拖拽，不增加独立手柄。保留默认 8 行折叠及勾选行为。 |
 | `packages/core/src/workspace.ts`、`src/host/workspaces-fs.ts`、`packages/core/handlers.ts`、`apps/web/src/lib/workspaces.ts` | workspace 文档的 `agents` 是全局勾选集合，并不是全部已安装 Agent 的顺序。已有 host 读改写串行队列、POST 动作及共享订阅可承载独立排序字段；多个写入路径显式构造 `WorkspaceState`，必须逐一保留新字段。 |
 | `apps/web/src/lib/hub.ts`、`packages/extensions/src/settings.ts` | 通用设置的 storage.write 通过 `void storeDocument` 异步写入并吞掉失败；不能仅靠 settings 的同步返回宣称拖拽已持久化。工作区 POST 能返回真正的写入成功/失败。 |
 | `packages/extensions/src/components/avatar-stack.tsx`；Skills `src/provenance-line.tsx`；Prompts `src/held.ts`；Plugins `src/parts.tsx`；MCP `src/parts.tsx` | AvatarStack 只按传入顺序绘制且最多显示 5 个；Skills marks 的 id 是 place id，Prompts 是 Agent id，Plugins 是 client id，MCP 是具体文件 place id。需要在业务调用处映射到 Agent id，再保序映射图标与可访问标签，不能让通用 AvatarStack 猜 id 或统一去重。 |
 | `packages/resources/{skills,prompts,mcp,plugins}/src/provider.ts` | 注册表注册时 push、停用时 splice，重新激活会改变顺序。provider id 不等于扩展包 id：`trae` 一个包注册 IDE/CLI 多个目标，Claude Code 的 provider id 与 `plugin.yaml` id 也不同。 |
-| Skills/Prompts provider 的 order 字段 | `readablePlaces` 与 `promptPlaces` 仍按数字 order / scope 排序；只需处理 Agent 位置这一层，不改资源条目。 |
-| MCP `src/catalog.ts`：placesOf/resolvePlaces | 扁平位置按 scopeRank 排序，供 Agent 位置列表使用。本计划只改依赖该顺序的 Agent 选项，不修改服务条目顺序和声明副本选择逻辑。 |
+| Skills/Prompts provider 的 order 字段 | `readablePlaces` 与 `promptPlaces` 按数字 order / scope 排序；移除字段和比较器，并同步两仓声明与测试。此字段并非侧边栏顺序来源。 |
+| Skills `src/host/skills-fs.ts`、`src/host/place-skills.ts`、`src/library.ts` | `skills.json` 是持久记录而非可丢弃缓存；序列化按名称排序，首次加载重建按目录枚举重排，place 另按名称排序，最终 library 行在 own 行前。必须同时修复读、写、重建和合并才能稳定沿用文件原序。 |
+| Prompts `src/host/prompts-fs.ts`、`src/library.ts`、`src/provider.ts` | `prompts.json` 的数组序已保留；`useHoldsMap` 只对已有库行调用 `held`，provider 没有枚举未知 Prompt 的接口。当前扫描仅能判定已收录行是否被 Agent 持有，不能把未收录内容误说成已扫描。 |
+| Plugins `src/records.ts`、`src/rows.ts`、`src/scan.ts` | 记录文件保留数组顺序；`collectScanned` 按客户端输入顺序合并、`composeRows` 当前库行在前。扫描顺序与读取/元数据选取相关，必须避免仅为展示更改副本来源。 |
+| MCP `src/records.ts`、`src/catalog.ts` | 收录文件 `mcp.json` 的记录数组保序，`cache.json` 只是探测结果；`scanPlaces` 并发完成后写 Map，迭代 Map 可能按完成顺序，`buildCatalog` 最后按名称排序。另 `upsert` 通过过滤后追加会让编辑过的记录移动。 |
+| MCP `src/catalog.ts`：placesOf/resolvePlaces | 扁平位置按 scopeRank 排序，供 Agent 位置列表及扫描使用。展示次序需按 Agent 安装序构造，同时保持现有声明副本选择逻辑；服务条目排序在阶段 2A 调整。 |
 | `apps/web/src/lib/extensions.ts`、`src/pages/extensions.tsx` | `categoryOrder` 是固定分类表；页面把已安装条目放在市场未安装条目前，安装后会改变条目的合并位置。 |
 | `apps/web/src/lib/extension-market.ts` | `marketEntriesFor` 已保留 `index.plugins` 原序，但跳过已安装项；`installMarketExtension` 未把完整磁盘安装序传回运行中的内核。 |
 | 扩展仓 `scripts/build-marketplace.mjs:main` | `fs.readdir` 后 `dirs.sort()`，随后 `plugins.sort(id)`；README 明确宣称按 id 排序。 |
@@ -118,12 +123,32 @@
 5. `installMarketExtension` 在安装并发现后读取 `source.list()` 的完整最新安装序，传给 `ExtensionService.replace(module, installedIds?)` 可选参数。内核在同一串行变更中应用到已加载 stored 扩展后发布 snapshot；内置模块保持原序，未知或加载失败 id 不产生虚假模块。普通 replace 不传参仍原位保留。
 6. 后续并发安装以记录提交后的完整 source 顺序为准；remove 删除目录项，后续 add 才追加。
 7. AgentGroup 继续消费 target contribution，并保留 `useSkillAgents()` 过滤、勾选、8 行折叠和展开状态；不以 `page.agents` 勾选先后排序。
-8. 删除 SkillPlace/PromptPlace 的数字 order 字段及 Agent 选项中的权重 comparator，同步模块自带声明、legacy adapter 映射、扩展仓本地 contracts、注册 fixture 和测试。作用域继续由现有 UI 分组；MCP 现有 scope 排列和声明副本选择不改。同一作用域内的 Agent 选项依所属扩展安装序展示，资源条目合并与排序不动。
+8. 删除 SkillPlace/PromptPlace 的数字 order 字段及 Agent 选项中的权重 comparator，同步模块自带声明、legacy adapter 映射、扩展仓本地 contracts、注册 fixture 和测试。作用域继续由现有 UI 分组；MCP 的声明副本选择保持原语义。同一作用域内的 Agent 选项依所属扩展安装序展示；资源条目合并另见阶段 2A。
 9. 搜索 replace 调用、上下文 mock、导出、owner 类型和字符串引用；保留 manifest inject、依赖等待和 incompatible 行为。
 
 **依赖**：阶段 1；与全局入口计划共享的文件先协调到稳定状态。
 
 **完成判据**：默认 z→a→m 的侧栏与资源页 Agent 选项顺序一致；停用/启用 a、更新 z、依赖服务重新出现、重建内核都不改变默认相对顺序；一个扩展提供多个不同 id 的 target/provider 时按声明原序；卸载全部回卷。
+
+### 2A. 对齐四类资源读取与扫描顺序
+
+**目标**：四个资源页面、搜索及分页使用同一顺序：扫描命中的资源在前，未扫描命中的已收录资源按各自记录文件的原序在后；不按名字、修改时间或异步完成先后重排。
+
+**文件**：Skills `src/host/{skills-fs,place-skills}.ts`、`src/{library,library-store,search}.ts`；Prompts `src/{library,library-store,page,provider,search}.ts`；Plugins `src/{rows,scan,library-store,library,search}.ts`；MCP `src/{catalog,records,library-store,library,search}.ts`；四模块相邻 store、registry、rows、search、catalog 测试与 fixtures；两仓与公开契约及使用文档。实施前逐一查阅调用链与现有测试。
+
+**步骤**：
+
+1. 把“安装顺序”落实为阶段 1、2 的 **Agent 扩展安装顺序**，不使用侧边栏手动顺序；每个 Agent 多个位置按声明顺序，同一位置内按读取原序。异步扫描可以并发，但汇总必须按输入的位置顺序读取结果，而非 Promise 结束顺序。用户拖动侧栏只改变头像和 Agent 选项，不重扫、不改资源行顺序。共享位置不伪装成 Agent，按现有收录与持有规则处理。
+2. 以每个模块原有身份规则识别重合项：扫描命中且已有库记录的行排在扫描段，继续使用库记录及原有合并/读写逻辑；仅有扫描结果的行照原有规则显示；剩余收录记录保留文件数组顺序。多个 Agent 命中同一已合并身份时，取第一个命中位置决定行位置，不改变现有去重粒度、持有数、可用性、冲突或副本读取优先级。筛选、搜索、分页与网格/列表对同一有序集合派生，顺序在分页前确定。
+3. Skills：去掉 `serializeCatalog` 与 `readPlaceSkills` 的名称排序。重建时已知条目沿用 `skills.json` 数组原序，过滤实际已不存在项，新发现目录以 `readdir` 返回序追加；新增、更新、迁移保持记录与既有错误处理。当前用对象键与 `Object.values` 承载顺序，纯数字名称会被 JavaScript 枚举规则重排，改用显式顺序承载并覆盖数字名称；不得只删 `sort`。合并扫描与库行，保留 `showsOwnRow`、`takenAt`、多 place 重复语义和库内容优先，扫描段提前但不改实际来源。
+4. Plugins：`collectScanned` 的版本、来源、目录和 enabled 选择依赖扫描输入序；保留其现有事实选择与过滤语义，仅对合并后的行做稳定展示编排。`composeRows` 扫描段命中库记录时使用 `toRow`，扫描独有项用 `heldRow`；随后追加未命中的 records。页面与 `searchPlugins` 使用同一结果。
+5. MCP：保持 `rowOf` 原有声明/冲突判定和 `places` 的语义顺序不变，单独以 Agent 安装序迭代扫描结果构造展示名称序，避免 `scan.entries` Map 按异步完成时间排序；去掉服务器名称比较器，追加未命中 records。`upsert` 更新已有记录时原位替换，新记录追加；保留失败、未知及 globalOnly 语义。探测 `cache.json` 不是条目顺序来源。
+6. Prompts：`prompts.json` 按原序读取和保存；利用现有 `held` 结果把已收录且被 Agent 持有的行按 Agent 顺序前置，其余行保持文件原序。页面扫描加载中或某个位置失败时按已知结果处理，不能把失败当成确认不存在；搜索与页面共享同样的可用扫描事实。当前 provider 没有枚举未收录 Prompt 的能力，`PlaceFiles.list` 只列白名单子目录，不能凭空承诺发现所有 Agent 提示词。本阶段维持现有扫描能力，不编造扫描结果；若需要展示 Agent 内尚未收录的 Prompt，需要补充 provider 枚举契约、各扩展实现、只读文件范围及冲突/收录规则，属于另一个必须先明确和设计的能力。
+7. 对照 `useSkillLibrary` / 搜索 / 数据共享层的读取及更新路径，确认所有过滤、分页操作发生在最终顺序之后；测试刷新、手动编辑记录、重建、增删改、扫描延迟乱序、同名、多位置、未选 Agent、全局入口和失败回退。检查状态文件必须使用隔离 home，禁止覆盖真实数据。更新现有注释及文档，明确“读取原序不保证真实历史安装时间”。
+
+**依赖**：阶段 1、2 的稳定安装序；不依赖阶段 3 的手动顺序。
+
+**完成判据**：给定 Agent 安装序 A→B、A 读到 z→a、B 读到 m→z、收录文件为 q→a→p，按现有身份合并后按扫描首见顺序展示 z→a→m，再展示 q→p；扫描仅改变行位置，不改变 `a` 的库记录内容。Prompts 仅在当前 `held` 可确认的已收录行上应用等价规则。反向完成扫描、重启、编辑和刷新后仍满足规则；过滤、搜索、分页和两种布局与该顺序一致。
 
 ### 3. 保存手动顺序并实现拖拽
 
@@ -136,11 +161,12 @@
 1. 在现有 `WorkspaceState` / `WorkspacePage` 增加独立的 `agentOrder: string[]`；旧文档默认空数组，解析时过滤空字符串、非字符串和重复 id。`agents` 继续只表达勾选集合。该文档本来是全局的，此字段不按当前工作区分叉。检查 `NO_WORKSPACES`、所有 `WorkspaceState` 显式对象构造、`page()` 和默认工作区修复/迁移写入，使用已有 state 展开保留新字段，避免用户改名、选择、添加或修复工作区时把排序擦掉。
 2. 给 `WorkspaceStore` / `WorkspaceService` 增加最小排序写入方法，复用 `WORKSPACE_ROUTE` 的 POST action 和 host 现有 `run` 队列、原子文档写入；验证输入是非空 id 组成且无重复的数组，允许保存暂时不可见的 id。请求成功后才以服务返回的顺序作为已保存状态；失败通过现有错误通道反馈并还原。`samePage` 必须比较 `agentOrder`，否则其他订阅者收不到更新。
 3. 客户端排序写入与工作区的其他修改串行；刷新中的旧响应不得覆盖已成功写入的新状态。拖拽放下后保持草稿直到写入成功，期间锁定新的排序提交；失败恢复上一次服务确认值并通过现有 toast 提示。客户端无宿主时同样提示未保存，不使用仅内存状态冒充持久化。
-4. 在 `packages/extensions/src/agents.ts` 放最小纯顺序函数：输入“当前侧边栏可见 target 的默认安装序”和已保存 id 数组，先按已保存顺序选取当前可见 target，再把尚未记录的 target 按默认安装序追加。按 id 去重、不丢失源数组，未出现在侧边栏的 id 不产生新行。新建状态合并函数，以已保存顺序为骨架，将当前参与拖拽的可见行按新顺序替换各自的原有可见槽位；隐藏、停用和未加载 id 的相对位置保留。首次拖拽时把当前完整有效列表纳入保存，不能只保存折叠时可见的前 8 项。
+4. 在 `packages/extensions/src/agents.ts` 放最小纯顺序函数：输入“当前侧边栏可见 target 的默认安装序”和已保存 id 数组，先按已保存顺序选取当前可见 target，再把尚未记录的 target 按默认安装序追加。按 id 去重、不丢失源数组，未出现在侧边栏的 id 不产生新行。新建状态合并函数：先在已保存序列末尾补入所有尚未记录的当前 target，再将本次参与拖拽的可见行按新顺序替换各自的槽位；隐藏、停用和未加载 id 的相对位置保留。首次拖拽时把当前完整有效列表纳入保存，不能只保存折叠时可见的前 8 项。
 5. 通过 `packages/extensions/src/react.tsx` 提供最小共享展示顺序 context/hook，由 `apps/web/src/components/app-layout.tsx` 挂载：边界读取 `useContributions("target")` 与 `useSkillAgents()`，使用与 AgentGroup 完全相同的可见性过滤，再结合 `hub.workspaces` 的已保存顺序。侧边栏和各资源页面从该 hook 获得同一个有效 Agent id 序列；无此边界的独立组件按输入原序回退。排序变更只触发展示重算，不改变 kernel contributions、provider 注册顺序、资源共享库 key 或重新扫描。
-6. AgentGroup 内提供可聚焦的拖拽手柄，使用现有浏览器 Pointer Events 实现桌面鼠标和触摸拖动，不新增依赖。拖动前超过阈值才进入排序，拖拽过程有落点指示；拖手柄不触发行点击/勾选。避免把按钮嵌入另一个 button/`role=button`：调整 Agent 行结构，让选择控件与手柄成为独立同级可交互元素，其他 SidebarRow 的导航与工作区行为不变。支持键盘聚焦手柄，以 Space/Enter 开始或提交、上下方向键调整、Escape 取消；以本地化的可访问名称和 live region 说明位置变化，并保持焦点。
-7. 保留 8 行折叠和展开行为。折叠状态下可在显示的 Agent 之间拖动，不允许“展开更多”行成为排序目标；需要跨越隐藏区域时先展开再拖。排序完成后仍保留当前折叠状态；隐藏 target、不可见标记及其顺序不得丢失。对同一扩展的多个 target 验证可分别移动和交错。
-8. 搜索 `WorkspacePage` / `WorkspaceState` 的所有直接构造、类型、mock、RPC action、客户端回退、tests 和文档；补齐不中断原有工作区选择、重命名和迁移的 fixture。新增 UI 文案同时维护 English 与简体中文。
+6. 将 `@hello-pangea/dnd@18.0.1` 只添加到 `web`，让 AgentGroup 使用 `DragDropContext`、单个垂直 `Droppable` 和每行一个 `Draggable`，以稳定 target id 作 draggableId。使用 SDK 的 `dragHandleProps`、默认鼠标/触摸/键盘传感器、placeholder 和自动滚动；不手写 Pointer Events、命中检测或键盘拖拽。SDK 要求 `onDragEnd` 同步更新列表，因此落下时先同步更新本地展示草稿，再异步调用阶段 3 的保存接口，失败回滚到服务确认值。取消、无目标或相同位置均不保存。
+7. 按用户后续要求，将 SDK 的 `dragHandleProps` 绑定到现有 Agent 行，整行直接拖动，不新增手柄 DOM；其他 SidebarRow 的导航与工作区行为不变。鼠标点击继续切换选择；键盘 Enter 切换选择，Space 提起/放下、上下方向键移动、Escape 取消。通过 `dragHandleUsageInstructions` 和 responder 的 `announce` 提供中英文可访问提示，验证焦点与读屏顺序。拖动不触发 Agent 行的勾选动作。
+8. 保留 8 行折叠和展开行为。折叠状态下可在显示的 Agent 之间拖动，不允许“展开更多”行成为排序目标；需要跨越隐藏区域时先展开再拖。排序完成后仍保留当前折叠状态；隐藏 target、不可见标记及其顺序不得丢失。对同一扩展的多个 target 验证可分别移动和交错。
+9. 搜索 `WorkspacePage` / `WorkspaceState` 的所有直接构造、类型、mock、RPC action、客户端回退、tests 和文档；补齐不中断原有工作区选择、重命名和迁移的 fixture。新增 UI 文案同时维护 English 与简体中文。
 
 **依赖**：阶段 1、2 的默认安装顺序。
 
@@ -154,7 +180,7 @@
 
 **步骤**：
 
-1. 复用阶段 3 的展示顺序 hook，并在 `packages/extensions/src/agents.ts` 提供一个最小稳定重排函数：输入每个展示项对应的 target id 和共享 Agent 序列，已知 Agent 按侧边栏顺序排列，同一 Agent 的多个项保留原相对顺序；无法关联的 place/共享标记追加并保留原相对顺序。只返回展示用数组，不修改来源数据、provider 顺序、资源库顺序或安装副本选择。
+1. 复用阶段 3 的展示顺序 hook，并在 `packages/extensions/src/agents.ts` 提供一个最小稳定重排函数：输入每个展示项对应的 target id 和共享 Agent 序列，已知 Agent 按侧边栏顺序排列，同一 Agent 的多个项保留原相对顺序；无法关联的 place/共享标记追加并保留原相对顺序。只返回展示用数组，不修改来源数据、provider 顺序、阶段 2A 的资源行顺序或安装副本选择。
 2. Skills：在 `ProvenanceLine` 将 `placedIn(skill)` 的 place id/scope/dir 与当前 SkillProvider 映射为 target id 后重排 marks；不能直接把 place id 当 Agent id。保留 `holdsOf + takenAt`、不可读取位置的回退图标与标签。同一 Agent 的多个标记仍按现有规则显示。卡片、列表、详情都复用该行。
 3. Prompts：对 `heldMarks` 已按 `place.agent` 合并的 marks 做展示排序；卡片 `PromptMarks`、列表 `MarksLine`、详情 `MarksLine` 均使用同一有序结果；不改变合并、计数或读取失败语义。
 4. Plugins：用 `PluginHeldBy.client` 映射 target id，在 `HolderStack` 与详情 `MarksLine` 的展示数据处统一重排；不更改 `collectScanned` 的来源/目录选择、插件记录或库行顺序。
@@ -164,7 +190,7 @@
 
 **依赖**：阶段 3 的单一有效 Agent 序列。
 
-**完成判据**：侧边栏从 A→B 拖为 B→A 后，四类资源的卡片、列表、详情与位置筛选中的相关头像立即从 B→A 显示，刷新后仍一致；资源行顺序、数量、图标、详情和安装结果不变。
+**完成判据**：侧边栏从 A→B 拖为 B→A 后，四类资源的卡片、列表、详情与位置筛选中的相关头像立即从 B→A 显示，刷新后仍一致；拖拽不改变阶段 2A 的资源行顺序、数量、图标、详情和安装结果。
 
 ### 5. 对齐扩展页面与市场索引
 
@@ -203,7 +229,7 @@
 5. 更新安装记录、手动顺序的作用范围、保存失败反馈及旧数据初始顺序文档。完成 AOCI 维护；若因其他任务 stale 或批次阻塞，记录结果，不擅自维护无关文件。
 6. 交付两仓 diff、重要路径、检查结果和未验证限制；不提交、不 push、不发布，不自动归档本计划。
 
-**依赖**：阶段 1–5。
+**依赖**：阶段 1–5，包含阶段 2A。
 
 **完成判据**：相关测试、类型和构建通过，浏览器矩阵有实际结果；有既有失败时明确输出与归属，不以“已移除 sort”代替流程验收。
 
@@ -225,6 +251,16 @@ pnpm --filter @context-hub/prompts test
 pnpm --filter @context-hub/mcp test
 pnpm --filter @context-hub/plugins test
 pnpm --filter @context-hub/extensions typecheck
+
+# 阶段 2A：四类资源记录和扫描顺序
+pnpm --filter @context-hub/skills test
+pnpm --filter @context-hub/prompts test
+pnpm --filter @context-hub/plugins test
+pnpm --filter @context-hub/mcp test
+pnpm --filter @context-hub/skills typecheck
+pnpm --filter @context-hub/prompts typecheck
+pnpm --filter @context-hub/plugins typecheck
+pnpm --filter @context-hub/mcp typecheck
 
 # 阶段 3：持久化、事件与侧栏交互
 pnpm --filter @context-hub/core test __test__/workspaces.test.ts
@@ -264,24 +300,27 @@ pnpm build
 
 | 输入/操作 | 应观察的结果 |
 | --- | --- |
+| Agent A 扫描 z→a、B 扫描 m→z，库记录 q→a→p | 以各模块既有身份规则合并，扫描段先显示 z→a→m、库独有 q→p；a 保留收录内容；扫描完成先后不影响顺序。Prompts 只按现有已收录项的 held 答案处理。 |
+| Skills 记录非字母序含纯数字名称，刷新、重启、修改、新增 | 现存数组顺序不变，新发现追加，数字名称不被对象枚举重排；实际不存在的文件仍按原规则处理。 |
+| MCP 编辑已有收录项、记录仅在库中 | 记录原位更新，未命中扫描的记录保持文件顺序；探测缓存不决定行序。 |
 | 按 z→a→m 安装，未设置手动顺序 | 宿主 list、内核目录、Agent 侧边栏和资源页 Agent 选项默认顺序一致，区别于字母序。 |
 | 把 m 拖到 z 前，刷新、重启并切换工作区 | 侧边栏保留 m→z→a；四类资源的 Agent 头像及位置选择即时采用此顺序。 |
-| 拖动/取消、空目标放下、点击手柄、键盘排序 | 只有有效提交改变顺序；不会触发 Agent 勾选，Escape 取消并恢复焦点。 |
+| 拖动/取消、空目标放下、点击 Agent 行、键盘排序 | 只有有效提交改变顺序；点击或 Enter 切换勾选，拖动不切换勾选，Escape 取消并恢复焦点。 |
 | 同一扩展两个 target 手动交错 | 两个 target 可独立移动到其他 Agent 两侧，不被包级顺序强行合并。 |
 | 保存失败、慢响应和连续操作 | 提示失败并还原到服务确认值；旧刷新/写响应不覆盖新排序，其他工作区动作不抹掉顺序。 |
 | 折叠超过 8 行、禁用或卸载后重装 | 隐藏项排序不丢；展开后可跨隐藏区域拖动；已记录的 Agent 重新出现回原位置。 |
 | 卡片、列表、详情及位置筛选头像 | 相对顺序与侧边栏一致；同 Agent 多位置保留原语义、未知标记不丢，tooltip、读屏名称、5 个上限与 +N 对应排序结果。 |
 | 更新 a、停用再启用 z、依赖重新激活 | 相对顺序不变；停用期间行消失，启用后回原位置。 |
 | 刷新、重启、第二个 store 读同一 home | 使用同一持久化安装顺序。 |
-| 卸载 a 再安装 | z→m→a；删除失败不先抹掉顺序；记录写失败有 warning。 |
+| 卸载 a 再安装 | 安装记录顺序为 z→m→a；若 a 有手动顺序记录，侧边栏恢复手动位置，否则按新安装追加。删除失败不先抹掉安装顺序；记录写失败有 warning。 |
 | 旧 index、无记录扩展、纯数字 id、失效 order | 记录与扩展不丢失，首次补齐后不再依赖目录枚举。 |
 | 两个安装/更新并发、list 与记录写入并发 | 不丢记录、不重复 order，运行目录最终与 source 一致。 |
-| 一个扩展包含两个 Agent/provider | 相邻且按声明原序，包级更新/停用/卸载正确回卷。 |
+| 一个扩展包含两个 Agent/provider | 默认相邻且按声明原序，手动排序后允许分开；包级更新/停用/卸载正确回卷。 |
 | 全局入口与普通工作区切换、取消/重选 Agent | 过滤、数量、头像、安装目标和旧扫描结果仍正确，剩余顺序保持。 |
 | 市场分类首现为 z 类→a 类，条目非字母序 | 分类与组内条目按原序；安装不前置；语言切换不按翻译名称重排。 |
 | 非字母序目录结果生成市场 | `plugins` 与发现原序相同，校验和版本选择仍正常。 |
 
-浏览器检查覆盖侧栏超过 8 行的展开/折叠、安装菜单、详情位置、批量入口和扩展页搜索；按 ego-browser 规则启动自有实例，启动命令取项目 `dev.ts` 或已有工作流，不在计划中猜隔离 home 参数。
+浏览器检查覆盖鼠标和触摸拖动、键盘排序与取消、保存失败回滚、侧栏超过 8 行的展开/折叠、资源头像堆叠、安装菜单、详情位置、批量入口和扩展页搜索；按 ego-browser 规则启动自有实例，启动命令取项目 `dev.ts` 或已有工作流，不在计划中猜隔离 home 参数。
 
 ## 风险与待确认项
 
@@ -293,4 +332,6 @@ pnpm build
 6. **共享文件在途改动**：全局入口计划会继续改相同文件；实施前以最新内容为准，不把当前类型错误或测试数量当作基线。
 7. **扩展仓发布**：本次只改本地两仓，不发布市场；真实 Agent 客户端和生产用户 home 迁移不作为无授权验收。
 
-待审批的是本次收窄后的范围、旧记录初始化规则和复用 `index.json` 持久化安装顺序的方案；审批前不修改源码或执行验证。
+8. **扫描能力与历史顺序的边界**：Prompts 当前不能枚举 Agent 自有且尚未收录的提示词；本计划只排序已有扫描能确认的行，不把这说成完整发现。Agent 内文件或命令返回顺序也不保证资源真实安装先后；若原始来源没有安装记录，本计划不猜时间、不伪造历史。
+
+待审批的是更新后的范围、资源扫描顺序解释、旧记录初始化规则和复用 `index.json` 持久化安装顺序的方案；审批前不修改源码或执行验证。

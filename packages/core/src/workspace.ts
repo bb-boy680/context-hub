@@ -75,6 +75,8 @@ export interface WorkspacePage {
    * ids here: an id nothing answers for simply chooses nothing.
    */
   agents: string[]
+  /** Manual Agent display order, shared by all workspaces. */
+  agentOrder: string[]
 }
 
 /** What the hub remembers between runs. */
@@ -82,10 +84,11 @@ export interface WorkspaceState {
   folders: WorkspaceFolder[]
   current: string | null
   agents: string[]
+  agentOrder: string[]
 }
 
 /** The state before any folder has been picked. */
-export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null, agents: [] }
+export const NO_WORKSPACES: WorkspaceState = { folders: [], current: null, agents: [], agentOrder: [] }
 
 /** The workspace list as the form offers it to whoever renders it. */
 export interface WorkspaceStore {
@@ -118,6 +121,8 @@ export interface WorkspaceStore {
    * about; choosing none is an empty list, not a different state.
    */
   setAgent(id: string, on: boolean): Promise<WorkspacePage>
+  /** Save the manually arranged Agent target ids. */
+  setAgentOrder(ids: string[]): Promise<WorkspacePage>
 }
 
 /**
@@ -146,6 +151,8 @@ export interface WorkspaceService {
   remove(id: string): Promise<boolean>
   /** Remember whether one agent is delivered to; `false` when the hub refused it. */
   setAgent(id: string, on: boolean): Promise<boolean>
+  /** Save the Agent display order; false when the host refuses it. */
+  setAgentOrder(ids: string[]): Promise<boolean>
 }
 
 /**
@@ -184,6 +191,7 @@ export function readWorkspaceState(value: unknown): WorkspaceState {
     folders?: unknown
     current?: unknown
     agents?: unknown
+    agentOrder?: unknown
     agent?: unknown
   }
   const folders: WorkspaceFolder[] = []
@@ -216,5 +224,11 @@ export function readWorkspaceState(value: unknown): WorkspaceState {
     if (typeof entry !== "string" || entry === "" || agents.includes(entry)) continue
     agents.push(entry)
   }
-  return { folders, current, agents }
+  const agentOrder: string[] = []
+  if (Array.isArray(stored.agentOrder)) {
+    for (const entry of stored.agentOrder) {
+      if (typeof entry === "string" && entry.trim() !== "" && !agentOrder.includes(entry)) agentOrder.push(entry)
+    }
+  }
+  return { folders, current, agents, agentOrder }
 }

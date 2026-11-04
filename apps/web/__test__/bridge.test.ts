@@ -188,6 +188,17 @@ describe("the workspace list", () => {
     expect(workspaces.current()?.agents.length).toBe(1)
   })
 
+  it("persists the Agent display order through the workspace route", async () => {
+    const workspaces = service()
+    await workspaces.refresh()
+    expect(await workspaces.setAgentOrder(["z", "a", "m"]), workspaces.failure() ?? "").toBe(true)
+    const reopened = service()
+    await reopened.refresh()
+    expect(reopened.current()?.agentOrder).toEqual(["z", "a", "m"])
+    expect(await workspaces.setAgentOrder(["z", "z"])).toBe(false)
+    expect(workspaces.current()?.agentOrder).toEqual(["z", "a", "m"])
+  })
+
   it("reports a failure rather than throwing it at a click", async () => {
     const workspaces = service()
     await workspaces.refresh()

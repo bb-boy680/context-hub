@@ -6,10 +6,10 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useGlobalWorkspace, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
+import { useAgentOrder, useCatalog, useChosenAgents, useExtensionSnapshot, useGlobalWorkspace, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
-import { chosenAgents, createCatalog, isGlobalWorkspace, type Catalog } from "@context-hub/extensions"
+import { chosenAgents, createCatalog, isGlobalWorkspace, orderByAgent, type Catalog } from "@context-hub/extensions"
 import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
@@ -145,6 +145,16 @@ export function useSelectablePlaces(): SkillPlace[] {
   const chosen = useChosenAgents()
   const globalOnly = useGlobalWorkspace()
   return selectablePlaces(providers, chosen, globalOnly)
+}
+
+/** Reorder place views without changing the registry or scanning order. */
+export function useSkillDisplayPlaces<T extends { id: string; scope: AssetScope; dir: string }>(places: readonly T[]): T[] {
+  const ctx = useHub()
+  const order = useAgentOrder()?.order
+  const providers = ctx.get("skills")?.providers() ?? []
+  return orderByAgent(places, order, (place) => providers.find((provider) =>
+    provider.shared !== true && provider.places.some((held) =>
+      held.id === place.id && held.scope === place.scope && held.dir === place.dir))?.id)
 }
 
 /**
@@ -553,19 +563,30 @@ export function useSkillLibrary(
         ...(takenAt.length === 0 ? {} : { takenAt }),
       }
     })
-    /*
-     * A skill the library already holds is on screen as its library row; but a
-     * place's own skill under a name the library does not hold is that place's.
-     */
-    const own: Skill[] = []
-    for (const place of roots) {
+    const sharedIds = new Set((ctx.get("skills")?.providers() ?? [])
+      .filter((provider) => provider.shared === true)
+      .flatMap((provider) => provider.places.map((place) => place.id)))
+    const orderedRoots = [
+      ...roots.filter((place) => !sharedIds.has(place.id)),
+      ...roots.filter((place) => sharedIds.has(place.id)),
+    ]
+    const byName = new Map(library.map((row) => [row.name, row]))
+    const seen = new Set<string>()
+    const rows: Skill[] = []
+    for (const place of orderedRoots) {
       for (const skill of held[place.id]?.skills ?? []) {
-        if (!showsOwnRow(skill, items)) continue
-        own.push(placeRow(skill, place))
+        const stored = byName.get(skill.name)
+        if (stored !== undefined) {
+          if (!seen.has(stored.name)) rows.push(stored)
+          seen.add(stored.name)
+        } else if (showsOwnRow(skill, items)) {
+          rows.push(placeRow(skill, place))
+        }
       }
     }
-    return [...library, ...own]
-  }, [store, page, held, targets, locale])
+    for (const row of library) if (!seen.has(row.name)) rows.push(row)
+    return rows
+  }, [ctx, store, page, held, targets, locale])
 
   const assertPlace = React.useCallback((ref: SkillPlaceRef) => {
     const current = ctx.get("hub.workspaces")

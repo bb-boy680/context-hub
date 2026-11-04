@@ -100,6 +100,30 @@ export function marketEntriesFor(
     })
 }
 
+/** Keep built-ins first, then market order, then locally installed extensions. */
+export function mergeMarketEntries(
+  installed: readonly ExtensionView[], index: ExtensionMarketIndex | null, hubVersion: string
+): ExtensionView[] {
+  if (index === null) return [...installed]
+  const byId = new Map(installed.map((entry) => [entry.manifest.id, entry]))
+  const available = new Map(marketEntriesFor(installed, index, hubVersion).map((entry) => [entry.plugin.id, entry.view]))
+  const result = installed.filter((entry) => !entry.stored)
+  const seen = new Set(result.map((entry) => entry.manifest.id))
+  for (const plugin of index.plugins) {
+    if (seen.has(plugin.id)) continue
+    const entry = byId.get(plugin.id) ?? available.get(plugin.id)
+    if (entry === undefined) continue
+    result.push(entry)
+    seen.add(plugin.id)
+  }
+  for (const entry of installed) {
+    if (seen.has(entry.manifest.id)) continue
+    seen.add(entry.manifest.id)
+    result.push(entry)
+  }
+  return result
+}
+
 /** One installed plugin's update, with the market entry it came from. */
 export interface MarketUpdateEntry extends MarketUpdate {
   plugin: ExtensionMarketPlugin
@@ -148,7 +172,7 @@ const market = createRemoteExtensionMarket()
  * @throws {Error} when the host refuses, or the new entry cannot be loaded.
  */
 export async function installMarketExtension(options: {
-  ctx: { extensions: { replace(module: ExtensionModule): Promise<void> } }
+  ctx: { extensions: { replace(module: ExtensionModule, installedIds?: readonly string[]): Promise<void> } }
   plugin: ExtensionMarketPlugin
   version: ExtensionMarketVersion
   hubVersion: string
@@ -158,8 +182,9 @@ export async function installMarketExtension(options: {
     options.plugin.id,
     options.version.version
   )
+  const source = createRemotePluginSource()
   const found = await discoverPlugins({
-    source: createRemotePluginSource(),
+    source,
     /* A fresh URL bypasses the module cache, so a reinstall runs the new file. */
     importModule: async (url) =>
       import(/* @vite-ignore */ `${url}?t=${String(Date.now())}`),
@@ -173,7 +198,7 @@ export async function installMarketExtension(options: {
         `the installed extension "${options.plugin.id}" could not be loaded`
     )
   }
-  await options.ctx.extensions.replace(loaded.module)
+  await options.ctx.extensions.replace(loaded.module, await source.list())
   return result
 }
 

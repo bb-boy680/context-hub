@@ -35,7 +35,8 @@ import { ServerDialog } from "./server-dialog.tsx"
 import type { ServerFormValues } from "./server-form.tsx"
 import { declarationOf } from "./server-form.tsx"
 import type { McpAgentPlace, McpPlaceKind, McpServer } from "./types.ts"
-import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
+import { orderByAgent } from "@context-hub/extensions"
+import { useAgentOrder, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import {
   FilterBar,
   PageBody,
@@ -393,6 +394,8 @@ export function McpServersPage() {
   const catalog = library.catalog
   const servers = React.useMemo(() => catalog?.servers ?? [], [catalog])
   const places = library.places
+  const agentOrder = useAgentOrder()?.order
+  const displayPlaces = orderByAgent(places, agentOrder, (place) => place.client)
   /* The types the servers carry right now — the chips and the detail editor
      both offer these rather than a fixed vocabulary, so a type reads the same
      wherever it appears and picking one cannot invent a second spelling. */
@@ -454,7 +457,7 @@ export function McpServersPage() {
   /* Counts use the unfiltered catalog and distinguish a failed scan from zero. */
   const scopePlaces = React.useMemo(() => {
     const byScope: Record<McpPlaceKind, PlaceOption[]> = { workspace: [], global: [] }
-    for (const place of places) {
+    for (const place of displayPlaces) {
       byScope[place.scope].push({
         id: place.id,
         icon: place.icon,
@@ -465,7 +468,7 @@ export function McpServersPage() {
       })
     }
     return byScope
-  }, [places, servers, library.readPlaces, activeTab, chosen])
+  }, [displayPlaces, servers, library.readPlaces, activeTab, chosen])
 
   const visible = React.useMemo(() => {
     const needle = query.trim().toLowerCase()
@@ -518,7 +521,7 @@ export function McpServersPage() {
 
   const rowActions = React.useCallback(
     (server: McpServer): ServerActions => ({
-      places,
+      places: displayPlaces,
       onTogglePlace: (place) => {
         const held = server.detail.installs.find((install) => install.place === place)
         void (held?.installed === true
@@ -533,7 +536,7 @@ export function McpServersPage() {
         void library.test(server.id)
       },
     }),
-    [library, places]
+    [library, displayPlaces]
   )
 
   const installSelected = React.useCallback(
@@ -688,7 +691,7 @@ export function McpServersPage() {
         ) : view === "list" ? (
           <ServerListView
             servers={rows}
-            places={places}
+            places={displayPlaces}
             needle={query.trim()}
             selected={selected}
             age={checkedAge}
@@ -700,7 +703,7 @@ export function McpServersPage() {
         ) : (
           <ServerCardView
             servers={rows}
-            places={places}
+            places={displayPlaces}
             age={checkedAge}
             onOpen={(server) => setOpenId(server.id)}
             rowActions={rowActions}
@@ -711,7 +714,7 @@ export function McpServersPage() {
       {open === null ? null : (
         <ServerDialog
           server={open}
-          places={places}
+          places={displayPlaces}
           recordsFile={library.recordsFile}
           tagSuggestions={serverTags}
           tools={open.detail.tools}

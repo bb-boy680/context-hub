@@ -94,7 +94,7 @@ export interface PluginRecord {
 export interface PluginSource {
   /** Directory the plugins live in, for display in settings and diagnostics. */
   readonly root: string
-  /** Every installed plugin id, sorted; a directory without a manifest is not one. */
+  /** Every installed plugin id in recorded install order; directories without a manifest are omitted. */
   list(): Promise<string[]>
   /** Read one text file inside a plugin directory. */
   read(id: string, file: string): Promise<string>
@@ -110,4 +110,6 @@ export interface PluginStore extends PluginSource {
   records(): Promise<Record<string, PluginRecord>>
   /** Record what was installed and from where. */
   setRecord(id: string, record: PluginRecord): Promise<void>
+  /** Replace files and record their installation without interleaving a listing. */
+  commitInstall?(id: string, record: PluginRecord, install: () => Promise<void>): Promise<string | undefined>
 }

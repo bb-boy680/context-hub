@@ -14,6 +14,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope, PlaceFiles, PlaceRef } from "@context-hub/core/place-files"
+import { orderedRegistry, type Placement } from "@context-hub/extensions"
 
 import type { McpDeclaration } from "./declaration.ts"
 import { mcpTools, type McpTools } from "./toolkit.ts"
@@ -139,7 +140,7 @@ export interface McpProvider {
 export class McpService extends Service {
   readonly tools: McpTools = mcpTools
 
-  private readonly held: McpProvider[] = []
+  private readonly held: Placement<McpProvider>[] = []
 
   constructor(ctx: Context) {
     super(ctx, MCP_SERVICE)
@@ -147,14 +148,15 @@ export class McpService extends Service {
 
   /** Every provider registered right now, in registration order. */
   providers(): readonly McpProvider[] {
-    return this.held
+    return orderedRegistry(this.ctx, this.held)
   }
 
   /** Add one provider, for as long as the plugin that added it stays loaded. */
   register(provider: McpProvider): () => void {
-    this.held.push(provider)
+    const placement = { owner: this.ctx.fiber?.name ?? "root", value: provider }
+    this.held.push(placement)
     return this.ctx.effect(() => () => {
-      const at = this.held.indexOf(provider)
+      const at = this.held.indexOf(placement)
       if (at >= 0) this.held.splice(at, 1)
     })
   }

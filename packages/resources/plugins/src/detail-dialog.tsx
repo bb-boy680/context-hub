@@ -75,7 +75,8 @@ import {
   type MediaItem,
   type PlaceOption,
 } from "@context-hub/extensions/components"
-import { useHub, useI18n } from "@context-hub/extensions/react"
+import { orderByAgent } from "@context-hub/extensions"
+import { useAgentOrder, useHub, useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Dialog,
@@ -1052,6 +1053,8 @@ function InfoPanel({
   tagSuggestions: string[]
 }) {
   const { t } = useI18n()
+  const order = useAgentOrder()?.order
+  const held = orderByAgent(plugin.held, order, (hold) => hold.client)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -1064,8 +1067,8 @@ function InfoPanel({
           <DialogDescription className="flex min-w-0 items-center gap-2 font-mono text-[12px] text-muted-foreground">
             <MarksLine
               lead={t(`plugins.source.${plugin.source}`)}
-              marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
-              label={plugin.held.map((hold) => hold.label).join(" · ")}
+              marks={held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
+              label={held.map((hold) => hold.label).join(" · ")}
             />
           </DialogDescription>
         </div>

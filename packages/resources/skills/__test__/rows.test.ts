@@ -72,7 +72,7 @@ describe("the places a row is on screen under", () => {
 
 describe("the installation location filter", () => {
   const workspace: SkillPlace = {
-    id: "codex", scope: "workspace", dir: ".codex/skills", labelKey: "codex.tab", icon: () => null, order: 1,
+    id: "codex", scope: "workspace", dir: ".codex/skills", labelKey: "codex.tab", icon: () => null,
   }
   const global: SkillPlace = { ...workspace, scope: "global" }
   const workspaceRow = row({ places: [{ id: workspace.id, scope: workspace.scope, dir: workspace.dir }] })

@@ -388,6 +388,21 @@ const locked: ExtensionModule = {
   },
 }
 
+describe("catalog order", () => {
+  it("keeps contributions in install order after reactivation and runtime installs", async () => {
+    const storedPage = (id: string): ExtensionModule => ({ ...page(id, "1.0.0", `/${id}`), stored: true })
+    const kernel = await createHubKernel({ host: testHost(), extensions: [storedPage("z"), storedPage("a")] })
+    await kernel.start()
+    const paths = () => kernel.ctx.extensions.contributions("nav").map((entry) => entry.path)
+    expect(paths()).toEqual(["/z", "/a"])
+    await kernel.ctx.extensions.disable("z")
+    await kernel.ctx.extensions.enable("z")
+    expect(paths()).toEqual(["/z", "/a"])
+    await kernel.ctx.extensions.replace(storedPage("m"), ["z", "m", "a"])
+    expect(paths()).toEqual(["/z", "/m", "/a"])
+  })
+})
+
 describe("replacing a running extension", () => {
   let kernel: Kernel
   let documents: Map<string, unknown>

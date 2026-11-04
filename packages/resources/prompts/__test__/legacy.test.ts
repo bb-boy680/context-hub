@@ -45,7 +45,6 @@ const old: LegacyPromptProvider = {
       labelKey: "legacy.tab",
       icon: () => null,
       scope: "workspace",
-      order: 20,
       commandDir: ".legacy/commands",
       ruleDir: ".legacy/rules",
       agentDir: ".legacy/agents",
@@ -91,7 +90,6 @@ describe("recognising and translating the old shape", () => {
     const [one] = provider.places
     expect(one?.id).toBe(place)
     expect(one?.agent).toBe("hub.target.legacy")
-    expect(one?.order).toBe(20)
     expect(one?.where).toBe(".legacy")
     expect(provider.shared).toBe(true)
     expect(one?.forms.map((form) => form.id)).toEqual([

@@ -93,15 +93,10 @@ export async function migrateExtensionSpace(home: string): Promise<void> {
   if (left.length === 0) await fs.rmdir(legacy).catch(() => undefined)
 }
 
-async function readJsonFile(file: string): Promise<unknown> {
-  const raw = await fs.readFile(file, "utf8").catch(() => null)
-  if (raw === null) return null
-  try {
-    return JSON.parse(raw) as unknown
-  } catch {
-    /* A records file this build cannot read is rebuilt, not trusted. */
-    return null
-  }
+interface RecordsDocument {
+  format: 1
+  order: string[]
+  records: Record<string, PluginRecord>
 }
 
 /** Keep only well-formed records, so a hand-edited file cannot break the catalog. */
@@ -125,6 +120,60 @@ function readRecords(value: unknown): Record<string, PluginRecord> {
     }
   }
   return records
+}
+
+/** Serialise record changes across stores that point at the same home. */
+const recordQueues = new Map<string, Promise<void>>()
+
+function withRecords<T>(root: string, operation: () => Promise<T>): Promise<T> {
+  const key = path.resolve(root)
+  const previous = recordQueues.get(key) ?? Promise.resolve()
+  const result = previous.then(operation)
+  const settled = result.then(() => undefined, () => undefined)
+  recordQueues.set(key, settled)
+  void settled.then(() => {
+    if (recordQueues.get(key) === settled) recordQueues.delete(key)
+  })
+  return result
+}
+
+async function loadRecords(file: string): Promise<{ document: RecordsDocument; legacy: boolean }> {
+  let raw: string
+  try {
+    raw = await fs.readFile(file, "utf8")
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { document: { format: 1, order: [], records: {} }, legacy: false }
+    throw error
+  }
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    throw new Error("invalid extension records")
+  }
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error("invalid extension records")
+  }
+  const document = value as Record<string, unknown>
+  if (typeof document.format === "number") {
+    if (document.format !== 1 || !Array.isArray(document.order) ||
+      typeof document.records !== "object" || document.records === null || Array.isArray(document.records)) {
+      throw new Error("invalid extension records format")
+    }
+    const order: string[] = []
+    for (const id of document.order) {
+      if (typeof id !== "string" || order.includes(id)) continue
+      try { assertPluginId(id) } catch { continue }
+      order.push(id)
+    }
+    return { document: { format: 1, order, records: readRecords(document.records) }, legacy: order.length !== document.order.length }
+  }
+  const records = readRecords(document)
+  return { document: { format: 1, order: Object.keys(records), records }, legacy: true }
+}
+
+async function saveRecords(file: string, document: RecordsDocument): Promise<void> {
+  await writeFileAtomic(file, `${JSON.stringify(document, null, 2)}\n`)
 }
 
 /** One migration per home: concurrent stores share it instead of racing. */
@@ -156,21 +205,38 @@ export function createFsPluginStore(home: string): PluginStore {
 
     async list() {
       await migrated
-      const entries = await fs.readdir(root, { withFileTypes: true }).catch(() => [])
-      const ids: string[] = []
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue
-        try {
-          assertPluginId(entry.name)
-        } catch {
-          /* A directory that is not an extension id stays on disk and out of the list. */
-          continue
+      return withRecords(root, async () => {
+        const entries = await fs.readdir(root, { withFileTypes: true }).catch((error: NodeJS.ErrnoException) => {
+          if (error.code === "ENOENT") return []
+          throw error
+        })
+        const ids: string[] = []
+        for (const entry of entries) {
+          if (!entry.isDirectory()) continue
+          try {
+            assertPluginId(entry.name)
+          } catch {
+            /* A directory that is not an extension id stays on disk and out of the list. */
+            continue
+          }
+          const manifest = path.join(root, entry.name, PLUGIN_MANIFEST)
+          if ((await fs.stat(manifest).catch(() => null)) === null) continue
+          ids.push(entry.name)
         }
-        const manifest = path.join(root, entry.name, PLUGIN_MANIFEST)
-        if ((await fs.stat(manifest).catch(() => null)) === null) continue
-        ids.push(entry.name)
-      }
-      return ids.sort((a, b) => a.localeCompare(b))
+        try {
+          const { document, legacy } = await loadRecords(recordsPath)
+          const present = new Set(ids)
+          const order = document.order.filter((id) => present.has(id))
+          for (const id of ids) if (!order.includes(id)) order.push(id)
+          if (legacy || order.length !== document.order.length || order.some((id, i) => id !== document.order[i])) {
+            await saveRecords(recordsPath, { ...document, order })
+          }
+          return order
+        } catch (error) {
+          console.warn("Could not persist extension order:", error)
+          return ids
+        }
+      })
     },
 
     async read(id, file) {
@@ -185,23 +251,48 @@ export function createFsPluginStore(home: string): PluginStore {
 
     async remove(id) {
       await migrated
-      await fs.rm(pluginDir(id), { recursive: true, force: true })
-      const records = readRecords(await readJsonFile(recordsPath))
-      if (records[id] === undefined) return
-      delete records[id]
-      await writeFileAtomic(recordsPath, `${JSON.stringify(records, null, 2)}\n`)
+      await withRecords(root, async () => {
+        const { document } = await loadRecords(recordsPath)
+        await fs.rm(pluginDir(id), { recursive: true, force: true })
+        delete document.records[id]
+        document.order = document.order.filter((entry) => entry !== id)
+        await saveRecords(recordsPath, document)
+      })
     },
 
     async records() {
       await migrated
-      return readRecords(await readJsonFile(recordsPath))
+      return withRecords(root, async () => {
+        try { return (await loadRecords(recordsPath)).document.records } catch { return {} }
+      })
+    },
+
+    async commitInstall(id, record, install) {
+      await migrated
+      return withRecords(root, async () => {
+        assertPluginId(id)
+        await install()
+        try {
+          const { document } = await loadRecords(recordsPath)
+          if (!document.order.includes(id)) document.order.push(id)
+          document.records[id] = record
+          await saveRecords(recordsPath, document)
+          return undefined
+        } catch (error) {
+          return error instanceof Error ? error.message : String(error)
+        }
+      })
     },
 
     async setRecord(id, record) {
       await migrated
-      const records = readRecords(await readJsonFile(recordsPath))
-      records[assertPluginId(id)] = record
-      await writeFileAtomic(recordsPath, `${JSON.stringify(records, null, 2)}\n`)
+      await withRecords(root, async () => {
+        const { document } = await loadRecords(recordsPath)
+        assertPluginId(id)
+        if (!document.order.includes(id)) document.order.push(id)
+        document.records[id] = record
+        await saveRecords(recordsPath, document)
+      })
     },
   }
 }

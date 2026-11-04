@@ -13,9 +13,11 @@ import { cn } from "@context-hub/shadcn-ui/lib/utils"
 export function SidebarGroup({
   label,
   children,
+  listProps,
 }: {
   label: string
   children: React.ReactNode
+  listProps?: React.ComponentPropsWithRef<"ul">
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -24,7 +26,7 @@ export function SidebarGroup({
       <div className="flex h-[25px] items-center px-3 text-xs leading-[15px] font-semibold text-muted-soft dark:text-copy">
         {label}
       </div>
-      <ul className="flex list-none flex-col gap-1 p-0">{children}</ul>
+      <ul {...listProps} className={cn("flex list-none flex-col gap-1 p-0", listProps?.className)}>{children}</ul>
     </div>
   )
 }
@@ -46,6 +48,8 @@ export function SidebarRow({
   expanded,
   href,
   onClick,
+  itemProps,
+  dragHandleProps,
 }: {
   label: string
   /** What the row points at, shown on hover rather than as a second line. */
@@ -61,6 +65,8 @@ export function SidebarRow({
   expanded?: boolean
   href?: string
   onClick?: () => void
+  itemProps?: React.ComponentPropsWithRef<"li">
+  dragHandleProps?: React.HTMLAttributes<HTMLDivElement> | null
 }) {
   const className = cn(
     "group/row flex h-10 w-full items-center gap-2.5 rounded-md px-3 text-left text-sm ring-sidebar-ring outline-hidden transition-colors focus-visible:ring-2",
@@ -118,17 +124,20 @@ export function SidebarRow({
   }
 
   return (
-    <li>
+    <li {...itemProps}>
       <div
+        {...dragHandleProps}
         role="button"
         tabIndex={0}
         title={title}
         aria-expanded={expanded}
-        className={className}
+        className={cn(className, dragHandleProps != null && "cursor-grab active:cursor-grabbing")}
         onClick={onClick}
         onKeyDown={(event) => {
           /* Keys belong to the row's own control once the focus is inside it. */
           if (event.target !== event.currentTarget) return
+          /* Space belongs to the drag sensor on draggable Agent rows. */
+          if (dragHandleProps != null && event.key === " ") return
           if (event.key !== "Enter" && event.key !== " ") return
           event.preventDefault()
           onClick?.()

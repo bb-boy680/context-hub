@@ -16,7 +16,9 @@
 import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
-import { createCatalog, type Catalog, type CatalogState } from "@context-hub/extensions"
+import { chosenAgents, chosenProviders, createCatalog, isGlobalWorkspace, type Catalog, type CatalogState } from "@context-hub/extensions"
+
+import type { PromptHeld, PromptPlace, PromptProvider } from "./provider.ts"
 
 import type { PromptStore, StoredPrompt } from "./store.ts"
 
@@ -38,6 +40,24 @@ export interface PromptLibraryValue {
   tags: string[]
   /** Where the library lives, as the host names it. */
   root: string
+}
+
+export function orderPromptRows(
+  rows: readonly StoredPrompt[],
+  answers: readonly (readonly (PromptHeld | undefined)[])[]
+): StoredPrompt[] {
+  const seen = new Set<string>()
+  const ordered: StoredPrompt[] = []
+  for (const place of answers) {
+    rows.forEach((row, index) => {
+      const held = place[index]
+      if (held === undefined || !Object.values(held).some(Boolean) || seen.has(row.id)) return
+      seen.add(row.id)
+      ordered.push(row)
+    })
+  }
+  for (const row of rows) if (!seen.has(row.id)) ordered.push(row)
+  return ordered
 }
 
 /**
@@ -62,9 +82,56 @@ export class PromptLibrary extends Service {
         const store = this.store()
         if (store === null) return { rows: [], tags: [], root: "" }
         const page = await store.list()
-        return { rows: page.items, tags: page.tags, root: page.root }
+        const workspaces = this.ctx.get("hub.workspaces")
+        await workspaces?.refresh()
+        const workspace = workspaces?.current()
+        const chosen = chosenAgents(workspaces)
+        const providers = chosenProviders(this.ctx.get("prompts")?.providers() ?? [], chosen)
+          .filter((provider) => provider.shared !== true)
+        const places: { provider: PromptProvider; place: PromptPlace }[] = providers.flatMap((provider) =>
+          provider.places.filter((place) => !isGlobalWorkspace(workspace) || place.scope === "global")
+            .map((place) => ({ provider, place })))
+        const host = this.ctx.get("host")
+        const files = host?.files ?? null
+        if (files === null) return { rows: page.items, tags: page.tags, root: page.root }
+        const io = { files, workspace: () => files.workspace() }
+        const answers = await Promise.all(places.map(async ({ provider, place }) =>
+          Promise.all(page.items.map(async (row) => {
+            try {
+              return await provider.held(io, place.id, row)
+            } catch (error) {
+              host?.log("warn", `prompts: could not read ${place.id}: ${String(error)}`)
+              return undefined
+            }
+          }))))
+        const current = workspaces?.current()
+        const sameWorkspace = workspace?.current === current?.current &&
+          isGlobalWorkspace(workspace) === isGlobalWorkspace(current) &&
+          JSON.stringify(chosen) === JSON.stringify(chosenAgents(workspaces))
+        return { rows: sameWorkspace ? orderPromptRows(page.items, answers) : page.items, tags: page.tags, root: page.root }
       },
     })
+    const again = () => { if (this.started) void this.reload() }
+    this.ctx.on("extensions/changed", again)
+    this.ctx.effect(() => {
+      const workspaces = this.ctx.get("hub.workspaces")
+      if (workspaces === undefined) return () => undefined
+      let seen = this.workspaceKey()
+      return workspaces.subscribe(() => {
+        const next = this.workspaceKey()
+        if (next === seen) return
+        seen = next
+        again()
+      })
+    })
+  }
+
+  private started = false
+
+  private workspaceKey(): string {
+    const workspaces = this.ctx.get("hub.workspaces")
+    const page = workspaces?.current()
+    return JSON.stringify([page?.current, isGlobalWorkspace(page), chosenAgents(workspaces)])
   }
 
   /** The library this form provided, or `null` when it can reach none. */
@@ -82,11 +149,13 @@ export class PromptLibrary extends Service {
 
   /** Read if nothing has been read. A page that opens first does this itself. */
   load(): Promise<void> {
+    this.started = true
     return this.catalog.load()
   }
 
   /** Read again: what a page calls once it has written something. */
   reload(): Promise<void> {
+    this.started = true
     return this.catalog.reload()
   }
 

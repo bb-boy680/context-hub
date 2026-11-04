@@ -5,17 +5,6 @@ import type { ExtensionCategoryId } from "@context-hub/extensions"
 export const cardSurface =
   "rounded-lg bg-card p-5 ring-1 ring-glass-border shadow-glass backdrop-blur-glass"
 
-/** Catalog order of the sections; a category with no entries is skipped. */
-export const categoryOrder: ExtensionCategoryId[] = [
-  "agent",
-  "asset",
-  "integration",
-  "language",
-  "appearance",
-  "source",
-  "storage",
-]
-
 /** Icon tile tint per category; borrows the skill tag palette so the modules read as one system. */
 export const categoryTile: Record<ExtensionCategoryId, string> = {
   agent: "bg-chip-integrations",

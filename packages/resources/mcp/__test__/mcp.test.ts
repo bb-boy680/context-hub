@@ -351,6 +351,20 @@ describe("the catalog", () => {
     ours = byName("ours")
   })
 
+  it("uses provider and file order rather than scan completion or scope", () => {
+    const first = provider({ id: "first", places: [OTHER[0]!], entries: {} })
+    const second = provider({ id: "second", places: [PLACES[0]!], entries: {} })
+    const ordered = placesOf([first, second], () => MARK)
+    const scan: McpScan = { entries: new Map([
+      ["a-global", [{ name: "m", declaration: STDIO, enabled: true }, { name: "z", declaration: STDIO, enabled: true }]],
+      ["c-project", [{ name: "z", declaration: STDIO, enabled: true }, { name: "a", declaration: STDIO, enabled: true }]],
+    ]), problems: [] }
+    const stored = ["q", "a", "p"].map((name) => ({ name, declaration: OWN, description: "stored", tags: [] }))
+    const servers = buildCatalog(stored, scan, ordered, [], 0).servers
+    expect(servers.map((row) => row.name)).toEqual(["z", "a", "m", "q", "p"])
+    expect(servers[1]?.description).toBe("stored")
+  })
+
   it("makes a row of a recorded server", () => {
     expect(github, "a recorded server is a row").toBeDefined()
   })

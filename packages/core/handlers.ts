@@ -632,6 +632,13 @@ export function createWorkspaceHandler(options: { home?: string; folder?: string
           return
         }
 
+        case "agent-order": {
+          if (!Array.isArray(body.ids) || body.ids.some((id) => typeof id !== "string" || id.trim() === "") ||
+            new Set(body.ids).size !== body.ids.length) throw new Error("agent order needs unique non-empty ids")
+          sendJson(response, 200, await store.setAgentOrder(body.ids as string[]))
+          return
+        }
+
         case "rename": {
           const id = required(body.id, "rename needs a workspace id")
           /* An empty name is meaningful: the default workspace restores its

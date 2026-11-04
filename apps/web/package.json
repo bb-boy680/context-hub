@@ -28,6 +28,7 @@
     "@context-hub/skills": "workspace:*",
     "@context-hub/variables": "workspace:*",
     "@context-hub/shadcn-ui": "workspace:*",
+    "@hello-pangea/dnd": "18.0.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8",

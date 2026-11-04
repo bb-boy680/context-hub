@@ -169,15 +169,11 @@ describe("the plugin space", () => {
   })
 
   it("counts only directories with a manifest as plugins", () => {
-    expect(ids).toEqual([
-      "acme.bare",
-      "acme.empty",
-      "acme.future",
-      "acme.hello",
-      "acme.legacy",
-      "acme.mismatch",
-      "acme.packed",
-    ])
+    expect(ids[0]).toBe("acme.legacy")
+    expect(ids).toHaveLength(7)
+    expect(ids).toEqual(expect.arrayContaining([
+      "acme.bare", "acme.empty", "acme.future", "acme.hello", "acme.mismatch", "acme.packed",
+    ]))
   })
 
   it("moved an extension directory to `<home>/extensions`", async () => {
@@ -367,9 +363,19 @@ describe("install records", () => {
     expect((await store.records())["acme.hello"]?.version).toBe("1.0.0")
   })
 
-  it("read as none when the file cannot be parsed", async () => {
-    await fs.writeFile(path.join(extensions, EXTENSION_RECORDS), "{not json", "utf8")
-    expect(await store.records()).toEqual({})
+  it("does not overwrite records when the file cannot be parsed", async () => {
+    const file = path.join(extensions, EXTENSION_RECORDS)
+    const previous = await fs.readFile(file, "utf8")
+    try {
+      await fs.writeFile(file, "{not json", "utf8")
+      expect(await store.records()).toEqual({})
+      await expect(store.setRecord("acme.hello", {
+        version: "1.0.1", source: "local", installedAt: "2026-10-08T00:00:00.000Z",
+      })).rejects.toThrow("invalid extension records")
+      expect(await fs.readFile(file, "utf8")).toBe("{not json")
+    } finally {
+      await fs.writeFile(file, previous, "utf8")
+    }
   })
 
   it("are rewritten whole", async () => {
@@ -397,14 +403,12 @@ describe("removing a plugin", () => {
   })
 
   it("leaves the other plugins", async () => {
-    expect(await store.list()).toEqual([
-      "acme.bare",
-      "acme.empty",
-      "acme.future",
-      "acme.legacy",
-      "acme.mismatch",
-      "acme.packed",
-    ])
+    const ids = await store.list()
+    expect(ids[0]).toBe("acme.legacy")
+    expect(ids).toHaveLength(6)
+    expect(ids).toEqual(expect.arrayContaining([
+      "acme.bare", "acme.empty", "acme.future", "acme.mismatch", "acme.packed",
+    ]))
   })
 })
 

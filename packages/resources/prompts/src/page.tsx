@@ -40,8 +40,8 @@ import {
   type LedgerColumn,
   type PlaceOption,
 } from "@context-hub/extensions/components"
-import { chosenAgents, isGlobalWorkspace, type AssetScope } from "@context-hub/extensions"
-import { useHub, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
+import { chosenAgents, isGlobalWorkspace, orderByAgent, type AssetScope } from "@context-hub/extensions"
+import { useAgentOrder, useHub, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { DropdownMenu, DropdownMenuTrigger } from "@context-hub/shadcn-ui/components/dropdown-menu"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
@@ -382,6 +382,8 @@ export function PromptsPage() {
   const { t, state } = useI18n()
   const library = usePromptLibrary()
   const places = usePromptPlaces()
+  const order = useAgentOrder()?.order
+  const displayPlaces = orderByAgent(places, order, (place) => place.agent)
   const files = usePlaceFiles()
   const service = usePromptService()
 
@@ -453,7 +455,7 @@ export function PromptsPage() {
   /* Each prompt counts once, even when a place holds several of its forms. */
   const scopePlaces = React.useMemo(() => {
     const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
-    for (const place of places) {
+    for (const place of displayPlaces) {
       byScope[place.scope].push({
         id: place.id,
         icon: place.icon,
@@ -466,7 +468,7 @@ export function PromptsPage() {
       })
     }
     return byScope
-  }, [places, library.loading, library.error, library.store, library.rows, holdsMap, failedPlaces, screenTab, chosen, t])
+  }, [displayPlaces, library.loading, library.error, library.store, library.rows, holdsMap, failedPlaces, screenTab, chosen, t])
 
   const pageCount = Math.max(1, Math.ceil(scoped.length / pageSize))
   const shownPage = Math.min(page, pageCount - 1)
@@ -533,6 +535,7 @@ export function PromptsPage() {
         if (remove === true) {
           const taken = await provider.remove(io, place.id, prompt, form, option)
           setStamp((current) => current + 1)
+          await library.reload()
           if (taken) {
             toast.add({
               type: "success",
@@ -546,6 +549,7 @@ export function PromptsPage() {
         }
         await provider.install(io, place.id, prompt, form, option)
         setStamp((current) => current + 1)
+        await library.reload()
         /* A section says which file it went into; a file is its own answer. */
         toast.add({
           type: "success",
@@ -560,7 +564,7 @@ export function PromptsPage() {
         setBusy(false)
       }
     },
-    [ctx, files, service, refuseDelivery, t]
+    [ctx, files, service, refuseDelivery, t, library.reload]
   )
 
   const submit = React.useCallback(
@@ -624,7 +628,7 @@ export function PromptsPage() {
     updated: formatAge(prompt.updatedAt, state.active),
     busy,
     store: library.store,
-    places,
+    places: displayPlaces,
     holds: holdsMap[prompt.id] ?? {},
     onOpen: () => setDetailId(prompt.id),
     onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) =>
@@ -676,7 +680,7 @@ export function PromptsPage() {
       /* Which agents hold this prompt, as their own marks: the same stack the
          card wears, so a row answers "who has this" without being opened. */
       cell: (prompt) => {
-        const marks = heldMarks(places, holdsMap[prompt.id] ?? {}, (place) => t(place.labelKey))
+        const marks = heldMarks(displayPlaces, holdsMap[prompt.id] ?? {}, (place) => t(place.labelKey))
         return (
           /* The same provenance line the detail panel draws, not just its
              stack: a row and its panel must answer "where is this" alike. */
@@ -717,7 +721,7 @@ export function PromptsPage() {
       cell: (prompt) => (
         <LedgerAction
           prompt={prompt}
-          places={places}
+          places={displayPlaces}
           holds={holdsMap[prompt.id] ?? {}}
           files={files}
           busy={busy}
@@ -954,7 +958,7 @@ export function PromptsPage() {
                   action: (
                     <BatchActions
                       count={checked.length}
-                      places={places}
+                      places={displayPlaces}
                       files={files}
                       busy={busy}
                       onGenerate={(place, action, chosen) => {

@@ -109,6 +109,7 @@ export function createFsWorkspaceStore(
         .filter((_, at) => at !== found)
         .map((known) => (known.default === true ? plain(known) : known))
       return persist(state, {
+        ...state,
         folders: [kept.alias === undefined ? { ...kept, alias: systemAlias() } : kept, ...rest],
         current: state.current ?? folderId(kept),
         agents: state.agents,
@@ -135,6 +136,7 @@ export function createFsWorkspaceStore(
         default: true,
       }
       return persist(state, {
+        ...state,
         folders: [upgraded, ...base.filter((_, at) => at !== existing)],
         current: state.current ?? folderId(upgraded),
         agents: state.agents,
@@ -155,6 +157,7 @@ export function createFsWorkspaceStore(
         default: true,
       }
       return persist(state, {
+        ...state,
         folders: [upgraded, ...base.filter((_, at) => at !== named)],
         current:
           state.current === null || state.current === folderId(row)
@@ -171,6 +174,7 @@ export function createFsWorkspaceStore(
       default: true,
     }
     return persist(state, {
+      ...state,
       folders: [host, ...base],
       current: state.current ?? folderId(host),
       agents: state.agents,
@@ -258,7 +262,7 @@ export function createFsWorkspaceStore(
       changed = true
     }
     if (!changed) return state
-    const next: WorkspaceState = { folders, current, agents: state.agents }
+    const next: WorkspaceState = { ...state, folders, current }
     await documents.write(WORKSPACE_DOCUMENT, next)
     return next
   }
@@ -270,7 +274,7 @@ export function createFsWorkspaceStore(
 
   const page = async (): Promise<WorkspacePage> => {
     const state = await read()
-    return { folders: state.folders.map(view), current: state.current, agents: state.agents }
+    return { folders: state.folders.map(view), current: state.current, agents: state.agents, agentOrder: state.agentOrder }
   }
 
   /**
@@ -298,7 +302,7 @@ export function createFsWorkspaceStore(
         const folders = state.folders.some((known) => folderId(known) === id)
           ? state.folders
           : [...state.folders, folder]
-        await documents.write(WORKSPACE_DOCUMENT, { folders, current: id, agents: state.agents })
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, folders, current: id })
         return page()
       }),
 
@@ -355,6 +359,15 @@ export function createFsWorkspaceStore(
         }
         const folders = state.folders.filter((known) => folderId(known) !== id)
         await documents.write(WORKSPACE_DOCUMENT, { ...state, folders })
+        return page()
+      }),
+
+    setAgentOrder: (ids) =>
+      run(async () => {
+        if (!Array.isArray(ids) || ids.some((id) => typeof id !== "string" || id.trim() === "") ||
+          new Set(ids).size !== ids.length) throw new Error("agent order needs unique non-empty ids")
+        const state = await read()
+        await documents.write(WORKSPACE_DOCUMENT, { ...state, agentOrder: ids })
         return page()
       }),
 

@@ -83,7 +83,7 @@ export interface InstallResult {
 
 /** What the installer needs from the store and the state document. */
 export interface InstallDependencies {
-  store: Pick<PluginStore, "root" | "setRecord">
+  store: Pick<PluginStore, "root" | "setRecord" | "commitInstall">
   state: Pick<StateStore, "read" | "write">
   plugin: ExtensionMarketPlugin
   version: ExtensionMarketVersion
@@ -564,20 +564,28 @@ export async function installExtensionFromMarket(
     await assertEntry(staging, pkg.entry)
 
     const target = path.join(root, id)
-    const fresh = (await fs.stat(target).catch(() => null)) === null
-    await replaceDirectory({ staging, target, rename: options.rename })
-
-    let warning: string | undefined
+    let fresh = false
+    const install = async () => {
+      fresh = (await fs.stat(target).catch(() => null)) === null
+      await replaceDirectory({ staging, target, rename: options.rename })
+    }
     const record: PluginRecord = {
       version: pkg.version,
       source: sourceOf(options.version.source),
       installedAt: new Date().toISOString(),
     }
-    try {
-      await options.store.setRecord(id, record)
-    } catch (error) {
-      warning = `installed, but the record could not be written: ${messageOf(error)}`
+    let failure: string | undefined
+    if (options.store.commitInstall !== undefined) {
+      failure = await options.store.commitInstall(id, record, install)
+    } else {
+      await install()
+      try {
+        await options.store.setRecord(id, record)
+      } catch (error) {
+        failure = messageOf(error)
+      }
     }
+    const warning = failure === undefined ? undefined : `installed, but the record could not be written: ${failure}`
 
     let enabled = false
     if (fresh) {

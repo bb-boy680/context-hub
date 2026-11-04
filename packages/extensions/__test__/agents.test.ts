@@ -7,13 +7,37 @@
  */
 import { describe, expect, it } from "vitest"
 
-import { chosenAgents, chosenProviders, isGlobalWorkspace, type ChosenProvider } from "../src/agents.ts"
+import { agentDisplayOrder, chosenAgents, chosenProviders, isGlobalWorkspace, mergeAgentOrder, orderByAgent, type ChosenProvider } from "../src/agents.ts"
 import type { WorkspacePage, WorkspaceService } from "@context-hub/core/workspace"
+
+describe("Agent display order", () => {
+  it("restores saved positions and appends new Agents", () => {
+    expect(agentDisplayOrder(["z", "a", "m", "n"], ["m", "hidden", "z", "a"]))
+      .toEqual(["m", "z", "a", "n"])
+  })
+
+  it("orders marks while retaining each Agent's places and unknown marks", () => {
+    const marks = [
+      { agent: "a", id: "a-one" }, { agent: "unknown", id: "unknown" },
+      { agent: "b", id: "b-one" }, { agent: "a", id: "a-two" },
+      { agent: "c", id: "c-one" }, { agent: "d", id: "d-one" },
+    ]
+    expect(orderByAgent(marks, ["b", "a", "c", "d"], (mark) => mark.agent).map((mark) => mark.id))
+      .toEqual(["b-one", "a-one", "a-two", "c-one", "d-one", "unknown"])
+    expect(orderByAgent(marks, undefined, (mark) => mark.agent)).toEqual(marks)
+  })
+
+  it("reorders visible slots without dropping hidden or collapsed Agents", () => {
+    expect(mergeAgentOrder(["z", "hidden", "a", "m"], ["z", "a", "m", "n"], ["a", "z"]))
+      .toEqual(["a", "hidden", "z", "m", "n"])
+  })
+})
 
 describe("全局入口", () => {
   const page: WorkspacePage = {
     current: "home",
     agents: [],
+    agentOrder: [],
     folders: [
       { id: "project", name: "全局", path: "/project", display: "/project", default: false, nameKey: null },
       { id: "home", name: "自定义名称", path: "/home", display: "~", default: true, nameKey: null },
@@ -46,7 +70,7 @@ function provider(id: string, shared?: boolean): ChosenProvider {
 /** A form's workspace list, holding only the agents it was given. */
 function workspaces(agents: string[]): WorkspaceService {
   return {
-    current: () => ({ folders: [], current: null, agents }),
+    current: () => ({ folders: [], current: null, agents, agentOrder: [] }),
     failure: () => null,
     subscribe: () => () => undefined,
     refresh: async () => undefined,
@@ -55,6 +79,7 @@ function workspaces(agents: string[]): WorkspaceService {
     rename: async () => true,
     remove: async () => true,
     setAgent: async () => true,
+    setAgentOrder: async () => true,
   }
 }
 

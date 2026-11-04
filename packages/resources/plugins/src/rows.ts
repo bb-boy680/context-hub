@@ -258,7 +258,7 @@ export function heldRow(pack: ScannedPack): PluginRow {
  *
  * @param records — what the library holds, in its own order.
  * @param scanned — what the clients hold, folded by {@link collectScanned}.
- * @returns the rows, library records first.
+ * @returns scanned rows first, followed by records not seen in any client.
  */
 export function composeRows(
   records: readonly PluginRecord[],
@@ -266,12 +266,17 @@ export function composeRows(
   language: string | undefined,
   t: (key: string) => string
 ): PluginRow[] {
-  const stored = new Set(records.map((record) => record.name))
-  const answers = new Map(scanned.map((pack) => [pack.name, pack.held]))
-  const rows = records.map((record) => toRow(record, answers.get(record.name) ?? [], language, t))
+  const stored = new Map(records.map((record) => [record.name, record]))
+  const seen = new Set<string>()
+  const rows: PluginRow[] = []
   for (const pack of scanned) {
-    if (stored.has(pack.name)) continue
-    rows.push(heldRow(pack))
+    if (seen.has(pack.name)) continue
+    seen.add(pack.name)
+    const record = stored.get(pack.name)
+    rows.push(record === undefined ? heldRow(pack) : toRow(record, pack.held, language, t))
+  }
+  for (const record of records) {
+    if (!seen.has(record.name)) rows.push(toRow(record, [], language, t))
   }
   return rows
 }

@@ -24,7 +24,7 @@ import {
 import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
-import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, unstored, useReadablePlaces, useSelectablePlaces, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, unstored, useReadablePlaces, useSelectablePlaces, useSkillDisplayPlaces, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import type { SkillPlace } from "./provider.ts"
@@ -163,7 +163,7 @@ function SkillActionButton({
 }) {
   const { t } = useI18n()
   /* Targets exclude the shared read-only choice. */
-  const places = useSelectablePlaces()
+  const places = useSkillDisplayPlaces(useSelectablePlaces())
   const holds = placedIn(skill)
   /* A machine-wide place needs no workspace, so only the workspace ones depend
      on there being a folder to write into. */
@@ -619,7 +619,7 @@ function BatchInstall({
   onInstall: (place: SkillPlace) => void
 }) {
   const { t } = useI18n()
-  const places = useSelectablePlaces()
+  const places = useSkillDisplayPlaces(useSelectablePlaces())
   /* A machine-wide place needs no workspace, so only the workspace ones depend
      on there being a folder to write into. */
   const writable = places.filter((place) => place.scope !== "workspace" || blocked === null)
@@ -878,6 +878,7 @@ export function SkillsPage() {
      names, and the machine-wide ones of the agents the sidebar chose. */
   const places = useReadablePlaces()
   const selectable = useSelectablePlaces()
+  const displaySelectable = useSkillDisplayPlaces(selectable)
 
   const library = useSkillLibrary(places, needle)
   /* The page filters and pages what the hook hands it: rows come from the
@@ -1214,7 +1215,7 @@ export function SkillsPage() {
                 currentSelection
                 groups={SCOPES.map((scope) => ({
                   label: t(`skills.group.${scope}`),
-                  options: selectable.filter((place) => place.scope === scope).map((place) => ({
+                  options: displaySelectable.filter((place) => place.scope === scope).map((place) => ({
                     id: skillPlaceKey(place),
                     icon: place.icon,
                     label: t(place.labelKey),

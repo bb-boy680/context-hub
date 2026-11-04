@@ -40,6 +40,47 @@ export function chosenAgents(workspaces: WorkspaceService | undefined): readonly
   return workspaces?.current()?.agents ?? NONE
 }
 
+/** Resolve the visible Agent ids against saved order, appending new arrivals. */
+export function agentDisplayOrder(available: readonly string[], saved: readonly string[]): string[] {
+  const known = new Set(available)
+  const result: string[] = []
+  for (const id of [...saved, ...available]) {
+    if (known.has(id) && !result.includes(id)) result.push(id)
+  }
+  return result
+}
+
+/** Replace only the slots participating in a drag; absent Agents keep their slots. */
+export function mergeAgentOrder(
+  saved: readonly string[], available: readonly string[], moved: readonly string[]
+): string[] {
+  const all = [...new Set([...saved, ...available])]
+  const moving = new Set(moved)
+  let index = 0
+  return all.map((id) => moving.has(id) ? moved[index++]! : id)
+}
+
+/** Order display items by Agent id, keeping each Agent's own item order. */
+export function orderByAgent<T>(
+  items: readonly T[], order: readonly string[] | null | undefined, agentOf: (item: T) => string | undefined
+): T[] {
+  if (order === null || order === undefined) return [...items]
+  const groups = new Map<string, T[]>()
+  const unknown: T[] = []
+  const known = new Set(order)
+  for (const item of items) {
+    const id = agentOf(item)
+    if (id === undefined || !known.has(id)) {
+      unknown.push(item)
+      continue
+    }
+    const group = groups.get(id) ?? []
+    group.push(item)
+    groups.set(id, group)
+  }
+  return [...order.flatMap((id) => groups.get(id) ?? []), ...unknown]
+}
+
 /**
  * The same answer for a caller holding the context rather than the service.
  *

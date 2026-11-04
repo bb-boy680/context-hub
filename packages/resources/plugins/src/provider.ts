@@ -16,6 +16,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope, PlaceFiles } from "@context-hub/core/place-files"
+import { orderedRegistry, type Placement } from "@context-hub/extensions"
 
 import { pluginManifestPaths } from "./contract.ts"
 import { pluginManifestRules, type PluginManifestRule } from "./manifest-rules.ts"
@@ -381,7 +382,7 @@ export type PluginBridgeTools = Omit<PluginTools, "files">
 export class PluginService extends Service {
   readonly tools: PluginBridgeTools
 
-  private readonly held: PluginInstaller[] = []
+  private readonly held: Placement<PluginInstaller>[] = []
   private readonly manifests: string[][] = []
   private readonly rules: PluginManifestRule[][] = []
 
@@ -422,14 +423,15 @@ export class PluginService extends Service {
 
   /** Every installer registered right now, in registration order. */
   installers(): readonly PluginInstaller[] {
-    return this.held
+    return orderedRegistry(this.ctx, this.held)
   }
 
   /** Add one installer, for as long as the plugin that added it stays loaded. */
   register(installer: PluginInstaller): () => void {
-    this.held.push(installer)
+    const placement = { owner: this.ctx.fiber?.name ?? "root", value: installer }
+    this.held.push(placement)
     return this.ctx.effect(() => () => {
-      const at = this.held.indexOf(installer)
+      const at = this.held.indexOf(placement)
       if (at >= 0) this.held.splice(at, 1)
     })
   }

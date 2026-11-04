@@ -41,6 +41,8 @@ export type McpLog = McpIo["log"]
 export interface ScannedPlace {
   place: McpAgentPlace
   provider: McpProvider
+  /** Position in provider and declaration order before scope grouping. */
+  readOrder?: number
 }
 
 /** What one scan produced: what each file holds, and what could not be read. */
@@ -74,6 +76,7 @@ export function placesOf(
       if (globalOnly && place.scope !== "global") continue
       places.push({
         provider,
+        readOrder: places.length,
         place: {
           ...place,
           path: place.scope === "global" ? `~/${place.root === undefined ? "" : `${place.root.home}/`}${place.file}` : place.file,
@@ -109,7 +112,7 @@ export async function resolvePlaces(
       const display = place.root !== undefined
         ? await files.display?.(place) ?? (() => { throw new Error("client path display is not supported") })()
         : place.scope === "global" ? `~/${place.file}` : place.file
-      places.push({ provider, place: { ...place, path: display.replaceAll("\\", "/"), client: provider.id, icon: iconFor(provider.id) } })
+      places.push({ provider, readOrder: places.length, place: { ...place, path: display.replaceAll("\\", "/"), client: provider.id, icon: iconFor(provider.id) } })
     }
   }
   return places.sort((left, right) => scopeRank(left.place) - scopeRank(right.place))
@@ -176,16 +179,17 @@ export function buildCatalog(
   scannedAt: number,
   checks: Readonly<Record<string, McpCacheEntry | null>> = {}
 ): McpCatalog {
-  const names = new Set<string>(records.map((record) => record.name))
-  for (const entries of scan.entries.values()) {
-    for (const entry of entries) names.add(entry.name)
+  const names = new Set<string>()
+  const scanOrder = [...places].sort((left, right) => (left.readOrder ?? 0) - (right.readOrder ?? 0))
+  for (const { place } of scanOrder) {
+    for (const entry of scan.entries.get(place.id) ?? []) names.add(entry.name)
   }
+  for (const record of records) names.add(record.name)
 
   const servers = [...names]
     .map((name) =>
       rowOf(name, records.find((record) => record.name === name), scan, places, checks[name] ?? null)
     )
-    .sort((left, right) => left.name.localeCompare(right.name))
   return { servers, scannedAt, problems }
 }
 

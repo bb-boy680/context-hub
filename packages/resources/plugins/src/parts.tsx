@@ -7,7 +7,9 @@
 import { PlugIcon } from "lucide-react"
 import * as React from "react"
 
+import { orderByAgent } from "@context-hub/extensions"
 import { AvatarStack } from "@context-hub/extensions/components"
+import { useAgentOrder } from "@context-hub/extensions/react"
 
 import type { PluginRow } from "./types.ts"
 
@@ -66,13 +68,15 @@ export function PluginTile({
  * local directory like every other pack on this machine.
  */
 export function HolderStack({ plugin }: { plugin: PluginRow }) {
-  if (plugin.held.length === 0) return null
+  const order = useAgentOrder()?.order
+  const held = orderByAgent(plugin.held, order, (hold) => hold.client)
+  if (held.length === 0) return null
 
   return (
     <AvatarStack
-      marks={plugin.held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
+      marks={held.map((hold) => ({ id: hold.client, icon: hold.icon }))}
       seam="ring-card"
-      label={plugin.held.map((hold) => hold.label).join(" · ")}
+      label={held.map((hold) => hold.label).join(" · ")}
     />
   )
 }

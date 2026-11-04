@@ -71,19 +71,26 @@ export function searchSkills(
     })
   }
 
-  for (const item of value.page?.items ?? []) {
-    if (!matchesQuery(query, item.name, item.description, item.tags.join(" "))) continue
+  const items = value.page?.items ?? []
+  const stored = new Map(items.map((item) => [item.name, item]))
+  const visitStored = (item: typeof items[number]) => {
+    if (seen.has(item.name)) return
+    seen.add(item.name)
+    if (!matchesQuery(query, item.name, item.description, item.tags.join(" "))) return
     const ref = item.assets[0]
     push(item.name, item.description, ref === undefined ? null : assetUrl(ref))
   }
-
-  for (const view of Object.values(value.held)) {
-    for (const skill of view?.skills ?? []) {
-      if (seen.has(skill.name)) continue
-      if (!matchesQuery(query, skill.name, skill.description)) continue
-      push(skill.name, skill.description)
+  for (const id of value.placeOrder ?? Object.keys(value.held)) {
+    for (const skill of value.held[id]?.skills ?? []) {
+      const item = stored.get(skill.name)
+      if (item !== undefined) {
+        visitStored(item)
+      } else if (!seen.has(skill.name) && matchesQuery(query, skill.name, skill.description)) {
+        push(skill.name, skill.description)
+      }
     }
   }
+  for (const item of items) visitStored(item)
 
   return results
 }

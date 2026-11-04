@@ -7,8 +7,9 @@
  */
 import { FileTextIcon, HardDriveIcon } from "lucide-react"
 
+import { orderByAgent } from "@context-hub/extensions"
 import { AvatarStack } from "@context-hub/extensions/components"
-import { useI18n } from "@context-hub/extensions/react"
+import { useAgentOrder, useI18n } from "@context-hub/extensions/react"
 
 import type { HeldMark } from "./held.ts"
 import { tokenLabel } from "./library.ts"
@@ -77,13 +78,15 @@ export function PromptMeta({
  * wear, so a detail panel answers "which agents have this" the way its row did.
  */
 export function PromptMarks({ marks }: { marks: readonly HeldMark[] }) {
-  if (marks.length === 0) return null
+  const order = useAgentOrder()?.order
+  const shown = orderByAgent(marks, order, (mark) => mark.id)
+  if (shown.length === 0) return null
 
   return (
     <AvatarStack
-      marks={marks}
+      marks={shown}
       seam="ring-card"
-      label={marks.map((mark) => mark.label).join(" · ")}
+      label={shown.map((mark) => mark.label).join(" · ")}
     />
   )
 }

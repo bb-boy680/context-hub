@@ -27,6 +27,9 @@ function samePage(left: WorkspacePage | null, right: WorkspacePage | null): bool
   if (left.folders.length !== right.folders.length) return false
   if (left.agents.length !== right.agents.length) return false
   if (left.agents.some((agent, at) => agent !== right.agents[at])) return false
+  const leftOrder = left.agentOrder ?? []
+  const rightOrder = right.agentOrder ?? []
+  if (leftOrder.length !== rightOrder.length || leftOrder.some((id, at) => id !== rightOrder[at])) return false
   return left.folders.every((folder, at) => {
     const other = right.folders[at]
     return (
@@ -92,6 +95,8 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
      library that needs to know which folder it is reading in, and those are the
      same question: one request answers all of them. */
   let refreshing: Promise<void> | null = null
+  let mutation: Promise<unknown> = Promise.resolve()
+  let generation = 0
   /* What watchers were last told. A read that answered the same thing it did
      last time tells nobody — which is not politeness: the libraries that ask for
      this list are the ones watching it, so announcing an unchanged answer is
@@ -117,6 +122,22 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
     return false
   }
 
+  const action = (body: unknown): Promise<boolean> => {
+    generation += 1
+    const next = mutation.then(async () => {
+      try {
+        const result = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", body)
+        generation += 1
+        return settle(result)
+      } catch (error) {
+        generation += 1
+        return refuse(error)
+      }
+    })
+    mutation = next
+    return next
+  }
+
   return {
     current: () => page,
     failure: () => failure,
@@ -130,11 +151,15 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
 
     refresh() {
       refreshing ??= (async () => {
+        const started = generation
         try {
-          page = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "GET")
-          failure = null
+          const answer = await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "GET")
+          if (started === generation) {
+            page = answer
+            failure = null
+          }
         } catch (error) {
-          failure = reasonOf(error)
+          if (started === generation) failure = reasonOf(error)
         } finally {
           refreshing = null
         }
@@ -143,49 +168,12 @@ export function createRemoteWorkspaceService(base = ""): WorkspaceService {
       return refreshing
     },
 
-    async select(id) {
-      try {
-        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "select", id }))
-      } catch (error) {
-        return refuse(error)
-      }
-    },
-
-    async add(path) {
-      try {
-        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "add", path }))
-      } catch (error) {
-        return refuse(error)
-      }
-    },
-
-    async setAgent(id, on) {
-      try {
-        return settle(
-          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "agent", id, on })
-        )
-      } catch (error) {
-        return refuse(error)
-      }
-    },
-
-    async rename(id, name) {
-      try {
-        return settle(
-          await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "rename", id, name })
-        )
-      } catch (error) {
-        return refuse(error)
-      }
-    },
-
-    async remove(id) {
-      try {
-        return settle(await call<WorkspacePage>(`${base}${WORKSPACE_ROUTE}`, "POST", { action: "remove", id }))
-      } catch (error) {
-        return refuse(error)
-      }
-    },
+    select: (id) => action({ action: "select", id }),
+    add: (path) => action({ action: "add", path }),
+    setAgent: (id, on) => action({ action: "agent", id, on }),
+    setAgentOrder: (ids) => action({ action: "agent-order", ids }),
+    rename: (id, name) => action({ action: "rename", id, name }),
+    remove: (id) => action({ action: "remove", id }),
   }
 }
 

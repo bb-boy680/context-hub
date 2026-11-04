@@ -29,7 +29,6 @@ const SHARED_PLACE: SkillPlace = {
   icon: FolderIcon,
   scope: "workspace",
   dir: ".agents/skills",
-  order: 10,
 }
 
 /**

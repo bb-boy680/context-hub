@@ -57,9 +57,9 @@ const assetUrl = (ref: string) => `/assets/${ref}`
 describe("searching the skills", () => {
   it("finds the library and a place's own skills, each name once", () => {
     const rows = searchSkills(value, "PDF", assetUrl)
-    expect(rows.map((one) => one.title)).toEqual(["pdf-extract", "pdf-forms"])
-    expect(rows[0]?.avatar, "the library row's own picture").toBe("/assets/assets/a.png")
-    expect(rows[1]?.avatar, "a place's row has no picture").toBeUndefined()
+    expect(rows.map((one) => one.title)).toEqual(["pdf-forms", "pdf-extract"])
+    expect(rows[1]?.avatar, "the library row's own picture").toBe("/assets/assets/a.png")
+    expect(rows[0]?.avatar, "a place's row has no picture").toBeUndefined()
   })
 
   it("matches a tag and ignores case", () => {
@@ -70,8 +70,8 @@ describe("searching the skills", () => {
 
   it("opens the page filtered by the clicked row's own name", () => {
     const rows = searchSkills(value, "pdf", assetUrl)
-    expect(rows[0]?.path).toBe("/skills?q=pdf-extract")
-    expect(rows[1]?.path).toBe("/skills?q=pdf-forms")
+    expect(rows[0]?.path).toBe("/skills?q=pdf-forms")
+    expect(rows[1]?.path).toBe("/skills?q=pdf-extract")
   })
 
   it("returns nothing for an empty query", () => {

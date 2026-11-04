@@ -37,6 +37,8 @@ export interface SkillLibraryValue {
   page: SkillPage | null
   /** What each place holds, by its id; a place that could not be read is absent, not empty. */
   held: Record<string, PlaceSkillsView | null>
+  /** Place ids in the order they were read, including numeric ids. */
+  placeOrder?: string[]
   /** Every category in use, for the filter row; it spans the library, not the page. */
   tags: string[]
 }
@@ -153,12 +155,19 @@ export class SkillLibrary extends Service {
     /* A place that could not be read must not fail the whole read: the rows the
        catalog itself answered are worth showing. */
     const tags = await store.tags().catch(() => NOTHING_READ.tags)
+    const sharedIds = new Set((this.ctx.get("skills")?.providers() ?? [])
+      .filter((provider) => provider.shared === true)
+      .flatMap((provider) => provider.places.map((place) => place.id)))
 
     return {
       page,
       held: key === this.key()
         ? Object.fromEntries(targets.map(([id], at) => [id, views[at] ?? null]))
         : {},
+      placeOrder: key === this.key() ? [
+        ...targets.filter(([id]) => !sharedIds.has(id)).map(([id]) => id),
+        ...targets.filter(([id]) => sharedIds.has(id)).map(([id]) => id),
+      ] : [],
       tags,
     }
   }

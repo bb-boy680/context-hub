@@ -15,7 +15,7 @@ import * as React from "react"
 
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { ahead, formatAge, holdsOf, inLibrary, modified as isModified, placeOf, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, useSelectablePlaces, type SkillPlaceView } from "./library.ts"
+import { ahead, formatAge, holdsOf, inLibrary, modified as isModified, placeOf, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, useSelectablePlaces, useSkillDisplayPlaces, type SkillPlaceView } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
@@ -534,7 +534,7 @@ function PlacesSection({
   /* The icon and the label are the contribution's, since only the extension
      that knows a place can draw it. */
   const contributed = useSelectablePlaces()
-  const visiblePlaces = places.filter((place) => selectedSkillPlace(contributed, place) !== null)
+  const visiblePlaces = useSkillDisplayPlaces(places.filter((place) => selectedSkillPlace(contributed, place) !== null))
   /* Count only the rows this section shows; the library is one row too. */
   const installed = visiblePlaces.filter((place) => skillHeldAt(skill, place)).length + (own ? 1 : 0)
   const icons = React.useMemo(
