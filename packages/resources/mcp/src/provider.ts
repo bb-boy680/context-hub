@@ -45,8 +45,10 @@ export interface McpEntry {
   name: string
   /** The declaration, or null when the entry holds one this build cannot read. */
   declaration: McpDeclaration | null
-  /** Whether that client will connect it; always true for a client with no switch. */
-  enabled: boolean
+  /** 声明的启用状态；无法解析时为 null。 */
+  enabled: boolean | null
+  /** 声明可查看，但不能安全修改。 */
+  readOnly?: boolean
 }
 
 /**
@@ -55,6 +57,8 @@ export interface McpEntry {
 export interface McpIo {
   /** The client configuration files under this hub's roots. */
   readonly files: PlaceFiles
+  /** 当前扫描或操作所用的已解析位置。 */
+  readonly place?: McpPlace
   /** Record one diagnostic line; a person's screen shows the key, not this. */
   log(level: "info" | "warn" | "error", message: string): void
 }
@@ -72,6 +76,8 @@ export interface McpProvider {
   readonly id: string
   /** Every file this client keeps declarations in. */
   readonly places: readonly McpPlace[]
+  /** 每次扫描时解析全部当前位置。 */
+  placesFor?(io: McpIo): Promise<readonly McpPlace[]>
   /**
    * What that file holds, one entry per server.
    *

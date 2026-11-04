@@ -5,7 +5,7 @@
  * Nothing about this is recorded and nothing of it is derivable from the pack's
  * manifest, so the pack's own directory is asked — and only the three names a
  * pack follows are asked about: one directory per skill under `skills/`, one
- * markdown file per command under `commands/`, and a single `.mcp.json` at the
+ * markdown file per command under `commands/`, and the MCP declaration at the
  * root. A pack carrying none of them answers with empty lists, which is what
  * tells a screen that the tab is not one to offer.
  *
@@ -19,7 +19,7 @@
 import { promises as fs, type Dirent } from "node:fs"
 import path from "node:path"
 
-import type { PackContentItem, PackContents } from "../contract.ts"
+import type { PackContentItem, PackContents, PluginManifestRule } from "../contract.ts"
 import { readManifestFields, safePackPath } from "./describe.ts"
 
 /** The directory a pack keeps its skills in, one directory per skill. */
@@ -177,10 +177,10 @@ function byTitle(left: PackContentItem, right: PackContentItem): number {
  * which directory they are in.
  *
  * @param dir — the pack's directory.
- * @returns its skills and commands in title order, and its `.mcp.json` as written.
+ * @returns its skills and commands in title order, and its MCP declaration as written.
  */
-export async function readPackContents(dir: string, manifests: readonly string[] = []): Promise<PackContents> {
-  const fields = await readManifestFields(dir, manifests)
+export async function readPackContents(dir: string, manifests: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<PackContents> {
+  const fields = await readManifestFields(dir, manifests, rules)
   const doc = fields.document ?? {}
   const paths = (value: unknown, fallback: string): string[] => {
     if (value === undefined) return [fallback]
@@ -207,15 +207,24 @@ export async function readPackContents(dir: string, manifests: readonly string[]
     } else commands.push(...await scanCommands(target))
   }
   const mcpDeclarations = doc.mcpServers === undefined ? [] : Array.isArray(doc.mcpServers) ? doc.mcpServers : [doc.mcpServers]
+  const agentPlugin = typeof doc.$schema === "string" && /^https:\/\/agent-plugins\.org\/schemas\/1\.\d+\.\d+\/plugin\.schema\.json$/.test(doc.$schema)
+  const implicitAgentMcp = doc.mcpServers === undefined && agentPlugin
   const mcpParts: string[] = []
-  for (const value of doc.mcpServers === undefined ? [MCP_FILE] : mcpDeclarations) {
+  const mcpFiles: string[] = []
+  const sources = doc.mcpServers === undefined ? (implicitAgentMcp ? ["mcp.json", MCP_FILE] : [MCP_FILE]) : mcpDeclarations
+  for (const value of sources) {
     if (typeof value === "string") {
       const text = await readText(await safePackPath(dir, value))
-      if (text !== null) mcpParts.push(text)
+      if (text !== null) {
+        mcpParts.push(text)
+        mcpFiles.push(value)
+        if (implicitAgentMcp) break
+      }
     } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       mcpParts.push(JSON.stringify({ mcpServers: value }, null, 2))
     } else throw new Error("invalid plugin MCP declaration")
   }
   const mcp = mcpParts.length === 0 ? null : mcpParts.join("\n\n")
-  return { skills: skills.sort(byTitle), commands: commands.sort(byTitle), mcp }
+  const mcpPath = mcpParts.length === 1 && mcpFiles.length === 1 && mcpFiles[0] !== MCP_FILE ? mcpFiles[0] : undefined
+  return { skills: skills.sort(byTitle), commands: commands.sort(byTitle), mcp, ...(mcpPath === undefined ? {} : { mcpPath }) }
 }

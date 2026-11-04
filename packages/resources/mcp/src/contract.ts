@@ -24,6 +24,7 @@ export {
   type McpTransport,
 } from "./declaration.ts"
 export { McpError, failureText, mcpFailure, type McpFailure } from "./failure.ts"
+export { parseYamlDocument, spliceYamlDocument, type YamlNode } from "@context-hub/core/yaml-document"
 export { editJson, jsonValueLines, parseJsonc, readJsonObject, valueAt } from "./jsonc.ts"
 export {
   MCP_SERVICE,
@@ -39,6 +40,7 @@ export {
   type McpFailureTools,
   type McpJsonTools,
   type McpTomlTools,
+  type McpYamlTools,
   type McpTools,
 } from "./toolkit.ts"
 export {

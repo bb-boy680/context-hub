@@ -188,13 +188,14 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
       /* One entry per place, each with the answer that place itself gives. The
          group comes from the client's own declaration of the place, so an agent
          naming its scopes its own way still lands where it says it does. */
-      const declared = answer.places.find((one) => one.scopeWord === pack.scope)
+      const declared = answer.places.find((one) => pack.placeId !== undefined ? one.id === pack.placeId : one.scopeWord === pack.scope)
       /* An explicit setting cannot resolve a client's unknown effective state. */
       const here = pack.enabled === undefined ? undefined : answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
-      const already = found.places.find((one) => one.scope === pack.scope && one.id === pack.id)
+      const already = found.places.find((one) => one.scope === pack.scope && one.id === pack.id && one.placeId === pack.placeId)
       if (already === undefined) {
         found.places.push({
           scope: pack.scope,
+          ...(pack.placeId === undefined ? {} : { placeId: pack.placeId }),
           group: declared?.scope ?? (pack.scope === "managed" || pack.scope === "user" ? "global" : "workspace"),
           id: pack.id,
           readOnly: pack.readOnly === true || declared === undefined,
@@ -294,6 +295,10 @@ export type PluginTab = "all" | "library" | "unstored" | "updates" | "place"
  */
 export const SCOPES: readonly AssetScope[] = ["workspace", "global"]
 
+export function installablePlaces(places: readonly PluginPlace[], hasArtifact = true): PluginPlace[] {
+  return places.filter((place) => place.installable !== false || (place.initialInstallable === true && !hasArtifact))
+}
+
 /**
  * The place a group's action reaches, given the places an agent keeps.
  *
@@ -306,9 +311,10 @@ export const SCOPES: readonly AssetScope[] = ["workspace", "global"]
  */
 export function placeReached(
   places: readonly PluginPlace[],
-  group: AssetScope
+  group: AssetScope,
+  hasArtifact = true
 ): PluginPlace | undefined {
-  return places.find((one) => one.scope === group)
+  return installablePlaces(places, hasArtifact).find((one) => one.scope === group)
 }
 
 /**
@@ -366,13 +372,16 @@ export function placesShown(
       if (!here && !over) return []
       const ids = new Set(hold.places.filter((place) => !place.readOnly).map((place) => place.id ?? hold.id))
       if (ids.size !== 1) return []
-      const own = hold.places.filter((place) => !place.readOnly && place.scope === declared.scopeWord)
+      const own = hold.places.filter((place) => !place.readOnly && (place.placeId !== undefined ? place.placeId === declared.id : place.scope === declared.scopeWord))
       const affected = own.length > 0 ? own : hold.places.filter((place) => !place.readOnly && (declared.overrides ?? []).includes(place.scope))
       const hasUnknown = affected.some((place) => place.enabled === undefined)
-      const recorded = hasUnknown ? undefined : client.switches[declared.scopeWord]?.[[...ids][0]!]
+      const recorded = hasUnknown ? undefined
+        : affected.some((place) => place.placeId !== undefined)
+          ? affected.some((place) => place.enabled === true)
+          : client.switches[declared.scopeWord]?.[[...ids][0]!]
       return [
         {
-          id: `${hold.client}:${declared.scopeWord}`,
+          id: `${hold.client}:${declared.id}`,
           client: hold.client,
           label: client.label,
           icon: client.icon,
@@ -394,10 +403,11 @@ export function placesShown(
 export const SCOPE_LABELS: Record<string, string> = {
   user: "plugins.scope.user",
   project: "plugins.scope.project",
+  local: "plugins.scope.local",
 }
 
 export function placeSourceNote(places: readonly PluginHeldPlace[], scope: AssetScope, reached: PluginPlace, t: (key: string) => string): string {
-  const here = places.filter((place) => place.group === scope)
+  const here = places.filter((place) => place.group === scope && place.scope === reached.scopeWord)
   if (here.some((place) => place.sourceAvailable === false)) return t("plugins.place.sourceUnavailable")
   const declared = here.some((place) => place.origin === "declaration") ? ` · ${t("plugins.place.declared")}` : ""
   return `${scopeWords([reached.scopeWord], t)}${declared}`

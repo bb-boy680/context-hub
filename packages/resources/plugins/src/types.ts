@@ -30,6 +30,8 @@ export interface PluginHeldPlace {
   group: AssetScope
   /** The exact installation identity and whether its owner allows changes. */
   id?: string
+  /** The declared place this installation belongs to. */
+  placeId?: string
   readOnly?: boolean
   origin?: "record" | "declaration" | "skills-dir"
   sourceAvailable?: boolean

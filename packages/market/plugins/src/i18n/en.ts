@@ -71,6 +71,7 @@ export const marketPluginsEn: Record<string, string> = {
   "market.plugins.install.running": "Installing…",
   "market.plugins.install.done": "Installed {name}",
   "market.plugins.install.failed": "Install failed",
+  "market.plugins.install.followUp": "Installed {name}; follow-up is needed",
   "market.plugins.install.noAgent": "No agent is available on this machine.",
   "market.plugins.install.installed": "Installed",
 }

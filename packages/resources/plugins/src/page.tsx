@@ -42,6 +42,7 @@ import {
   type PluginCollected,
 } from "./library.ts"
 import {
+  installablePlaces,
   pluginPlaceCount,
   pluginPlaceKey,
   rowsForTab,
@@ -53,7 +54,7 @@ import {
 } from "./rows.ts"
 import { HolderStack, PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
-import { PluginNameTakenError, type PluginInstallScope } from "./contract.ts"
+import { PluginNameTakenError, type PluginInstallReport, type PluginInstallScope } from "./contract.ts"
 
 import type { ExtensionIcon } from "@context-hub/extensions"
 import {
@@ -199,10 +200,11 @@ interface RowActions {
   /** True while a call is in flight, which disables the actions. */
   busy: boolean
   onUpdate: (plugin: PluginRow) => void
-  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
-  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
   /** Switch an agent's own use of a pack on or off, where it already sits. */
-  onSetEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, on: boolean) => void
+  onSetEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, on: boolean, placeId?: string) => void
+  onClearEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
   /** Take a pack an agent holds into the library. */
   onAdopt: (plugin: PluginRow) => void
 }
@@ -215,9 +217,10 @@ function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowAct
       clients={actions.clients}
       busy={actions.busy}
       onUpdate={() => actions.onUpdate(plugin)}
-      onInstall={(client, scope) => actions.onInstall(plugin, client, scope)}
-      onUninstall={(client, scope) => actions.onUninstall(plugin, client, scope)}
-      onSetEnabled={(client, scope, on) => actions.onSetEnabled(plugin, client, scope, on)}
+      onInstall={(client, scope, placeId) => actions.onInstall(plugin, client, scope, placeId)}
+      onUninstall={(client, scope, placeId) => actions.onUninstall(plugin, client, scope, placeId)}
+      onSetEnabled={(client, scope, on, placeId) => actions.onSetEnabled(plugin, client, scope, on, placeId)}
+      onClearEnabled={(client, scope, placeId) => actions.onClearEnabled(plugin, client, scope, placeId)}
     />
   )
 }
@@ -627,7 +630,7 @@ function PluginTable({
               {t("plugins.action.installTo")}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" sideOffset={6} className="w-[272px] p-1">
-              {actions.clients.map((client) => (
+              {actions.clients.filter((client) => installablePlaces(client.places).length > 0).map((client) => (
                 <div key={client.id}>
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="flex items-center gap-1.5 px-1.5 py-1 text-[11.5px] font-semibold text-muted-soft">
@@ -635,15 +638,15 @@ function PluginTable({
                       {client.label}
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
-                  {client.places.map((place) => (
+                  {installablePlaces(client.places).map((place) => (
                     <DropdownMenuItem
-                      key={`${client.id}:${place.scopeWord}`}
+                      key={`${client.id}:${place.id}`}
                       closeOnClick={false}
                       disabled={actions.busy || !client.available}
                       onClick={() => {
                         for (const plugin of plugins) {
                           if (checked.includes(plugin.id)) {
-                            actions.onInstall(plugin, client.id, place.scopeWord)
+                            actions.onInstall(plugin, client.id, place.scopeWord, place.id)
                           }
                         }
                         onCheck([])
@@ -877,6 +880,10 @@ export function PluginsPage() {
     [matching, shownPage, pageSize]
   )
 
+  const showInstallReport = (report: PluginInstallReport) => {
+    if (report?.warning !== undefined) toast.add({ type: "warning", title: t("plugins.transaction.committed"), description: report.warning })
+  }
+
   /* Every row's own write: a pack is delivered to one client at one scope, or
      taken back out of that same place. Each place is its own, so the row's menu
      acts on them one at a time. */
@@ -904,18 +911,23 @@ export function PluginsPage() {
           })
         })
     },
-    onInstall: (plugin, client, scope) => {
-      void library.install(plugin.name, client, scope).catch((error: unknown) => {
+    onInstall: (plugin, client, scope, placeId) => {
+      void library.install(plugin.name, client, scope, placeId).then(showInstallReport).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
-    onUninstall: (plugin, client, scope) => {
-      void library.uninstall(plugin.name, client, scope).catch((error: unknown) => {
+    onUninstall: (plugin, client, scope, placeId) => {
+      void library.uninstall(plugin.name, client, scope, placeId).then(showInstallReport).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
-    onSetEnabled: (plugin, client, scope, on) => {
-      void library.setEnabled(plugin.name, client, scope, on).catch((error: unknown) => {
+    onClearEnabled: (plugin, client, scope, placeId) => {
+      void library.clearEnabled(plugin.name, client, scope, placeId).then(showInstallReport).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onSetEnabled: (plugin, client, scope, on, placeId) => {
+      void library.setEnabled(plugin.name, client, scope, on, placeId).then(showInstallReport).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
@@ -1317,8 +1329,8 @@ export function PluginsPage() {
         busy={library.busy}
         tagSuggestions={tagsOf(catalog)}
         onUpdate={(plugin) => actions.onUpdate(plugin)}
-        onInstall={(plugin, client, scope) => actions.onInstall(plugin, client, scope)}
-        onUninstall={(plugin, client, scope) => actions.onUninstall(plugin, client, scope)}
+        onInstall={(plugin, client, scope, placeId) => actions.onInstall(plugin, client, scope, placeId)}
+        onUninstall={(plugin, client, scope, placeId) => actions.onUninstall(plugin, client, scope, placeId)}
         onAdopt={(plugin) => actions.onAdopt(plugin)}
         onCheckUpdate={(plugin) => library.checkUpdate(plugin.name).then(() => undefined)}
         onDelete={(plugin) => library.remove(plugin.name)}

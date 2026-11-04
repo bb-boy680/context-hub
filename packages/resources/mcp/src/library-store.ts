@@ -31,6 +31,7 @@ import {
 import {
   buildCatalog,
   placesOf,
+  resolvePlaces,
   scanPlaces,
   type McpLog,
   type McpScan,
@@ -72,7 +73,7 @@ export interface McpLibraryValue {
   /** The hub's own records, as its file holds them. */
   records: McpRecord[]
   /** What the last scan found, and when it ran; null before the first one. */
-  scan: { answer: McpScan; at: number } | null
+  scan: { answer: McpScan; at: number; places?: ScannedPlace[]; key?: string } | null
   /**
    * What the probe cache answered, by server name. A name the cache holds no
    * answer for is null until that server's own probe lands.
@@ -231,11 +232,11 @@ export class McpLibrary extends Service {
    */
   rows(): McpCatalog | null {
     const value = this.catalog.state().value
-    if (value === null || value.scan === null) return null
+    if (value === null || value.scan === null || (value.scan.key !== undefined && value.scan.key !== this.key())) return null
     return buildCatalog(
       value.records,
       value.scan.answer,
-      this.places(),
+      value.scan.places ?? this.places(),
       [],
       value.scan.at,
       value.checks
@@ -355,6 +356,7 @@ export class McpLibrary extends Service {
        form answers that from its own copy: a scan that ran before its list
        arrived would read those places against nothing. */
     await this.ctx.get("hub.workspaces")?.refresh()
+    const scanKey = this.key()
 
     const force = this.forced
     this.forced = false
@@ -365,6 +367,7 @@ export class McpLibrary extends Service {
 
     let declared: McpRecord[]
     let answer: McpScan
+    let places: ScannedPlace[]
     try {
       /* The records are read first: their failure names itself, while a scan of
          client files has its own sentence. */
@@ -373,7 +376,21 @@ export class McpLibrary extends Service {
           draft.recordsFile = file
         })
       })
-      answer = await scanPlaces(this.places(), files, this.log)
+      const chosen = chosenAgents(this.ctx.get("hub.workspaces"))
+      places = await resolvePlaces(chosenProviders(this.providers(), chosen), (id) => this.icon(id), files, this.log)
+      answer = await scanPlaces(places, files, this.log)
+      const prior = this.catalog.state().value?.scan
+      const previous = prior?.key === scanKey ? prior.answer : undefined
+      for (const problem of answer.problems) {
+        const oldPath = prior?.places?.find((entry) => entry.place.id === problem.place)?.place.path
+        const newPath = places.find((entry) => entry.place.id === problem.place)?.place.path
+        const held = oldPath === newPath ? previous?.entries.get(problem.place) : undefined
+        if (held !== undefined) {
+          answer.entries.set(problem.place, held.map((entry) => ({
+            name: entry.name, declaration: null, enabled: null, readOnly: true,
+          })))
+        }
+      }
     } catch (error) {
       /* Thrown as the sentence the page reads: the catalog keeps the last
          answer and says what went wrong with the one that did not arrive. The
@@ -385,13 +402,13 @@ export class McpLibrary extends Service {
     /* The list is readable now; its probes run beside it, not before it. */
     commit((draft) => {
       draft.records = declared
-      draft.scan = { answer, at }
+      draft.scan = { answer, at, places, key: scanKey }
       draft.failure = null
     })
     /* Nothing waits for the probes, so nothing is left to report an unexpected
        throw: it is an answer that did not arrive, and is reported as one rather
        than rejected into the console. */
-    void this.probeAll(answer, at, force, declared, commit).catch((error: unknown) => {
+    void this.probeAll(answer, places, at, force, declared, commit).catch((error: unknown) => {
       commit((draft) => {
         draft.failure = failureText(this.t, mcpFailure(error, "mcp.error.probe"))
       })
@@ -410,13 +427,13 @@ export class McpLibrary extends Service {
    */
   private async probeAll(
     answer: McpScan,
+    places: ScannedPlace[],
     at: number,
     force: boolean,
     declared: readonly McpRecord[],
     commit: Commit<McpLibraryValue>
   ): Promise<void> {
     if (!(await this.reachable())) return
-    const places = this.places()
     const servers = buildCatalog(declared, answer, places, [], at).servers
     const targets = probeTargets(servers, places)
     if (targets.length === 0) return

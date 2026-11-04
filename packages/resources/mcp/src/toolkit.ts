@@ -10,6 +10,7 @@
  * downloaded from elsewhere behave identically.
  */
 import { parse } from "smol-toml"
+import { parseYamlDocument, spliceYamlDocument, type YamlNode } from "@context-hub/core/yaml-document"
 
 import {
   declarationLine,
@@ -93,6 +94,11 @@ export interface McpTomlTools {
   tomlEntryLines(text: string, table: string, name: string): [number, number] | null
 }
 
+export interface McpYamlTools {
+  parseYamlDocument(text: string): YamlNode | null
+  spliceYamlDocument(text: string, start: number, end: number, replacement: string): string
+}
+
 /** How a provider reports what went wrong. */
 export interface McpFailureTools {
   /**
@@ -113,6 +119,7 @@ export interface McpTools
   extends McpDeclarationTools,
     McpJsonTools,
     McpTomlTools,
+    McpYamlTools,
     McpFailureTools {
   /** A key written the way TOML spells it, quoted when it is not bare. */
   writeTomlKey(name: string): string
@@ -129,6 +136,8 @@ function parseToml(text: string): Record<string, unknown> {
 
 /** The toolkit itself, assembled in one place so nothing can go missing from it. */
 export const mcpTools: McpTools = {
+  parseYamlDocument,
+  spliceYamlDocument,
   readDeclaration,
   writeDeclaration,
   declarationLine,

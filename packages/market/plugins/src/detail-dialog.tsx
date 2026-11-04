@@ -324,7 +324,7 @@ export function MarketDetailDialog({
                 client is handed is exactly what is written there. */}
             {tabs.includes("mcp") ? (
               <TabsContent value="mcp" className="min-h-0 flex-1 px-8 py-7">
-                <CodeCard path=".mcp.json" text={contents?.mcp ?? ""} className="h-full" />
+                <CodeCard path={contents?.mcpPath ?? ".mcp.json"} text={contents?.mcp ?? ""} className="h-full" />
               </TabsContent>
             ) : null}
           </Tabs>

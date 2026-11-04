@@ -1,4 +1,6 @@
 import { promises as fs } from "node:fs"
+import { spawn } from "node:child_process"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -7,7 +9,7 @@ import { writeFileAtomic } from "@context-hub/core/host/atomic"
 import { createFsPluginLibrary } from "../src/host/library.ts"
 import { createInstallerFiles } from "../src/host/installer-files.ts"
 import { writeMarketplaceIndexes } from "../src/host/marketplace.ts"
-import type { PluginDiskDeclaration } from "../src/provider.ts"
+import type { PluginDiskDeclaration, PluginJournalCommit } from "../src/provider.ts"
 
 const declaration: PluginDiskDeclaration = {
   home: ".claude",
@@ -54,6 +56,29 @@ async function collect(): Promise<void> {
   await fs.writeFile(path.join(staged, ".claude-plugin", "plugin.json"), '{"name":"demo","version":"1.0.0"}')
   await fs.writeFile(path.join(staged, "skills", "one", "SKILL.md"), "one")
   await library.add("demo", staged, { kind: "local", path: root }, "fixture")
+}
+
+function journalScope(): PluginDiskDeclaration {
+  return {
+    ...declaration,
+    directories: [":name"],
+    config: { write: ["store/lock", "store/state.json", "store/previous.json", "store/projection.json", "store/transactions/*", "store/staging/*", "store/rollback/*"], read: ["store/transactions", "store/staging", "store/rollback"] },
+    stateFiles: { write: ["*"], read: [] },
+    library: { write: [], read: ["demo"] },
+    lease: { ref: { root: "config", path: "store/lock" }, stale: 60000, update: 5000, retries: { retries: 0, factor: 1, minTimeout: 10, maxTimeout: 10, randomize: false } },
+  }
+}
+
+function journalRecipe(sourceSnapshot: string): PluginJournalCommit {
+  return {
+    pending: { root: "config", path: "store/transactions" },
+    guardEmpty: [{ root: "config", path: "store/staging" }, { root: "config", path: "store/rollback" }],
+    journal: { ref: { root: "config", path: "store/transactions/fixture.json" }, prepared: '{"phase":"prepared"}', swapped: '{"phase":"swapped"}', committed: '{"phase":"committed"}' },
+    before: [{ ref: { root: "config", path: "store/previous.json" }, before: null, after: "previous" }],
+    commit: { ref: { root: "config", path: "store/state.json" }, before: null, after: "committed" },
+    after: [{ ref: { root: "config", path: "store/projection.json" }, before: null, after: "projection" }],
+    artifact: { operation: "copy", name: "demo", destination: "demo", sourceSnapshot, before: null, staging: { root: "config", path: "store/staging/fixture" }, backup: { root: "config", path: "store/rollback/fixture" } },
+  }
 }
 
 describe("installer file roots and boundaries", () => {
@@ -109,6 +134,46 @@ describe("installer file roots and boundaries", () => {
     await expect(disk.roots(declaration)).rejects.toThrow(/absolute/)
   })
 
+  it("supports an explicitly declared direct-child plugin directory", async () => {
+    await collect()
+    const disk = files()
+    const scoped = { ...declaration, directories: [":name"], stateFiles: { write: ["*"], read: [] } }
+    await disk.run(scoped, async (roots) => {
+      await disk.commit(roots, [], { name: "demo", destination: "demo", before: null })
+      const ref = { root: "plugins" as const, path: "demo" }
+      const snapshot = await disk.snapshotDirectory(roots, ref)
+      expect(snapshot).toMatch(/^[a-f0-9]{64}$/)
+      await expect(disk.removeDirectory(roots, { root: "plugins", path: ".." })).rejects.toThrow()
+      await disk.commit(roots, [], undefined, { ref, before: snapshot })
+      expect(await disk.snapshotDirectory(roots, ref)).toBeNull()
+    })
+    for (const template of ["*", ":name/:name", "../:name", ""]) {
+      await expect(disk.roots({ ...scoped, directories: [template] })).rejects.toThrow()
+    }
+  })
+
+  it("expands declared environment roots and captures canonical workspaces", async () => {
+    const disk = files()
+    const scoped = { ...declaration, stateEnv: undefined, homeEnvResolution: "workspace" as const, canonicalWorkspace: true }
+    env.CLAUDE_CONFIG_DIR = "~/custom"
+    const expanded = await disk.roots(scoped)
+    expect(expanded.config).toBe(path.join(root, "user", "custom"))
+    expect(expanded.workspaceCanonical).toBe(await fs.realpath(workspace!))
+    const actualWorkspace = workspace!
+    const linkedWorkspace = path.join(root, "linked-workspace")
+    await fs.symlink(actualWorkspace, linkedWorkspace, "junction")
+    workspace = linkedWorkspace
+    expect((await disk.roots(scoped)).workspaceCanonical).toBe(await fs.realpath(actualWorkspace))
+    workspace = actualWorkspace
+    env.CLAUDE_CONFIG_DIR = "relative/config"
+    expect((await disk.roots(scoped)).config).toBe(path.join(workspace!, "relative", "config"))
+    workspace = path.join(root, "missing-workspace")
+    expect((await disk.roots(scoped)).workspaceCanonical).toBe(workspace)
+    workspace = null
+    await expect(disk.roots(scoped)).rejects.toThrow(/selected workspace/)
+    await expect(disk.roots({ ...declaration, homeEnvResolution: "invalid" as never })).rejects.toThrow(/resolution/)
+  })
+
   it("refuses path escapes, symlinks, and workspace changes", async () => {
     const disk = files()
     const roots = await disk.roots(declaration)
@@ -144,6 +209,227 @@ describe("installer file roots and boundaries", () => {
       ])).rejects.toThrow(/injected failure/)
       expect(await disk.read(locked, first)).toBe("before")
       expect(await disk.read(locked, second)).toBeNull()
+    })
+  })
+
+  it("respects a compatible lock held by another process", async () => {
+    const lockPath = path.join(env.CLAUDE_CONFIG_DIR!, "extension-store", "lock")
+    await fs.mkdir(path.dirname(lockPath), { recursive: true })
+    await fs.writeFile(lockPath, "")
+    const modulePath = createRequire(import.meta.url).resolve("proper-lockfile")
+    const script = `const lock=require(process.argv[1]); lock(process.argv[2],{stale:60000,update:5000}).then(release=>{process.send('ready');process.on('message',async()=>{await release();process.exit(0)})}).catch(error=>{console.error(error);process.exit(1)})`
+    const child = spawn(process.execPath, ["-e", script, modulePath, lockPath], { stdio: ["ignore", "ignore", "pipe", "ipc"] })
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error("lock fixture did not start")), 5000)
+        child.once("message", () => { clearTimeout(timer); resolve() })
+        child.once("exit", code => { clearTimeout(timer); reject(new Error(`lock fixture exited ${code}`)) })
+        child.once("error", error => { clearTimeout(timer); reject(error) })
+      })
+      const disk = files()
+      const scoped = {
+        ...declaration,
+        config: { ...declaration.config, write: [...declaration.config.write, "extension-store/lock"] },
+        lease: { ref: { root: "config" as const, path: "extension-store/lock" }, stale: 60000, update: 5000, retries: { retries: 0, factor: 1.2, minTimeout: 50, maxTimeout: 500, randomize: true } },
+      }
+      await expect(disk.begin(scoped)).rejects.toThrow()
+      child.send("release")
+      await new Promise<void>((resolve, reject) => child.once("exit", code => code === 0 ? resolve() : reject(new Error(`lock fixture exited ${code}`))))
+      await disk.run(scoped, async roots => {
+        expect(await fs.stat(`${lockPath}.lock`)).toBeDefined()
+        expect(await disk.read(roots, { root: "config", path: "settings.json" })).toBeNull()
+      })
+      expect(await fs.stat(`${lockPath}.lock`).catch(() => null)).toBeNull()
+    } finally {
+      if (child.exitCode === null) child.kill()
+    }
+  })
+
+  it("recovers a stale compatible lock and still rejects symlinked lock targets", async () => {
+    const disk = files()
+    const scoped = {
+      ...declaration,
+      config: { ...declaration.config, write: [...declaration.config.write, "extension-store/lock"] },
+      lease: { ref: { root: "config" as const, path: "extension-store/lock" }, stale: 60000, update: 5000, retries: { retries: 0, factor: 1, minTimeout: 10, maxTimeout: 10, randomize: false } },
+    }
+    const dir = path.join(env.CLAUDE_CONFIG_DIR!, "extension-store")
+    await fs.mkdir(path.join(dir, "lock.lock"), { recursive: true })
+    const old = new Date(Date.now() - 120000)
+    await fs.utimes(path.join(dir, "lock.lock"), old, old)
+    await disk.run(scoped, async roots => { expect(await fs.stat(`${path.join(roots.config, "extension-store", "lock")}.lock`)).toBeDefined() })
+    await fs.rm(path.join(dir, "lock"))
+    await fs.symlink(root, path.join(dir, "lock"), "junction")
+    await expect(disk.begin(scoped)).rejects.toThrow(/symbolic link/)
+  })
+
+  it("refuses further operations after a lease is compromised", async () => {
+    const disk = files()
+    const scoped = {
+      ...declaration,
+      config: { ...declaration.config, write: [...declaration.config.write, "extension-store/lock"] },
+      lease: { ref: { root: "config" as const, path: "extension-store/lock" }, stale: 5000, update: 1000, retries: { retries: 0, factor: 1, minTimeout: 10, maxTimeout: 10, randomize: false } },
+    }
+    await expect(disk.run(scoped, async roots => {
+      await fs.rmdir(path.join(roots.config, "extension-store", "lock.lock"))
+      await new Promise(resolve => setTimeout(resolve, 1800))
+      await disk.read(roots, { root: "config", path: "settings.json" })
+    })).rejects.toThrow(/compromised/)
+  })
+
+  it("commits a journalled artifact and removes its recovery files", async () => {
+    await collect()
+    const disk = files()
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      const result = await disk.journalCommit(roots, journalRecipe(source!))
+      expect(result).toEqual({ committed: true, warnings: [] })
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBe("committed")
+      expect(await disk.read(roots, { root: "config", path: "store/projection.json" })).toBe("projection")
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBe(source)
+      expect(await fs.readdir(path.join(roots.config, "store", "transactions"))).toEqual([])
+    })
+  })
+
+  it("refuses recovery directories containing a symbolic link", async () => {
+    await collect()
+    const disk = files()
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      const staging = path.join(roots.config, "store", "staging")
+      await fs.mkdir(staging, { recursive: true })
+      await fs.symlink(root, path.join(staging, "unknown"), "junction")
+      expect(await disk.list(roots, { root: "config", path: "store/staging" })).toEqual([])
+      expect(await disk.list(roots, { root: "config", path: "store/staging" }, { includeLinks: true })).toEqual([{ name: "unknown", directory: false }])
+      await expect(disk.journalCommit(roots, journalRecipe(source!))).rejects.toThrow(/pending client transaction/)
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBeNull()
+    })
+  })
+
+  it("refuses an occupied backup path without reading or removing it", async () => {
+    await collect()
+    const disk = files()
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      const backup = path.join(roots.config, "store", "rollback", "fixture")
+      await fs.mkdir(backup, { recursive: true })
+      await fs.writeFile(path.join(backup, "person-file"), "keep")
+      await expect(disk.journalCommit(roots, { ...journalRecipe(source!), guardEmpty: [] })).rejects.toThrow(/directory changed/)
+      expect(await fs.readFile(path.join(backup, "person-file"), "utf8")).toBe("keep")
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBeNull()
+    })
+  })
+
+  it("uses the same filtered source snapshot for journalled copies", async () => {
+    await collect()
+    const disk = files(), scoped = { ...journalScope(), copyExcludeTop: [".env", ".env.*"], copyRejectNested: [".env", ".env.*"] }
+    const sourceDir = path.join(root, "hub", "plugins", "demo")
+    await fs.writeFile(path.join(sourceDir, ".env"), "fixture private")
+    await disk.run(scoped, async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      await disk.journalCommit(roots, journalRecipe(source!))
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBe(source)
+      expect(await fs.lstat(path.join(roots.plugins, "demo", ".env")).catch(() => null)).toBeNull()
+    })
+  })
+
+  it("retries transient artifact renames before failing", async () => {
+    await collect()
+    let attempts = 0
+    const disk = createInstallerFiles({
+      library: createFsPluginLibrary(path.join(root, "hub")), workspace: async () => workspace, userHome: path.join(root, "user"), env,
+      rename: async (from, to) => {
+        attempts++
+        if (attempts < 3) throw Object.assign(new Error("temporary lock"), { code: "EPERM" })
+        await fs.rename(from, to)
+      },
+    })
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      expect((await disk.journalCommit(roots, journalRecipe(source!))).committed).toBe(true)
+      expect(attempts).toBe(3)
+    })
+  })
+
+  it("rolls back an artifact when the commit point fails", async () => {
+    await collect()
+    const disk = files(async (file, text) => {
+      if (file.endsWith("state.json")) throw new Error("injected commit failure")
+      await writeFileAtomic(file, text)
+    })
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      await expect(disk.journalCommit(roots, journalRecipe(source!))).rejects.toThrow(/injected commit failure/)
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBeNull()
+      expect(await disk.read(roots, { root: "config", path: "store/previous.json" })).toBeNull()
+      expect(await fs.readdir(path.join(roots.config, "store", "transactions"))).toEqual([])
+    })
+  })
+
+  it("preserves a concurrent state change immediately before replacement", async () => {
+    await collect()
+    const disk = files(async (file, text, options) => {
+      if (file.endsWith("state.json")) {
+        await fs.mkdir(path.dirname(file), { recursive: true })
+        await fs.writeFile(file, "external change")
+      }
+      await writeFileAtomic(file, text, options)
+    })
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      await expect(disk.journalCommit(roots, journalRecipe(source!))).rejects.toThrow(/file changed/)
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBe("external change")
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBeNull()
+    })
+  })
+
+  it("reports a committed transaction when projection fails", async () => {
+    await collect()
+    const disk = files(async (file, text) => {
+      if (file.endsWith("projection.json")) throw new Error("injected projection failure")
+      await writeFileAtomic(file, text)
+    })
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      const result = await disk.journalCommit(roots, journalRecipe(source!))
+      expect(result.committed).toBe(true)
+      expect(result.warnings.join()).toMatch(/injected projection failure/)
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBe("committed")
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBe(source)
+      expect(await disk.read(roots, { root: "config", path: "store/transactions/fixture.json" })).toContain("committed")
+      await expect(disk.journalCommit(roots, journalRecipe(source!))).rejects.toThrow(/pending client transaction/)
+    })
+  })
+
+  it("retains a swapped journal if the commit marker fails after the commit point", async () => {
+    await collect()
+    const disk = files(async (file, text) => {
+      if (file.endsWith("fixture.json") && typeof text === "string" && text.includes('"committed"')) throw new Error("injected marker failure")
+      await writeFileAtomic(file, text)
+    })
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      const result = await disk.journalCommit(roots, journalRecipe(source!))
+      expect(result.committed).toBe(true)
+      expect(result.warnings.join()).toMatch(/injected marker failure/)
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBe("committed")
+      expect(await disk.read(roots, { root: "config", path: "store/transactions/fixture.json" })).toContain("swapped")
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBe(source)
+    })
+  })
+
+  it("recognizes a committed state even if its writer reports an error after writing", async () => {
+    await collect()
+    const disk = files(async (file, text) => {
+      await writeFileAtomic(file, text)
+      if (file.endsWith("state.json")) throw new Error("injected post-write failure")
+    })
+    await disk.run(journalScope(), async roots => {
+      const source = await disk.snapshotDirectory(roots, { root: "library", path: "demo" })
+      const result = await disk.journalCommit(roots, journalRecipe(source!))
+      expect(result.committed).toBe(true)
+      expect(result.warnings.join()).toMatch(/injected post-write failure/)
+      expect(await disk.read(roots, { root: "config", path: "store/state.json" })).toBe("committed")
+      expect(await disk.snapshotDirectory(roots, { root: "plugins", path: "demo" })).toBe(source)
     })
   })
 

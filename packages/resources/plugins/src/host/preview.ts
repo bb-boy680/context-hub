@@ -13,7 +13,7 @@
 import { promises as fs } from "node:fs"
 import path from "node:path"
 
-import type { PackContents } from "../contract.ts"
+import type { PackContents, PluginManifestRule } from "../contract.ts"
 import type { PluginSourceSpec } from "../inspect.ts"
 import { readPackContents } from "./contents.ts"
 import { fetchPlugin, stagingDir } from "./fetch.ts"
@@ -36,7 +36,7 @@ const cached = new Map<string, { at: number; value: MarketPreview }>()
 const pending = new Map<string, Promise<MarketPreview>>()
 
 /** One address as the cache key: every part that names different bytes. */
-function keyOf(spec: PluginSourceSpec, manifests: readonly string[]): string {
+function keyOf(spec: PluginSourceSpec, manifests: readonly string[], rules: readonly PluginManifestRule[]): string {
   return JSON.stringify([
     spec.kind,
     "url" in spec ? spec.url : "",
@@ -44,17 +44,18 @@ function keyOf(spec: PluginSourceSpec, manifests: readonly string[]): string {
     "ref" in spec ? spec.ref : "",
     "sha" in spec ? spec.sha : "",
     manifests,
+    rules,
   ])
 }
 
 /** Fetch one pack into a staging directory, read it, and remove the directory. */
-async function readPreview(spec: PluginSourceSpec, manifests: readonly string[]): Promise<MarketPreview> {
+async function readPreview(spec: PluginSourceSpec, manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<MarketPreview> {
   const work = await stagingDir()
   const stage = path.join(work, "pack")
   try {
     await fs.mkdir(stage, { recursive: true })
     await fetchPlugin(spec, stage, work)
-    const contents = await readPackContents(stage, manifests)
+    const contents = await readPackContents(stage, manifests, rules)
     let readme: string | null = null
     for (const name of README_NAMES) {
       readme = await fs.readFile(path.join(stage, name), "utf8").catch(() => null)
@@ -72,15 +73,15 @@ async function readPreview(spec: PluginSourceSpec, manifests: readonly string[])
  * @param spec — a validated market address.
  * @throws {Error} when the pack cannot be fetched or read.
  */
-export function previewMarket(spec: PluginSourceSpec, manifests: readonly string[] = []): Promise<MarketPreview> {
-  const key = keyOf(spec, manifests)
+export function previewMarket(spec: PluginSourceSpec, manifests: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<MarketPreview> {
+  const key = keyOf(spec, manifests, rules)
   const hit = cached.get(key)
   if (hit !== undefined && Date.now() - hit.at < PREVIEW_TTL) {
     return Promise.resolve(hit.value)
   }
   const running = pending.get(key)
   if (running !== undefined) return running
-  const job = readPreview(spec, manifests)
+  const job = readPreview(spec, manifests, rules)
     .then((value) => {
       cached.set(key, { at: Date.now(), value })
       return value

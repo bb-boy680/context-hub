@@ -25,11 +25,14 @@ import path from "node:path"
 import type { AssetStore } from "@context-hub/core"
 
 import {
+  matchesPluginManifestRule,
   pluginManifestPaths,
+  pluginManifestRules,
   PLUGIN_MARKETPLACE_MANIFEST,
   hasStandardComponents,
   marketplaceManifest,
   type PackDescription,
+  type PluginManifestRule,
 } from "../contract.ts"
 import { findLogo, storePicture } from "./logo.ts"
 import { assertPackRelative } from "./names.ts"
@@ -89,7 +92,7 @@ const NOTHING: ManifestFields = {
  * @param dir — the pack's directory.
  * @returns what the manifest says, with `carried` saying whether one was found at all.
  */
-export async function readManifestFields(dir: string, paths: readonly string[] = []): Promise<ManifestFields> {
+export async function readManifestFields(dir: string, paths: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<ManifestFields> {
   let carried = false
   for (const relative of pluginManifestPaths(paths)) {
     const manifest = await readManifestFile(await safePackPath(dir, relative))
@@ -97,6 +100,30 @@ export async function readManifestFields(dir: string, paths: readonly string[] =
     carried = true
     const name =
       typeof manifest.name === "string" && manifest.name !== "" ? manifest.name : undefined
+    const version = typeof manifest.version === "string" ? manifest.version : ""
+    if (name === undefined && version === "") continue
+    if (typeof manifest.icon === "string") await safePackPath(dir, manifest.icon)
+    return {
+      carried: true,
+      marketplace: false,
+      components: false,
+      ...(name === undefined ? {} : { name }),
+      version,
+      description: typeof manifest.description === "string" ? manifest.description : "",
+      ...(typeof manifest.icon === "string" ? { icon: manifest.icon } : {}),
+      document: manifest,
+    }
+  }
+
+  /* An extension's structured rule claims a manifest only when its declared
+     literal fields are present; a package.json without them stays a plain
+     package. This runs before the marketplace and component fallbacks so an
+     explicit declaration wins over a layout guess. */
+  for (const rule of pluginManifestRules(rules)) {
+    const manifest = await readManifestFile(await safePackPath(dir, rule.file))
+    if (manifest === null || !matchesPluginManifestRule(manifest, rule)) continue
+    carried = true
+    const name = typeof manifest.name === "string" && manifest.name !== "" ? manifest.name : undefined
     const version = typeof manifest.version === "string" ? manifest.version : ""
     if (name === undefined && version === "") continue
     if (typeof manifest.icon === "string") await safePackPath(dir, manifest.icon)
@@ -204,9 +231,10 @@ export async function describePack(
   dir: string,
   name: string,
   assets: AssetStore,
-  paths: readonly string[] = []
+  paths: readonly string[] = [],
+  rules: readonly PluginManifestRule[] = []
 ): Promise<PackDescription> {
-  const fields = await readManifestFields(dir, paths)
+  const fields = await readManifestFields(dir, paths, rules)
   const logo = fields.icon === undefined ? await findLogo(dir) : (await safePackPath(dir, fields.icon), fields.icon)
   const icon = logo === undefined ? undefined : await storePicture(assets, dir, name, logo)
   return {

@@ -90,6 +90,7 @@ export const mcpMessages: Record<string, string> = {
   "mcp.error.incomplete": "A server needs a command or a URL before it can be written.",
   "mcp.error.noRecord": "{name} is not recorded in the hub, so there is nothing to delete.",
   "mcp.error.selfManaged": "That client manages this itself; the hub cannot switch it off.",
+  "mcp.error.readOnly": "This declaration cannot be changed safely.",
   "mcp.empty.noStore.title": "No MCP store here",
   "mcp.empty.noStore.hint":
     "This form cannot read the MCP config files. Open the hub with its local host to declare servers.",
@@ -124,6 +125,7 @@ export const mcpMessages: Record<string, string> = {
   "mcp.detail.place.machine": "This machine",
   "mcp.place.on": "on",
   "mcp.place.off": "off",
+  "mcp.place.unknown": "Unknown",
   "mcp.menu.enabled.title": "Enable",
   "mcp.menu.enabled.tally": "{count} on",
   "mcp.menu.enabled.note": "{scope} · {state}",

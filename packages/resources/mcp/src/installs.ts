@@ -67,8 +67,11 @@ export function installedCount(states: readonly McpPlaceState[]): number {
  * this rather than a field of its own, so a switch flipped in the menu and the
  * chip beside it can never disagree.
  */
-export function isEnabled(server: McpServer): boolean {
-  return server.detail.installs.some((install) => install.installed && install.enabled)
+export function isEnabled(server: McpServer): boolean | null {
+  const installed = server.detail.installs.filter((install) => install.installed)
+  if (installed.some((install) => install.enabled === true)) return true
+  if (installed.some((install) => install.enabled === null)) return null
+  return false
 }
 
 /**

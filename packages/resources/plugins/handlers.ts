@@ -27,7 +27,7 @@ import {
   type HubMiddleware,
 } from "@context-hub/core/host/http"
 
-import { PLUGIN_ROUTE, PluginNameTakenError, pluginManifestPaths } from "./src/contract.ts"
+import { PLUGIN_ROUTE, PluginNameTakenError, pluginManifestPaths, pluginManifestRules } from "./src/contract.ts"
 import { assertMarketInstall } from "./src/market-install.ts"
 import { createPluginCollector, type PackUpload } from "./src/host/collect.ts"
 import { readPackContents } from "./src/host/contents.ts"
@@ -146,6 +146,9 @@ export function createPluginHandler(
       const manifests = pluginManifestPaths(method === "GET"
         ? JSON.parse(url.searchParams.get("manifests") ?? "[]") as unknown
         : sent?.manifests)
+      const rules = pluginManifestRules(method === "GET"
+        ? JSON.parse(url.searchParams.get("rules") ?? "[]") as unknown
+        : sent?.rules)
 
       /* GET /hub/plugins?action=list — every collected pack, and which of
          them have no files: the index is what says a pack was here, so a
@@ -155,7 +158,7 @@ export function createPluginHandler(
         sendJson(response, 200, {
           root: library.root,
           plugins: await library.list(),
-          missing: await library.missing(manifests),
+          missing: await library.missing(manifests, rules),
         })
         return
       }
@@ -242,7 +245,8 @@ export function createPluginHandler(
             dir === null
               ? library.packDir(requiredString(url.searchParams.get("name"), "name"))
               : dir,
-            manifests
+            manifests,
+            rules
           )
         )
         return
@@ -262,14 +266,14 @@ export function createPluginHandler(
           sendJson(response, 200, await disk.begin(body.declaration as PluginDiskDeclaration))
           return
         case "disk-end":
-          disk.end(requiredString(body.token, "token"))
+          await disk.end(requiredString(body.token, "token"))
           sendJson(response, 200, {})
           return
         case "disk-read":
           sendJson(response, 200, { text: await disk.read(body.roots as PluginDiskRoots, body.ref as PluginDiskRef) })
           return
         case "disk-list":
-          sendJson(response, 200, { entries: await disk.list(body.roots as PluginDiskRoots, body.ref as PluginDiskRef) })
+          sendJson(response, 200, { entries: await disk.list(body.roots as PluginDiskRoots, body.ref as PluginDiskRef, body.options as Parameters<typeof disk.list>[2]) })
           return
         case "disk-path":
           sendJson(response, 200, { path: await disk.path(body.roots as PluginDiskRoots, body.ref as PluginDiskRef) })
@@ -287,23 +291,26 @@ export function createPluginHandler(
           await disk.removeDirectory(body.roots as PluginDiskRoots, body.ref as PluginDiskRef)
           sendJson(response, 200, {})
           return
+        case "disk-journal-commit":
+          sendJson(response, 200, await disk.journalCommit(body.roots as PluginDiskRoots, body.recipe as Parameters<typeof disk.journalCommit>[1]))
+          return
         case "disk-commit":
           await disk.commit(body.roots as PluginDiskRoots, body.changes as PluginDiskChange[], body.copy as Parameters<typeof disk.commit>[2], body.remove as Parameters<typeof disk.commit>[3])
           sendJson(response, 200, {})
           return
         case "add":
-          sendJson(response, 200, await collector.add(requiredString(body.source, "source"), manifests))
+          sendJson(response, 200, await collector.add(requiredString(body.source, "source"), manifests, rules))
           return
         /* A pack a market index named. The spec is validated here again: the
            page's copy of the rules is a courtesy, the host's is the boundary. */
         case "market-install":
-          sendJson(response, 200, await collector.addSpec(assertMarketInstall(body.spec), manifests))
+          sendJson(response, 200, await collector.addSpec(assertMarketInstall(body.spec), manifests, rules))
           return
         /* A pack's own contents before it is collected: a staging fetch the
            library never sees, so the detail can show a README and what the
            pack carries without putting it in the library. */
         case "market-preview":
-          sendJson(response, 200, await previewMarket(assertMarketInstall(body.spec), manifests))
+          sendJson(response, 200, await previewMarket(assertMarketInstall(body.spec), manifests, rules))
           return
         /* A folder a person chose, as the files in it. A page cannot name a
            directory on this machine, so this is the only way a pack that
@@ -315,7 +322,8 @@ export function createPluginHandler(
             await collector.addFolder(
               requiredString(body.name, "name"),
               uploadsOf(body.files),
-              manifests
+              manifests,
+              rules
             )
           )
           return
@@ -327,7 +335,7 @@ export function createPluginHandler(
            its record carries. One pack per request, so a page can run
            several at once and stop asking about each as it lands. */
         case "restore":
-          sendJson(response, 200, await collector.restore(requiredString(body.name, "name"), manifests))
+          sendJson(response, 200, await collector.restore(requiredString(body.name, "name"), manifests, rules))
           return
         case "tags":
           await library.setTags(
@@ -370,7 +378,7 @@ export function createPluginHandler(
           )
           return
         case "update":
-          sendJson(response, 200, await updater.update(requiredString(body.name, "name"), manifests))
+          sendJson(response, 200, await updater.update(requiredString(body.name, "name"), manifests, rules))
           return
         /* The indexes a client reads, written from the library as it stands. */
         case "sync-marketplace":
@@ -407,7 +415,8 @@ export function createPluginHandler(
               requiredString(body.path, "path"),
               requiredString(body.name, "name"),
               assets,
-              manifests
+              manifests,
+              rules
             )
           )
           return

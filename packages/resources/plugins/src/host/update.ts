@@ -19,7 +19,7 @@ import path from "node:path"
 
 import { folderHash } from "@context-hub/core/host/folder-hash"
 
-import { installedRevision, type PluginOrigin } from "../contract.ts"
+import { installedRevision, type PluginManifestRule, type PluginOrigin } from "../contract.ts"
 import type { PluginRecord } from "../revision.ts"
 import { originToSpec } from "../inspect.ts"
 import { fetchPlugin, stagingDir } from "./fetch.ts"
@@ -46,13 +46,13 @@ export interface PluginUpdater {
    * @returns what happened, including the case where nothing needed to change.
    * @throws {Error} when the pack is not in the library, or has no source to fetch again.
    */
-  update(name: string, manifests?: readonly string[]): Promise<PluginUpdateOutcome>
+  update(name: string, manifests?: readonly string[], rules?: readonly PluginManifestRule[]): Promise<PluginUpdateOutcome>
 }
 
 /** Create the updater over one library. */
 export function createPluginUpdater(library: PluginLibrary): PluginUpdater {
   return {
-    async update(name, manifests) {
+    async update(name, manifests, rules) {
       const records = await library.list()
       const record = records.find((one) => one.name === name)
       if (record === undefined) throw new Error(`${name} is not in this library`)
@@ -86,7 +86,7 @@ export function createPluginUpdater(library: PluginLibrary): PluginUpdater {
         }
 
         const edited = (await library.hash(name).catch(() => null)) !== record.hash
-        const updated = await library.replace(name, stage, source, landed, manifests)
+        const updated = await library.replace(name, stage, source, landed, manifests, rules)
         /* The check that said "there is an update" is answered by this update,
            so it is replaced rather than left to be re-read as still true. */
         await library.setCheck(name, {

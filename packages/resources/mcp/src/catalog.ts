@@ -74,7 +74,7 @@ export function placesOf(
         provider,
         place: {
           ...place,
-          path: place.scope === "global" ? `~/${place.file}` : place.file,
+          path: place.scope === "global" ? `~/${place.root === undefined ? "" : `${place.root.home}/`}${place.file}` : place.file,
           client: provider.id,
           icon: iconFor(provider.id),
         },
@@ -83,6 +83,39 @@ export function placesOf(
   }
   /* Stable sort: one rank per scope, so a group keeps the order it arrived in. */
   return places.sort((left, right) => scopeRank(left.place) - scopeRank(right.place))
+}
+
+export async function resolvePlaces(
+  providers: readonly McpProvider[],
+  iconFor: (id: string) => ExtensionIcon,
+  files: PlaceFiles,
+  log: McpLog
+): Promise<ScannedPlace[]> {
+  const io: McpIo = { files, log }
+  const resolved = await Promise.all(providers.map(async (provider) => ({
+    provider,
+    places: provider.placesFor === undefined ? provider.places : await provider.placesFor(io),
+  })))
+  const places: ScannedPlace[] = []
+  const ids = new Set<string>()
+  for (const { provider, places: entries } of resolved) {
+    for (const place of entries) {
+      if (ids.has(place.id)) throw new Error(`duplicate MCP place: ${place.id}`)
+      ids.add(place.id)
+      const display = place.root !== undefined
+        ? await files.display?.(place) ?? (() => { throw new Error("client path display is not supported") })()
+        : place.scope === "global" ? `~/${place.file}` : place.file
+      places.push({ provider, place: { ...place, path: display.replaceAll("\\", "/"), client: provider.id, icon: iconFor(provider.id) } })
+    }
+  }
+  return places.sort((left, right) => scopeRank(left.place) - scopeRank(right.place))
+}
+
+export function availablePlaces(places: readonly ScannedPlace[], scan: McpScan | null): ScannedPlace[] {
+  const failed = new Set(scan?.problems.map((problem) => problem.place) ?? [])
+  return places.map((entry) => failed.has(entry.place.id)
+    ? { ...entry, place: { ...entry.place, installable: false, switchable: false } }
+    : entry)
 }
 
 /** Global places before workspace ones. */
@@ -109,7 +142,7 @@ export async function scanPlaces(
   await Promise.all(
     places.map(async ({ place, provider }) => {
       try {
-        entries.set(place.id, await provider.read(io, place.id))
+        entries.set(place.id, await provider.read({ ...io, place }, place.id))
       } catch (error) {
         problems.push({ place: place.id, failure: mcpFailure(error, "mcp.error.read") })
       }
@@ -171,6 +204,7 @@ function rowOf(
       place: place.id,
       installed: true,
       enabled: entry.enabled,
+      ...(entry.readOnly === true ? { readOnly: true } : {}),
       ...(entry.declaration === null ? { unreadable: true } : {}),
     })
     if (entry.declaration === null) unreadable += 1

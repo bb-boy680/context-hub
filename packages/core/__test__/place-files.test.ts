@@ -17,6 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
 import { readPlaceCall } from "../src/place-files.ts"
 import { assertPlaceFile, createFsPlaceFiles } from "../src/host/place-files.ts"
+import { writeFileAtomic } from "../src/host/atomic.ts"
 
 let root: string
 let home: string
@@ -140,6 +141,80 @@ describe("reading and writing", () => {
   it("still reads a global place without one", async () => {
     const noWorkspace = createFsPlaceFiles({ home: path.join(root, "empty-hub"), userHome })
     expect(await noWorkspace.read({ scope: "global", file: "absent.json" })).toBeNull()
+  })
+})
+
+describe("declared client roots", () => {
+  const client = { scope: "global", file: "cordis.patch.yml", root: { home: ".example", homeEnv: "EXAMPLE_HOME", list: ["profiles"] } } as const
+
+  it("uses fallback and absolute environment roots, then rejects stale snapshots", async () => {
+    const env: NodeJS.ProcessEnv = {}
+    const port = createFsPlaceFiles({ home, userHome, env })
+    const before = await port.snapshot!(client)
+    expect(before.text).toBeNull()
+    await port.commit!(client, before, "first")
+    expect(await fs.readFile(path.join(userHome, ".example/cordis.patch.yml"), "utf8")).toBe("first")
+    await expect(port.commit!(client, before, "lost")).rejects.toThrow(/changed/)
+    const captured = await port.snapshot!(client)
+    const pinned = { ...client, rootIdentity: captured.root }
+    expect(readPlaceCall({ action: "read", ref: pinned }).ref?.rootIdentity).toBe(captured.root)
+    env.EXAMPLE_HOME = path.join(root, "alternate")
+    await expect(port.read(pinned)).rejects.toThrow(/root changed/)
+    await expect(port.commit!(client, captured, "wrong root")).rejects.toThrow(/changed/)
+    const alternate = await port.snapshot!(client)
+    await port.commit!(client, alternate, "second")
+    expect(await fs.readFile(path.join(root, "alternate/cordis.patch.yml"), "utf8")).toBe("second")
+    env.EXAMPLE_HOME = "   "
+    expect(await port.read(client)).toBe("first")
+    env.EXAMPLE_HOME = "relative/path"
+    await expect(port.read(client)).rejects.toThrow(/absolute/)
+  })
+
+  it("lists direct directories and rejects unsafe paths, env names and unguarded writes", async () => {
+    const port = createFsPlaceFiles({ home, userHome, env: {} })
+    await fs.mkdir(path.join(userHome, ".example/profiles/one"), { recursive: true })
+    await fs.mkdir(path.join(userHome, ".example/profiles/two"), { recursive: true })
+    await fs.writeFile(path.join(userHome, ".example/profiles/file"), "x")
+    expect(await port.list!({ ...client, file: "profiles" })).toEqual(["one", "two"])
+    await expect(port.list!({ ...client, file: "other" })).rejects.toThrow(/allowlist/)
+    await expect(port.list!({ ...client, root: { ...client.root, list: ["../escape"] }, file: "profiles" })).rejects.toThrow()
+    await expect(port.write(client, "x")).rejects.toThrow(/guarded/)
+    await expect(port.read({ ...client, root: { home: "../other" } })).rejects.toThrow()
+    await expect(port.read({ ...client, root: { home: ".example", homeEnv: "SECRET_HOME" } })).rejects.toThrow()
+    await expect(port.read({ ...client, file: "..\\outside" })).rejects.toThrow()
+    expect(readPlaceCall({ action: "snapshot", ref: client }).ref?.root).toEqual(client.root)
+    expect(() => readPlaceCall({ action: "commit", ref: client, text: "x" })).toThrow(/snapshot/)
+  })
+
+  it("refuses a symlink inside a declared root", async () => {
+    const port = createFsPlaceFiles({ home, userHome, env: {} })
+    const outside = path.join(root, "outside")
+    await fs.mkdir(outside, { recursive: true })
+    await fs.mkdir(path.join(userHome, ".example"), { recursive: true })
+    await fs.symlink(outside, path.join(userHome, ".example/link"), "junction")
+    await expect(port.snapshot!({ ...client, file: "link/file.yml" })).rejects.toThrow(/symbolic link/)
+  })
+
+  it("rechecks immediately before replacement and removes the temporary file on failure", async () => {
+    const dir = path.join(root, "atomic-check")
+    await fs.mkdir(dir, { recursive: true })
+    const target = path.join(dir, "config.yml")
+    await fs.writeFile(target, "original")
+    await expect(writeFileAtomic(target, "replacement", { beforeReplace: async () => {
+      await fs.writeFile(target, "external")
+      throw new Error("conflict")
+    } })).rejects.toThrow("conflict")
+    expect(await fs.readFile(target, "utf8")).toBe("external")
+    expect(await fs.readdir(dir)).toEqual(["config.yml"])
+  })
+
+  it("serializes guarded commits to the same snapshot", async () => {
+    const port = createFsPlaceFiles({ home, userHome, env: {} })
+    const ref = { ...client, file: "race.yml" }
+    const before = await port.snapshot!(ref)
+    const results = await Promise.allSettled([port.commit!(ref, before, "one"), port.commit!(ref, before, "two")])
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1)
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1)
   })
 })
 

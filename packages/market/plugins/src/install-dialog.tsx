@@ -63,7 +63,7 @@ const CIRCLE =
 
 /** The agent's own word for a place, which is what the row's second line says. */
 function scopeWordKey(place: PluginPlace): string {
-  return place.scopeWord === "user" ? "plugins.scope.user" : "plugins.scope.project"
+  return `plugins.scope.${place.scopeWord}`
 }
 
 function Heading({ children }: { children: React.ReactNode }) {
@@ -123,9 +123,11 @@ export function MarketInstallDialog({
       .find((one) => one.client === client.id)
       ?.places.some((one) => one.group === place.scope && one.scope === place.scopeWord) ===
     true
+  const artifactIn = (client: PluginClient): boolean =>
+    (held?.held.find((one) => one.client === client.id)?.places.length ?? 0) > 0
   const targets = library.clients.flatMap((client) =>
     client.places
-      .filter((place) => picked.includes(place.id) && !belongs(client, place))
+      .filter((place) => (place.installable !== false || (place.initialInstallable === true && !artifactIn(client))) && picked.includes(place.id) && !belongs(client, place))
       .map((place) => ({ client, place }))
   )
   /* Already in the library and nothing picked: installing again would only
@@ -167,9 +169,11 @@ export function MarketInstallDialog({
       /* One refusal must not hide the places that did land, so each is tried
          and the first reason is what the dialog keeps. */
       let refused: string | null = null
+      const warnings: string[] = []
       for (const target of targets) {
         try {
-          await library.install(name, target.client.id, target.place.scopeWord)
+          const report = await library.install(name, target.client.id, target.place.scopeWord)
+          if (report.warning !== undefined && report.warning.trim() !== "") warnings.push(report.warning)
         } catch (error: unknown) {
           refused ??= error instanceof Error ? error.message : String(error)
         }
@@ -178,10 +182,20 @@ export function MarketInstallDialog({
         setFailure(refused)
         return
       }
-      toast.add({
-        type: "success",
-        title: t("market.plugins.install.done").replace("{name}", row.entry.name),
-      })
+      /* A committed delivery may still need follow-up; a success notice alone
+         would hide that from the person who asked for it. */
+      if (warnings.length > 0) {
+        toast.add({
+          type: "warning",
+          title: t("market.plugins.install.followUp").replace("{name}", row.entry.name),
+          description: warnings.join("\n"),
+        })
+      } else {
+        toast.add({
+          type: "success",
+          title: t("market.plugins.install.done").replace("{name}", row.entry.name),
+        })
+      }
       onOpenChange(false)
     })()
       .catch((error: unknown) => {
@@ -281,7 +295,7 @@ export function MarketInstallDialog({
             {SCOPES.map((scope) => {
               const group = library.clients.flatMap((client) =>
                 client.places
-                  .filter((place) => place.scope === scope)
+                  .filter((place) => place.scope === scope && (place.installable !== false || (place.initialInstallable === true && !artifactIn(client))))
                   .map((place) => ({ client, place }))
               )
               if (group.length === 0) return null

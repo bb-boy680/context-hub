@@ -248,7 +248,7 @@ export class PluginLibrary extends Service {
         id: one.installer.id,
         label: one.installer.label,
         icon: this.iconFor(one.installer.id),
-        places: one.installer.places,
+        places: one.places,
         switches: one.switches,
         available: one.available,
         ...(one.error === undefined ? {} : { error: one.error }),
@@ -263,7 +263,7 @@ export class PluginLibrary extends Service {
             client: one.installer.id,
             label: one.installer.label,
             icon: this.iconFor(one.installer.id),
-            places: one.installer.places,
+            places: one.places,
             switches: one.switches,
             packs: one.packs,
           }))

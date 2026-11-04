@@ -21,7 +21,7 @@
  */
 import { mapLimit } from "@context-hub/extensions"
 
-import type { PluginHeld, PluginInstaller, PluginSwitches, PluginTools } from "./provider.ts"
+import type { PluginHeld, PluginInstaller, PluginPlace, PluginSwitches, PluginTools } from "./provider.ts"
 
 /**
  * How many clients are asked at once.
@@ -45,6 +45,8 @@ export interface ClientProbe {
    * all, which `error` is what tells apart.
    */
   readonly available: boolean
+  /** The places this run resolved, for display and place-id dispatch. */
+  readonly places: readonly PluginPlace[]
   /** What the client holds; empty when it is absent, or when reading it failed. */
   readonly packs: readonly PluginHeld[]
   /**
@@ -79,19 +81,26 @@ function messageOf(error: unknown): string {
  * @returns what it holds, or why that could not be read.
  */
 async function probe(installer: PluginInstaller, tools: PluginTools): Promise<ClientProbe> {
+  let places: readonly PluginPlace[]
+  try {
+    places = installer.placesFor === undefined ? installer.places : await installer.placesFor(tools)
+  } catch (error) {
+    return { installer, places: [], available: true, packs: [], switches: {}, error: messageOf(error) }
+  }
   try {
     if (!(await installer.available(tools))) {
-      return { installer, available: false, packs: [], switches: {} }
+      return { installer, places, available: false, packs: [], switches: {} }
     }
   } catch (error) {
     /* Whether the program is on this machine could not be established, so this
        client is not offered as a target — but having failed to look is not the
        same as having looked and not found it, and the reason is what says so. */
-    return { installer, available: false, packs: [], switches: {}, error: messageOf(error) }
+    return { installer, places, available: false, packs: [], switches: {}, error: messageOf(error) }
   }
   try {
     return {
       installer,
+      places,
       available: true,
       packs: await installer.held(tools),
       /* Reading a switch is this hub's own file read rather than the client's
@@ -102,7 +111,7 @@ async function probe(installer: PluginInstaller, tools: PluginTools): Promise<Cl
   } catch (error) {
     /* The client is here and did not answer. What it holds is unknown, so it
        reads empty rather than gone, and its own words say why. */
-    return { installer, available: true, packs: [], switches: {}, error: messageOf(error) }
+    return { installer, places, available: true, packs: [], switches: {}, error: messageOf(error) }
   }
 }
 

@@ -19,6 +19,7 @@ import type { PluginRecord } from "../src/revision.ts"
 import {
   collectScanned,
   composeRows,
+  installablePlaces,
   pluginPlaceCount,
   pluginPlaceKey,
   rowsForTab,
@@ -207,6 +208,12 @@ it("retains verified source availability and each installation path", () => {
   const unverified = collectScanned([codex])[0]!.held[0]!.places
   expect(unverified[0]?.sourceAvailable).toBeUndefined()
   expect(placeSourceNote(unverified, "global", codex.places[0]!, plain)).not.toContain("plugins.place.sourceUnavailable")
+})
+
+it("does not apply local source status to a different project place", () => {
+  const project = collectScanned([{ ...claudeCode, packs: [held("hud", "project")] }])[0]!.held[0]!.places[0]!
+  const local = { ...project, scope: "local", sourceAvailable: false }
+  expect(placeSourceNote([project, local], "workspace", claudeCode.places[1]!, plain)).not.toBe("plugins.place.sourceUnavailable")
 })
 
 const answers: ScannedAnswer[] = [claudeCode, codex]
@@ -653,6 +660,7 @@ describe("the words one agent's scopes wear", () => {
   const words: Record<string, string> = {
     "plugins.scope.user": "This machine",
     "plugins.scope.project": "This repository",
+    "plugins.scope.local": "Only me in this repository",
   }
   const t = (key: string) => words[key] ?? key
 
@@ -669,6 +677,10 @@ describe("the words one agent's scopes wear", () => {
       scopeWords(["user", "project"], t),
       "and two words that say different things both stay"
     ).toBe("This machine · This repository")
+  })
+
+  it("distinguishes project and local places when both are present", () => {
+    expect(scopeWords(["user", "project", "local"], t)).toBe("This machine · This repository · Only me in this repository")
   })
 
   it("shows a word this build has no key for as the agent spelled it", () => {
@@ -717,6 +729,13 @@ describe("which place a group's action reaches", () => {
       placeReached(onlyUser, "workspace"),
       "an agent keeping nothing in the group reaches nothing"
     ).toBeUndefined()
+  })
+
+  it("does not treat a policy-only place as an artifact installation", () => {
+    const places = [ccPlaces[0]!, { ...ccPlaces[1]!, installable: false }]
+    expect(installablePlaces(places).map((place) => place.scopeWord)).toEqual(["user"])
+    expect(placeReached(places, "workspace")).toBeUndefined()
+    expect(placeReached(places, "global")?.scopeWord).toBe("user")
   })
 
   it("takes the agent's own answer where a place's file is silent", () => {

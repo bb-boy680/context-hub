@@ -69,6 +69,7 @@ export const marketPluginsZh: Record<string, string> = {
   "market.plugins.install.running": "安装中…",
   "market.plugins.install.done": "已安装 {name}",
   "market.plugins.install.failed": "安装失败",
+  "market.plugins.install.followUp": "已安装 {name}，仍需后续处理",
   "market.plugins.install.noAgent": "这台机器上没有可用的 Agent。",
   "market.plugins.install.installed": "已安装",
 }

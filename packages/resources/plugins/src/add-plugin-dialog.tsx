@@ -38,10 +38,13 @@ import {
 import { Spinner } from "@context-hub/shadcn-ui/components/spinner"
 
 import {
+  matchesPluginManifestRule,
   pluginManifestPaths,
+  pluginManifestRules,
   PLUGIN_MARKETPLACE_MANIFEST,
   hasStandardComponents,
   marketplaceManifest,
+  type PluginManifestRule,
 } from "./contract.ts"
 import { PLUGIN_SERVICE } from "./provider.ts"
 import { dataUrlOf } from "./library.ts"
@@ -287,21 +290,21 @@ async function walk(entry: FileSystemEntry, prefix: string, into: ReadFile[]): P
  *
  * @returns the folder, or `null` when what was dropped was not one folder — loose files have no folder to scan.
  */
-async function readDropped(transfer: DataTransfer, manifests: readonly string[]): Promise<ChosenFolder | null> {
+async function readDropped(transfer: DataTransfer, manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<ChosenFolder | null> {
   const roots = [...transfer.items]
     .filter((item) => item.kind === "file")
     .map((item) => item.webkitGetAsEntry())
     .filter((entry): entry is FileSystemEntry => entry !== null)
   /* A form without the entry API still reports a dropped folder as its files,
      each named by its path from that folder; the picker's rule reads those. */
-  if (roots.length === 0) return readChosen([...transfer.files], manifests)
+  if (roots.length === 0) return readChosen([...transfer.files], manifests, rules)
   const only = roots.length === 1 ? roots[0] : undefined
   if (only === undefined || !only.isDirectory) return null
   const read: ReadFile[] = []
   for (const child of await childrenOf(only as FileSystemDirectoryEntry)) {
     await walk(child, "", read)
   }
-  return read.length === 0 ? null : found(only.name, read, manifests)
+  return read.length === 0 ? null : found(only.name, read, manifests, rules)
 }
 
 /**
@@ -309,7 +312,7 @@ async function readDropped(transfer: DataTransfer, manifests: readonly string[])
  *
  * @returns the folder, or `null` when the choice held nothing.
  */
-async function readChosen(files: readonly File[], manifests: readonly string[]): Promise<ChosenFolder | null> {
+async function readChosen(files: readonly File[], manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<ChosenFolder | null> {
   const read: ReadFile[] = []
   for (const file of files) {
     /* A chosen directory arrives as every file under it, named by its path from
@@ -321,12 +324,12 @@ async function readChosen(files: readonly File[], manifests: readonly string[]):
     read.push({ path: inner, file })
   }
   const name = files[0]?.webkitRelativePath.split("/")[0] ?? ""
-  return read.length === 0 || name === "" ? null : found(name, read, manifests)
+  return read.length === 0 || name === "" ? null : found(name, read, manifests, rules)
 }
 
 /** Read one chosen folder into what it is called and the packs it holds. */
-async function found(name: string, read: readonly ReadFile[], manifests: readonly string[]): Promise<ChosenFolder> {
-  return { name, read: read.length, packs: await scanPacks(name, read, manifests) }
+async function found(name: string, read: readonly ReadFile[], manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<ChosenFolder> {
+  return { name, read: read.length, packs: await scanPacks(name, read, manifests, rules) }
 }
 
 /** Arrange one folder's files into the directories they sit in. */
@@ -385,7 +388,7 @@ function fileAt(dir: TreeNode, relative: string): ReadFile | null {
  * @param dir — the directory to read in.
  * @returns the manifest that names it, an empty object for a layout-only pack, or `null` when it is neither.
  */
-async function manifestOf(dir: TreeNode, manifests: readonly string[]): Promise<Record<string, unknown> | null> {
+async function manifestOf(dir: TreeNode, manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<Record<string, unknown> | null> {
   for (const relative of pluginManifestPaths(manifests)) {
     const found = fileAt(dir, relative)
     if (found === null) continue
@@ -403,6 +406,22 @@ async function manifestOf(dir: TreeNode, manifests: readonly string[]): Promise<
     }
     const named = typeof manifest.name === "string" && manifest.name !== ""
     if (named || typeof manifest.version === "string") return manifest
+  }
+
+  for (const rule of pluginManifestRules(rules)) {
+    const found = fileAt(dir, rule.file)
+    if (found === null) continue
+    const raw = await found.file.text().catch(() => null)
+    if (raw === null) continue
+    let manifest: Record<string, unknown>
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (typeof parsed !== "object" || parsed === null) continue
+      manifest = parsed as Record<string, unknown>
+    } catch {
+      continue
+    }
+    if (matchesPluginManifestRule(manifest, rule)) return manifest
   }
 
   const market = fileAt(dir, PLUGIN_MARKETPLACE_MANIFEST)
@@ -508,8 +527,8 @@ function filesUnder(dir: TreeNode, root = dir.dir): ReadFile[] {
  * @param chosen — the chosen folder's own name, which is what a pack at its root is called when its manifest gives no name.
  * @returns the pack, or `null` when the directory is not one.
  */
-async function packIn(node: TreeNode, chosen: string, manifests: readonly string[]): Promise<Candidate | null> {
-  const manifest = await manifestOf(node, manifests)
+async function packIn(node: TreeNode, chosen: string, manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<Candidate | null> {
+  const manifest = await manifestOf(node, manifests, rules)
   if (manifest === null) return null
   const pack: Candidate = {
     from: node.dir === "" ? chosen : `${chosen}/${node.dir}`,
@@ -546,9 +565,9 @@ async function packIn(node: TreeNode, chosen: string, manifests: readonly string
  * @param read — every file the page read out of it.
  * @returns the packs found, in path order, each with the label its record keeps.
  */
-async function scanPacks(name: string, read: readonly ReadFile[], manifests: readonly string[]): Promise<Candidate[]> {
+async function scanPacks(name: string, read: readonly ReadFile[], manifests: readonly string[], rules: readonly PluginManifestRule[]): Promise<Candidate[]> {
   const root = treeOf(read)
-  const whole = await packIn(root, name, manifests)
+  const whole = await packIn(root, name, manifests, rules)
   if (whole !== null) return [whole]
   const packs: Candidate[] = []
   const descend = async (dir: TreeNode, depth: number): Promise<void> => {
@@ -557,7 +576,7 @@ async function scanPacks(name: string, read: readonly ReadFile[], manifests: rea
       left.localeCompare(right)
     )
     for (const [, child] of below) {
-      const pack = await packIn(child, name, manifests)
+      const pack = await packIn(child, name, manifests, rules)
       if (pack !== null) {
         packs.push(pack)
         continue
@@ -607,6 +626,7 @@ export function AddPluginDialog({
   const { t } = useI18n()
   const ctx = useHub()
   const manifests = () => ctx.get(PLUGIN_SERVICE)?.manifestPaths() ?? []
+  const rules = () => ctx.get(PLUGIN_SERVICE)?.manifestRules() ?? []
   const pickerRef = React.useRef<HTMLInputElement>(null)
   /** The address being typed. */
   const [source, setSource] = React.useState("")
@@ -677,7 +697,7 @@ export function AddPluginDialog({
         const input = event.target
         const files = [...(input.files ?? [])]
         input.value = ""
-        void accept(() => readChosen(files, manifests()))
+        void accept(() => readChosen(files, manifests(), rules()))
       }}
     />
   )
@@ -783,7 +803,7 @@ export function AddPluginDialog({
                 onDrop={(event) => {
                   event.preventDefault()
                   const transfer = event.dataTransfer
-                  void accept(() => readDropped(transfer, manifests()))
+                  void accept(() => readDropped(transfer, manifests(), rules()))
                 }}
                 className="flex h-56 flex-col items-center justify-center gap-3 rounded-md bg-surface-raised px-6 text-center ring-1 ring-border ring-inset"
               >

@@ -17,7 +17,7 @@
 import * as React from "react"
 import { ServerIcon } from "lucide-react"
 
-import { createCatalog, chosenProviders, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
+import { createCatalog, chosenAgents, chosenProviders, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
 import {
   useCatalog,
   useChosenAgents,
@@ -27,7 +27,7 @@ import {
   useI18n,
 } from "@context-hub/extensions/react"
 
-import { buildCatalog, placesOf, type ScannedPlace } from "./catalog.ts"
+import { availablePlaces, buildCatalog, placesOf, type ScannedPlace } from "./catalog.ts"
 import { McpError, failureText, mcpFailure } from "./contract.ts"
 import type { McpDeclaration, McpIo } from "./contract.ts"
 import {
@@ -159,21 +159,30 @@ export function useMcpLibrary(): McpLibrary {
      them are read is the sidebar's choice — a client nobody chose has no file
      this hub scans, probes, or offers as an install target. */
   const chosen = useChosenAgents()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribeWorkspace = React.useCallback((listener: () => void) => workspaces?.subscribe(listener) ?? (() => undefined), [workspaces])
+  const currentWorkspace = React.useSyncExternalStore(subscribeWorkspace, () => workspaces?.current()?.current ?? "")
+  const scanKey = `${currentWorkspace}\n${chosen.join(",")}`
+  const currentScan = value.scan?.key === undefined || value.scan.key === scanKey
   const providers = React.useMemo(() => {
     void revision
     return chosenProviders(service?.providers() ?? [], chosen)
   }, [service, revision, chosen])
-  const scanned = React.useMemo(() => placesOf(providers, iconFor), [providers, iconFor])
+  const scanned = React.useMemo(() => {
+    if (!currentScan) return []
+    const places = value.scan?.places?.filter((entry) => providers.some((provider) => provider.id === entry.provider.id)) ?? placesOf(providers, iconFor)
+    return availablePlaces(places, value.scan?.answer ?? null)
+  }, [currentScan, value.scan, providers, iconFor])
   const places = React.useMemo(() => scanned.map((entry) => entry.place), [scanned])
 
   const catalog = React.useMemo(() => {
-    if (value.scan === null) return null
+    if (value.scan === null || !currentScan) return null
     const problems: McpScanProblem[] = value.scan.answer.problems.map((problem) => ({
       place: problem.place,
       message: failureText(t, problem.failure),
     }))
     return buildCatalog(value.records, value.scan.answer, scanned, problems, value.scan.at, value.checks)
-  }, [value, scanned, t])
+  }, [value, scanned, t, currentScan])
 
   const log = React.useCallback(
     (level: "info" | "warn" | "error", message: string) => {
@@ -224,12 +233,16 @@ export function useMcpLibrary(): McpLibrary {
     (place: string): { found: ScannedPlace; io: McpIo } => {
       /* Read from the places this page offers, so a place whose agent was
          un-chosen is not one a write can still reach. */
+      const workspaces = ctx.get("hub.workspaces")
+      const scanKey = `${workspaces?.current()?.current ?? ""}\n${chosenAgents(workspaces).join(",")}`
+      if (value.scan?.key !== undefined && value.scan.key !== scanKey) throw new McpError("mcp.error.scan")
+      if (value.scan?.answer.problems.some((problem) => problem.place === place)) throw new McpError("mcp.error.read")
       const found = scanned.find((entry) => entry.place.id === place)
       if (found === undefined) throw new McpError("mcp.error.unknownPlace", { place })
       if (files === null) throw new McpError("mcp.error.noFiles")
-      return { found, io: { files, log } }
+      return { found, io: { files, log, place: found.place } }
     },
-    [scanned, files, log]
+    [scanned, files, log, ctx, value.scan]
   )
 
   /** Run one change, then read every file again. `force` re-probes as well. */
@@ -264,7 +277,9 @@ export function useMcpLibrary(): McpLibrary {
     failure: actionFailure ?? readFailure ?? value.failure,
     catalog,
     places,
-    readPlaces: new Set(value.scan?.answer.entries.keys() ?? []),
+    readPlaces: new Set(currentScan ? [...(value.scan?.answer.entries.keys() ?? [])].filter(
+      (place) => !value.scan?.answer.problems.some((problem) => problem.place === place)
+    ) : []),
     recordsFile: value.recordsFile,
     testing: value.testing,
 
@@ -357,7 +372,11 @@ export function useMcpLibrary(): McpLibrary {
         /* Rewriting the declaration is what a save means: it reaches every file
            that already holds this server, and a rename moves the key with it so
            no client is left pointing at a name the hub no longer uses. */
-        for (const install of rowOf(id).detail.installs) {
+        const installs = rowOf(id).detail.installs
+        if (installs.some((install) => install.readOnly === true || install.enabled === null)) {
+          throw new McpError("mcp.error.readOnly")
+        }
+        for (const install of installs) {
           const { found, io } = providerAt(install.place)
           if (name !== id) await found.provider.uninstall(io, install.place, id)
           await found.provider.install(io, install.place, name, declaration)
@@ -393,7 +412,10 @@ export function useMcpLibrary(): McpLibrary {
 
     async install(id, place) {
       await run(async () => {
-        const declaration = rowOf(id).detail.declaration
+        const row = rowOf(id)
+        const held = row.detail.installs.find((install) => install.place === place)
+        if (held?.readOnly === true || held?.enabled === null) throw new McpError("mcp.error.readOnly")
+        const declaration = row.detail.declaration
         if (declaration === null) throw new McpError("mcp.error.incomplete")
         const { found, io } = providerAt(place)
         await found.provider.install(io, place, id, declaration)
@@ -402,6 +424,8 @@ export function useMcpLibrary(): McpLibrary {
 
     async uninstall(id, place) {
       await run(async () => {
+        const held = rowOf(id).detail.installs.find((install) => install.place === place)
+        if (held?.readOnly === true || held?.enabled === null) throw new McpError("mcp.error.readOnly")
         const { found, io } = providerAt(place)
         await found.provider.uninstall(io, place, id)
       })
@@ -409,6 +433,8 @@ export function useMcpLibrary(): McpLibrary {
 
     async setEnabled(id, place, enabled) {
       await run(async () => {
+        const held = rowOf(id).detail.installs.find((install) => install.place === place)
+        if (held?.readOnly === true || held?.enabled === null) throw new McpError("mcp.error.readOnly")
         const { found, io } = providerAt(place)
         /* The place's own scope is what the switch is about: it is the root the
            person was looking at when they flipped it. */
