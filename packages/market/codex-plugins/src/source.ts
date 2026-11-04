@@ -20,8 +20,11 @@ import {
   type MarketLog,
 } from "./apis/marketplace.ts"
 
-/** The marketplace's own name, as the rail and every row show it. */
-const SOURCE_NAME = "openai"
+/** The marketplace's own name, as the extension, the rail and every row show it. */
+export const SOURCE_NAME = "openai"
+
+/** The owner's mark, shipped with the package and shared by the extension and the rail. */
+export const SOURCE_MARK = new URL("../assets/openai.png", import.meta.url).href
 
 /** Build the source over one form's network. */
 export function createCodexPluginsSource(net: NetPort | null, log: MarketLog): MarketSource {
@@ -31,7 +34,7 @@ export function createCodexPluginsSource(net: NetPort | null, log: MarketLog): M
   return {
     id: CODEX_SOURCE_ID,
     name: SOURCE_NAME,
-    mark: "https://github.com/openai.png?size=64",
+    mark: SOURCE_MARK,
     repo: CODEX_MARKET_REPO.replace(/^https:\/\//, ""),
     index: CODEX_MARKET_INDEX,
 
