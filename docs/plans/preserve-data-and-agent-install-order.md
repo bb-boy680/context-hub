@@ -129,7 +129,7 @@
 
 **目标**：用户可在 Agent 侧边栏直接拖拽，排序持久化并由统一展示顺序驱动；不改资源和 Agent 勾选状态。
 
-**文件**：`packages/core/src/workspace.ts`、`src/host/workspaces-fs.ts`、`packages/core/handlers.ts`；`apps/web/src/lib/workspaces.ts`、`src/components/app-layout.tsx`、`src/components/app-sidebar.tsx`、`src/components/sidebar-rows.tsx`；`packages/extensions/src/{agents.ts,react.tsx}`；`packages/extensions/src/builtin/locale-en.ts`、`packages/i18n/zh-cn/src/messages.ts`；`packages/core/__test__/workspaces.test.ts`、`apps/web/__test__/bridge.test.ts`、`packages/extensions/__test__/agents.test.ts` 和必要的侧栏交互测试。
+**文件**：`packages/core/src/workspace.ts`、`src/host/workspaces-fs.ts`、`packages/core/handlers.ts`；`apps/web/package.json`、根 `pnpm-lock.yaml`、`apps/web/src/lib/workspaces.ts`、`src/components/app-layout.tsx`、`src/components/app-sidebar.tsx`、`src/components/sidebar-rows.tsx`；`packages/extensions/src/agents.ts`、`src/react.tsx`；`packages/extensions/src/builtin/locale-en.ts`、`packages/i18n/zh-cn/src/messages.ts`；`packages/core/__test__/workspaces.test.ts`、`apps/web/__test__/bridge.test.ts`、`packages/extensions/__test__/agents.test.ts` 和必要的侧栏交互测试。
 
 **步骤**：
 
