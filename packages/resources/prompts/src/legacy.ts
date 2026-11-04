@@ -47,7 +47,6 @@ export interface LegacyPromptPlace {
   readonly labelKey: string
   readonly icon: ExtensionIcon
   readonly scope: AssetScope
-  readonly order: number
   readonly commandDir: string
   readonly ruleDir: string
   readonly agentDir?: string
@@ -173,7 +172,6 @@ export function legacyPromptProvider(old: LegacyPromptProvider): PromptProvider 
       labelKey: place.labelKey,
       icon: place.icon,
       scope: place.scope,
-      order: place.order,
       ...(place.generatedOnly === undefined ? {} : { generatedOnly: place.generatedOnly }),
       where: place.scope === "global" ? `~/${where}` : where,
       forms: formsOf(place),

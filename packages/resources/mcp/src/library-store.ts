@@ -21,6 +21,7 @@ import type { ExtensionIcon } from "@context-hub/extensions"
 import {
   chosenAgents,
   chosenProviders,
+  isGlobalWorkspace,
   createCatalog,
   mapLimit,
   type Catalog,
@@ -210,7 +211,7 @@ export class McpLibrary extends Service {
   private key(): string {
     const workspaces = this.ctx.get("hub.workspaces")
     const folder = workspaces?.current()?.current ?? ""
-    return `${folder}\n${chosenAgents(workspaces).join(",")}`
+    return `${folder}\n${isGlobalWorkspace(workspaces?.current())}\n${chosenAgents(workspaces).join(",")}`
   }
 
   /** The records port this library reads and writes through. */
@@ -357,6 +358,7 @@ export class McpLibrary extends Service {
        arrived would read those places against nothing. */
     await this.ctx.get("hub.workspaces")?.refresh()
     const scanKey = this.key()
+    const globalOnly = isGlobalWorkspace(this.ctx.get("hub.workspaces")?.current())
 
     const force = this.forced
     this.forced = false
@@ -377,7 +379,7 @@ export class McpLibrary extends Service {
         })
       })
       const chosen = chosenAgents(this.ctx.get("hub.workspaces"))
-      places = await resolvePlaces(chosenProviders(this.providers(), chosen), (id) => this.icon(id), files, this.log)
+      places = await resolvePlaces(chosenProviders(this.providers(), chosen), (id) => this.icon(id), files, this.log, globalOnly)
       answer = await scanPlaces(places, files, this.log)
       const prior = this.catalog.state().value?.scan
       const previous = prior?.key === scanKey ? prior.answer : undefined
@@ -399,6 +401,7 @@ export class McpLibrary extends Service {
     }
 
     const at = Date.now()
+    if (scanKey !== this.key()) return this.catalog.state().value ?? EMPTY_MCP_LIBRARY
     /* The list is readable now; its probes run beside it, not before it. */
     commit((draft) => {
       draft.records = declared
@@ -539,7 +542,7 @@ export class McpLibrary extends Service {
    */
   private places(): ScannedPlace[] {
     const chosen = chosenAgents(this.ctx.get("hub.workspaces"))
-    return placesOf(chosenProviders(this.providers(), chosen), (id) => this.icon(id))
+    return placesOf(chosenProviders(this.providers(), chosen), (id) => this.icon(id), isGlobalWorkspace(this.ctx.get("hub.workspaces")?.current()))
   }
 
   /**

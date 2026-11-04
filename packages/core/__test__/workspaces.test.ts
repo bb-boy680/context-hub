@@ -27,7 +27,7 @@ import { createFsWorkspaceStore } from "../src/host/workspaces-fs.ts"
 import { projectRoot } from "../src/host/fs-browse.ts"
 import { ensureDefaultWorkspace } from "../handlers.ts"
 
-const EMPTY = { folders: [], current: null, agents: [] }
+const EMPTY = { folders: [], current: null, agents: [], agentOrder: [] }
 
 let home: string
 let store: ReturnType<typeof createFsWorkspaceStore>
@@ -47,6 +47,24 @@ beforeAll(async () => {
 afterAll(async () => {
   await fs.rm(inside, { recursive: true, force: true })
   await fs.rm(home, { recursive: true, force: true })
+})
+
+describe("Agent display order", () => {
+  it("persists independently of selection and survives workspace changes", async () => {
+    const isolated = await fs.mkdtemp(path.join(tmpdir(), "hub-agent-order-"))
+    try {
+      const local = createFsWorkspaceStore(isolated)
+      await local.setAgentOrder(["z", "a", "m"])
+      await local.setAgent("a", true)
+      await local.add(isolated)
+      await Promise.all([local.setAgentOrder(["m", "z", "a"]), local.rename(isolated, "renamed")])
+      expect((await createFsWorkspaceStore(isolated).page()).agentOrder).toEqual(["m", "z", "a"])
+      await expect(local.setAgentOrder(["a", "a"])).rejects.toThrow(/unique/)
+      expect((await local.page()).agentOrder).toEqual(["m", "z", "a"])
+    } finally {
+      await fs.rm(isolated, { recursive: true, force: true })
+    }
+  })
 })
 
 describe("the workspace list", () => {
@@ -398,6 +416,7 @@ describe("the default workspace", () => {
       ],
       current: host,
       agents: [],
+      agentOrder: [],
     })
   })
 
@@ -415,6 +434,7 @@ describe("the default workspace", () => {
       ],
       current: homedir(),
       agents: [],
+      agentOrder: [],
     })
   })
 
@@ -486,6 +506,7 @@ describe("the default workspace", () => {
       folders: [{ name: "host", path: host, alias: "Home", default: true }],
       current: host,
       agents: [],
+      agentOrder: [],
     })
   })
 
@@ -588,6 +609,7 @@ describe("the default workspace", () => {
       ],
       current: host,
       agents: [],
+      agentOrder: [],
     })
   })
 

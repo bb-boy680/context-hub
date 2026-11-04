@@ -56,7 +56,7 @@ import { HolderStack, PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
 import { PluginNameTakenError, type PluginInstallReport, type PluginInstallScope } from "./contract.ts"
 
-import type { ExtensionIcon } from "@context-hub/extensions"
+import { orderByAgent, type ExtensionIcon } from "@context-hub/extensions"
 import {
   ActionTab,
   AutoplayVideo,
@@ -73,7 +73,7 @@ import {
   type LedgerColumn,
   type PlaceWords,
 } from "@context-hub/extensions/components"
-import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
+import { useAgentOrder, useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
 import {
@@ -756,6 +756,8 @@ export function PluginsPage() {
   const [batch, setBatch] = React.useState<"adopt" | "update" | null>(null)
   /* The library the rows come from, and the one place a write reaches it. */
   const library = usePluginLibrary()
+  const agentOrder = useAgentOrder()?.order
+  const displayClients = orderByAgent(library.clients, agentOrder, (client) => client.id)
   const catalog = library.rows
 
   /* A pack whose folder was deleted is fetched again as the page loads: the
@@ -828,7 +830,7 @@ export function PluginsPage() {
   const scopePlaces = React.useMemo(
     () => SCOPES.map((scope) => ({
       scope,
-      options: library.clients
+      options: displayClients
         .filter((client) => client.places.some((place) => place.scope === scope))
         .map((client) => ({
           id: pluginPlaceKey({ scope, client: client.id }),
@@ -838,7 +840,7 @@ export function PluginsPage() {
           count: pluginPlaceCount(catalog, client, scope),
         })),
     })),
-    [library.clients, catalog]
+    [displayClients, catalog]
   )
 
   const chosen = selectedPluginPlace(library.clients, narrowed)
@@ -888,7 +890,7 @@ export function PluginsPage() {
      taken back out of that same place. Each place is its own, so the row's menu
      acts on them one at a time. */
   const actions: RowActions = {
-    clients: library.clients,
+    clients: displayClients,
     busy: library.busy,
     onUpdate: (plugin) => {
       void library
@@ -1324,7 +1326,7 @@ export function PluginsPage() {
       />
       <PluginDetailDialog
         plugin={detail}
-        clients={library.clients}
+        clients={displayClients}
         root={library.root}
         busy={library.busy}
         tagSuggestions={tagsOf(catalog)}

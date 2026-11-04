@@ -29,6 +29,7 @@ import type { ExtensionIcon } from "@context-hub/extensions"
 import {
   chosenAgents,
   chosenProviders,
+  isGlobalWorkspace,
   createCatalog,
   type Catalog,
   type CatalogState,
@@ -205,7 +206,10 @@ export class PluginLibrary extends Service {
        is read from, so it is settled before anything is asked. The form starts
        the same refresh at startup without waiting for it, and it is single-flight,
        so this joins that one question instead of asking a second. */
-    await this.owner.get("hub.workspaces")?.refresh()
+    const workspaces = this.owner.get("hub.workspaces")
+    await workspaces?.refresh()
+    const key = this.key(workspaces)
+    const globalOnly = isGlobalWorkspace(workspaces?.current())
 
     const manifests = encodeURIComponent(JSON.stringify(service?.manifestPaths() ?? []))
     const answer = await call<ListAnswer>(`${PLUGIN_ROUTE}?action=list&manifests=${manifests}`)
@@ -215,7 +219,7 @@ export class PluginLibrary extends Service {
       draft.missing = answer.missing
     })
 
-    if (service === null || tools === null) {
+    if (service === null || tools === null || key !== this.key(workspaces)) {
       /* No registry to ask: this form's library is the hub's own copy of the
          packs, and no client is offered. */
       return {
@@ -240,16 +244,19 @@ export class PluginLibrary extends Service {
       tools
     )
 
+    const current = key === this.key(workspaces) ? probes : []
     return {
       records: answer.plugins,
       root: answer.root,
       missing: answer.missing,
-      clients: probes.map((one) => ({
+      clients: current.map((one) => ({
         id: one.installer.id,
         label: one.installer.label,
         icon: this.iconFor(one.installer.id),
-        places: one.places,
-        switches: one.switches,
+        places: one.places.filter((place) => !globalOnly || place.scope === "global"),
+        switches: globalOnly ? Object.fromEntries(Object.entries(one.switches).filter(([key]) =>
+          one.places.some((place) => place.scope === "global" && (place.scopeWord === key || place.id === key))
+        )) : one.switches,
         available: one.available,
         ...(one.error === undefined ? {} : { error: one.error }),
       })),
@@ -257,7 +264,7 @@ export class PluginLibrary extends Service {
          failed knows of none, and drawing its empty answer as "holds nothing" is
          the one thing the error is carried to prevent. */
       scanned: collectScanned(
-        probes
+        current
           .filter((one) => one.error === undefined)
           .map((one) => ({
             client: one.installer.id,
@@ -266,7 +273,8 @@ export class PluginLibrary extends Service {
             places: one.places,
             switches: one.switches,
             packs: one.packs,
-          }))
+          })),
+        globalOnly
       ),
     }
   }
@@ -306,6 +314,10 @@ export class PluginLibrary extends Service {
         const now = this.key(workspaces)
         if (now === seen) return
         seen = now
+        this.catalog.update((draft) => {
+          draft.clients = []
+          draft.scanned = []
+        })
         if (this.started) void this.reload()
       })
     })
@@ -314,7 +326,7 @@ export class PluginLibrary extends Service {
   /** What decides which clients are asked and which folders they are read in. */
   private key(workspaces: WorkspaceService | undefined): string {
     const folder = workspaces?.current()?.current ?? ""
-    return `${folder}\n${chosenAgents(workspaces).join(",")}`
+    return `${folder}\n${isGlobalWorkspace(workspaces?.current())}\n${chosenAgents(workspaces).join(",")}`
   }
 
   /**

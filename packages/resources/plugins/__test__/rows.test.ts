@@ -151,6 +151,35 @@ const codex: ScannedAnswer = {
   ],
 }
 
+describe("全局插件持有记录", () => {
+  it("在挑选元数据前排除工作区副本，保留 managed 和未知全局只读位置", () => {
+    const answer: ScannedAnswer = { ...claudeCode, packs: [
+      { ...held("hud", "project"), source: { kind: "local", path: "/project/hud" }, pack: { name: "hud", version: "project", description: "project" } },
+      { ...held("project-only", "project") },
+      { ...held("hud", "user"), enabled: false, source: { kind: "local", path: "/global/hud" }, pack: { name: "hud", version: "global", description: "global" } },
+      held("managed", "managed"),
+      held("unknown-project", "local"),
+    ] }
+    const result = collectScanned([answer], true)
+    expect(result.map((one) => one.name)).toEqual(["hud", "managed"])
+    expect(result[0]).toMatchObject({ version: "global", description: "global", directory: "/global/hud", source: { path: "/global/hud" } })
+    expect(result[0]!.held[0]!.places).toEqual([expect.objectContaining({ scope: "user", group: "global", enabled: false })])
+    expect(result[1]!.held[0]!.places[0]).toMatchObject({ scope: "managed", group: "global", readOnly: true })
+    expect(collectScanned([answer]).map((one) => one.name)).toContain("project-only")
+  })
+
+  it("优先用 placeId 识别动态位置的作用域", () => {
+    const answer: ScannedAnswer = { ...claudeCode, places: [
+      { id: "profile", label: "Profile", scope: "global", scopeWord: "local", switchable: false },
+      { id: "project", label: "Project", scope: "workspace", scopeWord: "user", switchable: false },
+    ], packs: [
+      { ...held("global-profile", "local"), placeId: "profile" },
+      { ...held("project-profile", "user"), placeId: "project" },
+    ] }
+    expect(collectScanned([answer], true).map((one) => one.name)).toEqual(["global-profile"])
+  })
+})
+
 it("keeps marketplace identities and marks undeclared places read-only", () => {
   const pack = claudeCode.packs[0]!
   const result = collectScanned([{ ...claudeCode, packs: [
@@ -405,27 +434,34 @@ describe("folding the agents' answers", () => {
 })
 
 describe("merging the library and the agents", () => {
+  it("moves scanned records ahead while keeping their stored content", () => {
+    const result = composeRows([record("q"), record("hud"), record("p")], scanned, "en", plain)
+    expect(result.map((row) => row.name)).toEqual(["hud", "q", "p"])
+    expect(result[0]?.stored).toBe(true)
+    expect(result[0]?.description).toBe("hud does things")
+    expect(result[0]?.held).toHaveLength(2)
+  })
   it("keeps the library's pack and the agent's pack as two rows", () => {
     expect(rows, "the library's pack and the agent's pack are two rows").toHaveLength(2)
   })
 
   it("draws the library's row as stored, under its own fields", () => {
-    expect(rows[0]?.stored, "the library's row is stored").toBe(true)
-    expect(rows[0]?.name, "under the name the record holds").toBe("stored")
-    expect(rows[0]?.description, "and keeps its own fields").toBe("stored does things")
+    expect(rows.map((row) => row.name)).toEqual(["hud", "stored"])
+    expect(rows.find((row) => row.name === "stored")?.stored, "the library's row is stored").toBe(true)
+    expect(rows.find((row) => row.name === "stored")?.description, "and keeps its own fields").toBe("stored does things")
   })
 
   it("draws the agent's row as one this hub has yet to take in", () => {
-    expect(rows[1]?.stored, "the agent's row is not stored").toBe(false)
-    expect(rows[1]?.name, "and names the pack the agents hold").toBe("hud")
-    expect(rows[1]?.held, "carrying its holders").toHaveLength(2)
+    expect(rows[0]?.stored, "the agent's row is not stored").toBe(false)
+    expect(rows[0]?.name, "and names the pack the agents hold").toBe("hud")
+    expect(rows[0]?.held, "carrying its holders").toHaveLength(2)
   })
 
   it("says what the pack says about itself on the agent's row", () => {
-    expect(rows[1]?.description, "and it says what the pack says about itself").toBe(
+    expect(rows[0]?.description, "and it says what the pack says about itself").toBe(
       "A statusline HUD"
     )
-    expect(rows[1]?.icon, "and draws the mark as a file the hub holds").toBe(
+    expect(rows[0]?.icon, "and draws the mark as a file the hub holds").toBe(
       "/hub/files/assets/hud-logo-3f9a2b1c.png"
     )
   })
@@ -434,11 +470,11 @@ describe("merging the library and the agents", () => {
      directory the agent reads it from — so its row says so rather than naming the
      agent in the source's place. Which agents hold it is what the marks are for. */
   it("reads a pack only an agent holds as a local one", () => {
-    expect(rows[1]?.source, "a pack only an agent holds reads as a local one").toBe("local")
+    expect(rows[0]?.source, "a pack only an agent holds reads as a local one").toBe("local")
   })
 
   it("reads a pack collected from a repository as the repository", () => {
-    expect(rows[0]?.source, "a pack collected from a repository reads as the repository").toBe(
+    expect(rows[1]?.source, "a pack collected from a repository reads as the repository").toBe(
       "repo"
     )
   })
@@ -599,10 +635,10 @@ describe("the pictures a row draws", () => {
       drawn({ icon: "assets/stored-logo-3f9a2b1c.png" })?.cover,
       "a mark is never the card's cover"
     ).toBeUndefined()
-    expect(rows[1]?.icon, "and a pack only an agent holds draws its mark too").toBe(
+    expect(rows[0]?.icon, "and a pack only an agent holds draws its mark too").toBe(
       "/hub/files/assets/hud-logo-3f9a2b1c.png"
     )
-    expect(rows[1]?.cover, "never as the cover either").toBeUndefined()
+    expect(rows[0]?.cover, "never as the cover either").toBeUndefined()
   })
 
   it("draws a picture a person added as what the card draws instead", () => {

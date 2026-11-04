@@ -150,10 +150,13 @@ interface HeldBuilder {
  * @param answers — what each client reported, in the order they were asked.
  * @returns one entry per pack, in the order the clients named them.
  */
-export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[] {
+export function collectScanned(answers: readonly ScannedAnswer[], globalOnly = false): ScannedPack[] {
   const byName = new Map<string, ScannedPack & { at: Map<string, HeldBuilder> }>()
   for (const answer of answers) {
     for (const pack of answer.packs) {
+      const declared = answer.places.find((one) => pack.placeId !== undefined ? one.id === pack.placeId : one.scopeWord === pack.scope)
+      const group = declared?.scope ?? (pack.scope === "managed" || pack.scope === "user" ? "global" : "workspace")
+      if (globalOnly && group !== "global") continue
       const entry = byName.get(pack.name) ?? {
         name: pack.name,
         version: "",
@@ -188,7 +191,6 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
       /* One entry per place, each with the answer that place itself gives. The
          group comes from the client's own declaration of the place, so an agent
          naming its scopes its own way still lands where it says it does. */
-      const declared = answer.places.find((one) => pack.placeId !== undefined ? one.id === pack.placeId : one.scopeWord === pack.scope)
       /* An explicit setting cannot resolve a client's unknown effective state. */
       const here = pack.enabled === undefined ? undefined : answer.switches[pack.scope]?.[pack.id] ?? pack.enabled
       const already = found.places.find((one) => one.scope === pack.scope && one.id === pack.id && one.placeId === pack.placeId)
@@ -196,7 +198,7 @@ export function collectScanned(answers: readonly ScannedAnswer[]): ScannedPack[]
         found.places.push({
           scope: pack.scope,
           ...(pack.placeId === undefined ? {} : { placeId: pack.placeId }),
-          group: declared?.scope ?? (pack.scope === "managed" || pack.scope === "user" ? "global" : "workspace"),
+          group,
           id: pack.id,
           readOnly: pack.readOnly === true || declared === undefined,
           origin: pack.origin,
@@ -256,7 +258,7 @@ export function heldRow(pack: ScannedPack): PluginRow {
  *
  * @param records — what the library holds, in its own order.
  * @param scanned — what the clients hold, folded by {@link collectScanned}.
- * @returns the rows, library records first.
+ * @returns scanned rows first, followed by records not seen in any client.
  */
 export function composeRows(
   records: readonly PluginRecord[],
@@ -264,12 +266,17 @@ export function composeRows(
   language: string | undefined,
   t: (key: string) => string
 ): PluginRow[] {
-  const stored = new Set(records.map((record) => record.name))
-  const answers = new Map(scanned.map((pack) => [pack.name, pack.held]))
-  const rows = records.map((record) => toRow(record, answers.get(record.name) ?? [], language, t))
+  const stored = new Map(records.map((record) => [record.name, record]))
+  const seen = new Set<string>()
+  const rows: PluginRow[] = []
   for (const pack of scanned) {
-    if (stored.has(pack.name)) continue
-    rows.push(heldRow(pack))
+    if (seen.has(pack.name)) continue
+    seen.add(pack.name)
+    const record = stored.get(pack.name)
+    rows.push(record === undefined ? heldRow(pack) : toRow(record, pack.held, language, t))
+  }
+  for (const record of records) {
+    if (!seen.has(record.name)) rows.push(toRow(record, [], language, t))
   }
   return rows
 }

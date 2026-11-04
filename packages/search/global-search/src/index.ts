@@ -7,7 +7,7 @@
  * variable. Settings and Extensions are the exception, because they are shell
  * pages rather than extensions — their providers live here.
  */
-import { SearchIcon } from "lucide-react"
+import { SidebarSearchIcon } from "@context-hub/extensions/icons"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
@@ -26,7 +26,7 @@ export const globalSearchExtension: ExtensionModule = {
     kind: "code",
     category: "integration",
     description: "Search every module from anywhere with Ctrl+K.",
-    icon: SearchIcon,
+    icon: SidebarSearchIcon,
     defaultEnabled: true,
     /* The header control and the palette are part of the shell, not a module a
        person may switch off. */

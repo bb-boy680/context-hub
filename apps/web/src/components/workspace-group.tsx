@@ -5,7 +5,8 @@
  * menu renames or forgets the row and never the folder, which is why neither
  * asks for a confirmation.
  */
-import { CheckIcon, EllipsisIcon, FolderIcon, PenLineIcon, PlusIcon, Trash2Icon } from "lucide-react"
+import { CheckIcon, EllipsisIcon, PenLineIcon, Trash2Icon } from "lucide-react"
+import { SidebarCreateIcon, SidebarWorkspaceIcon } from "@context-hub/extensions/icons"
 import * as React from "react"
 
 import { useI18n } from "@context-hub/extensions/react"
@@ -166,7 +167,7 @@ export function WorkspaceGroup() {
             label={label}
             hint={folder.default ? null : folder.display}
             active={active}
-            icon={<FolderIcon className="size-[18px]" aria-hidden />}
+            icon={<SidebarWorkspaceIcon className="size-[18px]" aria-hidden />}
             onClick={() => select(folder.id)}
             trailing={
               active ? (
@@ -219,7 +220,7 @@ export function WorkspaceGroup() {
       <SidebarRow
         label={t("workspace.create")}
         active={false}
-        icon={<PlusIcon className="size-[18px]" aria-hidden />}
+        icon={<SidebarCreateIcon className="size-[18px]" aria-hidden />}
         onClick={() => void create()}
       />
       {message === null ? null : (

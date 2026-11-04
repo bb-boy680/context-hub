@@ -16,11 +16,12 @@ import {
   installMarketExtension,
   marketEntriesFor,
   marketUpdatesFor,
+  mergeMarketEntries,
   useExtensionMarket,
   type MarketEntry,
   type MarketUpdateEntry,
 } from "@/lib/extension-market"
-import { cardSurface, categoryOrder, categoryTile } from "@/lib/extensions"
+import { cardSurface, categoryTile } from "@/lib/extensions"
 import { runExtensionCheck } from "@/lib/extension-updates"
 import {
   compatibleVersion,
@@ -223,10 +224,7 @@ export function ExtensionsPage() {
     market.index === null
       ? []
       : marketEntriesFor(snapshot.entries, market.index, ctx.host.version)
-  const allEntries = [
-    ...snapshot.entries,
-    ...marketEntries.map((item) => item.view),
-  ]
+  const allEntries = mergeMarketEntries(snapshot.entries, market.index, ctx.host.version)
   const entries = allEntries.filter((entry) =>
     matches(entry, query, i18n.active)
   )
@@ -420,7 +418,7 @@ export function ExtensionsPage() {
           </div>
         </div>
 
-        {categoryOrder.map((category) => {
+        {[...new Set(entries.map((entry) => entry.manifest.category))].map((category) => {
           const items = entries.filter(
             (entry) => entry.manifest.category === category
           )

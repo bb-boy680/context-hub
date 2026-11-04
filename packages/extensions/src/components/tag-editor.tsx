@@ -54,12 +54,14 @@ export function TagEditor({
   words,
   onChange,
   labelFor,
+  disabled = false,
 }: {
   tags: readonly string[]
   suggestions: readonly string[]
   words: TagEditorWords
   onChange: (tags: string[]) => void
   labelFor?: (value: string) => string
+  disabled?: boolean
 }) {
   const [value, setValue] = React.useState("")
   const read = (tag: string) => (labelFor === undefined ? tag : labelFor(tag))
@@ -80,6 +82,7 @@ export function TagEditor({
           <button
             type="button"
             aria-label={words.remove.replace("{tag}", read(tag))}
+            disabled={disabled}
             onClick={() => onChange(tags.filter((held) => held !== tag))}
             className={REMOVE}
           >
@@ -89,7 +92,7 @@ export function TagEditor({
       ))}
       <Popover>
         <PopoverTrigger
-          render={<button type="button" aria-label={words.add} className={TRIGGER} />}
+          render={<button type="button" aria-label={words.add} disabled={disabled} className={TRIGGER} />}
         >
           <PlusIcon className="size-3" />
           {words.add}
@@ -97,6 +100,7 @@ export function TagEditor({
         <PopoverContent align="start" className="w-60 gap-2 p-2">
           <Input
             value={value}
+            disabled={disabled}
             onChange={(event) => setValue(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter") add(value)
@@ -108,7 +112,7 @@ export function TagEditor({
           {available.length > 0 ? (
             <div className="flex flex-wrap gap-1.5">
               {available.map((tag) => (
-                <button key={tag} type="button" onClick={() => add(tag)} className={OPTION}>
+                <button key={tag} type="button" disabled={disabled} onClick={() => add(tag)} className={OPTION}>
                   {read(tag)}
                 </button>
               ))}

@@ -146,7 +146,6 @@ export function createSkillHandler(
                 tag: url.searchParams.get("tag") ?? undefined,
                 enabled: enabled === null ? undefined : enabled === "true",
                 source: ORIGINS.find((origin) => origin === wanted),
-                sort: url.searchParams.get("sort") === "name" ? "name" : "updated",
               })
             )
             return

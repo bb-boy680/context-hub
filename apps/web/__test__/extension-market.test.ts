@@ -13,6 +13,7 @@ import type { ExtensionView } from "@context-hub/extensions"
 import {
   marketEntriesFor,
   marketUpdatesFor,
+  mergeMarketEntries,
   refreshExtensionMarket,
 } from "../src/lib/extension-market"
 
@@ -163,6 +164,19 @@ describe("marketEntriesFor", () => {
       ],
     }
     expect(marketEntriesFor([], mixed, HUB_VERSION)[0]?.version?.version).toBe("2.0.0")
+  })
+})
+
+describe("merging market and installed extensions", () => {
+  it("keeps the market position before and after installation", () => {
+    const builtin = entry("builtin", "1.0.0")
+    const local = { ...entry("local", "1.0.0"), stored: true }
+    const installed = { ...entry("demo.two", "1.0.0"), stored: true }
+    const before = mergeMarketEntries([builtin, local], INDEX, HUB_VERSION)
+    const after = mergeMarketEntries([builtin, local, installed], INDEX, HUB_VERSION)
+    expect(before.map((row) => row.manifest.id)).toEqual(["builtin", "demo.one", "demo.two", "local"])
+    expect(after.map((row) => row.manifest.id)).toEqual(["builtin", "demo.one", "demo.two", "local"])
+    expect(after[2]).toBe(installed)
   })
 })
 

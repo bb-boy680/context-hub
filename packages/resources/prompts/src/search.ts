@@ -6,7 +6,7 @@
  * person is looking for when they type it. The note under a result stays the
  * description — the body is the page's material, not a one-line annotation.
  */
-import { FileTextIcon } from "lucide-react"
+import { SidebarPromptsIcon } from "@context-hub/extensions/icons"
 
 import { matchesQuery, searchPath } from "@context-hub/extensions"
 import type { SearchContribution, SearchResult } from "@context-hub/extensions"
@@ -25,7 +25,7 @@ const PAGE = "/prompts"
 export function promptSearch(library: PromptLibrary): SearchContribution {
   return {
     labelKey: "search.group.prompts",
-    icon: FileTextIcon,
+    icon: SidebarPromptsIcon,
     search(query) {
       const value = library.state().value
       if (value === null) return []

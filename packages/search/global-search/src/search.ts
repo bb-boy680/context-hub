@@ -13,7 +13,7 @@
  * step by hand: a new shell row in `apps/web/src/pages/settings.tsx` needs a
  * line here, or the global search cannot find it.
  */
-import { BlocksIcon, SettingsIcon } from "lucide-react"
+import { SidebarExtensionsIcon, SidebarSettingsIcon } from "@context-hub/extensions/icons"
 
 import { localized, matchesQuery, searchPath } from "@context-hub/extensions"
 import type {
@@ -138,7 +138,7 @@ export function settingsContribution(
 ): SearchContribution {
   return {
     labelKey: "search.group.settings",
-    icon: SettingsIcon,
+    icon: SidebarSettingsIcon,
     search: (query) => searchSettings(t, query, sections()),
   }
 }
@@ -158,7 +158,7 @@ export function extensionsContribution(
 ): SearchContribution {
   return {
     labelKey: "search.group.extensions",
-    icon: BlocksIcon,
+    icon: SidebarExtensionsIcon,
     search: (query) => searchExtensions(entries(), query, locale()),
   }
 }

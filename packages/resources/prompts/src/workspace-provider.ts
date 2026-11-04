@@ -83,7 +83,6 @@ const PLACE: PromptPlace = {
   labelKey: "prompts.location.workspace",
   icon: () => null,
   scope: "workspace",
-  order: 0,
   generatedOnly: true,
   where: ".agents",
   forms: FORMS,

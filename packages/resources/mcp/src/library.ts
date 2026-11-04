@@ -17,12 +17,13 @@
 import * as React from "react"
 import { ServerIcon } from "lucide-react"
 
-import { createCatalog, chosenAgents, chosenProviders, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
+import { createCatalog, chosenAgents, chosenProviders, isGlobalWorkspace, type Catalog, type ExtensionIcon } from "@context-hub/extensions"
 import {
   useCatalog,
   useChosenAgents,
   useContributions,
   useExtensionSnapshot,
+  useGlobalWorkspace,
   useHub,
   useI18n,
 } from "@context-hub/extensions/react"
@@ -162,7 +163,8 @@ export function useMcpLibrary(): McpLibrary {
   const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
   const subscribeWorkspace = React.useCallback((listener: () => void) => workspaces?.subscribe(listener) ?? (() => undefined), [workspaces])
   const currentWorkspace = React.useSyncExternalStore(subscribeWorkspace, () => workspaces?.current()?.current ?? "")
-  const scanKey = `${currentWorkspace}\n${chosen.join(",")}`
+  const globalOnly = useGlobalWorkspace()
+  const scanKey = `${currentWorkspace}\n${globalOnly}\n${chosen.join(",")}`
   const currentScan = value.scan?.key === undefined || value.scan.key === scanKey
   const providers = React.useMemo(() => {
     void revision
@@ -170,9 +172,9 @@ export function useMcpLibrary(): McpLibrary {
   }, [service, revision, chosen])
   const scanned = React.useMemo(() => {
     if (!currentScan) return []
-    const places = value.scan?.places?.filter((entry) => providers.some((provider) => provider.id === entry.provider.id)) ?? placesOf(providers, iconFor)
-    return availablePlaces(places, value.scan?.answer ?? null)
-  }, [currentScan, value.scan, providers, iconFor])
+    const places = value.scan?.places?.filter((entry) => providers.some((provider) => provider.id === entry.provider.id)) ?? placesOf(providers, iconFor, globalOnly)
+    return availablePlaces(places.filter((entry) => !globalOnly || entry.place.scope === "global"), value.scan?.answer ?? null)
+  }, [currentScan, value.scan, providers, iconFor, globalOnly])
   const places = React.useMemo(() => scanned.map((entry) => entry.place), [scanned])
 
   const catalog = React.useMemo(() => {
@@ -234,7 +236,7 @@ export function useMcpLibrary(): McpLibrary {
       /* Read from the places this page offers, so a place whose agent was
          un-chosen is not one a write can still reach. */
       const workspaces = ctx.get("hub.workspaces")
-      const scanKey = `${workspaces?.current()?.current ?? ""}\n${chosenAgents(workspaces).join(",")}`
+      const scanKey = `${workspaces?.current()?.current ?? ""}\n${isGlobalWorkspace(workspaces?.current())}\n${chosenAgents(workspaces).join(",")}`
       if (value.scan?.key !== undefined && value.scan.key !== scanKey) throw new McpError("mcp.error.scan")
       if (value.scan?.answer.problems.some((problem) => problem.place === place)) throw new McpError("mcp.error.read")
       const found = scanned.find((entry) => entry.place.id === place)

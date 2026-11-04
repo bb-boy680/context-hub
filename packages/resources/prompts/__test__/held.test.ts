@@ -16,7 +16,6 @@ const spot = (id: string, agent: string): PromptPlace => ({
   labelKey: `${id}.label`,
   icon: () => null,
   scope: "workspace",
-  order: 20,
   forms: [{ id: "commands", labelKey: "prompts.menu.commands" }],
 })
 

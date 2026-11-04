@@ -7,8 +7,60 @@
  */
 import { describe, expect, it } from "vitest"
 
-import { chosenAgents, chosenProviders, type ChosenProvider } from "../src/agents.ts"
-import type { WorkspaceService } from "@context-hub/core/workspace"
+import { agentDisplayOrder, chosenAgents, chosenProviders, isGlobalWorkspace, mergeAgentOrder, orderByAgent, type ChosenProvider } from "../src/agents.ts"
+import type { WorkspacePage, WorkspaceService } from "@context-hub/core/workspace"
+
+describe("Agent display order", () => {
+  it("restores saved positions and appends new Agents", () => {
+    expect(agentDisplayOrder(["z", "a", "m", "n"], ["m", "hidden", "z", "a"]))
+      .toEqual(["m", "z", "a", "n"])
+  })
+
+  it("orders marks while retaining each Agent's places and unknown marks", () => {
+    const marks = [
+      { agent: "a", id: "a-one" }, { agent: "unknown", id: "unknown" },
+      { agent: "b", id: "b-one" }, { agent: "a", id: "a-two" },
+      { agent: "c", id: "c-one" }, { agent: "d", id: "d-one" },
+    ]
+    expect(orderByAgent(marks, ["b", "a", "c", "d"], (mark) => mark.agent).map((mark) => mark.id))
+      .toEqual(["b-one", "a-one", "a-two", "c-one", "d-one", "unknown"])
+    expect(orderByAgent(marks, undefined, (mark) => mark.agent)).toEqual(marks)
+  })
+
+  it("reorders visible slots without dropping hidden or collapsed Agents", () => {
+    expect(mergeAgentOrder(["z", "hidden", "a", "m"], ["z", "a", "m", "n"], ["a", "z"]))
+      .toEqual(["a", "hidden", "z", "m", "n"])
+  })
+})
+
+describe("全局入口", () => {
+  const page: WorkspacePage = {
+    current: "home",
+    agents: [],
+    agentOrder: [],
+    folders: [
+      { id: "project", name: "全局", path: "/project", display: "/project", default: false, nameKey: null },
+      { id: "home", name: "自定义名称", path: "/home", display: "~", default: true, nameKey: null },
+    ],
+  }
+
+  it("按当前行标记识别，不依赖名称、系统别名或行顺序", () => {
+    expect(isGlobalWorkspace(page)).toBe(true)
+    expect(isGlobalWorkspace({ ...page, current: "project" })).toBe(false)
+  })
+
+  it("未加载、没有选择或当前行未知时不推断为全局", () => {
+    expect(isGlobalWorkspace(undefined)).toBe(false)
+    expect(isGlobalWorkspace(null)).toBe(false)
+    expect(isGlobalWorkspace({ ...page, current: null })).toBe(false)
+    expect(isGlobalWorkspace({ ...page, current: "unknown" })).toBe(false)
+  })
+
+  it("相同 ID 的默认标记变化后重新判断", () => {
+    expect(isGlobalWorkspace({ ...page, folders: page.folders.map((folder) => ({ ...folder, default: false })) })).toBe(false)
+    expect(isGlobalWorkspace(page)).toBe(true)
+  })
+})
 
 /** One provider, as an agent integration or a module itself registers it. */
 function provider(id: string, shared?: boolean): ChosenProvider {
@@ -18,7 +70,7 @@ function provider(id: string, shared?: boolean): ChosenProvider {
 /** A form's workspace list, holding only the agents it was given. */
 function workspaces(agents: string[]): WorkspaceService {
   return {
-    current: () => ({ folders: [], current: null, agents }),
+    current: () => ({ folders: [], current: null, agents, agentOrder: [] }),
     failure: () => null,
     subscribe: () => () => undefined,
     refresh: async () => undefined,
@@ -27,6 +79,7 @@ function workspaces(agents: string[]): WorkspaceService {
     rename: async () => true,
     remove: async () => true,
     setAgent: async () => true,
+    setAgentOrder: async () => true,
   }
 }
 

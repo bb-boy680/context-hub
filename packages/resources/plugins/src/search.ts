@@ -5,7 +5,7 @@
  * a client holds alone is a row there, so it is a result here — and the mark a
  * row carries is already a URL by the time it reaches this function.
  */
-import { PlugIcon } from "lucide-react"
+import { SidebarPluginsIcon } from "@context-hub/extensions/icons"
 
 import { matchesQuery, searchPath } from "@context-hub/extensions"
 import type { Context } from "@deepseek-ai/cordis"
@@ -27,7 +27,7 @@ const PAGE = "/plugins"
 export function pluginSearch(ctx: Context, library: PluginLibrary): SearchContribution {
   return {
     labelKey: "search.group.plugins",
-    icon: PlugIcon,
+    icon: SidebarPluginsIcon,
     search(query) {
       const value = library.state().value
       if (value === null) return []

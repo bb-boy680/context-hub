@@ -3,8 +3,8 @@
 `/market/plugins` lists the packs in the markets this build ships. The page
 itself is `@context-hub/market-plugins`; each market is its own extension and
 registers one `MarketSource` into the page's registry. There is no way to add a
-source from the page: a source is an extension, so it is enabled, disabled and
-updated on the Extensions page.
+source from the page: a source is an extension, so it is managed on the
+Extensions page.
 
 ## Sources
 
@@ -13,12 +13,13 @@ updated on the Extensions page.
 | `hub.market.claude-plugins-official` | `claude-plugins-official` | `.claude-plugin/marketplace.json` in `anthropics/claude-plugins-official` |
 | `hub.market.codex-plugins` | `openai` | `.agents/plugins/marketplace.json` in `openai/plugins` |
 
-The source rail and each row's badge use the marketplace's own name; the icon
-beside it in the rail is that marketplace owner's GitHub avatar.
+The source rail, each row's badge and the Extensions page use the marketplace's
+own name; the icon in both places is that owner's GitHub avatar, shipped in the
+extension package's `assets/` so neither page needs the network to draw it.
 
-Both are on by default. Disabling one removes its rows and leaves every pack
-already collected in the library, and every pack already delivered to an agent,
-where it is.
+Both are built in and locked on, like the other built-in extensions, so the
+Extensions page offers no switch for them. Packs already collected in the
+library, and every pack already delivered to an agent, stay where they are.
 
 The page merges every registered source, groups by a normalized category, and
 searches across the current source set. The source rail narrows to one source;

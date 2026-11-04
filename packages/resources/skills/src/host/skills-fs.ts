@@ -135,6 +135,7 @@ interface CatalogEntry {
 
 interface CatalogFile {
   skills: Record<string, CatalogEntry>
+  order: string[]
 }
 
 /**
@@ -157,11 +158,9 @@ function serializeEntry(entry: CatalogEntry): Record<string, unknown> {
   }
 }
 
-/** The whole record: rows in name order, two-space JSON, one closing newline. */
-function serializeCatalog(skills: Record<string, CatalogEntry>): string {
-  const rows = Object.values(skills)
-    .sort((left, right) => left.name.localeCompare(right.name))
-    .map(serializeEntry)
+/** The whole record, in stored order. */
+function serializeCatalog(catalog: CatalogFile): string {
+  const rows = catalog.order.map((name) => serializeEntry(catalog.skills[name]!))
   return `${JSON.stringify(rows, null, 2)}\n`
 }
 
@@ -196,22 +195,24 @@ function entryOf(record: Record<string, unknown>, name: string): CatalogEntry {
  * guessed at. A file that will not parse reads as no rows, and the scan then
  * seeds every directory from its manifest.
  */
-async function readCatalogFile(file: string): Promise<Record<string, CatalogEntry>> {
+async function readCatalogFile(file: string): Promise<CatalogFile> {
   let parsed: unknown
   try {
     parsed = JSON.parse(await fs.readFile(file, "utf8"))
   } catch {
-    return {}
+    return { skills: {}, order: [] }
   }
-  if (!Array.isArray(parsed)) return {}
+  if (!Array.isArray(parsed)) return { skills: {}, order: [] }
   const skills: Record<string, CatalogEntry> = {}
+  const order: string[] = []
   for (const row of parsed) {
     if (typeof row !== "object" || row === null) continue
     const record = row as Record<string, unknown>
     if (typeof record.name !== "string" || record.name === "") continue
+    if (!Object.hasOwn(skills, record.name)) order.push(record.name)
     skills[record.name] = entryOf(record, record.name)
   }
-  return skills
+  return { skills, order }
 }
 
 /** The hub-owned fields of one manifest, or `null` when it cannot be read. */
@@ -267,9 +268,9 @@ async function migrateLegacyCatalog(root: string): Promise<void> {
   if (legacy === null) return
   const catalogPath = path.join(root, CATALOG_FILE)
   const current = await readCatalogFile(catalogPath)
-  const merged: Record<string, CatalogEntry> = { ...legacy, ...current }
+  const merged: Record<string, CatalogEntry> = { ...legacy, ...current.skills }
   for (const [name, row] of Object.entries(legacy)) {
-    if (current[name] !== undefined) continue
+    if (current.skills[name] !== undefined) continue
     const frontmatter = await readManifestFrontmatter(
       path.join(root, name, MANIFEST)
     )
@@ -280,7 +281,8 @@ async function migrateLegacyCatalog(root: string): Promise<void> {
       tags: frontmatter.tags ?? [],
     }
   }
-  await writeFileAtomic(catalogPath, serializeCatalog(merged))
+  const order = [...current.order, ...Object.keys(legacy).filter((name) => !current.order.includes(name))]
+  await writeFileAtomic(catalogPath, serializeCatalog({ skills: merged, order }))
   await fs.rm(legacyPath, { force: true })
 }
 
@@ -490,9 +492,10 @@ export async function createFsSkillStore(
    * who owns those files is a different answer.
    */
   const rebuild = async (): Promise<CatalogFile> => {
-    const previous = catalog ?? { skills: await readCatalogFile(catalogPath) }
+    const previous = catalog ?? await readCatalogFile(catalogPath)
     const entries = await readdirOrEmpty(root)
     const skills: Record<string, CatalogEntry> = {}
+    const discovered: string[] = []
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue
       const dir = path.join(root, entry.name)
@@ -511,15 +514,20 @@ export async function createFsSkillStore(
         known === undefined
           ? await readEntry(entry.name, link)
           : await carried(known, entry.name, link)
-      if (row !== null) skills[entry.name] = row
+      if (row !== null) {
+        skills[entry.name] = row
+        discovered.push(entry.name)
+      }
     }
-    return { skills }
+    const order = previous.order.filter((name) => Object.hasOwn(skills, name))
+    for (const name of discovered) if (!order.includes(name)) order.push(name)
+    return { skills, order }
   }
 
   /** Publish the record atomically; the next scan merges against it. */
   const saveCatalog = async (next: CatalogFile): Promise<CatalogFile> => {
     catalog = next
-    await writeFileAtomic(catalogPath, serializeCatalog(next.skills))
+    await writeFileAtomic(catalogPath, serializeCatalog(next))
     return catalog
   }
 
@@ -541,7 +549,9 @@ export async function createFsSkillStore(
     const current = await loadCatalog()
     const skills = { ...current.skills }
     change(skills)
-    await saveCatalog({ ...current, skills })
+    const order = current.order.filter((name) => Object.hasOwn(skills, name))
+    for (const name of Object.keys(skills)) if (!order.includes(name)) order.push(name)
+    await saveCatalog({ ...current, skills, order })
   }
 
   /**
@@ -676,7 +686,8 @@ export async function createFsSkillStore(
       const current = await loadCatalog()
       const needle = query.q?.trim().toLowerCase()
       const matching: SkillSummary[] = []
-      for (const row of Object.values(current.skills)) {
+      for (const name of current.order) {
+        const row = current.skills[name]!
         if (query.tag !== undefined && !row.tags.includes(query.tag)) continue
         if (query.enabled !== undefined && row.enabled !== query.enabled) continue
         if (
@@ -713,13 +724,7 @@ export async function createFsSkillStore(
         query.source === undefined
           ? matching
           : matching.filter((row) => row.source === query.source)
-      rows.sort((a, b) => {
-        if (query.sort === "name") return a.name.localeCompare(b.name)
-        /* Newest first, name as the tiebreaker so paging never drifts. */
-        return (
-          b.updatedAt.localeCompare(a.updatedAt) || a.name.localeCompare(b.name)
-        )
-      })
+      /* Keep the record's order through filtering and pagination. */
       const offset = Math.max(0, query.offset ?? 0)
       const limit = query.limit ?? rows.length
       return {

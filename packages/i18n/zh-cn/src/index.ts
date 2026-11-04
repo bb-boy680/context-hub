@@ -3,7 +3,7 @@
  * `zh-CN` locale to Context Hub's language picker. The package carries data
  * only, so the kernel never runs code for it and every form can load it.
  */
-import { LanguagesIcon } from "lucide-react"
+import { SidebarLanguageIcon } from "@context-hub/extensions/icons"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
@@ -20,7 +20,7 @@ export const simplifiedChineseLocale: ExtensionModule = {
     kind: "declarative",
     category: "language",
     description: "Chinese (Simplified) interface language.",
-    icon: LanguagesIcon,
+    icon: SidebarLanguageIcon,
     defaultEnabled: true,
     locked: true,
     permissions: [],

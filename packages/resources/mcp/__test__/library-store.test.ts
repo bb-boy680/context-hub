@@ -96,6 +96,48 @@ describe("the library a form starts", () => {
     expect(kernel.ctx.get(MCP_LIBRARY_SERVICE)).toBeInstanceOf(McpLibrary)
   })
 
+  it("全局只扫描动态解析出的全局位置，标记变化后重新扫描", async () => {
+    vi.stubGlobal("fetch", async (url: string) => new Response(JSON.stringify(
+      String(url).includes("action=records") ? { value: [], file: "" } : {}
+    ), { status: 200 }))
+    const workspace = formWorkspaces([PROVIDER.id])
+    let global = true
+    const read = vi.fn(PROVIDER.read)
+    const dynamic: McpProvider = {
+      ...PROVIDER,
+      places: [],
+      placesFor: async () => [
+        ...PROVIDER.places,
+        { id: "user", label: "Acme", scope: "global", file: "acme.json", switchable: false, installable: false },
+      ],
+      read,
+    }
+    const kernel = await createHubKernel({
+      host: { ...bareHost(), files: noFiles() },
+      services: { "hub.workspaces": { ...workspace, current: () => ({
+        current: "home", agents: [PROVIDER.id],
+        folders: [{ id: "home", name: "Home", path: "/home", display: "~", default: global, nameKey: null }],
+      }) } },
+      extensions: [mcpModuleWith(() => null)],
+    })
+    await kernel.start()
+    kernel.ctx.get("mcp")!.register(dynamic)
+    const library = kernel.ctx.get(MCP_LIBRARY_SERVICE)!
+    await library.load()
+    expect(read.mock.calls.map(([, id]) => id)).toEqual(["user"])
+    expect(library.rows()!.servers[0]!.detail.installs.map((one) => one.place)).toEqual(["user"])
+
+    global = false
+    workspace.announce()
+    expect(library.rows()).toBeNull()
+    await library.load()
+    expect(library.state().value!.scan!.places!.map((one) => one.place.id)).toEqual(["user", "acme"])
+    global = true
+    workspace.announce()
+    await library.load()
+    expect(library.state().value!.scan!.places!.map((one) => one.place.id)).toEqual(["user"])
+  })
+
   it("keeps dynamically resolved places with the scan that produced them", async () => {
     vi.stubGlobal("fetch", async (url: string) => new Response(JSON.stringify(
       String(url).includes("action=records") ? { value: [], file: "" } : {}

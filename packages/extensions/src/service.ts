@@ -6,7 +6,7 @@
  * the same mechanism — including the ones it made through a contribution point,
  * which is a service and takes its lifetime from the same place.
  */
-import { POINT_SERVICES, type ContributionPoint } from "./contributions.ts"
+import { orderPlacements, POINT_SERVICES, type ContributionPoint } from "./contributions.ts"
 import { Service } from "./cordis.ts"
 import type { Context, Fiber, Plugin } from "./cordis.ts"
 
@@ -179,7 +179,7 @@ export class ExtensionService extends Service {
     return this.run(() => this.addNow(module))
   }
 
-  private async addNow(module: ExtensionModule): Promise<void> {
+  private async addNow(module: ExtensionModule, installedIds?: readonly string[]): Promise<void> {
     const manifest = catalogManifest(module)
     const { id } = manifest
     if (this.entries.has(id)) {
@@ -187,6 +187,7 @@ export class ExtensionService extends Service {
     }
     const entry: Entry = { module, manifest, enabled: false, status: "inactive" }
     this.entries.set(id, entry)
+    if (installedIds !== undefined) this.reorderStored(installedIds)
     if (!isCompatible(manifest.engines, this.host.version)) {
       entry.status = "incompatible"
       this.publish()
@@ -207,16 +208,16 @@ export class ExtensionService extends Service {
    * not have is simply added. An incompatible module is refused before the old
    * entry is touched, so a bad download never costs a working extension.
    */
-  replace(module: ExtensionModule): Promise<void> {
-    return this.run(() => this.replaceNow(module))
+  replace(module: ExtensionModule, installedIds?: readonly string[]): Promise<void> {
+    return this.run(() => this.replaceNow(module, installedIds))
   }
 
-  private async replaceNow(module: ExtensionModule): Promise<void> {
+  private async replaceNow(module: ExtensionModule, installedIds?: readonly string[]): Promise<void> {
     const manifest = catalogManifest(module)
     const { id } = manifest
     const existing = this.entries.get(id)
     if (existing === undefined) {
-      await this.addNow(module)
+      await this.addNow(module, installedIds)
       return
     }
     if (existing.manifest.locked === true) {
@@ -229,9 +230,24 @@ export class ExtensionService extends Service {
     await this.deactivate(existing)
     const entry: Entry = { module, manifest, enabled, status: "inactive" }
     this.entries.set(id, entry)
+    if (installedIds !== undefined) this.reorderStored(installedIds)
     if (enabled) await this.activate(entry)
     this.persist()
     this.publish()
+  }
+
+  private reorderStored(ids: readonly string[]): void {
+    const all = [...this.entries.entries()]
+    const stored = new Map(all.filter(([, entry]) => entry.module.stored === true))
+    this.entries.clear()
+    for (const [id, entry] of all) if (entry.module.stored !== true) this.entries.set(id, entry)
+    for (const id of ids) {
+      const entry = stored.get(id)
+      if (entry === undefined) continue
+      this.entries.set(id, entry)
+      stored.delete(id)
+    }
+    for (const [id, entry] of stored) this.entries.set(id, entry)
   }
 
   /**
@@ -278,10 +294,7 @@ export class ExtensionService extends Service {
   contributions<P extends ExtensionPointId>(point: P): ContributionMap[P][] {
     const held = this.placements(point)
     if (held.length === 0) return []
-    const rank = new Map([...this.entries.keys()].map((id, at) => [id, at]))
-    return [...held]
-      .sort((left, right) => (rank.get(left.owner) ?? Infinity) - (rank.get(right.owner) ?? Infinity))
-      .map((placement) => placement.value as ContributionMap[P])
+    return orderPlacements(held, [...this.entries.keys()]) as ContributionMap[P][]
   }
 
   /** Contributions one extension currently makes at one point. */

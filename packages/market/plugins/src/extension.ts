@@ -3,7 +3,7 @@
  * phase), the source registry every market extension registers into, and the
  * sidebar row that reaches it.
  */
-import { StoreIcon } from "lucide-react"
+import { SidebarPluginsMarketIcon } from "@context-hub/extensions/icons"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
@@ -23,7 +23,7 @@ export const marketPluginsExtension: ExtensionModule = {
     kind: "code",
     category: "source",
     description: "Browse the plugin markets this hub ships and install their packs.",
-    icon: StoreIcon,
+    icon: SidebarPluginsMarketIcon,
     defaultEnabled: true,
     locked: true,
     permissions: ["network"],
@@ -41,7 +41,7 @@ export const marketPluginsExtension: ExtensionModule = {
     ctx.nav.register({
       path: "/market/plugins",
       labelKey: "market.plugins.nav",
-      icon: StoreIcon,
+      icon: SidebarPluginsMarketIcon,
       group: "market",
       order: 20,
     })

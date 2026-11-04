@@ -2,7 +2,7 @@
  * The locked English base pack. The kernel ships it because every lookup
  * falls back to it; other languages arrive as their own extension packages.
  */
-import { LanguagesIcon } from "lucide-react"
+import { SidebarLanguageIcon } from "../components/sidebar-icons.ts"
 
 import type { ExtensionModule } from "../types.ts"
 
@@ -81,10 +81,16 @@ const en: Record<string, string> = {
   "menu.refreshPlugins.done": "Plugin market refreshed",
   "menu.refreshPlugins.failed": "The plugin market could not be refreshed: {reason}",
   "workspace.group.title": "Workspaces",
-  "workspace.defaultName": "Default workspace",
+  "workspace.defaultName": "Global",
   "agents.group.title": "Agents",
   "agents.group.expand": "Show {count} more",
   "agents.group.collapse": "Show fewer",
+  "agents.order.instructions": "Press Space to pick up, use the arrow keys to move, Space to drop, or Escape to cancel.",
+  "agents.order.failed": "Could not save Agent order",
+  "agents.order.picked": "Picked up {agent}, position {position} of {count}.",
+  "agents.order.moved": "{agent}, position {position} of {count}.",
+  "agents.order.dropped": "Dropped {agent}, position {position} of {count}.",
+  "agents.order.cancelled": "Reordering cancelled.",
   "workspace.create": "Create workspace",
   "workspace.create.unsupported": "This browser has no system folder dialog.",
   "workspace.action.more": "More",
@@ -188,7 +194,7 @@ export const englishLocale: ExtensionModule = {
     kind: "builtin",
     category: "language",
     description: "Base interface language every other pack falls back to.",
-    icon: LanguagesIcon,
+    icon: SidebarLanguageIcon,
     defaultEnabled: true,
     locked: true,
     permissions: [],

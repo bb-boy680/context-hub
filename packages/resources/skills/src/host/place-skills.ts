@@ -167,7 +167,6 @@ export async function readPlaceSkills(
       ...(link === null ? {} : { link }),
     })
   }
-  skills.sort((left, right) => left.name.localeCompare(right.name))
   return { ...view, skills }
 }
 

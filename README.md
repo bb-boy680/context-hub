@@ -116,8 +116,8 @@ pnpm dev:desktop  # the desktop shell only
 
 1. **Choose your agents** in the sidebar. Only the agents you select are read
    and written.
-2. **Add a workspace**: the folder of the project you are working on. The hub
-   reads each agent's workspace directories inside it.
+2. **Choose Global or add a workspace**: Global shows only each agent's global
+   locations. Selecting a project workspace includes both project and global locations.
 3. **Add assets**: import a skill from a folder or a registry your plugins
    provide, add an MCP server, install a plugin pack, write a prompt, or record
    an environment variable.

@@ -11,9 +11,20 @@
 import { Context } from "@deepseek-ai/cordis"
 import { describe, expect, it } from "vitest"
 
-import { PROMPT_LIBRARY_SERVICE, PromptLibrary } from "../src/library-store.ts"
+import { orderPromptRows, PROMPT_LIBRARY_SERVICE, PromptLibrary } from "../src/library-store.ts"
+import type { StoredPrompt } from "../src/store.ts"
 
 describe("the prompt library a form starts", () => {
+  it("places confirmed Agent holdings before other records, in Agent order", () => {
+    const rows: StoredPrompt[] = ["q", "a", "m", "p"].map((id) => ({
+      id, name: id, description: "", prompt: "", tags: [], assets: [], updatedAt: "",
+    }))
+    const ordered = orderPromptRows(rows, [
+      [undefined, { commands: true }, {}, {}],
+      [{}, { commands: true }, { commands: true }, undefined],
+    ])
+    expect(ordered.map((row) => row.id)).toEqual(["a", "m", "q", "p"])
+  })
   it("is under the name the form reads it by", () => {
     const ctx = new Context()
     new PromptLibrary(ctx)

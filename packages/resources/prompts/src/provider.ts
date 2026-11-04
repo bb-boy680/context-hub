@@ -17,7 +17,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope, PlaceFiles } from "@context-hub/core/place-files"
-import { chosenProviders, type ExtensionIcon } from "@context-hub/extensions"
+import { chosenProviders, orderedRegistry, type ExtensionIcon, type Placement } from "@context-hub/extensions"
 
 import { isLegacyPromptProvider, legacyPromptProvider } from "./legacy.ts"
 import type { LegacyPromptProvider } from "./legacy.ts"
@@ -72,8 +72,6 @@ export interface PromptPlace {
   readonly icon: ExtensionIcon
   /** The root every form below is read under. */
   readonly scope: AssetScope
-  /** Sort rank among the places of its own scope. */
-  readonly order: number
   /**
    * Whether this place takes only what a prompt is written *out* as, and not
    * the prompt itself.
@@ -148,7 +146,7 @@ export interface PromptProvider {
  * switched off.
  */
 export class PromptService extends Service {
-  private readonly held: PromptProvider[] = []
+  private readonly held: Placement<PromptProvider>[] = []
 
   /** The file-naming and section rules a provider cannot import itself. */
   readonly tools: PromptTools = promptTools
@@ -159,12 +157,12 @@ export class PromptService extends Service {
 
   /** Every provider registered right now, in registration order. */
   providers(): readonly PromptProvider[] {
-    return this.held
+    return orderedRegistry(this.ctx, this.held)
   }
 
   /** The provider that declared one place, or none when no one did. */
   providerOf(place: string): PromptProvider | undefined {
-    return this.held.find((provider) => provider.places.some((one) => one.id === place))
+    return this.providers().find((provider) => provider.places.some((one) => one.id === place))
   }
 
   /**
@@ -189,15 +187,16 @@ export class PromptService extends Service {
       throw new Error(`${next.id} declares the same place twice`)
     }
     const taken = places.find((id) =>
-      this.held.some((one) => one.places.some((place) => place.id === id))
+      this.held.some((one) => one.value.places.some((place) => place.id === id))
     )
     if (taken !== undefined) {
       throw new Error(`the place ${taken} is already registered`)
     }
 
-    this.held.push(next)
+    const placement = { owner: this.ctx.fiber?.name ?? "root", value: next }
+    this.held.push(placement)
     return this.ctx.effect(() => () => {
-      const at = this.held.indexOf(next)
+      const at = this.held.indexOf(placement)
       if (at >= 0) this.held.splice(at, 1)
     })
   }
@@ -248,16 +247,16 @@ function assertProvider(provider: PromptProvider): void {
  *
  * @param providers — every registered provider.
  * @param chosen — the agents the sidebar chose, by provider id.
- * @returns the places, ordered by scope and then by their own rank.
+ * @returns the places in provider and declaration order.
  */
 export function promptPlaces(
   providers: readonly PromptProvider[],
-  chosen: readonly string[]
+  chosen: readonly string[],
+  globalOnly = false
 ): readonly PromptPlace[] {
   return chosenProviders(providers, chosen)
     .flatMap((provider) => provider.places)
-    .slice()
-    .sort((a, b) => a.scope.localeCompare(b.scope) || a.order - b.order)
+    .filter((place) => !globalOnly || place.scope === "global")
 }
 
 /**

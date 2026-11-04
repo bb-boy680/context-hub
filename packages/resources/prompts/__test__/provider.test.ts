@@ -19,14 +19,13 @@ import {
 } from "../src/provider.ts"
 
 /** One place, as an agent extension declares it. */
-function place(id: string, agent: string, scope: "workspace" | "global", order: number): PromptPlace {
+function place(id: string, agent: string, scope: "workspace" | "global"): PromptPlace {
   return {
     id,
     agent,
     labelKey: `${id}.label`,
     icon: () => null,
     scope,
-    order,
     where: `.${id}`,
     forms: [{ id: "commands", labelKey: "prompts.menu.commands" }],
   }
@@ -45,12 +44,12 @@ function provider(id: string, places: PromptPlace[], shared = false): PromptProv
 }
 
 const providers: PromptProvider[] = [
-  provider("hub.prompt.catalog", [place("own", "hub.prompt.catalog", "workspace", 0)], true),
+  provider("hub.prompt.catalog", [place("own", "hub.prompt.catalog", "workspace")], true),
   provider("hub.target.one", [
-    place("one-workspace", "hub.target.one", "workspace", 20),
-    place("one-global", "hub.target.one", "global", 20),
+    place("one-workspace", "hub.target.one", "workspace"),
+    place("one-global", "hub.target.one", "global"),
   ]),
-  provider("hub.target.two", [place("two-global", "hub.target.two", "global", 20)]),
+  provider("hub.target.two", [place("two-global", "hub.target.two", "global")]),
 ]
 
 const idsOf = (chosen: string[]) => promptPlaces(providers, chosen).map((one) => one.id)
@@ -60,8 +59,14 @@ describe("the places a prompt can be delivered to", () => {
     expect(idsOf([])).toEqual(["own"])
   })
 
-  it("offers both scopes of a chosen agent, globals first", () => {
-    expect(idsOf(["hub.target.one"])).toEqual(["one-global", "own", "one-workspace"])
+  it("offers both scopes in provider declaration order", () => {
+    expect(idsOf(["hub.target.one"])).toEqual(["own", "one-workspace", "one-global"])
+  })
+
+  it("全局入口不提供共享生成目录与 Agent 的工作区目标", () => {
+    expect(promptPlaces(providers, ["hub.target.one", "hub.target.two"], true).map((one) => one.id))
+      .toEqual(["one-global", "two-global"])
+    expect(promptPlaces(providers, [], true)).toEqual([])
   })
 
   it("stops offering an agent's places when it is un-chosen", () => {
@@ -101,14 +106,14 @@ describe("the provider registry", () => {
     const service = new PromptService(new Context())
     service.register(providers[1] as PromptProvider)
     expect(() =>
-      service.register(provider("hub.target.other", [place("one-global", "hub.target.other", "global", 20)]))
+      service.register(provider("hub.target.other", [place("one-global", "hub.target.other", "global")]))
     ).toThrow(/already registered/)
   })
 
   it("refuses a provider that does not implement the three methods", () => {
     const service = new PromptService(new Context())
     expect(() =>
-      service.register({ id: "broken", places: [place("x", "broken", "workspace", 20)] } as never)
+      service.register({ id: "broken", places: [place("x", "broken", "workspace")] } as never)
     ).toThrow(/held, install and remove/)
   })
 
@@ -124,7 +129,6 @@ describe("the provider registry", () => {
           labelKey: "claudeCode.tab",
           icon: () => null,
           scope: "workspace",
-          order: 20,
           commandDir: ".claude/commands",
           ruleDir: ".claude/rules",
           agentDir: ".claude/agents",

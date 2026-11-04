@@ -6,7 +6,7 @@
  * them. The group is the note under a name, because it is what the page shows
  * beside it.
  */
-import { VariableIcon } from "lucide-react"
+import { SidebarVariablesIcon } from "@context-hub/extensions/icons"
 
 import { matchesQuery, searchPath } from "@context-hub/extensions"
 import type { SearchContribution, SearchResult } from "@context-hub/extensions"
@@ -26,7 +26,7 @@ const PAGE = "/variables"
 export function variableSearch(library: VariableLibrary): SearchContribution {
   return {
     labelKey: "search.group.variables",
-    icon: VariableIcon,
+    icon: SidebarVariablesIcon,
     search(query) {
       const document = library.state().value?.document ?? null
       return document === null ? [] : searchVariables(document, query)

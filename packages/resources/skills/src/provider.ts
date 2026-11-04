@@ -16,7 +16,7 @@ import { Service } from "@deepseek-ai/cordis"
 import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope } from "@context-hub/core/place-files"
-import { chosenProviders, type ExtensionIcon } from "@context-hub/extensions"
+import { chosenProviders, orderedRegistry, type ExtensionIcon, type Placement } from "@context-hub/extensions"
 
 /** The service name the skills module publishes and every agent plugin requires. */
 export const SKILL_SERVICE = "skills"
@@ -40,8 +40,6 @@ export interface SkillPlace {
   readonly scope: AssetScope
   /** The directory inside that root, `/`-separated, e.g. ".claude/skills". */
   readonly dir: string
-  /** Sort rank among the places of its own scope. */
-  readonly order: number
 }
 
 /** One agent, as the skills module uses it: where that agent reads skills. */
@@ -74,22 +72,23 @@ export interface SkillProviderRegistry {
  * places would stay behind on every agent that was ever enabled.
  */
 export class SkillService extends Service {
-  private readonly held: SkillProvider[] = []
+  private readonly held: Placement<SkillProvider>[] = []
 
   constructor(ctx: Context) {
     super(ctx, SKILL_SERVICE)
   }
 
-  /** Every provider registered right now, in registration order. */
+  /** Every provider registered right now, in extension catalog order. */
   providers(): readonly SkillProvider[] {
-    return this.held
+    return orderedRegistry(this.ctx, this.held)
   }
 
   /** Add one provider, for as long as the plugin that added it stays loaded. */
   register(provider: SkillProvider): () => void {
-    this.held.push(provider)
+    const placement = { owner: this.ctx.fiber?.name ?? "root", value: provider }
+    this.held.push(placement)
     return this.ctx.effect(() => () => {
-      const at = this.held.indexOf(provider)
+      const at = this.held.indexOf(placement)
       if (at >= 0) this.held.splice(at, 1)
     })
   }
@@ -110,10 +109,11 @@ export class SkillService extends Service {
  */
 export function readablePlaces(
   providers: readonly SkillProvider[],
-  chosen: readonly string[]
+  chosen: readonly string[],
+  globalOnly = false
 ): SkillPlace[] {
-  const places = chosenProviders(providers, chosen).flatMap((provider) => provider.places)
-  return places.sort((left, right) => left.order - right.order)
+  return chosenProviders(providers, chosen).flatMap((provider) => provider.places)
+    .filter((place) => !globalOnly || place.scope === "global")
 }
 
 /**

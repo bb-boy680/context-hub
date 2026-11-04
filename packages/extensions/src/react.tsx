@@ -8,7 +8,7 @@ import { useSyncExternalStoreWithSelector } from "use-sync-external-store/shim/w
 
 import type { Context } from "./cordis.ts"
 
-import { chosenAgentsOf } from "./agents.ts"
+import { chosenAgentsOf, isGlobalWorkspace } from "./agents.ts"
 import type { Catalog, CatalogState } from "./catalog.ts"
 import type { I18nState } from "./i18n.ts"
 import type { ExtensionSnapshot } from "./service.ts"
@@ -16,6 +16,23 @@ import type { HubSettings, SettingsPatch } from "./settings.ts"
 import type { ContributionMap, ExtensionPointId } from "./types.ts"
 
 const HubContext = React.createContext<Context | null>(null)
+
+export interface AgentOrderValue {
+  order: readonly string[]
+  saving: boolean
+  reorder(ids: readonly string[]): void
+}
+
+const AgentOrderContext = React.createContext<AgentOrderValue | null>(null)
+
+/** Share the shell's effective Agent display order with resource pages. */
+export function AgentOrderProvider({ value, children }: { value: AgentOrderValue; children: React.ReactNode }) {
+  return <AgentOrderContext.Provider value={value}>{children}</AgentOrderContext.Provider>
+}
+
+export function useAgentOrder(): AgentOrderValue | null {
+  return React.useContext(AgentOrderContext)
+}
 
 /** Nothing to follow when this form provides no workspace list. */
 const NO_LISTENERS: (listener: () => void) => () => void = () => () => undefined
@@ -51,6 +68,8 @@ export function useExtensionSnapshot(): ExtensionSnapshot {
 export function useContributions<P extends ExtensionPointId>(
   point: P
 ): ContributionMap[P][] {
+  "use no memo"
+  // 注册信息在服务内部变化，必须随扩展通知重新读取。
   const ctx = useHub()
   useExtensionSnapshot()
   return ctx.extensions.contributions(point)
@@ -61,6 +80,7 @@ export function useExtensionContributions<P extends ExtensionPointId>(
   id: string,
   point: P
 ): ContributionMap[P][] {
+  "use no memo"
   const ctx = useHub()
   useExtensionSnapshot()
   return ctx.extensions.contributionsFrom(id, point)
@@ -87,6 +107,18 @@ export function useChosenAgents(): readonly string[] {
   return React.useSyncExternalStore(subscribe, read)
 }
 
+/** 订阅当前入口的作用域；默认行只提供全局位置。 */
+export function useGlobalWorkspace(): boolean {
+  const ctx = useHub()
+  const workspaces = React.useMemo(() => ctx.get("hub.workspaces"), [ctx])
+  const subscribe = React.useCallback(
+    (listener: () => void) => workspaces?.subscribe(listener) ?? NO_LISTENERS(listener),
+    [workspaces]
+  )
+  const read = React.useCallback(() => isGlobalWorkspace(workspaces?.current()), [workspaces])
+  return React.useSyncExternalStore(subscribe, read)
+}
+
 /** Translation and locale control returned by {@link useI18n}. */
 export interface I18n {
   state: I18nState
@@ -96,6 +128,8 @@ export interface I18n {
 
 /** Translation and locale control, re-rendering on every locale change. */
 export function useI18n(): I18n {
+  "use no memo"
+  // 翻译依赖服务内部状态，保留按语言快照更新函数的显式 memo。
   const ctx = useHub()
   const state = React.useSyncExternalStore(
     (onChange) => ctx.on("i18n/change", onChange),

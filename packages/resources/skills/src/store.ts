@@ -154,10 +154,7 @@ export interface SkillDetail extends SkillSummary {
   assetDetails: SkillAsset[]
 }
 
-/** Sort orders the catalog supports. */
-export type SkillSort = "updated" | "name"
-
-/** Catalog query; omitted fields mean "everything, in the default order". */
+/** Catalog query; omitted fields mean "everything, in the stored order". */
 export interface SkillQuery {
   offset?: number
   limit?: number
@@ -168,7 +165,6 @@ export interface SkillQuery {
   enabled?: boolean
   /** Keep only skills from this origin. */
   source?: SkillOrigin
-  sort?: SkillSort
 }
 
 /** Rows per origin for the query's other filters, plus their sum. */

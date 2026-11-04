@@ -4,10 +4,11 @@
  * column reads as one thing rather than three widgets stacked together.
  */
 import { CheckIcon, ChevronDownIcon } from "lucide-react"
+import { DragDropContext, Draggable, Droppable, type DragStart, type DragUpdate, type DropResult, type ResponderProvided } from "@hello-pangea/dnd"
 import * as React from "react"
 import { useLocation } from "react-router"
 
-import { useContributions, useI18n } from "@context-hub/extensions/react"
+import { useAgentOrder, useContributions, useI18n } from "@context-hub/extensions/react"
 import { useSkillAgents } from "@context-hub/skills"
 import { Sidebar, SidebarContent, SidebarHeader } from "@context-hub/shadcn-ui/components/sidebar"
 
@@ -59,63 +60,92 @@ function AgentGroup() {
   const { page, setAgent } = useWorkspaces()
   const [expanded, setExpanded] = React.useState(false)
   const chosen = page?.agents ?? []
+  const agentOrder = useAgentOrder()
   /* An agent is one this hub reads skills from: a target has a row while its
      own integration registered a place, which is what the skills page reads. */
   const agents = useSkillAgents()
-  const targets = useContributions("target").filter((entry) =>
-    agents.includes(entry.id)
-  )
+  const available = useContributions("target").filter((entry) => agents.includes(entry.id))
+  const byId = new Map(available.map((target) => [target.id, target]))
+  const targets = agentOrder === null ? available : agentOrder.order.flatMap((id) => {
+    const target = byId.get(id)
+    return target === undefined ? [] : [target]
+  })
 
   if (targets.length === 0) return null
 
   const rest = targets.length - AGENTS_VISIBLE
   const shown = expanded || rest <= 0 ? targets : targets.slice(0, AGENTS_VISIBLE)
 
+  const nameOf = (id: string) => byId.get(id)?.displayName ?? id
+  const announcement = (key: string, id: string, position: number) => t(key)
+    .replace("{agent}", nameOf(id))
+    .replace("{position}", String(position + 1))
+    .replace("{count}", String(shown.length))
+  const startDrag = (start: DragStart, { announce }: ResponderProvided) => {
+    announce(announcement("agents.order.picked", start.draggableId, start.source.index))
+  }
+  const updateDrag = (update: DragUpdate, { announce }: ResponderProvided) => {
+    if (update.destination !== null) announce(announcement("agents.order.moved", update.draggableId, update.destination.index))
+  }
+  const endDrag = (result: DropResult, { announce }: ResponderProvided) => {
+    if (agentOrder === null || result.reason !== "DROP" || result.destination === null ||
+      result.destination.index === result.source.index) {
+      announce(t("agents.order.cancelled"))
+      return
+    }
+    announce(announcement("agents.order.dropped", result.draggableId, result.destination.index))
+    const next = shown.map((target) => target.id)
+    const [moved] = next.splice(result.source.index, 1)
+    if (moved === undefined) return
+    next.splice(result.destination.index, 0, moved)
+    agentOrder.reorder(next)
+  }
+
   return (
-    <SidebarGroup label={t("agents.group.title")}>
-      {shown.map((target) => {
-        const Mark = target.icon
-        const on = chosen.includes(target.id)
-        return (
-          <SidebarRow
-            key={target.id}
-            label={target.displayName}
-            hint={target.format}
-            active={on}
-            iconWrap="rounded-xs bg-muted ring-1 ring-border"
-            icon={<Mark className="size-3" aria-hidden />}
-            onClick={() => setAgent(target.id, !on)}
-            trailing={
-              on ? (
-                <span className="flex size-6 shrink-0 items-center justify-center">
-                  <CheckIcon className="size-[15px] text-foreground" aria-hidden />
-                </span>
-              ) : null
-            }
-          />
-        )
-      })}
-      {rest <= 0 ? null : (
-        <SidebarRow
-          label={
-            expanded
-              ? t("agents.group.collapse")
-              : t("agents.group.expand").replace("{count}", String(rest))
-          }
-          active={false}
-          expanded={expanded}
-          icon={
-            <ChevronDownIcon
-              className={`size-[18px] shrink-0 transition-transform ${
-                expanded ? "rotate-180" : ""
-              }`}
-              aria-hidden
-            />
-          }
-          onClick={() => setExpanded(!expanded)}
-        />
-      )}
-    </SidebarGroup>
+    <DragDropContext onDragStart={startDrag} onDragUpdate={updateDrag} onDragEnd={endDrag} dragHandleUsageInstructions={t("agents.order.instructions")}>
+      <Droppable droppableId="agents">
+        {(drop) => (
+          <SidebarGroup label={t("agents.group.title")} listProps={{ ...drop.droppableProps, ref: drop.innerRef }}>
+            {shown.map((target, index) => {
+              const Mark = target.icon
+              const on = chosen.includes(target.id)
+              return (
+                <Draggable key={target.id} draggableId={target.id} index={index}
+                  isDragDisabled={agentOrder === null || agentOrder.saving}>
+                  {(drag) => (
+                    <SidebarRow
+                      itemProps={{ ...drag.draggableProps, ref: drag.innerRef }}
+                      dragHandleProps={drag.dragHandleProps}
+                      label={target.displayName}
+                      hint={target.format}
+                      active={on}
+                      iconWrap="rounded-xs bg-muted ring-1 ring-border"
+                      icon={<Mark className="size-3" aria-hidden />}
+                      onClick={() => setAgent(target.id, !on)}
+                      trailing={on ? (
+                        <span className="flex size-6 shrink-0 items-center justify-center">
+                          <CheckIcon className="size-[15px] text-foreground" aria-hidden />
+                        </span>
+                      ) : null}
+                    />
+                  )}
+                </Draggable>
+              )
+            })}
+            {drop.placeholder}
+            {rest <= 0 ? null : (
+              <SidebarRow
+                label={expanded ? t("agents.group.collapse") : t("agents.group.expand").replace("{count}", String(rest))}
+                active={false}
+                expanded={expanded}
+                icon={<ChevronDownIcon className={`size-[18px] shrink-0 transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden />}
+                onClick={() => setExpanded(!expanded)}
+              />
+            )}
+          </SidebarGroup>
+        )}
+      </Droppable>
+    </DragDropContext>
   )
 }
 

@@ -39,7 +39,8 @@ import {
   type PlaceGroup,
   type PlaceOption,
 } from "@context-hub/extensions/components"
-import { useI18n } from "@context-hub/extensions/react"
+import { orderByAgent } from "@context-hub/extensions"
+import { useAgentOrder, useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import { Dialog, DialogClose, DialogDescription, DialogTitle } from "@context-hub/shadcn-ui/components/dialog"
 import { Markdown } from "@context-hub/shadcn-ui/components/markdown"
@@ -224,6 +225,8 @@ function PlacesSection({
   onGenerate: (place: PromptPlace, form: string, option?: string, remove?: boolean) => void
 }) {
   const { t } = useI18n()
+  const order = useAgentOrder()?.order
+  const displayPlaces = orderByAgent(places, order, (place) => place.agent)
   const held = places.filter((place) => holdsSomething(holds[place.id])).length
   const byId = React.useMemo(() => new Map(places.map((place) => [place.id, place])), [places])
 
@@ -255,7 +258,7 @@ function PlacesSection({
 
   const groups: PlaceGroup[] = SCOPES.map((scope) => ({
     label: t(`prompts.group.${scope}`),
-    options: places
+    options: displayPlaces
       .filter((place) => place.scope === scope)
       .map((place) => ({
         id: place.id,
@@ -578,13 +581,11 @@ function InfoPanel({
   tagSuggestions: string[]
 }) {
   const { t } = useI18n()
+  const order = useAgentOrder()?.order
   const [copied, setCopied] = React.useState(false)
   /* The agents holding this prompt, drawn the way the card drew them: a place
      is one agent under one root, so two scopes of one agent share a mark. */
-  const marks = React.useMemo(
-    () => heldMarks(places, holds, (place) => t(place.labelKey)),
-    [places, holds, t]
-  )
+  const marks = orderByAgent(heldMarks(places, holds, (place) => t(place.labelKey)), order, (mark) => mark.id)
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

@@ -16,8 +16,11 @@ import {
   type MarketLog,
 } from "./apis/marketplace.ts"
 
-/** The marketplace's own name, as the rail and every row show it. */
-const SOURCE_NAME = "claude-plugins-official"
+/** The marketplace's own name, as the extension, the rail and every row show it. */
+export const SOURCE_NAME = "claude-plugins-official"
+
+/** The owner's mark, shipped with the package and shared by the extension and the rail. */
+export const SOURCE_MARK = new URL("../assets/anthropics.png", import.meta.url).href
 
 /** Build the source over one form's network. */
 export function createClaudePluginsSource(net: NetPort | null, log: MarketLog): MarketSource {
@@ -27,7 +30,7 @@ export function createClaudePluginsSource(net: NetPort | null, log: MarketLog): 
   return {
     id: CLAUDE_SOURCE_ID,
     name: SOURCE_NAME,
-    mark: "https://github.com/anthropics.png?size=64",
+    mark: SOURCE_MARK,
     repo: CLAUDE_MARKET_REPO.replace(/^https:\/\//, ""),
     index: CLAUDE_MARKET_INDEX,
 

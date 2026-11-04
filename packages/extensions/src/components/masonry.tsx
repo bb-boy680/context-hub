@@ -20,9 +20,11 @@ export function ResourceMasonry({ children }: { children: React.ReactNode }) {
 
   return (
     <div ref={ref} className="min-w-0">
+      {/* The SDK's `sequential` fills columns by index, so one tall cover stacks
+          a whole column while the others run dry; without it each card goes to
+          the shortest column. */}
       <Masonry
         columnsCount={columns}
-        sequential
         gutter="24px"
         style={{ justifyContent: "flex-start" }}
         itemStyle={{ flex: `0 0 calc(${100 / columns}% - ${(24 * (columns - 1)) / columns}px)` }}

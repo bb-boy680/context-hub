@@ -6,11 +6,10 @@
  * rendering rows nothing on this machine holds.
  */
 import * as React from "react"
-import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
+import { useAgentOrder, useCatalog, useChosenAgents, useExtensionSnapshot, useGlobalWorkspace, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
-import { parseSkillFile } from "./frontmatter.ts"
-import { createCatalog, type Catalog } from "@context-hub/extensions"
+import { chosenAgents, createCatalog, isGlobalWorkspace, orderByAgent, type Catalog } from "@context-hub/extensions"
 import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
@@ -23,7 +22,6 @@ import {
 import type {
   PlaceSkill,
   PlaceSkillsView,
-  SkillFileEntry,
   SkillInstall,
   SkillPage,
   SkillPlaceRef,
@@ -111,9 +109,11 @@ export function holdsOf(skill: Skill): SkillHold[] {
  * them back when it is disabled.
  */
 function useSkillProviders(): readonly SkillProvider[] {
+  "use no memo"
   const ctx = useHub()
   useExtensionSnapshot()
-  return ctx.get("skills")?.providers() ?? []
+  // 服务原位更新数组，复制后下游编译缓存才能识别注册变化。
+  return [...(ctx.get("skills")?.providers() ?? [])]
 }
 
 /**
@@ -123,24 +123,38 @@ function useSkillProviders(): readonly SkillProvider[] {
 export function useReadablePlaces(): SkillPlace[] {
   const providers = useSkillProviders()
   const chosen = useChosenAgents()
-  return readablePlaces(providers, chosen)
+  const globalOnly = useGlobalWorkspace()
+  return readablePlaces(providers, chosen, globalOnly)
 }
 
 /** Places offered as targets, without hiding the module's shared read. */
 export function selectablePlaces(
   providers: readonly SkillProvider[],
-  chosen: readonly string[]
+  chosen: readonly string[],
+  globalOnly = false
 ): SkillPlace[] {
   return readablePlaces(
     providers.filter((provider) => provider.id !== SKILLS_ID || provider.shared !== true),
-    chosen
+    chosen,
+    globalOnly
   )
 }
 
 export function useSelectablePlaces(): SkillPlace[] {
   const providers = useSkillProviders()
   const chosen = useChosenAgents()
-  return selectablePlaces(providers, chosen)
+  const globalOnly = useGlobalWorkspace()
+  return selectablePlaces(providers, chosen, globalOnly)
+}
+
+/** Reorder place views without changing the registry or scanning order. */
+export function useSkillDisplayPlaces<T extends { id: string; scope: AssetScope; dir: string }>(places: readonly T[]): T[] {
+  const ctx = useHub()
+  const order = useAgentOrder()?.order
+  const providers = ctx.get("skills")?.providers() ?? []
+  return orderByAgent(places, order, (place) => providers.find((provider) =>
+    provider.shared !== true && provider.places.some((held) =>
+      held.id === place.id && held.scope === place.scope && held.dir === place.dir))?.id)
 }
 
 /**
@@ -322,74 +336,6 @@ export function skillKey(skill: Skill): string {
   return inLibrary(skill) ? `library:${skill.name}` : `${skill.location}:${skill.name}`
 }
 
-/** Token count as a compact label, the way the cards show it. */
-export function tokenLabel(body: string): string {
-  const count = Math.round(body.length / 4)
-  return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count)
-}
-
-/** One skill's document as a cover reads it. */
-export interface SkillDocument {
-  /** The SKILL.md body, or `null` until it is read. */
-  body: string | null
-  /** Every file the skill ships, which the same read already answered. */
-  files: readonly SkillFileEntry[]
-}
-
-const NO_FILES: readonly SkillFileEntry[] = []
-
-/** Documents already read, so a re-mounted cover does not refetch. */
-const documents = new Map<string, SkillDocument>()
-
-/**
- * The skill's own document — the SKILL.md body and its file list, read from
- * wherever the skill lives. Only a cover that shows the document calls this, so
- * a card with a picture never pays for the read.
- *
- * @param skill — the row whose document is shown.
- * @param store — the form's library, or `null` when this form has none.
- * @returns the body and files, both empty until the read answers.
- */
-export function useSkillDocument(
-  skill: Skill,
-  store: SkillStore | null
-): SkillDocument {
-  const key = `${skillKey(skill)}@${skill.stamp ?? ""}`
-  const [document, setDocument] = React.useState<SkillDocument>(
-    () => documents.get(key) ?? { body: null, files: NO_FILES }
-  )
-
-  React.useEffect(() => {
-    if (store === null || documents.has(key)) return
-    let live = true
-    void (async () => {
-      try {
-        /* A skill no library record holds is read where the place keeps it. */
-        const hold = holdsOf(skill)[0]
-        const record =
-          hold === undefined
-            ? await store.get(skill.name)
-            : await store.placeSkill(skill.name, { scope: hold.scope, dir: hold.dir })
-        if (record === undefined || record === null) return
-        const text = "body" in record ? record.body : record.text
-        const read: SkillDocument = {
-          body: hold === undefined ? text : parseSkillFile(text).body,
-          files: record.files,
-        }
-        documents.set(key, read)
-        if (live) setDocument(read)
-      } catch {
-        /* An unreadable skill leaves the cover on its file-less placeholder. */
-      }
-    })()
-    return () => {
-      live = false
-    }
-  }, [key, store, skill])
-
-  return document
-}
-
 /** A past timestamp as an age the list can print, localized to the active locale. */
 export function formatAge(iso: string, locale: string): string {
   const then = Date.parse(iso)
@@ -466,7 +412,7 @@ export function useSkillLibrary(
   query = ""
 ): SkillLibrary {
   const ctx = useHub()
-  const { state } = useI18n()
+  const { state, t } = useI18n()
   const { installMode } = useSettings()
   const updateSettings = usePluginSettings(
     SKILLS_ID,
@@ -527,7 +473,7 @@ export function useSkillLibrary(
   React.useEffect(() => {
     if (store === null || needle === "") return
     let live = true
-    void store.list({ sort: "updated", q: needle }).then(
+    void store.list({ q: needle }).then(
       (answer) => {
         if (!live) return
         setMatched(answer)
@@ -617,57 +563,81 @@ export function useSkillLibrary(
         ...(takenAt.length === 0 ? {} : { takenAt }),
       }
     })
-    /*
-     * A skill the library already holds is on screen as its library row; but a
-     * place's own skill under a name the library does not hold is that place's.
-     */
-    const own: Skill[] = []
-    for (const place of roots) {
+    const sharedIds = new Set((ctx.get("skills")?.providers() ?? [])
+      .filter((provider) => provider.shared === true)
+      .flatMap((provider) => provider.places.map((place) => place.id)))
+    const orderedRoots = [
+      ...roots.filter((place) => !sharedIds.has(place.id)),
+      ...roots.filter((place) => sharedIds.has(place.id)),
+    ]
+    const byName = new Map(library.map((row) => [row.name, row]))
+    const seen = new Set<string>()
+    const rows: Skill[] = []
+    for (const place of orderedRoots) {
       for (const skill of held[place.id]?.skills ?? []) {
-        if (!showsOwnRow(skill, items)) continue
-        own.push(placeRow(skill, place))
+        const stored = byName.get(skill.name)
+        if (stored !== undefined) {
+          if (!seen.has(stored.name)) rows.push(stored)
+          seen.add(stored.name)
+        } else if (showsOwnRow(skill, items)) {
+          rows.push(placeRow(skill, place))
+        }
       }
     }
-    return [...library, ...own]
-  }, [store, page, held, targets, locale])
+    for (const row of library) if (!seen.has(row.name)) rows.push(row)
+    return rows
+  }, [ctx, store, page, held, targets, locale])
+
+  const assertPlace = React.useCallback((ref: SkillPlaceRef) => {
+    const current = ctx.get("hub.workspaces")
+    const allowed = readablePlaces(ctx.get("skills")?.providers() ?? [], chosenAgents(current), isGlobalWorkspace(current?.current()))
+    if ((current?.current()?.current ?? null) !== workspaceId ||
+      !allowed.some((place) => place.scope === ref.scope && place.dir === ref.dir)) {
+      throw new Error(t("skills.workspace.none"))
+    }
+  }, [ctx, workspaceId, t])
 
   const install = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       const landed = await store.installInto(id, ref, installMode)
       await reload()
       return landed
     },
-    [store, reload, installMode]
+    [store, reload, installMode, assertPlace]
   )
 
   const adopt = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       /* The place keeps its files; the library takes its own copy. */
       const landed = await store.adoptFrom(id, ref)
       await reload()
       return landed
     },
-    [store, reload]
+    [store, reload, assertPlace]
   )
 
   const deleteInPlace = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       await store.deleteInPlace(id, ref)
       await reload()
     },
-    [store, reload]
+    [store, reload, assertPlace]
   )
 
   const remove = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
+      assertPlace(ref)
       await store.removeFrom(id, ref)
       await reload()
     },
-    [store, reload]
+    [store, reload, assertPlace]
   )
 
   const checkUpdate = React.useCallback(
