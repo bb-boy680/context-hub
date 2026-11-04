@@ -502,6 +502,7 @@ describe("the record an older build left behind", () => {
               sourceType: "github",
               skillPath: "SKILL.md",
               hash: "installed",
+              revision: "commit-one",
             },
             checked: {
               at: "2026-01-02T00:00:00.000Z",
@@ -527,6 +528,7 @@ describe("the record an older build left behind", () => {
     expect(row?.source, "the origin survives").toBe("registry")
     expect(row?.assets, "the media survives").toEqual(["assets/picture.png"])
     expect(row?.upstream?.hash, "the recorded upstream survives").toBe("installed")
+    expect(row?.upstream?.revision, "the recorded commit survives").toBe("commit-one")
     expect(row?.checked?.latest, "the last check survives").toBe("newer")
     const written = JSON.parse(
       await fs.readFile(path.join(legacy.root, "skills.json"), "utf8")

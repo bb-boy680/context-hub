@@ -11,7 +11,7 @@ import { cn } from "cn"
 
 import { markImage } from "./marks.ts"
 import type { McpProbeIcon } from "./probe.ts"
-import { displayPlaceFile, type McpAgentPlace, type McpMark, type McpServer, type McpStatus, type McpTransport } from "./types.ts"
+import type { McpAgentPlace, McpMark, McpServer, McpStatus, McpTransport } from "./types.ts"
 import { AvatarStack } from "@context-hub/extensions/components"
 import { useI18n } from "@context-hub/extensions/react"
 
@@ -130,7 +130,7 @@ export function AgentStack({
       /* One line per file: a client holding two of them would otherwise read as
          one run of words with no seam between the two. */
       label={held
-        .map((place) => `${place.label} · ${displayPlaceFile(place)}`)
+        .map((place) => `${place.label} · ${place.path}`)
         .join("\n")}
     />
   )

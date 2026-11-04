@@ -253,24 +253,22 @@ export async function installSkillInto(
 }
 
 /**
- * Link one skill a place holds into the hub's library. The place keeps its own
- * directory and the library reaches it through the link, so the skill stays one
- * skill in two places rather than two copies that drift apart.
+ * Copy one skill a place holds into the hub's library. The library owns its own
+ * files; the place's directory is left where it is, so the two can move apart.
  *
  * @param base — the scope's root: the workspace folder, or the home directory.
- * @param libraryRoot — the hub's own library, where the link is made.
+ * @param libraryRoot — the hub's own library, where the copy is written.
  * @param id — the skill's directory name under the place's skills root.
  * @param dir — the place's directory inside that root.
- * @returns how it landed: `link` where the filesystem allows one, else `copy`.
- *   A copy is the only option on a filesystem with no links, and then the
- *   library owns its own set of files.
+ * @returns how it landed: always `copy`.
+ * @throws when the place has no such skill, or the library already has one
+ *   under that name.
  */
-export async function linkSkillIntoLibrary(
+export async function copySkillIntoLibrary(
   base: string,
   libraryRoot: string,
   id: string,
-  dir: string,
-  mode: InstallMode = "auto"
+  dir: string
 ): Promise<SkillInstall> {
   const name = assertSkillName(id)
   const source = path.join(placeSkillRoot(base, dir), name)
@@ -282,8 +280,14 @@ export async function linkSkillIntoLibrary(
   if ((await fs.lstat(target).catch(() => null)) !== null) {
     throw new Error(`a skill with this name is already in the library: ${id}`)
   }
-
-  return placeSkill(mode, source, target, true)
+  try {
+    /* A skill the place keeps as a link is copied as the files it points at. */
+    await fs.cp(source, target, { recursive: true, dereference: true })
+  } catch (failure) {
+    await fs.rm(target, { recursive: true, force: true }).catch(() => undefined)
+    throw failure
+  }
+  return "copy"
 }
 
 /**

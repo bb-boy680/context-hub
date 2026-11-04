@@ -2070,6 +2070,7 @@ describe("delivering", () => {
   const stubHeld: PluginHeld[] = []
   const tools: PluginTools = {
     root: async () => libraryRoot,
+    packs: async () => [],
     syncMarketplace: async () => {
       ran.push(["sync-marketplace"])
     },
@@ -2151,6 +2152,13 @@ describe("delivering", () => {
       registry.installers().map((one) => one.id),
       "registering one lists it"
     ).toEqual(["hub.target.stub"])
+  })
+
+  it("removes contributed manifest paths when disposed", () => {
+    const remove = registry.registerManifests([".fixture-plugin/plugin.json"])
+    expect(registry.manifestPaths()).toContain(".fixture-plugin/plugin.json")
+    remove()
+    expect(registry.manifestPaths()).not.toContain(".fixture-plugin/plugin.json")
   })
 
   it("records both scopes an installer was given", async () => {

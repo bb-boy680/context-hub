@@ -18,6 +18,7 @@ import { probeInstallers, type ClientProbe } from "../src/scan.ts"
 /** A toolkit no stub reads: every one here answers without reaching a machine. */
 const tools = {
   root: async () => "/library",
+  packs: async () => [],
   syncMarketplace: async () => undefined,
   run: async () => "",
   /* Required by the type and read by no stub: the client files are the form's,

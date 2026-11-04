@@ -37,7 +37,11 @@ export function createRemotePlaceFiles(base = ""): PlaceFiles {
       body: JSON.stringify(body),
     })
     const answer = (await response.json()) as Record<string, unknown>
-    if (!response.ok) throw new Error(String(answer.error ?? response.statusText))
+    if (!response.ok) {
+      const error = new Error(String(answer.error ?? response.statusText))
+      if (typeof answer.code === "string") Object.assign(error, { code: answer.code })
+      throw error
+    }
     return answer
   }
 
@@ -53,6 +57,34 @@ export function createRemotePlaceFiles(base = ""): PlaceFiles {
 
     async remove(ref: PlaceRef) {
       await call({ action: "remove", ref })
+    },
+
+    async list(ref) {
+      const answer = await call({ action: "list", ref })
+      if (!Array.isArray(answer.entries) || !answer.entries.every((entry) => typeof entry === "string")) {
+        throw new Error("invalid client directory listing")
+      }
+      return answer.entries as string[]
+    },
+
+    async display(ref) {
+      const answer = await call({ action: "display", ref })
+      if (typeof answer.path !== "string") throw new Error("invalid client path")
+      return answer.path
+    },
+
+    async snapshot(ref) {
+      const answer = await call({ action: "snapshot", ref })
+      if (typeof answer.snapshot !== "object" || answer.snapshot === null) throw new Error("invalid client snapshot")
+      const snapshot = answer.snapshot as { text?: unknown; root?: unknown }
+      if ((snapshot.text !== null && typeof snapshot.text !== "string") || typeof snapshot.root !== "string") {
+        throw new Error("invalid client snapshot")
+      }
+      return { text: snapshot.text, root: snapshot.root }
+    },
+
+    async commit(ref, before, text) {
+      await call({ action: "commit", ref, before, text })
     },
 
     async workspace() {

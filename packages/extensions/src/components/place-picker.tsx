@@ -160,7 +160,7 @@ type PlacePick =
  * It renders the popup itself, so a caller owns only its trigger: put this
  * inside a `DropdownMenu` beside the element that opens it.
  *
- * @param title — what the list is for, e.g. "Install to".
+ * @param title — optional heading for the list, e.g. "Install to".
  * @param groups — the places, each run under the scope that names it.
  * @param words — the strings this menu draws, translated by the caller.
  * @param leading — a row above the groups that names the whole list rather than
@@ -172,10 +172,11 @@ type PlacePick =
  * @param align — which edge the popup lines up with on its trigger.
  * @param count — the number the header prints; what it counts is the caller's,
  * since a menu may tally places that hold something rather than places.
+ * @param currentSelection — whether a selected row is the current filter.
  */
 export function PlaceMenu(
   props: {
-    title: string
+    title?: string
     groups: readonly PlaceGroup[]
     words: PlaceWords
     leading?: { option: PlaceOption; onPick: () => void }
@@ -183,6 +184,7 @@ export function PlaceMenu(
     trailing?: "check" | ((option: PlaceOption) => React.ReactNode)
     align?: "start" | "end"
     count?: (all: readonly PlaceOption[]) => number
+    currentSelection?: boolean
   } & PlacePick
 ) {
   const {
@@ -195,6 +197,7 @@ export function PlaceMenu(
     activation = "row",
     align = "start",
     count,
+    currentSelection = false,
   } = props
   const onPick = props.onPick
   const [query, setQuery] = React.useState("")
@@ -261,6 +264,7 @@ export function PlaceMenu(
     return (
       <DropdownMenuItem
         key={option.id}
+        aria-current={currentSelection && option.selected === true ? "true" : undefined}
         /* Taking one place should not dismiss the menu: an install can go to
            several, and the row just taken shows its check in place. */
         closeOnClick={closeOnClick}
@@ -331,12 +335,14 @@ export function PlaceMenu(
       ) : null}
       <div className={searchable ? "max-h-[400px] overflow-y-auto p-1.5" : ""}>
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="flex items-center justify-between gap-2">
-            <span>{title}</span>
-            <span className="font-mono text-[11px] font-normal">
-              {words.count(count === undefined ? all.length : count(all))}
-            </span>
-          </DropdownMenuLabel>
+          {title === undefined ? null : (
+            <DropdownMenuLabel className="flex items-center justify-between gap-2">
+              <span>{title}</span>
+              <span className="font-mono text-[11px] font-normal">
+                {words.count(count === undefined ? all.length : count(all))}
+              </span>
+            </DropdownMenuLabel>
+          )}
           {/* A row that names the whole list is the answer to no query, so a
              search sets it aside. */}
           {leading !== undefined && needle === ""

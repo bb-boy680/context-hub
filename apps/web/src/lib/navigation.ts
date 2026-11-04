@@ -15,6 +15,8 @@ export type NavItem = {
    * 30 …), so a contributed entry can be inserted between two of them.
    */
   order: number
+  /** The source is planned: the row is drawn disabled and has no route. */
+  soon?: boolean
 }
 
 export type NavGroup = {
@@ -30,6 +32,13 @@ export const navGroups: NavGroup[] = [
        until one does. */
     id: "assets",
     labelKey: "nav.group.assets",
+    items: [],
+  },
+  {
+    /* Sources that do not belong to this workspace: the catalog is discovered
+       from outside, then installed into the asset library. */
+    id: "market",
+    labelKey: "nav.group.market",
     items: [],
   },
   {
@@ -60,6 +69,7 @@ export function useNavGroups(): NavGroup[] {
                 path: item.path,
                 icon: item.icon,
                 order: item.order,
+                soon: item.soon,
               })),
           ].sort((a, b) => a.order - b.order),
         }))

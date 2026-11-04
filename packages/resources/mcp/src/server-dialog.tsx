@@ -31,7 +31,7 @@ import { heldPlaces, ServerTile, StatusPill } from "./parts.tsx"
 import type { McpCacheEntry } from "./probe.ts"
 import { ServerForm, formErrors, valuesOf, type ServerFormErrors, type ServerFormValues } from "./server-form.tsx"
 import type { McpTool } from "./tools.ts"
-import { displayPlaceFile, type McpAgentPlace, type McpServer } from "./types.ts"
+import type { McpAgentPlace, McpServer } from "./types.ts"
 import { useI18n } from "@context-hub/extensions/react"
 import { DialogSplit, MarksLine, PlaceList, TagEditor } from "@context-hub/extensions/components"
 import { Button } from "@context-hub/shadcn-ui/components/button"
@@ -75,9 +75,9 @@ function PlaceControls({
       {/* The switch means "this client connects it", so it only appears where
           the place is declared switchable and there is a declaration to switch.
           A place the client keeps the state for itself says so instead. */}
-      {!place.switchable ? (
-        <span className="flex h-5 w-[38px] shrink-0 items-center justify-center rounded-full bg-secondary text-[11px] text-muted-foreground">
-          {t("mcp.detail.place.self")}
+      {!place.switchable || install?.readOnly === true || install?.enabled === null ? (
+        <span className="flex h-5 min-w-[38px] shrink-0 items-center justify-center rounded-full bg-secondary px-2 text-[11px] text-muted-foreground">
+          {t(install?.enabled === null ? "mcp.place.unknown" : "mcp.detail.place.self")}
         </span>
       ) : installed ? (
         <Switch
@@ -92,6 +92,7 @@ function PlaceControls({
       <Button
         variant={installed ? "outline" : "secondary"}
         onClick={onToggle}
+        disabled={install?.readOnly === true || install?.enabled === null}
         className="h-[30px] shrink-0 gap-1.5 rounded-full px-3 text-[12.5px] font-semibold"
       >
         {installed ? (
@@ -201,7 +202,7 @@ function DeleteBubble({ name, onDelete }: { name: string; onDelete: () => Promis
  * column somewhere else, so a server the hub holds and a server only a client
  * file declares read the same way — the first row says which it is.
  */
-function Places({
+export function Places({
   server,
   recordsFile,
   states,
@@ -284,13 +285,15 @@ function Places({
         <PlaceList
           groups={MCP_SCOPES.map((scope) => ({
             label: t(`mcp.detail.group.${scope}`),
-            options: placesInScope(states, scope).map((state) => ({
-              id: state.place.id,
-              icon: state.place.icon,
-              label: state.place.label,
-              where: state.place.path,
-              selected: state.install?.installed === true,
-            })),
+            options: placesInScope(states, scope)
+              .filter((state) => state.place.installable !== false || state.install?.installed === true)
+              .map((state) => ({
+                id: state.place.id,
+                icon: state.place.icon,
+                label: state.place.label,
+                where: state.place.path,
+                selected: state.install?.installed === true,
+              })),
           })).filter((group) => group.options.length > 0)}
           words={{
             expand: (rest) => t("mcp.place.expand").replace("{count}", String(rest)),
@@ -497,7 +500,7 @@ function ServerPanel({
               /* One line per file: a client holding two of them would otherwise
                  read as one run of words with no seam between the two. */
               label={held
-                .map((place) => `${place.label} · ${displayPlaceFile(place)}`)
+                .map((place) => `${place.label} · ${place.path}`)
                 .join("\n")}
             />
           </div>

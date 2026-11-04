@@ -4,12 +4,61 @@
  * A provider answers `PromptHeld` — a map of the form or option keys it has —
  * and nothing here knows what any one key means. That is what lets the page
  * draw a tick for a form it has never heard of.
+ *
+ * An absent answer is "not known", not "nothing": a read that has not answered
+ * yet and one that failed both leave the place's count unknown.
  */
 import type { PromptHeld, PromptPlace } from "./provider.ts"
 
 /** Whether a place holds anything at all, including a place with no answer yet. */
 export function holdsSomething(held: PromptHeld | undefined): boolean {
   return held !== undefined && Object.values(held).some(Boolean)
+}
+
+/**
+ * How many of these prompts one place holds.
+ *
+ * The page passes `null` while a scan has not answered; a failed place is
+ * unknown too. An empty library leaves every place unread.
+ */
+export function heldCount(
+  rows: readonly { readonly id: string }[],
+  place: string,
+  holds: Readonly<Record<string, Readonly<Record<string, PromptHeld>>>>,
+  failed: ReadonlySet<string> | null
+): number | null {
+  if (failed === null || failed.has(place)) return null
+  let count = 0
+  for (const row of rows) {
+    const held = holds[row.id]?.[place]
+    if (held === undefined) return null
+    if (holdsSomething(held)) count += 1
+  }
+  return count
+}
+
+/**
+ * A saved place id, as a place that still exists.
+ *
+ * An agent switched off while its place was chosen takes the place with it, so
+ * the id alone is not a selection: it is one only while a place answers to it.
+ *
+ * @returns the place, or `null` when nothing does.
+ */
+export function selectedPromptPlace(
+  places: readonly PromptPlace[],
+  id: string | null
+): PromptPlace | null {
+  return id === null ? null : (places.find((one) => one.id === id) ?? null)
+}
+
+/** The prompt rows held at a particular place, or all rows without a selection. */
+export function promptsAtPlace<T extends { readonly id: string }>(
+  rows: readonly T[],
+  place: string | null,
+  holds: Readonly<Record<string, Readonly<Record<string, PromptHeld>>>>
+): readonly T[] {
+  return place === null ? rows : rows.filter((row) => holdsSomething(holds[row.id]?.[place]))
 }
 
 /** One agent that holds a prompt, as its mark. */

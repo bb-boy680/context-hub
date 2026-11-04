@@ -122,7 +122,11 @@ pnpm dev:desktop  # the desktop shell only
    provide, add an MCP server, install a plugin pack, write a prompt, or record
    an environment variable.
 4. **Install to a place**: skills, MCP servers, plugins, and prompts can be
-   delivered to a workspace or a global agent directory.
+   delivered to a workspace or a global agent directory. On each asset page,
+   use **Install locations** to filter by one workspace or global location,
+   or choose **All** to clear the filter. Existing skills in the shared workspace
+   folder (`.agents/skills`) can still be browsed and collected there; the folder
+   is no longer an install target.
 
 > [!TIP]
 > Press `Ctrl/Cmd+K` to search skills, servers, packs, prompts, and variables

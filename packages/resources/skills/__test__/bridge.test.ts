@@ -200,20 +200,11 @@ const CALLS: readonly Call[] = [
         "---\nname: adopted-here\ndescription: from the place\n---\n\nBody.\n",
         "utf8"
       )
-      return { mode: await s.adoptFrom("adopted-here", REF) }
-    },
-    keys: ["mode"],
-  },
-  {
-    label: "adopting one out of a place by copy",
-    run: async (s) => {
-      await fs.mkdir(path.join(place, "adopted-copy"), { recursive: true })
-      await fs.writeFile(
-        path.join(place, "adopted-copy", "SKILL.md"),
-        "---\nname: adopted-copy\ndescription: copied from the place\n---\n\nBody.\n",
-        "utf8"
-      )
-      return { mode: await s.adoptFrom("adopted-copy", REF, "copy") }
+      const mode = await s.adoptFrom("adopted-here", REF)
+      /* The library holds its own files, not a link back into the place. */
+      const stat = await fs.lstat(path.join(home, "skills", "adopted-here"))
+      if (stat.isSymbolicLink()) throw new Error("the adopted skill is a link, not a copy")
+      return { mode }
     },
     keys: ["mode"],
   },

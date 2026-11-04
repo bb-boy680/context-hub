@@ -16,7 +16,7 @@ import { DEV_HUB_PORT } from "./hub-port.ts"
  * https://vite.dev/config/
  */
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react({ compiler: true }), tailwindcss()],
   server: {
     proxy: {
       /* Everything the hub owns is under one prefix, so one rule covers it. */

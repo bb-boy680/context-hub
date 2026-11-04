@@ -26,6 +26,7 @@ import {
   type PackContents,
   type PluginInstallReport,
   type PluginInstallScope,
+  type PluginManifestRule,
 } from "./contract.ts"
 import { NOTHING_READ, PLUGIN_LIBRARY_SERVICE, type PluginLibraryValue } from "./library-store.ts"
 import {
@@ -125,13 +126,13 @@ export async function packFileIn(dir: string, path: string): Promise<string | nu
  * library records, so this is a read of the disk each time it is asked — which
  * is why the dialog asks once as it opens rather than on every render.
  */
-export async function packContents(name: string): Promise<PackContents> {
-  return call<PackContents>(`${ENDPOINT}?action=contents&name=${encodeURIComponent(name)}`)
+export async function packContents(name: string, manifests: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<PackContents> {
+  return call<PackContents>(`${ENDPOINT}?action=contents&name=${encodeURIComponent(name)}&manifests=${encodeURIComponent(JSON.stringify(manifests))}&rules=${encodeURIComponent(JSON.stringify(rules))}`)
 }
 
 /** What one pack carries, read out of the directory an agent keeps it in. */
-export async function packContentsIn(dir: string): Promise<PackContents> {
-  return call<PackContents>(`${ENDPOINT}?action=contents&dir=${encodeURIComponent(dir)}`)
+export async function packContentsIn(dir: string, manifests: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<PackContents> {
+  return call<PackContents>(`${ENDPOINT}?action=contents&dir=${encodeURIComponent(dir)}&manifests=${encodeURIComponent(JSON.stringify(manifests))}&rules=${encodeURIComponent(JSON.stringify(rules))}`)
 }
 
 /** The file a pack says what it is for in, which is what a cover falls back to. */
@@ -363,10 +364,10 @@ export interface PluginLibrary {
   addAssets(name: string, sources: string[]): Promise<void>
   /** Drop one picture a person added, and the file the hub kept for it. */
   removeAsset(name: string, ref: string): Promise<void>
-  /** Deliver a pack to one client, at one scope. */
-  install(name: string, client: string, scope: PluginInstallScope): Promise<void>
-  /** Take it back out of that client and scope, whatever marketplace it came from. */
-  uninstall(name: string, client: string, scope: PluginInstallScope): Promise<void>
+  /** Deliver a pack to one client, at one scope or one exact declared place. */
+  install(name: string, client: string, scope: PluginInstallScope, placeId?: string): Promise<PluginInstallReport>
+  /** Take it back out of that client and place, whatever marketplace it came from. */
+  uninstall(name: string, client: string, scope: PluginInstallScope, placeId?: string): Promise<PluginInstallReport>
   /**
    * Switch a client's use of a pack on or off in one scope.
    *
@@ -377,8 +378,11 @@ export interface PluginLibrary {
     name: string,
     client: string,
     scope: PluginInstallScope,
-    on: boolean
-  ): Promise<void>
+    on: boolean,
+    placeId?: string
+  ): Promise<PluginInstallReport>
+  /** Restore an inherited scope without uninstalling the artifact. */
+  clearEnabled(name: string, client: string, scope: PluginInstallScope, placeId?: string): Promise<PluginInstallReport>
 }
 
 /** What one update did, as the bridge reports it. */
@@ -400,7 +404,9 @@ export interface PluginUpdateOutcome {
  * pass ends by refreshing every page watching the library.
  */
 export function pluginUpdateSource(
-  reload: () => Promise<void>
+  reload: () => Promise<void>,
+  manifests: () => readonly string[] = () => [],
+  rules: () => readonly PluginManifestRule[] = () => []
 ): PluginUpdateSource {
   return {
     list: async () => {
@@ -412,7 +418,7 @@ export function pluginUpdateSource(
     checkUpdates: () =>
       call<PluginUpdateSummary>(ENDPOINT, { action: "check-updates" }),
     update: async (name) => {
-      await call<PluginUpdateOutcome>(ENDPOINT, { action: "update", name })
+      await call<PluginUpdateOutcome>(ENDPOINT, { action: "update", name, manifests: manifests(), rules: rules() })
     },
     reload,
   }
@@ -479,14 +485,14 @@ export function usePluginLibrary(): PluginLibrary {
 
   /* The actions a check pass makes, shared with the schedule; its reload is this
      read's, so a pass refreshes every page watching the library. */
-  const source = React.useMemo(() => pluginUpdateSource(reload), [reload])
+  const source = React.useMemo(() => pluginUpdateSource(reload, () => service?.manifestPaths() ?? [], () => service?.manifestRules() ?? []), [reload, service])
 
   /** Run one write, then read everything again: any write can change more than it named. */
   const write = React.useCallback(
     async <T,>(body: Record<string, unknown>): Promise<T> => {
       setBusy(true)
       try {
-        const answer = await call<T>(ENDPOINT, body)
+        const answer = await call<T>(ENDPOINT, { ...body, manifests: service?.manifestPaths() ?? [], rules: service?.manifestRules() ?? [] })
         await reload()
         setWriteFailure(null)
         return answer
@@ -494,7 +500,7 @@ export function usePluginLibrary(): PluginLibrary {
         setBusy(false)
       }
     },
-    [reload]
+    [reload, service]
   )
 
   /**
@@ -514,9 +520,14 @@ export function usePluginLibrary(): PluginLibrary {
       if (tools === null) throw new Error("the plugin library is not running")
       setBusy(true)
       try {
-        await act(installer, tools)
-        await reload()
+        const report = await act(installer, tools)
+        try {
+          await reload()
+        } catch (error) {
+          return { ...report, warning: [report?.warning, reasonOf(error)].filter(Boolean).join("\n") }
+        }
         setWriteFailure(null)
+        return report
       } catch (error: unknown) {
         setWriteFailure(reasonOf(error))
         throw error
@@ -541,7 +552,7 @@ export function usePluginLibrary(): PluginLibrary {
    * @returns the record as it stands once the files are back.
    */
   const restore = async (name: string): Promise<PluginRecord> =>
-    call<PluginRecord>(ENDPOINT, { action: "restore", name })
+    call<PluginRecord>(ENDPOINT, { action: "restore", name, manifests: service?.manifestPaths() ?? [], rules: service?.manifestRules() ?? [] })
 
   /* What the clients hold, as the read folded it; every write that acts on a
      client's own record reads it from here. */
@@ -562,8 +573,8 @@ export function usePluginLibrary(): PluginLibrary {
   const adopt = React.useCallback(
     (name: string): Promise<PluginCollected> => {
       const pack = scanned.find((one) => one.name === name)
-      if (pack?.source === undefined) return Promise.reject(new Error(t("plugins.adopt.unknown")))
-      return write<PluginCollected>({ action: "add", source: pack.source.path })
+      if (pack?.directory === undefined) return Promise.reject(new Error(t("plugins.adopt.unknown")))
+      return write<PluginCollected>({ action: "add", source: pack.directory })
     },
     [scanned, write, t]
   )
@@ -576,8 +587,16 @@ export function usePluginLibrary(): PluginLibrary {
    * what it holds, so this side never has to guess at it.
    */
   const heldId = React.useCallback(
-    (name: string, client: string): string | undefined =>
-      scanned.find((one) => one.name === name)?.held.find((one) => one.client === client)?.id,
+    (name: string, client: string, scope: string, allowOverride = false, placeId?: string): string | undefined => {
+      const hold = scanned.find((one) => one.name === name)?.held.find((one) => one.client === client)
+      if (hold === undefined) return undefined
+      const exact = placeId === undefined ? [] : hold.places.filter((place) => place.placeId === placeId && !place.readOnly)
+      const matching = exact.length > 0 ? exact : hold.places.filter((place) => place.scope === scope && !place.readOnly)
+      const candidates = matching.length > 0 ? matching : allowOverride ? hold.places.filter((place) => !place.readOnly) : []
+      const ids = [...new Set(candidates.map((place) => place.id ?? hold.id))]
+      if (ids.length > 1) throw new Error(`multiple plugin identities match ${name}; select an exact installation`)
+      return ids[0]
+    },
     [scanned]
   )
 
@@ -676,31 +695,76 @@ export function usePluginLibrary(): PluginLibrary {
         download: downloadRemoteImages,
       }),
     removeAsset: (name, ref) => write<void>({ action: "asset-remove", name, ref }),
-    install: (name, client, scope) =>
-      deliver(client, (installer, tools) => installer.install(name, scope, tools)),
-    uninstall: (name, client, scope) => {
+    install: (name, client, scope, placeId) =>
+      deliver(client, (installer, tools) => {
+        const hasArtifact = scanned.some((pack) => pack.name === name && pack.held.some((hold) => hold.client === client && hold.places.length > 0))
+        const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
+          placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
+        if (declared === undefined || !(declared.installable !== false || (declared.initialInstallable === true && !hasArtifact))) {
+          return Promise.reject(new Error(t("plugins.scope.unsupported")))
+        }
+        if (installer.installAt !== undefined) {
+          if (placeId === undefined) return Promise.reject(new Error(t("plugins.scope.unsupported")))
+          return installer.installAt(name, placeId, tools)
+        }
+        return installer.install(name, scope, tools)
+      }),
+    uninstall: (name, client, scope, placeId) => {
       /* The agent's own id for the pack, not the pack's name: it names the
          marketplace the pack really came from, and an agent holds packs this hub
          never delivered. It answered with that id when it was asked what it
          holds, so this side never has to guess at it. */
-      const own = heldId(name, client)
-      if (own === undefined) {
-        return Promise.reject(new Error(t("plugins.uninstall.unknown")))
-      }
-      return deliver(client, (installer, tools) => installer.remove(own, scope, tools))
-    },
-    setEnabled: (name, client, scope, on) => {
-      const own = heldId(name, client)
+      const own = heldId(name, client, scope, false, placeId)
       if (own === undefined) {
         return Promise.reject(new Error(t("plugins.uninstall.unknown")))
       }
       return deliver(client, (installer, tools) => {
+        const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
+          placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
+        if (declared === undefined || declared.installable === false) {
+          return Promise.reject(new Error(t("plugins.scope.unsupported")))
+        }
+        if (installer.removeAt !== undefined) {
+          if (placeId === undefined) return Promise.reject(new Error(t("plugins.scope.unsupported")))
+          return installer.removeAt(own, placeId, tools)
+        }
+        return installer.remove(own, scope, tools)
+      })
+    },
+    setEnabled: (name, client, scope, on, placeId) => {
+      const own = heldId(name, client, scope, true, placeId)
+      if (own === undefined) {
+        return Promise.reject(new Error(t("plugins.uninstall.unknown")))
+      }
+      return deliver(client, (installer, tools) => {
+        const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
+          placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
         /* An agent that keeps no such switch is refused here rather than left
            looking as though the press did nothing. */
-        if (installer.setEnabled === undefined) {
+        if (declared?.switchable !== true) {
           return Promise.reject(new Error(t("plugins.enable.selfManaged")))
         }
+        if (installer.setEnabledAt !== undefined) {
+          if (placeId === undefined) return Promise.reject(new Error(t("plugins.enable.selfManaged")))
+          return installer.setEnabledAt(own, placeId, on, tools)
+        }
+        if (installer.setEnabled === undefined) return Promise.reject(new Error(t("plugins.enable.selfManaged")))
         return installer.setEnabled(own, scope, on, tools)
+      })
+    },
+    clearEnabled: (name, client, scope, placeId) => {
+      const own = heldId(name, client, scope, true, placeId)
+      if (own === undefined) return Promise.reject(new Error(t("plugins.uninstall.unknown")))
+      return deliver(client, (installer, tools) => {
+        const declared = (value.clients.find((one) => one.id === client)?.places ?? []).find((place) =>
+          placeId !== undefined ? place.id === placeId : place.scopeWord === scope)
+        if (declared?.clearable !== true) return Promise.reject(new Error(t("plugins.enable.selfManaged")))
+        if (installer.clearEnabledAt !== undefined) {
+          if (placeId === undefined) return Promise.reject(new Error(t("plugins.enable.selfManaged")))
+          return installer.clearEnabledAt(own, placeId, tools)
+        }
+        if (installer.clearEnabled === undefined) return Promise.reject(new Error(t("plugins.enable.selfManaged")))
+        return installer.clearEnabled(own, scope, tools)
       })
     },
   }

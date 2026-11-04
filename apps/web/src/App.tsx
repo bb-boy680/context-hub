@@ -14,7 +14,7 @@ const designedPaths = ["/extensions", "/settings"]
 export function App() {
   const contributed = useContributions("route")
   const paths = useNavGroups().flatMap((group) =>
-    group.items.map((item) => item.path)
+    group.items.filter((item) => item.soon !== true).map((item) => item.path)
   )
   const designed = [...designedPaths, ...contributed.map((route) => route.path)]
 

@@ -78,16 +78,8 @@ export interface PluginCheck {
   currentHash: string
 }
 
-/** The scopes a plugin can be installed into, named the way the agents name them. */
-/**
- * Where an agent can be told to keep a pack.
- *
- * Two, not three. Claude Code also names its `local` scope, which is the same
- * repository as `project` but written to a file the person does not share — and
- * this hub has no way to read or write that file, so an install aimed at it
- * would be one nothing here could report on afterwards.
- */
-export type PluginInstallScope = "user" | "project"
+/** The agent's own scope for one plugin installation. */
+export type PluginInstallScope = "user" | "project" | "local"
 
 /**
  * What a pack says about itself in its own directory.
@@ -139,8 +131,10 @@ export interface PackContents {
   skills: PackContentItem[]
   /** One entry per command file the pack ships, in title order. */
   commands: PackContentItem[]
-  /** The `.mcp.json` at the pack's root as written, or null when it carries none. */
+  /** The pack's MCP declaration as written, or null when it carries none. */
   mcp: string | null
+  /** The source file when one file supplies the declaration; absent for the default or combined content. */
+  mcpPath?: string
 }
 
 /** A pack carrying none of the three — also what a scan that could not read the pack answers. */
@@ -154,6 +148,8 @@ export interface PluginInstallReport {
   location?: string
   /** What the client itself printed, when it printed anything worth keeping. */
   output?: string
+  /** A committed operation needs follow-up; the operation itself succeeded. */
+  warning?: string
 }
 
 /**
@@ -295,6 +291,12 @@ export class PluginNameTakenError extends Error {
   }
 }
 
+export {
+  matchesPluginManifestRule,
+  pluginManifestRules,
+  type PluginManifestRule,
+} from "./manifest-rules.ts"
+
 /** The directory under a hub home that holds collected plugin packs. */
 export const PLUGIN_LIBRARY_DIR = "plugins"
 
@@ -312,6 +314,16 @@ export const PLUGIN_MANIFESTS = [
   "plugin.json",
   ".codex-plugin/plugin.json",
 ]
+
+/** Validate extension-supplied paths again at the host boundary. */
+export function pluginManifestPaths(value: unknown = []): string[] {
+  if (!Array.isArray(value) || value.some((item) =>
+    typeof item !== "string" || item === "" || item.split("/").some((part: string) =>
+      part === "" || part === "." || part === ".." || /[\\:]/.test(part)
+    )
+  )) throw new Error("invalid plugin manifest path")
+  return [...new Set([...PLUGIN_MANIFESTS, ...value as string[]])]
+}
 
 /** The index inside the library root: one row per collected pack. */
 export const PLUGIN_INDEX_FILE = "plugins.json"

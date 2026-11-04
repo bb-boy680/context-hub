@@ -42,6 +42,7 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
       description: "Declare the MCP servers agents may use, and where each is installed.",
       icon: ServerIcon,
       defaultEnabled: true,
+      locked: true,
       permissions: ["storage.self", "filesystem"],
       provides: [MCP_SERVICE, MCP_LIBRARY_SERVICE],
     },

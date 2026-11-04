@@ -8,6 +8,29 @@ import type { McpAgentPlace, McpInstall, McpScope, McpServer } from "./types.ts"
 /** The scopes a place list is grouped by, in display order. */
 export const MCP_SCOPES: readonly McpScope[] = ["workspace", "global"]
 
+/** Count installed servers only after this place has been read. */
+export function placeServerCount(
+  servers: readonly McpServer[],
+  place: string,
+  readPlaces: ReadonlySet<string>
+): number | null {
+  if (!readPlaces.has(place)) return null
+  return servers.filter((server) => serverHeldAt(server, place)).length
+}
+
+/** Whether a server is installed in one exact place, even when it is disabled. */
+export function serverHeldAt(server: McpServer, place: string): boolean {
+  return server.detail.installs.some((install) => install.place === place && install.installed)
+}
+
+/** Resolve a selected location only while it is still offered. */
+export function selectedMcpPlace(
+  places: readonly McpAgentPlace[],
+  id: string | null
+): McpAgentPlace | null {
+  return id === null ? null : (places.find((place) => place.id === id) ?? null)
+}
+
 /** One place, paired with this server's state in it. */
 export interface McpPlaceState {
   place: McpAgentPlace
@@ -44,8 +67,11 @@ export function installedCount(states: readonly McpPlaceState[]): number {
  * this rather than a field of its own, so a switch flipped in the menu and the
  * chip beside it can never disagree.
  */
-export function isEnabled(server: McpServer): boolean {
-  return server.detail.installs.some((install) => install.installed && install.enabled)
+export function isEnabled(server: McpServer): boolean | null {
+  const installed = server.detail.installs.filter((install) => install.installed)
+  if (installed.some((install) => install.enabled === true)) return true
+  if (installed.some((install) => install.enabled === null)) return null
+  return false
 }
 
 /**

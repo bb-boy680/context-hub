@@ -111,6 +111,35 @@ async function resolveRef(url: string, ref: string | undefined, cwd: string): Pr
 }
 
 /**
+ * Fetch one commit into a checkout directory.
+ *
+ * A market publishes the commit it listed, and a branch can move under it;
+ * fetching that one commit is what makes the pack the one the index named.
+ * A shallow fetch by object id is enough on the hosts a market uses.
+ */
+async function fetchPinned(
+  url: string,
+  sha: string,
+  work: string,
+  checkout: string,
+  sparse?: string
+): Promise<void> {
+  await fs.mkdir(checkout, { recursive: true })
+  await run("git", ["init", "--quiet", checkout], work)
+  await run("git", ["-C", checkout, "remote", "add", "origin", url], work)
+  await run("git", ["-C", checkout, "fetch", "--depth", "1", "--no-tags", "origin", sha], work)
+  if (sparse !== undefined) {
+    await run("git", ["-C", checkout, "sparse-checkout", "init", "--cone"], work)
+    await run("git", ["-C", checkout, "sparse-checkout", "set", "--", sparse], work)
+  }
+  await run("git", ["-C", checkout, "checkout", "--quiet", "FETCH_HEAD"], work)
+  const head = (await run("git", ["-C", checkout, "rev-parse", "HEAD"], work)).trim()
+  if (head.toLowerCase() !== sha.toLowerCase()) {
+    throw new PluginFetchError(`${url} gave ${head} instead of the commit ${sha}`)
+  }
+}
+
+/**
  * Fetch one source into a staged directory, and report what revision landed.
  *
  * @param spec — the source, already parsed.
@@ -126,22 +155,27 @@ export async function fetchPlugin(
 ): Promise<PluginOrigin> {
   switch (spec.kind) {
     case "url": {
-      const revision = await resolveRef(spec.url, spec.ref, work)
       const checkout = path.join(work, "checkout")
-      await run(
-        "git",
-        [
-          "clone",
-          "--depth",
-          "1",
-          "--no-tags",
-          ...(spec.ref === undefined ? [] : ["--branch", spec.ref]),
-          "--",
-          spec.url,
-          checkout,
-        ],
-        work
-      )
+      const revision =
+        spec.sha ?? (await resolveRef(spec.url, spec.ref, work))
+      if (spec.sha === undefined) {
+        await run(
+          "git",
+          [
+            "clone",
+            "--depth",
+            "1",
+            "--no-tags",
+            ...(spec.ref === undefined ? [] : ["--branch", spec.ref]),
+            "--",
+            spec.url,
+            checkout,
+          ],
+          work
+        )
+      } else {
+        await fetchPinned(spec.url, spec.sha, work, checkout)
+      }
       /* The checkout is only a way to get the files; a pack is the files. */
       await fs.rm(path.join(checkout, ".git"), { recursive: true, force: true })
       await fs.cp(checkout, stage, { recursive: true })
@@ -154,29 +188,34 @@ export async function fetchPlugin(
     }
 
     case "git-subdir": {
-      const revision = await resolveRef(spec.url, spec.ref, work)
       /* The pack is one directory of a repository, so only that directory is
          asked for: a sparse checkout fetches the trees and the blobs the pack
          needs and leaves the rest of the repository on the server. */
       const inside = assertPackRelative(spec.path)
       const checkout = path.join(work, "checkout")
-      await run(
-        "git",
-        [
-          "clone",
-          "--depth",
-          "1",
-          "--no-tags",
-          "--filter=blob:none",
-          "--sparse",
-          ...(spec.ref === undefined ? [] : ["--branch", spec.ref]),
-          "--",
-          spec.url,
-          checkout,
-        ],
-        work
-      )
-      await run("git", ["sparse-checkout", "set", "--", inside], checkout)
+      const revision =
+        spec.sha ?? (await resolveRef(spec.url, spec.ref, work))
+      if (spec.sha === undefined) {
+        await run(
+          "git",
+          [
+            "clone",
+            "--depth",
+            "1",
+            "--no-tags",
+            "--filter=blob:none",
+            "--sparse",
+            ...(spec.ref === undefined ? [] : ["--branch", spec.ref]),
+            "--",
+            spec.url,
+            checkout,
+          ],
+          work
+        )
+        await run("git", ["sparse-checkout", "set", "--", inside], checkout)
+      } else {
+        await fetchPinned(spec.url, spec.sha, work, checkout, inside)
+      }
       const from = path.join(checkout, ...inside.split("/"))
       const stat = await fs.stat(from).catch(() => null)
       if (stat === null || !stat.isDirectory()) {

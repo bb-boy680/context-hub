@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "vitest"
 
-import { heldMarks, holdsSomething } from "../src/held.ts"
+import type { PlaceFiles } from "@context-hub/core/place-files"
+
+import { heldCount, heldMarks, holdsSomething, promptsAtPlace, selectedPromptPlace } from "../src/held.ts"
+import { heldInWorkspace } from "../src/library.ts"
 import type { PromptPlace } from "../src/provider.ts"
 
 const spot = (id: string, agent: string): PromptPlace => ({
@@ -28,6 +31,81 @@ describe("whether a place holds anything", () => {
   it("counts any form or option, not one fixed set", () => {
     expect(holdsSomething({ "instructions:agents": true })).toBe(true)
     expect(holdsSomething({ commands: false, rule: true })).toBe(true)
+  })
+})
+
+describe("place counts", () => {
+  const rows = [{ id: "first" }, { id: "second" }, { id: "third" }]
+  const holds = {
+    first: {
+      "a-workspace": { commands: true, rule: true },
+      "a-global": {},
+    },
+    second: {
+      "a-workspace": { commands: false },
+      "a-global": { "instructions:agents": true },
+    },
+    third: { "a-workspace": {}, "a-global": {} },
+  }
+
+  it("counts a prompt once per place even when several forms are held", () => {
+    expect(heldCount(rows, "a-workspace", holds, new Set())).toBe(1)
+    expect(heldCount(rows, "a-global", holds, new Set())).toBe(1)
+  })
+
+  it("distinguishes an unread or failed scan from a known empty place", () => {
+    const none = { first: { empty: {} }, second: { empty: {} }, third: { empty: {} } }
+    expect(heldCount(rows, "empty", none, null)).toBeNull()
+    expect(heldCount(rows, "empty", none, new Set(["empty"]))).toBeNull()
+    expect(heldCount(rows, "empty", none, new Set())).toBe(0)
+    expect(heldCount(rows, "missing", none, new Set())).toBeNull()
+    expect(heldCount([], "empty", {}, null)).toBeNull()
+    expect(heldCount([], "empty", {}, new Set(["empty"]))).toBeNull()
+    expect(heldCount([], "empty", {}, new Set())).toBe(0)
+  })
+
+  it("leaves one place unknown when only its read failed", () => {
+    const failed = new Set(["a-workspace"])
+    expect(heldCount(rows, "a-workspace", holds, failed)).toBeNull()
+    expect(heldCount(rows, "a-global", holds, failed)).toBe(1)
+  })
+
+  it("filters by the selected place rather than the agent or scope", () => {
+    expect(promptsAtPlace(rows, null, holds)).toEqual(rows)
+    expect(promptsAtPlace(rows, "a-workspace", holds)).toEqual([rows[0]])
+    expect(promptsAtPlace(rows, "a-global", holds)).toEqual([rows[1]])
+    expect(promptsAtPlace(rows, "other", holds)).toEqual([])
+    expect(promptsAtPlace(rows.slice(1), "a-workspace", holds)).toEqual([])
+  })
+})
+
+describe("the held snapshot", () => {
+  it("does not carry a snapshot into another workspace, place list, or file port", () => {
+    const files: PlaceFiles = {
+      read: async () => null,
+      write: async () => undefined,
+      remove: async () => undefined,
+      workspace: async () => "one",
+    }
+    const places = [spot("a-workspace", "a")]
+    const held = { first: { "a-workspace": { commands: true } } }
+    const scan = { workspace: "one", places, files, held }
+    expect(heldInWorkspace(scan, "one", places, files)).toBe(held)
+    expect(heldInWorkspace(scan, "two", places, files)).toBeNull()
+    expect(heldInWorkspace(scan, "one", [...places], files)).toBeNull()
+    expect(heldInWorkspace(scan, "one", places, { ...files })).toBeNull()
+    expect(heldInWorkspace(null, "one", places, files)).toBeNull()
+  })
+})
+
+describe("the selected prompt place", () => {
+  it("resolves each scope by its unique place id and drops a missing one", () => {
+    const workspace = spot("a-workspace", "a")
+    const global = { ...spot("a-global", "a"), scope: "global" as const }
+    expect(selectedPromptPlace([workspace, global], "a-workspace")).toBe(workspace)
+    expect(selectedPromptPlace([workspace, global], "a-global")).toBe(global)
+    expect(selectedPromptPlace([workspace], "a-global")).toBeNull()
+    expect(selectedPromptPlace([workspace, global], null)).toBeNull()
   })
 })
 

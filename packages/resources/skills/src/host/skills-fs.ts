@@ -47,17 +47,19 @@ import type { Frontmatter } from "../frontmatter.ts"
 import { importFolder } from "./folder-import.ts"
 import { walkSkillDir } from "./file-tree.ts"
 import { assertNewSkillName } from "./names.ts"
-import { downloadPackageSkills, fetchUpstreamRecords, listPackageSkills } from "./skills-cli.ts"
+import { parseGitSource, readRemoteRevision, type GitTarget } from "./git-source.ts"
+import { downloadPackageSkills, listPackageSkills } from "./skills-cli.ts"
 import { readLockedUpstream, skillFolderHash } from "./upstream.ts"
 import {
   deleteSkillIn,
   installSkillInto,
-  linkSkillIntoLibrary,
+  copySkillIntoLibrary,
   readPlaceSkill,
   readPlaceSkillFile,
   readPlaceSkills,
   removeSkillFrom,
 } from "./place-skills.ts"
+import { ahead } from "../store.ts"
 import type {
   PlaceSkillDetail as PlaceSkillRecord,
   PlaceSkillsView as PlaceSkills,
@@ -88,8 +90,19 @@ const CATALOG_FILE = "skills.json"
 /** What older builds wrote, moved into `skills.json` on first use. */
 const LEGACY_CATALOG_FILE = "index.json"
 const MANIFEST = "SKILL.md"
-/** Sources asked in parallel by one batch check; each run clones a package. */
-const CHECK_CONCURRENCY = 3
+/** Remotes asked in parallel by one batch check; each answer is one round trip. */
+const CHECK_CONCURRENCY = 8
+
+/** One remote and the rows waiting on its answer. */
+interface RemoteGroup {
+  target: GitTarget
+  names: string[]
+}
+
+/** The key two rows share when one `ls-remote` answers both. */
+function remoteKey(target: GitTarget): string {
+  return `${target.url}\u0000${target.ref ?? ""}`
+}
 
 /** One skill as the catalog records it. */
 interface CatalogEntry {
@@ -349,6 +362,11 @@ export interface SkillStoreOptions {
    * `<home>/assets` when absent.
    */
   assets?: AssetStore
+  /**
+   * How a check asks a source for its current commit. Tests pass one that never
+   * touches the network; the hub's own is `git ls-remote`.
+   */
+  resolveRevision?: (target: GitTarget) => Promise<string>
 }
 
 /** Create the disk-backed store for one hub home. */
@@ -368,6 +386,23 @@ export async function createFsSkillStore(
   let catalog: CatalogFile | null = null
   /** The workspace list holds the folder a skill installs into. */
   const workspaces = createFsWorkspaceStore(home, { folder: options.folder })
+
+  /** The commit a source holds now; the seam tests replace. */
+  const resolveRevision = options.resolveRevision ?? readRemoteRevision
+
+  /**
+   * The revision to record on a write. A source that cannot be asked is not a
+   * reason to refuse an install: the row simply starts untracked.
+   */
+  const revisionOf = async (source: string): Promise<string | null> => {
+    const target = parseGitSource(source)
+    if (target === null) return null
+    try {
+      return await resolveRevision(target)
+    } catch {
+      return null
+    }
+  }
 
   /** The current workspace folder, or `null` when none is picked or it has no path. */
   const currentWorkspace = async (): Promise<string | null> => {
@@ -510,29 +545,27 @@ export async function createFsSkillStore(
   }
 
   /**
-   * Ask each source what it holds now, one CLI run per group: a package that
-   * holds several skills is cloned once, and the run reports the hash the CLI
-   * itself would record for an install now, so nothing compares by a second
-   * implementation. A source that fails is reported, not thrown: the others
-   * still answer.
+   * Ask each remote what it holds now, one `ls-remote` per group: several
+   * skills installed from one repository share a single round trip. A source
+   * that fails is reported, not thrown: the others still answer.
    */
-  const askSources = async (
-    groups: Map<string, string[]>
+  const askRemotes = async (
+    groups: Map<string, RemoteGroup>
   ): Promise<{ latest: Map<string, string>; failed: { name: string; reason: string }[] }> => {
     const latest = new Map<string, string>()
     const failed: { name: string; reason: string }[] = []
-    const queue = [...groups]
+    const queue = [...groups.values()]
     let next = 0
     const worker = async (): Promise<void> => {
       while (next < queue.length) {
-        const [source, ids] = queue[next++]
+        const group = queue[next++]
+        if (group === undefined) return
         try {
-          const answer = await fetchUpstreamRecords(source, ids)
-          for (const [name, record] of answer.records) latest.set(name, record.hash)
-          for (const [name, reason] of answer.failed) failed.push({ name, reason })
+          const revision = await resolveRevision(group.target)
+          for (const name of group.names) latest.set(name, revision)
         } catch (failure) {
           const reason = failure instanceof Error ? failure.message : String(failure)
-          for (const id of ids) failed.push({ name: id, reason })
+          for (const name of group.names) failed.push({ name, reason })
         }
       }
     }
@@ -783,7 +816,13 @@ export async function createFsSkillStore(
     },
 
     async installPackage(source: string, names: string[]): Promise<SkillImport> {
+      /* Read the revision before the CLI runs: if the source moves during the
+         install, the older mark reports one update too many, never one too few. */
+      const revision = await revisionOf(source)
       const result = await downloadPackageSkills(source, names, root)
+      if (revision !== null && result.records !== undefined) {
+        for (const record of Object.values(result.records)) record.revision = revision
+      }
       await refreshCatalog()
       /* A row says where it came from and which revision, so a download
          records both: they are what a later update check compares against. */
@@ -952,17 +991,15 @@ export async function createFsSkillStore(
       return installSkillInto(base, root, name, ref.dir, mode)
     },
 
-    async adoptFrom(
-      name: string,
-      ref: SkillPlaceRef,
-      mode: InstallMode = "auto"
-    ): Promise<SkillInstall> {
+    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const base = await requiredBase(ref.scope)
-      const landed = await linkSkillIntoLibrary(base, root, name, ref.dir, mode)
+      const landed = await copySkillIntoLibrary(base, root, name, ref.dir)
       /* What the skills CLI installed this from, if it did: the lock beside
          the place's skills is the record, and its hash is what an update
-         check compares against. Without it the skill is still listed, but
-         nothing can tell whether the upstream moved. */
+         check compares against. No revision is recorded here: the lock has no
+         commit, and the remote's HEAD may be newer than the files this place
+         holds, so guessing it would mark an old copy current. The row starts
+         untracked; one update establishes the revision. */
       const upstream = await readLockedUpstream(base, name)
       await refreshCatalog()
       if (upstream !== null) {
@@ -982,47 +1019,66 @@ export async function createFsSkillStore(
       if (upstream === undefined) {
         throw new Error(`no recorded source for this skill, so nothing can be compared: ${name}`)
       }
-      const { latest, failed } = await askSources(new Map([[upstream.source, [name]]]))
-      const found = latest.get(name)
-      if (found === undefined) {
-        /* The CLI's own reason is worth more to a person than a generic one. */
-        const reason = failed.find((entry) => entry.name === name)?.reason
-        throw new Error(reason ?? `the source answered nothing about this skill: ${name}`)
+      const target = parseGitSource(upstream.source)
+      if (target === null) {
+        throw new Error(`the recorded source cannot be asked for a revision: ${upstream.source}`)
       }
-      const recorded = await recordChecks(latest)
-      const currentHash = recorded.get(name) ?? found
+      const latest = await resolveRevision(target)
+      const recorded = await recordChecks(new Map([[name, latest]]))
+      const currentHash = recorded.get(name)
+      if (currentHash === undefined) {
+        throw new Error(`the files of ${name} could not be read, so nothing was recorded`)
+      }
       return {
-        recordedHash: upstream.hash,
+        recordedRevision: upstream.revision ?? null,
+        latestRevision: latest,
         currentHash,
-        latestHash: found,
-        outdated: found !== upstream.hash,
+        outdated: ahead(upstream, latest),
         modified: currentHash !== upstream.hash,
       }
     },
 
     async checkUpdates(): Promise<SkillUpdateSummary> {
       const current = await loadCatalog()
-      /* One group per source: the CLI answers a whole package in one run. */
-      const groups = new Map<string, string[]>()
+      /* One group per remote: a repository answers for every skill taken from
+         it, however many subdirectories those skills sit in. */
+      const groups = new Map<string, RemoteGroup>()
+      const failed: { name: string; reason: string }[] = []
       for (const [name, row] of Object.entries(current.skills)) {
         const source = row.upstream?.source
         if (source === undefined) continue
-        const names = groups.get(source)
-        if (names === undefined) groups.set(source, [name])
-        else names.push(name)
+        const target = parseGitSource(source)
+        if (target === null) {
+          failed.push({
+            name,
+            reason: `the recorded source cannot be asked for a revision: ${source}`,
+          })
+          continue
+        }
+        const key = remoteKey(target)
+        const group = groups.get(key)
+        if (group === undefined) groups.set(key, { target, names: [name] })
+        else group.names.push(name)
       }
-      const { latest, failed } = await askSources(groups)
-      const recorded = await recordChecks(latest)
+      const asked = await askRemotes(groups)
+      const recorded = await recordChecks(asked.latest)
       let outdated = 0
       let modified = 0
       for (const [name, currentHash] of recorded) {
-        const installed = current.skills[name]?.upstream?.hash
-        if (installed !== latest.get(name)) outdated += 1
+        const row = current.skills[name]
+        const latest = asked.latest.get(name)
+        if (row === undefined || row.upstream === undefined || latest === undefined) continue
+        if (ahead(row.upstream, latest)) outdated += 1
         /* A source that has not moved on does not make a changed copy any less
            changed, so the two are counted apart. */
-        if (currentHash !== installed) modified += 1
+        if (currentHash !== row.upstream.hash) modified += 1
       }
-      return { checked: recorded.size, outdated, modified, failed }
+      return {
+        checked: recorded.size,
+        outdated,
+        modified,
+        failed: [...failed, ...asked.failed],
+      }
     },
 
     async updateFromUpstream(name: string): Promise<void> {
@@ -1033,6 +1089,12 @@ export async function createFsSkillStore(
       if (upstream === undefined) {
         throw new Error(`no recorded source for this skill, so there is nothing to install from: ${name}`)
       }
+      /* Read the revision before the install, for the same reason as an
+         install: an older mark can only cause one extra update. A source that
+         parses but cannot be read fails the update here, before any file moves,
+         rather than landing new content with an old revision attached. */
+      const target = parseGitSource(upstream.source)
+      const revision = target === null ? null : await resolveRevision(target)
       const work = await fs.mkdtemp(path.join(tmpdir(), "context-hub-skill-update-"))
       try {
         const result = await downloadPackageSkills(upstream.source, [name], work)
@@ -1047,23 +1109,38 @@ export async function createFsSkillStore(
         const held = skillDir(name)
         const isLink = (await fs.lstat(held).catch(() => null))?.isSymbolicLink() === true
         const target = isLink ? await fs.readlink(held) : held
-        await replaceDirectory(path.join(work, landed), target)
         /* The hash to record is the one the CLI computed for what it just
-           installed, not a second reading of the same bytes. */
-        const fresh = result.records?.[landed]?.hash ?? (await skillFolderHash(target))
+           installed, not a second reading of the same bytes. Read it from the
+           new copy before anything is swapped into place. */
+        const fresh =
+          result.records?.[landed]?.hash ?? (await skillFolderHash(path.join(work, landed)))
+        /* A repository's commit can move without this skill's directory
+           changing — another package in the same monorepo, say. Installing the
+           same bytes would overwrite a hand edit for no reason, so only the
+           revision advances and the files stay. */
+        const unchanged = fresh === upstream.hash
+        if (!unchanged) await replaceDirectory(path.join(work, landed), target)
+        const currentHash = unchanged ? await skillFolderHash(target) : fresh
+        const nextUpstream: SkillUpstream = { ...upstream, hash: fresh }
+        if (revision === null) delete nextUpstream.revision
+        else nextUpstream.revision = revision
         await mutate((skills) => {
           const next = skills[name]
           if (next !== undefined) {
             skills[name] = {
               ...next,
-              upstream: { ...upstream, hash: fresh },
+              upstream: nextUpstream,
               /* What the CLI just installed is, by construction, both the
-                 source's revision and what the files hold now. */
-              checked: {
-                at: new Date().toISOString(),
-                latest: fresh,
-                currentHash: fresh,
-              },
+                 source's revision and what the files hold now. A source that
+                 could not be asked keeps the answer it had. */
+              checked:
+                revision === null
+                  ? next.checked
+                  : {
+                      at: new Date().toISOString(),
+                      latest: revision,
+                      currentHash,
+                    },
             }
           }
         })

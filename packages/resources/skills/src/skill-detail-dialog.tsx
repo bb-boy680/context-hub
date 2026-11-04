@@ -15,7 +15,7 @@ import * as React from "react"
 
 import { SkillFileTree, fileTreeKey } from "./file-tree.tsx"
 import { parseSkillFile } from "./frontmatter.ts"
-import { formatAge, holdsOf, inLibrary, placeOf, placePath, skillKey, useReadablePlaces, type SkillPlaceView } from "./library.ts"
+import { ahead, formatAge, holdsOf, inLibrary, modified as isModified, placeOf, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, useSelectablePlaces, type SkillPlaceView } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import type { MediaItem, Skill } from "./types.ts"
 import type {
@@ -367,13 +367,13 @@ function SourceSection({
     const checked = skill.checked
     if (checked === undefined || upstream === undefined) return null
     return {
-      recordedHash: upstream.hash,
+      recordedRevision: upstream.revision ?? null,
+      latestRevision: checked.latest,
       currentHash: checked.currentHash,
-      latestHash: checked.latest,
-      outdated: checked.latest !== upstream.hash,
-      modified: checked.currentHash !== upstream.hash,
+      outdated: ahead(upstream, checked.latest),
+      modified: isModified(skill),
     }
-  }, [skill.checked, upstream])
+  }, [skill, upstream])
   const [state, setState] = React.useState<
     | { kind: "idle" }
     | { kind: "checking" }
@@ -431,7 +431,9 @@ function SourceSection({
         ? t("skills.update.applying")
         : state.kind === "checked"
           ? state.result.outdated
-            ? t("skills.update.available")
+            ? state.result.recordedRevision === null
+              ? t("skills.update.untracked")
+              : t("skills.update.available")
             : state.result.modified
               ? t("skills.update.edited")
               : t("skills.update.current")
@@ -527,21 +529,21 @@ function PlacesSection({
   onRemove: (ref: SkillPlaceRef) => void
 }) {
   const { t } = useI18n()
-  const holds = holdsOf(skill)
+  const holds = placedIn(skill)
   const own = inLibrary(skill)
-  /* The library is one of the rows, so it is one of the count: a skill the hub
-     holds is installed in one place even when no workspace link exists yet. */
-  const installed = holds.length + (own ? 1 : 0)
   /* The icon and the label are the contribution's, since only the extension
      that knows a place can draw it. */
-  const contributed = useReadablePlaces()
+  const contributed = useSelectablePlaces()
+  const visiblePlaces = places.filter((place) => selectedSkillPlace(contributed, place) !== null)
+  /* Count only the rows this section shows; the library is one row too. */
+  const installed = visiblePlaces.filter((place) => skillHeldAt(skill, place)).length + (own ? 1 : 0)
   const icons = React.useMemo(
-    () => new Map(contributed.map((place) => [place.id, place.icon])),
+    () => new Map(contributed.map((place) => [skillPlaceKey(place), place.icon])),
     [contributed]
   )
   const byId = React.useMemo(
-    () => new Map(places.map((place) => [place.id, place])),
-    [places]
+    () => new Map(visiblePlaces.map((place) => [skillPlaceKey(place), place])),
+    [visiblePlaces]
   )
 
   /* Rows are told apart by their marks and names; the one rule in this list
@@ -559,12 +561,11 @@ function PlacesSection({
   const outlinePill = `${pill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`
 
   /* Held, the row offers the way out; not held, the way in — unless the place
-     cannot take it: a workspace with no folder to write into, or a name another
-     skill already holds there. */
+     cannot take it: a workspace with no folder to write into. */
   const rowAction = (id: string) => {
     const place = byId.get(id)
     if (place === undefined) return null
-    const held = holds.some((hold) => hold.id === place.id)
+    const held = skillHeldAt(skill, place)
     if (held) {
       return (
         <Button
@@ -579,7 +580,6 @@ function PlacesSection({
         </Button>
       )
     }
-    const taken = skill.takenAt?.includes(place.id) === true
     /* A workspace place has nothing to write into without a folder; a
        machine-wide one never needs one. */
     const unavailable = place.scope === "workspace" ? blocked : null
@@ -588,8 +588,8 @@ function PlacesSection({
         type="button"
         variant="ghost"
         aria-label={`${t("skills.action.install")} ${skill.name}`}
-        disabled={taken || unavailable !== null}
-        title={taken ? t("skills.workspace.taken") : (unavailable ?? undefined)}
+        disabled={unavailable !== null}
+        title={unavailable ?? undefined}
         onClick={() => onInstall({ scope: place.scope, dir: place.dir })}
         className={soft}
       >
@@ -643,14 +643,14 @@ function PlacesSection({
         <PlaceList
           groups={SCOPES.map((scope) => ({
             label: t(`skills.group.${scope}`),
-            options: places
+            options: visiblePlaces
               .filter((place) => place.scope === scope)
               .map((place) => ({
-                id: place.id,
-                icon: icons.get(place.id) ?? LibraryIcon,
+                id: skillPlaceKey(place),
+                icon: icons.get(skillPlaceKey(place)) ?? LibraryIcon,
                 label: t(place.labelKey),
                 where: placePath(place),
-                selected: holds.some((hold) => hold.id === place.id),
+                selected: skillHeldAt(skill, place),
               })),
           }))}
           words={{
@@ -1146,6 +1146,9 @@ export function SkillDetailDialog({
   const inLib = skill !== null && inLibrary(skill)
   const placeOnly = skill !== null && !inLib && place !== null
   const placeRef = place?.ref ?? null
+  /* `placeOf` builds a new ref every render, so an effect must not depend on it. */
+  const placeScope = place?.ref.scope ?? null
+  const placeDir = place?.ref.dir ?? null
 
   /* Load the stored record whenever the lightbox opens on a library skill, and
      again after a write moves its timestamp. A skill no library record holds
@@ -1172,11 +1175,13 @@ export function SkillDetailDialog({
   /* A skill no library record holds lives outside the library, so its own
      manifest and files are read from the place that keeps them. */
   React.useEffect(() => {
-    if (store === null || name === null || !placeOnly || placeRef === null) return
+    if (store === null || name === null || !placeOnly || placeScope === null || placeDir === null) {
+      return
+    }
     let live = true
     void (async () => {
       try {
-        const found = await store.placeSkill(name, placeRef)
+        const found = await store.placeSkill(name, { scope: placeScope, dir: placeDir })
         if (live && found !== null) setHeld({ name, detail: found })
       } catch {
         /* An unreadable skill leaves the panel on the catalog row it came from. */
@@ -1185,7 +1190,7 @@ export function SkillDetailDialog({
     return () => {
       live = false
     }
-  }, [store, name, placeOnly, placeRef])
+  }, [store, name, placeOnly, placeScope, placeDir])
 
   const workspace = held !== null && held.name === name ? held.detail : null
 

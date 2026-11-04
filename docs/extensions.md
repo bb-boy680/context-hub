@@ -123,6 +123,158 @@ export fails that test rather than the first plugin that uses it.
 Do not import any other package. UI components come from `scope.ui`; icons from
 `scope.icons` and `scope.icon(name)`.
 
+## Plugin pack manifests and installer directories
+
+An agent extension can contribute manifest paths for native-only plugin packs:
+
+```ts
+ctx.plugins.registerManifests([".example-plugin/plugin.json"])
+```
+
+The registration lasts for the extension's lifetime. Paths are relative to the
+pack root, use `/`, and cannot contain empty, `.` or `..` segments, drive
+prefixes or backslashes. The host validates them again and refuses symbolic
+links. Built-in manifest paths remain available. Collection, descriptions,
+market previews and the contents pane use the currently registered paths.
+Manifest `name`, `version`, `description` and a relative `icon` are read; the
+contents pane supports `skills` and `commands` paths and `mcpServers` inline or
+as relative paths. Explicit paths replace the corresponding defaults.
+
+A file installer may declare additional destination templates in its existing
+`PluginDiskDeclaration`:
+
+```ts
+const declaration = {
+  home: ".example",
+  state: "cli/plugins",
+  directories: ["local/:name"],
+  config: { read: [], write: [] },
+  stateFiles: { read: [], write: ["local/*"] },
+  workspace: { read: [], write: [] },
+  library: { read: [], write: [] },
+  external: [],
+}
+```
+
+A template contains exactly one `:name`, which must match the copied library
+pack; it may be a direct child (`":name"`) and `*` matches one safe segment. The destination also needs a matching
+`stateFiles.write` pattern. `disk.run` and `disk.commit` still take snapshots,
+check the source tree and compensate for failed writes. The existing four-part
+cache destination remains available. A multi-segment `state` path is relative to
+`home` and every segment is checked for symbolic links; an explicitly declared
+absolute `stateEnv` override is a separate root.
+
+`PluginHeld.enabled` may be omitted when the agent cannot determine whether a
+pack is enabled. The hub shows an unknown state without an on/off switch.
+Aggregate status is on if any answer is true, off only when every answer is
+false, and unknown otherwise. An explicit setting does not make a reported
+unknown status known. A provider may set `PluginHeld.sourceAvailable` to
+`false` only when it has verified that the named source cannot be used; omit it
+when availability was not checked. The source path and availability are shown
+per agent location. The minimum Hub engine version providing these
+contracts must be set after that version is released.
+
+## Plugin installer file access
+
+An agent installer receives optional `tools.disk` through the plugins service.
+The installer declares its configuration and state roots, the workspace and library
+paths it needs, and read and write patterns. `*` matches one path segment and
+`**` matches multiple segments; an empty read pattern permits listing a root.
+Environment overrides require absolute paths by default. A declaration may opt
+into `homeEnvResolution: "workspace"` to expand `~` and resolve relative values
+against the selected workspace; a relative value is rejected when no workspace
+is selected. This resolution matches the client only when that client starts in
+the selected workspace. `canonicalWorkspace: true` captures a realpath workspace
+key, falling back to the resolved path only when it does not exist. `disk.list`
+skips links by default; `includeLinks: true` includes their names without
+traversing them for recovery checks.
+The host checks paths and refuses symbolic links, compares snapshots and uses
+`disk.run` to serialize read-modify-write operations. Marketplace index documents
+are supplied by the extension and written under the library root.
+
+The declaration is supplied by enabled extension code; it is not a sandbox against
+malicious extensions. Manifest `permissions` are informational, not enforced.
+Older hosts lack the current file contract; extensions must report that rather
+than silently falling back to a CLI.
+
+File replacement is atomic per file. A multi-file operation uses compensating
+writes on failure and reports any file it could not restore. For a directory
+whose contents must be protected, declare the destination template and read the
+library pack directory (`library.read: ["*"]`). Inside `disk.run`, obtain its
+`snapshotDirectory(roots, { root: "library", path: name })`, store that digest
+in the install record in the same `commit`, and pass it as `sourceSnapshot` on
+`copy`. Set `before: null` when the destination must be absent, or set it to the
+previously recorded digest when replacing. For uninstall, pass
+`{ ref: destinationRef, before: recordedDigest }` as the fourth `commit`
+argument together with the state-file changes. A freshly read destination
+snapshot alone cannot establish that it has not been modified since installation.
+Snapshots include binary files, empty directories and cache markers, and reject
+included links. Snapshot-protected copies cannot use `pruneVersions`.
+
+Ordinary `disk.commit` uses process-local compensation and does not lock a
+client. A declaration may opt into a `proper-lockfile` compatible `lease` with
+a declared writable lock ref, stale time, heartbeat and bounded retry options.
+`disk.run` holds that lease; a compromised lease refuses subsequent operations.
+
+`disk.journalCommit` requires such a lease. The extension supplies the opaque
+client-compatible journal documents and declared refs for pending journals,
+staging, backup, a single commit-point file and any before/after file changes.
+The host checks snapshots, creates the staging directory, writes the journal,
+copies the payload, swaps the artifact, writes the commit point and then attempts projection and cleanup. An
+existing pending journal is refused for client recovery rather than guessed at.
+After the commit point, failures return `committed: true` and warnings; installers
+must forward warnings as `PluginInstallReport.warning`. Recovery semantics and
+journal contents belong to the extension. Persistent directory-lock copy fallback
+and power-loss durability are not guaranteed by this interface.
+
+`copyExcludeTop` omits specified top-level names from a source snapshot and its
+copy. `copyRejectNested` refuses matching nested names before hashing or copying;
+patterns are exact names or a prefix ending in `.*`. Ordinary commit still uses
+process-local compensation. Agent-specific document formats and dependency
+semantics remain in the agent extension.
+
+A policy-only `PluginPlace` can set `installable: false` to stay out of artifact
+install and uninstall menus while retaining its switch. A `clearable` place with
+an installer `clearEnabled` method exposes restoring inheritance without removing
+the artifact.
+
+## MCP providers
+
+An MCP provider may mark a place `installable: false` to scan and show existing
+server declarations without offering that file as a new installation target.
+Existing declarations can still be removed or updated. When omitted, `installable`
+defaults to `true`.
+
+Providers with locations discovered at runtime may implement `placesFor(io)`;
+it returns the complete current place list for a scan. The catalog uses that
+same resolved list for scanning, display and actions. For each read or action,
+`io.place` carries that exact resolved place; use its captured root identity
+rather than resolving a new location by id. An entry can return
+`enabled: null` for an unknown switch state or `readOnly: true` when its
+literal declaration cannot be changed safely. The page keeps the location and
+diagnostic visible while disabling the corresponding writes.
+
+A global `PlaceRef` may declare `root: { home, homeEnv?, list? }`, where `home` is a
+relative fallback under the user's home, `homeEnv` names an absolute-path
+override, and `list` names the exact directories that may be enumerated.
+Environment names must end in `_HOME` and must not contain credential terms.
+Rooted paths reject traversal and links. `PlaceFiles.list` enumerates
+direct child directories, `display` resolves a location, and `snapshot` plus
+`commit` perform a guarded replacement when both root identity and previous
+text still match. A place may carry `rootIdentity` from a snapshot so display,
+read and mutation reject a root that changed after discovery. These methods are
+optional: providers requiring them must refuse writes on an older host. The lease
+serializes this host's guarded writes;
+it cannot prevent an external editor from racing the final filesystem replace.
+A root declaration is a trusted extension capability, not a sandbox for
+untrusted extension code.
+
+`ctx.mcp.tools.parseYamlDocument` exposes nodes, tags and source ranges without
+evaluating expressions; `spliceYamlDocument` validates a replacement by
+reparsing while preserving text outside its range. Providers must identify
+ownership and refuse unsafe aliases, anchors, ambiguous overrides and tagged
+values before requesting an edit.
+
 ## Prompt providers
 
 An agent extension that takes prompts declares where and how it takes them by
@@ -323,7 +475,9 @@ extensions, and use the same detail dialog and the same action button.
   A failed deletion leaves the extension installed but disabled, so code is
   never running after its files are gone.
 - A package compiled into the build has no directory to delete; its action is
-  **Disable** / **Enable**, and it stays in the catalog.
+  **Disable** / **Enable**, and it stays in the catalog. A locked built-in
+  (`locked: true` in its manifest) shows **Built-in** instead and offers no
+  action.
 - `state/extensions.json` holds one boolean per extension and nothing else:
   descriptions live in `plugin.yaml`, install source/version/time in
   `index.json`. Removing the key is how an uninstall forgets the user's choice.

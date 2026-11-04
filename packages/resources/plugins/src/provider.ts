@@ -17,6 +17,8 @@ import type { Context } from "@deepseek-ai/cordis"
 
 import type { AssetScope, PlaceFiles } from "@context-hub/core/place-files"
 
+import { pluginManifestPaths } from "./contract.ts"
+import { pluginManifestRules, type PluginManifestRule } from "./manifest-rules.ts"
 import type { PackDescription, PluginInstallReport, PluginInstallScope } from "./contract.ts"
 
 /** The service name the plugins module publishes and every agent plugin requires. */
@@ -30,19 +32,115 @@ export const PLUGIN_SERVICE = "plugins"
  * these rather than reaching for a disk or a process itself, which is also what
  * lets it be written once and drive every form of the app.
  */
+/** Roots an installer declares without exposing the host's environment. */
+export interface PluginRootScope {
+  write: string[]
+  read: string[]
+}
+
+export interface PluginDiskDeclaration {
+  home: string
+  homeEnv?: string
+  /** Expand ~ and resolve relative environment roots against the selected workspace. */
+  homeEnvResolution?: "workspace"
+  /** Capture the workspace's canonical filesystem path for client policy keys. */
+  canonicalWorkspace?: boolean
+  /** Optional cross-process lease compatible with the client's lockfile. */
+  lease?: {
+    ref: PluginDiskRef
+    stale: number
+    update: number
+    retries: { retries: number; factor: number; minTimeout: number; maxTimeout: number; randomize: boolean }
+  }
+  state: string
+  stateEnv?: string
+  config: PluginRootScope
+  stateFiles: PluginRootScope
+  /** Additional plugin directory templates; :name is the collected pack name. */
+  directories?: string[]
+  /** Top-level entries omitted from the delivered copy and its source snapshot. */
+  copyExcludeTop?: string[]
+  /** Names refused in nested directories before content is read or copied. */
+  copyRejectNested?: string[]
+  workspace: PluginRootScope
+  library: PluginRootScope
+  external: string[]
+}
+
+/** The roots captured for one operation. */
+export interface PluginDiskRoots {
+  declaration: PluginDiskDeclaration
+  config: string
+  plugins: string
+  workspace: string | null
+  workspaceCanonical?: string | null
+  library: string
+  platform: "win32" | "posix"
+  token?: string
+}
+
+export interface PluginDiskRef {
+  root: "config" | "plugins" | "workspace" | "library"
+  path: string
+}
+
+export interface PluginDiskChange {
+  ref: PluginDiskRef
+  before: string | null
+  after: string | null
+}
+
+export interface PluginJournalCommit {
+  pending: PluginDiskRef
+  guardEmpty?: readonly PluginDiskRef[]
+  journal?: { ref: PluginDiskRef; prepared: string; swapped: string; committed: string }
+  before: readonly PluginDiskChange[]
+  commit: PluginDiskChange
+  after: readonly PluginDiskChange[]
+  artifact?: {
+    operation: "copy" | "remove"
+    name: string
+    destination: string
+    sourceSnapshot?: string
+    before: string | null
+    staging?: PluginDiskRef
+    backup: PluginDiskRef
+    manifests?: readonly string[]
+  }
+}
+
+/** Narrow file operations for an installer; paths are relative to captured roots. */
+export interface PluginDisk {
+  roots(declaration: PluginDiskDeclaration): Promise<PluginDiskRoots>
+  read(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string | null>
+  list(roots: PluginDiskRoots, ref: PluginDiskRef, options?: { includeLinks?: boolean }): Promise<{ name: string; directory: boolean }[]>
+  path(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string>
+  snapshotDirectory(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<string | null>
+  external(roots: PluginDiskRoots, directory: string, relative: string): Promise<string>
+  readExternal(roots: PluginDiskRoots, directory: string, relative: string): Promise<string | null>
+  commit(
+    roots: PluginDiskRoots,
+    changes: readonly PluginDiskChange[],
+    copy?: { name: string; destination: string; replace?: boolean; pruneVersions?: boolean; manifests?: readonly string[]; before?: string | null; sourceSnapshot?: string },
+    remove?: { ref: PluginDiskRef; before: string | null }
+  ): Promise<void>
+  journalCommit(roots: PluginDiskRoots, recipe: PluginJournalCommit): Promise<{ committed: boolean; warnings: string[] }>
+  removeDirectory(roots: PluginDiskRoots, ref: PluginDiskRef): Promise<void>
+  run<T>(declaration: PluginDiskDeclaration, work: (roots: PluginDiskRoots) => Promise<T>): Promise<T>
+}
+
 export interface PluginTools {
+  /** File access for clients supported by a recent host. */
+  readonly disk?: PluginDisk
   /**
    * The directory packs are collected into. Registering it with the agent is
    * what makes them installable, so an installer reads it rather than assuming
    * a path.
    */
   root(): Promise<string>
-  /**
-   * Write every marketplace index the library root carries. A caller does this
-   * before registering the root, because an index that does not list a pack the
-   * person just collected would make that pack invisible to the agent.
-   */
-  syncMarketplace(): Promise<void>
+  /** List the library's packs and write extension-supplied marketplace indexes. */
+  packs(): Promise<{ name: string; description: string; version: string }[]>
+  syncMarketplace(indexes: readonly { path: string; document: unknown }[]): Promise<void>
   /**
    * Run one console program with structured arguments.
    *
@@ -107,6 +205,12 @@ export interface PluginPlace {
    * switch in one of its files and none in another.
    */
   switchable: boolean
+  /** False for a policy-only place that must not install or remove an artifact. */
+  installable?: boolean
+  /** Allow this policy context only when the client has no artifact yet. */
+  initialInstallable?: boolean
+  /** Whether this policy-only place can return to inherited state. */
+  clearable?: boolean
   /**
    * The file that records this place's switch, under its scope's root and
    * `/`-separated. Only a place the hub may switch names one.
@@ -139,15 +243,22 @@ export type PluginSwitches = Record<string, Record<string, boolean>>
 export interface PluginHeld {
   /** The pack's name: what the client lists it by, and the name this hub records it under. */
   name: string
-  /** The client's full id, `<name>@<marketplace>`, which its own commands take back. */
+  /** The client's own id for the marketplace entry, `<name>@<marketplace>`. */
   id: string
+  /** The declared place this hold came from, when the client can name one. */
+  placeId?: string
   version: string
   /** The place the client installed it at, in the client's own word — `user`, `project`, and so on. */
   scope: string
   /**
    * Whether the client currently switches it on.
    */
-  enabled: boolean
+  enabled?: boolean
+  /** A discovered or policy-owned entry may not be modified through this installer. */
+  readOnly?: boolean
+  origin?: "record" | "declaration" | "skills-dir"
+  /** Whether the named source was verified available; absent when not checked. */
+  sourceAvailable?: boolean
   /** The marketplace it came from; `null` when the client names none. */
   marketplace: string | null
   /**
@@ -175,6 +286,13 @@ export interface PluginInstaller {
    * An agent with no notion of scope declares the one it does have.
    */
   readonly places: readonly PluginPlace[]
+  /**
+   * Resolve this client's complete place list for one scan.
+   *
+   * A client whose destinations are discovered on disk returns them here; the
+   * caller uses this resolved list for both display and dispatch by place id.
+   */
+  placesFor?(tools: PluginTools): Promise<readonly PluginPlace[]>
   /** Whether the agent this installer drives is on this machine. */
   available(tools: PluginTools): Promise<boolean>
   /**
@@ -218,12 +336,22 @@ export interface PluginInstaller {
    * Absent for an agent that has no such switch, which is a fact about the agent
    * rather than a gap: the page offers the switch only where it exists.
    */
+  /** Clear a scoped override without uninstalling its shared artifact. */
+  clearEnabled?(id: string, scope: PluginInstallScope, tools: PluginTools): Promise<PluginInstallReport>
   setEnabled?(
     id: string,
     scope: PluginInstallScope,
     on: boolean,
     tools: PluginTools
   ): Promise<PluginInstallReport>
+  /** Install into one exact declared place; an older installer omits this. */
+  installAt?(name: string, placeId: string, tools: PluginTools): Promise<PluginInstallReport>
+  /** Remove from one exact declared place. */
+  removeAt?(id: string, placeId: string, tools: PluginTools): Promise<PluginInstallReport>
+  /** Set one exact declared place's switch. */
+  setEnabledAt?(id: string, placeId: string, on: boolean, tools: PluginTools): Promise<PluginInstallReport>
+  /** Clear one exact declared place's override. */
+  clearEnabledAt?(id: string, placeId: string, tools: PluginTools): Promise<PluginInstallReport>
 }
 
 /**
@@ -254,6 +382,38 @@ export class PluginService extends Service {
   readonly tools: PluginBridgeTools
 
   private readonly held: PluginInstaller[] = []
+  private readonly manifests: string[][] = []
+  private readonly rules: PluginManifestRule[][] = []
+
+  /** Paths contributed by currently enabled extensions. */
+  manifestPaths(): string[] {
+    return pluginManifestPaths(this.manifests.flat())
+  }
+
+  /** Structured conditions contributed by currently enabled extensions. */
+  manifestRules(): PluginManifestRule[] {
+    return pluginManifestRules(this.rules.flat())
+  }
+
+  /** Register relative manifest paths for the lifetime of the calling extension. */
+  registerManifests(paths: readonly string[]): () => void {
+    const declared = pluginManifestPaths(paths).filter((path) => !pluginManifestPaths().includes(path))
+    this.manifests.push(declared)
+    return this.ctx.effect(() => () => {
+      const at = this.manifests.indexOf(declared)
+      if (at >= 0) this.manifests.splice(at, 1)
+    })
+  }
+
+  /** Register structured manifest conditions for the lifetime of the calling extension. */
+  registerManifestRules(rules: readonly PluginManifestRule[]): () => void {
+    const declared = pluginManifestRules(rules)
+    this.rules.push(declared)
+    return this.ctx.effect(() => () => {
+      const at = this.rules.indexOf(declared)
+      if (at >= 0) this.rules.splice(at, 1)
+    })
+  }
 
   constructor(ctx: Context, tools: PluginBridgeTools) {
     super(ctx, PLUGIN_SERVICE)

@@ -9,7 +9,7 @@ import { HardDriveIcon, LibraryIcon, PackageIcon, StoreIcon, type LucideIcon } f
 import { useI18n } from "@context-hub/extensions/react"
 import { AvatarStack } from "@context-hub/extensions/components"
 
-import { holdsOf, locationLabel, sourceLabel, useReadablePlaces } from "./library.ts"
+import { locationLabel, placedIn, sourceLabel, useReadablePlaces } from "./library.ts"
 import type { Skill, SkillSource } from "./types.ts"
 
 /** The mark for how a skill reached this machine. */
@@ -25,7 +25,7 @@ export function ProvenanceLine({ skill }: { skill: Skill }) {
      their own extension does without every caller passing them down. */
   const places = useReadablePlaces()
   const Icon = SOURCE_ICONS[skill.source] ?? HardDriveIcon
-  const holds = holdsOf(skill)
+  const holds = placedIn(skill)
   /* A place this build no longer reads still holds the row's files, so it keeps
      a mark rather than quietly disappearing from the line. */
   const icons = new Map(places.map((place) => [place.id, place.icon]))

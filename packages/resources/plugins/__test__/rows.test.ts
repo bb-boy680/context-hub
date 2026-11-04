@@ -19,8 +19,13 @@ import type { PluginRecord } from "../src/revision.ts"
 import {
   collectScanned,
   composeRows,
+  installablePlaces,
+  pluginPlaceCount,
+  pluginPlaceKey,
   rowsForTab,
+  selectedPluginPlace,
   placeReached,
+  placeSourceNote,
   placesShown,
   scopeWords,
   type ScannedAnswer,
@@ -146,6 +151,71 @@ const codex: ScannedAnswer = {
   ],
 }
 
+it("keeps marketplace identities and marks undeclared places read-only", () => {
+  const pack = claudeCode.packs[0]!
+  const result = collectScanned([{ ...claudeCode, packs: [
+    pack,
+    { ...pack, id: "hud@other", marketplace: "other" },
+    { ...pack, scope: "local", readOnly: true },
+  ] }])[0]!
+  expect(result.held[0]?.places).toEqual(expect.arrayContaining([
+    expect.objectContaining({ id: "hud@hud", scope: "user", readOnly: false }),
+    expect.objectContaining({ id: "hud@other", scope: "user", readOnly: false }),
+    expect.objectContaining({ id: "hud@hud", scope: "local", readOnly: true }),
+  ]))
+})
+
+it("shows a missing declaration source without trusting settings or read-only", () => {
+  const missing = { ...held("demo", "user"), id: "demo@context-hub", enabled: undefined as undefined,
+    readOnly: true, origin: "declaration" as const, sourceAvailable: false,
+    source: { kind: "local" as const, path: "/library/demo" },
+    pack: { name: "", version: "", description: "" } }
+  const answer: ScannedAnswer = { ...claudeCode, switches: { user: { "demo@context-hub": true } },
+    packs: [missing] }
+  const scanned = collectScanned([answer])[0]!
+  const row = composeRows([], [scanned], "en", plain)[0]!
+  const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+    places: claudeCode.places, switches: { user: { "demo@context-hub": true } }, available: true }
+  expect(row.held[0]?.places[0], "a setting does not resolve the client's unknown state").toMatchObject({
+    id: "demo@context-hub", enabled: undefined, readOnly: true, origin: "declaration",
+    sourceAvailable: false, source: { path: "/library/demo" },
+  })
+  expect(row.sourceAddress, "the declared path stays readable").toBe("/library/demo")
+  expect(row.directory, "but a missing source is not read").toBeUndefined()
+  expect(placeSourceNote(row.held[0]!.places, "global", claudeCode.places[0]!, plain)).toBe("plugins.place.sourceUnavailable")
+  expect(placesShown(row, [client]), "a read-only declaration has no switch").toEqual([])
+})
+
+it("retains verified source availability and each installation path", () => {
+  const missing = { ...held("hud", "user"), origin: "declaration" as const, readOnly: true,
+    enabled: undefined, sourceAvailable: false, source: { kind: "local" as const, path: "/missing/hud" },
+    pack: { name: "", version: "", description: "" } }
+  const available = { ...held("hud", "project"), origin: "declaration" as const, sourceAvailable: true,
+    source: { kind: "local" as const, path: "/present/hud" } }
+  const result = collectScanned([{ ...claudeCode, packs: [missing, available] }])[0]!
+  expect(result.held[0]?.places).toEqual(expect.arrayContaining([
+    expect.objectContaining({ scope: "user", sourceAvailable: false, source: missing.source, origin: "declaration" }),
+    expect.objectContaining({ scope: "project", sourceAvailable: true, source: available.source, origin: "declaration" }),
+  ]))
+  const row = composeRows([], [result], "en", plain)[0]!
+  expect(row.sourceAddress).toBe("/missing/hud")
+  expect(row.directory).toBe("/present/hud")
+  const missingOnly = composeRows([], collectScanned([{ ...claudeCode, packs: [missing] }]), "en", plain)[0]!
+  expect(missingOnly.sourceAddress).toBe("/missing/hud")
+  expect(missingOnly.directory).toBeUndefined()
+  expect(placeSourceNote(result.held[0]!.places, "global", claudeCode.places[0]!, plain)).toBe("plugins.place.sourceUnavailable")
+  expect(placeSourceNote(result.held[0]!.places, "workspace", claudeCode.places[1]!, plain)).toContain("plugins.place.declared")
+  const unverified = collectScanned([codex])[0]!.held[0]!.places
+  expect(unverified[0]?.sourceAvailable).toBeUndefined()
+  expect(placeSourceNote(unverified, "global", codex.places[0]!, plain)).not.toContain("plugins.place.sourceUnavailable")
+})
+
+it("does not apply local source status to a different project place", () => {
+  const project = collectScanned([{ ...claudeCode, packs: [held("hud", "project")] }])[0]!.held[0]!.places[0]!
+  const local = { ...project, scope: "local", sourceAvailable: false }
+  expect(placeSourceNote([project, local], "workspace", claudeCode.places[1]!, plain)).not.toBe("plugins.place.sourceUnavailable")
+})
+
 const answers: ScannedAnswer[] = [claudeCode, codex]
 const scanned = collectScanned(answers)
 const rows = composeRows([record("stored")], scanned, "en", plain)
@@ -157,9 +227,8 @@ const behind: PluginRecord = {
 }
 const checkedCatalog = composeRows([record("stored"), behind], scanned, "en", plain)
 
-/* A roster of its own, for the two scope tabs, so that a pack held in the
-   repository and one held only machine-wide are both on it: the tabs have to tell
-   them apart rather than agree because every pack happens to be in both. */
+/* A roster of its own, so one agent's repository and machine-wide places,
+   and another agent's machine-wide place, hold distinguishable packs. */
 const scopePlaces = composeRows(
   [],
   collectScanned([
@@ -202,6 +271,49 @@ const scopePlaces = composeRows(
 )
 
 describe("folding the agents' answers", () => {
+  it.each([
+    [[false, false], false],
+    [[false, undefined], undefined],
+    [[undefined, false], undefined],
+    [[undefined, undefined], undefined],
+    [[undefined, true], true],
+    [[true, undefined], true],
+  ] as const)("combines %j as %s", (values, expected) => {
+    const packs = values.map((enabled, index) => ({ ...held("tri-state", index === 0 ? "user" : "project"), enabled }))
+    const result = collectScanned([{ ...claudeCode, switches: {}, packs }])
+    expect(result[0]?.held[0]?.enabled).toBe(expected)
+    expect(result[0]?.held[0]?.places.map((place) => place.enabled)).toEqual(values)
+  })
+  it.each([true, false])("keeps an unknown effective state unknown with an explicit %s setting", (setting) => {
+    const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: { user: { "hud@curated": setting } }, available: true }
+    const scanned = collectScanned([{ ...claudeCode, places: client.places, switches: client.switches,
+      packs: [{ ...held("hud", "user"), enabled: undefined }] }])
+    const row = composeRows([], scanned, "en", plain)[0]!
+    expect(row.held[0]?.places[0]?.enabled).toBeUndefined()
+    expect(placesShown(row, [client])).toMatchObject([{ on: undefined, recorded: undefined }])
+  })
+
+  it("keeps a duplicate place unknown if either report is unknown", () => {
+    const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: { user: { "hud@curated": true } }, available: true }
+    for (const values of [[undefined, true], [true, undefined]] as const) {
+      const packs = values.map((enabled) => ({ ...held("hud", "user"), enabled }))
+      const row = composeRows([], collectScanned([{ ...claudeCode, switches: client.switches, packs }]), "en", plain)[0]!
+      expect(row.held[0]?.places[0]?.enabled).toBeUndefined()
+      expect(placesShown(row, [client])[0]?.on).toBeUndefined()
+    }
+  })
+
+  it("preserves a known place when a different place is unknown", () => {
+    const client: PluginClient = { id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: { user: { "hud@curated": false }, project: { "hud@curated": true } }, available: true }
+    const scanned = collectScanned([{ ...claudeCode, switches: client.switches,
+      packs: [{ ...held("hud", "user"), enabled: false }, { ...held("hud", "project"), enabled: undefined }] }])
+    const row = composeRows([], scanned, "en", plain)[0]!
+    expect(placesShown(row, [client]).map(({ on }) => on)).toEqual([false, undefined])
+  })
+
   it("keeps one pack as one entry", () => {
     expect(scanned, "one pack stays one entry").toHaveLength(1)
   })
@@ -548,6 +660,7 @@ describe("the words one agent's scopes wear", () => {
   const words: Record<string, string> = {
     "plugins.scope.user": "This machine",
     "plugins.scope.project": "This repository",
+    "plugins.scope.local": "Only me in this repository",
   }
   const t = (key: string) => words[key] ?? key
 
@@ -564,6 +677,10 @@ describe("the words one agent's scopes wear", () => {
       scopeWords(["user", "project"], t),
       "and two words that say different things both stay"
     ).toBe("This machine · This repository")
+  })
+
+  it("distinguishes project and local places when both are present", () => {
+    expect(scopeWords(["user", "project", "local"], t)).toBe("This machine · This repository · Only me in this repository")
   })
 
   it("shows a word this build has no key for as the agent spelled it", () => {
@@ -612,6 +729,13 @@ describe("which place a group's action reaches", () => {
       placeReached(onlyUser, "workspace"),
       "an agent keeping nothing in the group reaches nothing"
     ).toBeUndefined()
+  })
+
+  it("does not treat a policy-only place as an artifact installation", () => {
+    const places = [ccPlaces[0]!, { ...ccPlaces[1]!, installable: false }]
+    expect(installablePlaces(places).map((place) => place.scopeWord)).toEqual(["user"])
+    expect(placeReached(places, "workspace")).toBeUndefined()
+    expect(placeReached(places, "global")?.scopeWord).toBe("user")
   })
 
   it("takes the agent's own answer where a place's file is silent", () => {
@@ -813,53 +937,71 @@ describe("which tab a row lands in, once a source has moved", () => {
   })
 })
 
-describe("which tab a row lands in, by the place it sits in", () => {
-  it("puts a pack an agent holds inside the repository in the workspace tab", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace").map((one) => one.name),
-      "a pack an agent holds inside the repository is the workspace tab"
-    ).toEqual(["here"])
+describe("which rows a selected place holds", () => {
+  const ccWorkspace = { scope: "workspace", client: "hub.target.claude-code" } as const
+  const ccGlobal = { scope: "global", client: "hub.target.claude-code" } as const
+  const codexGlobal = { scope: "global", client: "hub.target.codex" } as const
+  const clients: PluginClient[] = [
+    {
+      id: claudeCode.client, label: claudeCode.label, icon: mark,
+      places: claudeCode.places, switches: {}, available: true,
+    },
+    {
+      id: codex.client, label: codex.label, icon: mark,
+      places: codex.places, switches: {}, available: true,
+    },
+  ]
+
+  it("selects only that agent's repository packs", () => {
+    const names = rowsForTab(scopePlaces, "place", ccWorkspace).map((one) => one.name)
+    expect(names).toEqual(["here"])
+    expect(names).not.toContain("everywhere")
+    expect(names).not.toContain("away")
   })
 
-  it("leaves a pack held only machine-wide out of the workspace tab", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace").map((one) => one.name),
-      "one held only machine-wide is not, whoever holds it"
-    ).not.toContain("away")
+  it("selects the same agent's machine-wide packs separately", () => {
+    const names = rowsForTab(scopePlaces, "place", ccGlobal).map((one) => one.name)
+    expect(names).toEqual(["everywhere"])
+    expect(names).not.toContain("here")
   })
 
-  it("puts every pack an agent holds machine-wide in the global tab", () => {
-    expect(
-      rowsForTab(scopePlaces, "global").map((one) => one.name),
-      "every pack an agent holds machine-wide is the global tab"
-    ).toEqual(["everywhere", "away"])
+  it("selects only the other agent's machine-wide packs", () => {
+    expect(rowsForTab(scopePlaces, "place", codexGlobal).map((one) => one.name)).toEqual(["away"])
+    expect(rowsForTab(scopePlaces, "place", { ...codexGlobal, scope: "workspace" })).toHaveLength(0)
   })
 
-  it("leaves a pack held only inside the repository out of the global tab", () => {
+  it("includes an unstored pack in both of the agent's locations", () => {
+    expect(rowsForTab(catalog, "place", ccWorkspace).map((one) => one.name)).toEqual(["hud"])
+    expect(rowsForTab(catalog, "place", ccGlobal).map((one) => one.name)).toEqual(["hud"])
+    expect(rowsForTab(catalog, "place", codexGlobal).map((one) => one.name)).toEqual(["hud"])
+    expect(catalog.find((one) => one.name === "hud")?.stored).toBe(false)
     expect(
-      rowsForTab(scopePlaces, "global").map((one) => one.name),
-      "and one held only inside the repository is not"
-    ).not.toContain("here")
+      catalog.find((one) => one.name === "hud")?.held.find((one) => one.client === codex.client)?.enabled
+    ).toBe(false)
   })
 
-  it("keeps a pack for the tab narrowed to the agent that holds it there", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace", "hub.target.claude-code").map((one) => one.name),
-      "narrowed to the agent that holds it here, the workspace tab keeps it"
-    ).toEqual(["here"])
+  it("uses a different key for each scope, even for the same agent", () => {
+    const keys = [ccWorkspace, ccGlobal, codexGlobal].map(pluginPlaceKey)
+    expect(new Set(keys).size).toBe(3)
   })
 
-  it("empties the workspace tab for a narrowing to an agent that holds nothing there", () => {
-    expect(
-      rowsForTab(scopePlaces, "workspace", "hub.target.codex"),
-      "narrowed to the one that only holds machine-wide, the workspace tab is empty"
-    ).toHaveLength(0)
+  it("counts the unfiltered catalog and distinguishes a failed read from zero", () => {
+    const client = clients[0] as PluginClient
+    expect(pluginPlaceCount(scopePlaces, client, "workspace")).toBe(1)
+    expect(pluginPlaceCount(scopePlaces, client, "global")).toBe(1)
+    expect(pluginPlaceCount(catalog, clients[1] as PluginClient, "global")).toBe(1)
+    expect(pluginPlaceCount([], client, "workspace")).toBe(0)
+    expect(pluginPlaceCount([], { ...client, available: false }, "workspace")).toBe(0)
+    expect(pluginPlaceCount(scopePlaces, { ...client, error: "failed" }, "workspace")).toBeNull()
+    expect(pluginPlaceCount(scopePlaces, clients[1] as PluginClient, "global")).toBe(1)
   })
 
-  it("keeps the pack the global tab does hold when narrowed to that agent", () => {
-    expect(
-      rowsForTab(scopePlaces, "global", "hub.target.codex").map((one) => one.name),
-      "while the global tab narrowed to it keeps the one it does hold"
-    ).toEqual(["away"])
+  it("drops a selection when its agent or scope disappears", () => {
+    expect(selectedPluginPlace(clients, ccWorkspace)).toEqual(ccWorkspace)
+    expect(selectedPluginPlace(clients.slice(1), ccWorkspace)).toBeNull()
+    const withoutWorkspace = { ...clients[0] as PluginClient, places: codex.places }
+    expect(selectedPluginPlace([withoutWorkspace], ccWorkspace)).toBeNull()
+    expect(selectedPluginPlace(clients, null)).toBeNull()
+    expect(rowsForTab(catalog, "place", null)).toHaveLength(0)
   })
 })

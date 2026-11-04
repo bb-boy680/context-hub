@@ -35,7 +35,7 @@ beforeAll(async () => {
   folder = await fs.mkdtemp(path.join(tmpdir(), "context-hub-web-bridge-folder-"))
   extra = await fs.mkdtemp(path.join(tmpdir(), "context-hub-web-bridge-extra-"))
   const server = createHubServer({
-    middlewares: [createPlaceFileHandler({ home, folder }), createWorkspaceHandler({ home, folder })],
+    middlewares: [createPlaceFileHandler({ home, folder, userHome: extra, env: {} }), createWorkspaceHandler({ home, folder })],
     log: () => undefined,
   })
   listener = await server.listen()
@@ -82,6 +82,22 @@ describe("a client file", () => {
     /* Gone reads as absent rather than as an error: a file that was never
        there and one that was removed are the same answer to "what is in it". */
     expect(await files().read(ref)).toBeNull()
+  })
+
+  it("carries declared roots, directory listings and guarded snapshots over the wire", async () => {
+    const port = files()
+    const ref = { scope: "global", file: "patch.yml", root: { home: ".fixture", homeEnv: "FIXTURE_HOME", list: ["profiles"] } } as const
+    await fs.mkdir(path.join(extra, ".fixture/profiles/first"), { recursive: true })
+    expect(await port.list!({ ...ref, file: "profiles" })).toEqual(["first"])
+    const before = await port.snapshot!(ref)
+    expect(before.text).toBeNull()
+    await port.commit!(ref, before, "test\n")
+    expect(await port.read({ ...ref, rootIdentity: before.root })).toBe("test\n")
+    await expect(port.read({ ...ref, rootIdentity: "0".repeat(64) })).rejects.toThrow(/root changed/)
+    expect(await port.read(ref)).toBe("test\n")
+    await expect(port.commit!(ref, before, "overwrite\n")).rejects.toThrow(/changed/)
+    expect(await fs.readFile(path.join(extra, ".fixture/patch.yml"), "utf8")).toBe("test\n")
+    expect(await port.display!(ref)).toBe(path.join(extra, ".fixture/patch.yml"))
   })
 
   it("is refused when the path climbs out of the workspace", async () => {

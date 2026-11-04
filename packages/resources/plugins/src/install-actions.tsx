@@ -11,11 +11,11 @@
  * so its clicks stop there: without that, opening the menu would also open the
  * pack's own lightbox.
  */
-import { ChevronDownIcon, DownloadIcon, PowerIcon } from "lucide-react"
+import { ChevronDownIcon, DownloadIcon, PowerIcon, RotateCcwIcon } from "lucide-react"
 
 import type { PluginInstallScope } from "./contract.ts"
 import type { PluginClient } from "./library.ts"
-import { placesShown, SCOPE_LABELS, SCOPES } from "./rows.ts"
+import { installablePlaces, placesShown, SCOPE_LABELS, SCOPES } from "./rows.ts"
 import type { PluginRow } from "./types.ts"
 
 import { PlaceMenu } from "@context-hub/extensions/components"
@@ -65,23 +65,26 @@ function ScopeMenu({
   /** The clients this hub can deliver to, with what each one already holds. */
   clients: readonly PluginClient[]
   busy: boolean
-  onInstall: (client: string, scope: PluginInstallScope) => void
-  onUninstall: (client: string, scope: PluginInstallScope) => void
+  onInstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
 }) {
   const { t } = useI18n()
 
   /* Every place the clients declared, which is what they say they install into.
      Nothing here decides which places those are. */
   const options = clients.flatMap((client) =>
-    client.places.map((place) => {
+    installablePlaces(client.places, (plugin.held.find((one) => one.client === client.id)?.places.length ?? 0) > 0).map((place) => {
       /* What this agent holds, in its own words — not what this hub delivered to
          it. A pack the agent got from some other marketplace is just as
          installed, and its row has to offer the way out. */
-      const at = (plugin.held.find((one) => one.client === client.id)?.places ?? []).some(
-        (one) => one.scope === place.scopeWord
+      const matches = (plugin.held.find((one) => one.client === client.id)?.places ?? []).filter(
+        (one) => one.placeId !== undefined ? one.placeId === place.id : one.scope === place.scopeWord
       )
+      const at = matches.length > 0
+      const readOnly = at && matches.every((one) => one.readOnly)
+      const ambiguous = new Set(matches.filter((one) => !one.readOnly).map((one) => one.id)).size > 1
       return {
-        id: `${client.id}:${place.scopeWord}`,
+        id: `${client.id}:${place.id}`,
         client: client.id,
         place,
         icon: client.icon,
@@ -90,7 +93,9 @@ function ScopeMenu({
         note: t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord),
         selected: at,
         blocked:
-          client.error !== undefined
+          readOnly || ambiguous
+            ? t("plugins.place.selfManaged")
+            : client.error !== undefined
             ? t("plugins.client.unread")
             : !client.available
               ? t("plugins.client.absent")
@@ -138,8 +143,8 @@ function ScopeMenu({
         onPick={(id) => {
           const at = byId.get(id)
           if (at === undefined) return
-          if (at.selected) onUninstall(at.client, at.place.scopeWord)
-          else onInstall(at.client, at.place.scopeWord)
+          if (at.selected) onUninstall(at.client, at.place.scopeWord, at.place.id)
+          else onInstall(at.client, at.place.scopeWord, at.place.id)
         }}
         groups={SCOPES.map((group) => ({
           label: t(`plugins.detail.group.${group}`),
@@ -169,11 +174,13 @@ function EnabledMenu({
   clients,
   busy,
   onSetEnabled,
+  onClearEnabled,
 }: {
   plugin: PluginRow
   clients: readonly PluginClient[]
   busy: boolean
-  onSetEnabled: (client: string, scope: PluginInstallScope, on: boolean) => void
+  onSetEnabled: (client: string, scope: PluginInstallScope, on: boolean, placeId?: string) => void
+  onClearEnabled: (client: string, scope: PluginInstallScope, placeId?: string) => void
 }) {
   const { t } = useI18n()
 
@@ -225,6 +232,7 @@ function EnabledMenu({
              and one this hub cannot reach has nothing it may write: each says
              whose business it is rather than showing a control that would move
              something nobody chose. */
+          if (place.on === undefined) return null
           if (!place.declared.switchable || !reachable.has(place.client)) {
             return (
               <span className="flex h-5 shrink-0 items-center rounded-full bg-secondary px-2 text-[11.5px] leading-[1.3] text-muted-foreground">
@@ -233,19 +241,31 @@ function EnabledMenu({
             )
           }
           return (
-            <Switch
-              /* The same value the row's own line reads, and never the agent's
-                 answer for the pack: that answer is one value with the whole
-                 file chain already resolved into it, so a place this hub just
-                 switched off would show as still on wherever a wider place it
-                 sits in overrules it. */
-              checked={place.on}
-              onCheckedChange={(next) =>
-                onSetEnabled(place.client, place.declared.scopeWord, next)
-              }
-              aria-label={option.label}
-              className="data-unchecked:bg-secondary"
-            />
+            <span className="flex items-center gap-1">
+              {place.declared.clearable === true && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-xs"
+                  disabled={busy}
+                  aria-label={`${t("plugins.action.inherit")} ${option.label}`}
+                  title={t("plugins.action.inherit")}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onClearEnabled(place.client, place.declared.scopeWord, place.declared.id)
+                  }}
+                >
+                  <RotateCcwIcon aria-hidden />
+                </Button>
+              )}
+              <Switch
+                /* Keep the switch and its row on the same scoped answer. */
+                checked={place.on}
+                onCheckedChange={(next) => onSetEnabled(place.client, place.declared.scopeWord, next, place.declared.id)}
+                aria-label={option.label}
+                className="data-unchecked:bg-secondary"
+              />
+            </span>
           )
         }}
         groups={SCOPES.map((group) => ({
@@ -253,7 +273,7 @@ function EnabledMenu({
           options: places
             .filter((one) => one.declared.scope === group)
             .map((one) => {
-              const shown = one.declared.switchable && reachable.has(one.client)
+              const shown = one.on === undefined || (one.declared.switchable && reachable.has(one.client))
               return {
                 id: one.id,
                 icon: one.icon,
@@ -268,7 +288,7 @@ function EnabledMenu({
                       )
                       .replace(
                         "{state}",
-                        t(one.on ? "plugins.place.on" : "plugins.place.off")
+                        t(one.on === undefined ? "plugins.place.unknown" : one.on ? "plugins.place.on" : "plugins.place.off")
                       )
                   : t("plugins.place.selfManaged"),
               }
@@ -369,21 +389,23 @@ export function PluginActions({
   onInstall,
   onUninstall,
   onSetEnabled,
+  onClearEnabled,
 }: {
   plugin: PluginRow
   clients: readonly PluginClient[]
   busy: boolean
   onUpdate: () => void
-  onInstall: (client: string, scope: PluginInstallScope) => void
-  onUninstall: (client: string, scope: PluginInstallScope) => void
-  onSetEnabled: (client: string, scope: PluginInstallScope, on: boolean) => void
+  onInstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
+  onSetEnabled: (client: string, scope: PluginInstallScope, on: boolean, placeId?: string) => void
+  onClearEnabled: (client: string, scope: PluginInstallScope, placeId?: string) => void
 }) {
   return (
     <div className="flex items-center gap-3" onClick={(event) => event.stopPropagation()}>
       {plugin.outdated === true ? (
         <UpdateAction plugin={plugin} busy={busy} onUpdate={onUpdate} />
       ) : null}
-      <EnabledMenu plugin={plugin} clients={clients} busy={busy} onSetEnabled={onSetEnabled} />
+      <EnabledMenu plugin={plugin} clients={clients} busy={busy} onSetEnabled={onSetEnabled} onClearEnabled={onClearEnabled} />
       <ScopeMenu
         plugin={plugin}
         clients={clients}

@@ -10,18 +10,20 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@deepseek-ai/cordis": "^4.0.4",
-    "@headless-tree/core": "^1.7.0",
-    "@headless-tree/react": "^1.7.0",
     "@context-hub/core": "workspace:*",
     "@context-hub/extensions": "workspace:*",
     "@context-hub/shadcn-ui": "workspace:*",
+    "@deepseek-ai/cordis": "^4.0.4",
+    "@headless-tree/core": "^1.7.0",
+    "@headless-tree/react": "^1.7.0",
     "lucide-react": "^1.48.0",
+    "proper-lockfile": "4.1.2",
     "react": "^19.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^10",
     "@types/node": "^24",
+    "@types/proper-lockfile": "4.1.4",
     "@types/react": "^19",
     "eslint": "^10",
     "eslint-plugin-react-hooks": "^7.1.1",
@@ -35,6 +37,7 @@
     "./contract": "./src/contract.ts",
     "./provider": "./src/provider.ts",
     "./library": "./src/library.ts",
+    "./market-install": "./src/market-install.ts",
     "./handlers": "./handlers.ts"
   }
 }

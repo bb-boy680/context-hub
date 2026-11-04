@@ -93,7 +93,8 @@ export interface McpInstall {
    * {@link installed}: the declaration stays in the file while a client may be
    * told not to load it.
    */
-  enabled: boolean
+  enabled: boolean | null
+  readOnly?: boolean
   /**
    * The place's file says something but not a declaration this build can read,
    * which the place row marks rather than showing as absent.

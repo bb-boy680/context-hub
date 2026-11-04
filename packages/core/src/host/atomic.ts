@@ -19,10 +19,12 @@ const RETRYABLE = new Set(["EACCES", "EBUSY", "EPERM"])
  *
  * @param target — the file to replace; its directory is created when missing.
  * @param data — the contents to write.
+ * @param options — 重命名之前可选的冲突检查。
  */
 export async function writeFileAtomic(
   target: string,
-  data: string | Uint8Array
+  data: string | Uint8Array,
+  options: { beforeReplace?: () => Promise<void> } = {}
 ): Promise<void> {
   const dir = path.dirname(target)
   await fs.mkdir(dir, { recursive: true })
@@ -30,6 +32,7 @@ export async function writeFileAtomic(
   await fs.writeFile(temporary, data)
   for (let attempt = 0; ; attempt += 1) {
     try {
+      await options.beforeReplace?.()
       await fs.rename(temporary, target)
       return
     } catch (error) {

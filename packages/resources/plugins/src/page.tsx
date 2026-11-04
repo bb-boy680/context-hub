@@ -8,13 +8,13 @@
  * there too, and taking it in is what that lightbox offers.
  */
 import {
+  ChevronDownIcon,
   CircleArrowUpIcon,
   ContainerIcon,
   DownloadIcon,
   FileArchiveIcon,
   FolderGit2Icon,
   GitBranchIcon,
-  GlobeIcon,
   HardDriveIcon,
   InboxIcon,
   LayoutGridIcon,
@@ -41,12 +41,22 @@ import {
   type PluginClient,
   type PluginCollected,
 } from "./library.ts"
-import { rowsForTab, SCOPE_LABELS, type PluginTab } from "./rows.ts"
+import {
+  installablePlaces,
+  pluginPlaceCount,
+  pluginPlaceKey,
+  rowsForTab,
+  SCOPES,
+  selectedPluginPlace,
+  SCOPE_LABELS,
+  type PluginFilterPlace,
+  type PluginTab,
+} from "./rows.ts"
 import { HolderStack, PluginTile } from "./parts.tsx"
 import type { PluginRow, PluginSource } from "./types.ts"
-import { PluginNameTakenError, type PluginInstallScope } from "./contract.ts"
+import { PluginNameTakenError, type PluginInstallReport, type PluginInstallScope } from "./contract.ts"
 
-import type { AssetScope, ExtensionIcon } from "@context-hub/extensions"
+import type { ExtensionIcon } from "@context-hub/extensions"
 import {
   ActionTab,
   AutoplayVideo,
@@ -54,13 +64,13 @@ import {
   Highlighted,
   Ledger,
   PageBody,
-  PlaceScopePicker,
+  PlaceMenu,
+  ResourceMasonry,
   TablePagination,
   knownAspect,
   mediaKind,
   rememberAspect,
   type LedgerColumn,
-  type PlaceOption,
   type PlaceWords,
 } from "@context-hub/extensions/components"
 import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
@@ -83,24 +93,13 @@ import {
 } from "@context-hub/shadcn-ui/components/dropdown-menu"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
-/* The tab row carries two dimensions. Four entries are the hub's own view of the
-   catalog — everything, what it holds the files of, what only an agent holds,
-   and what a source has moved past. The last of the four stands for what is
-   missing rather than for where anything is, so it carries the one batch action
-   its set is for and the toolbar stays about the page as a whole. The last two
-   group the agents by the kind of place they hold a pack in: one inside the
-   repository in use, and one machine-wide. */
-const SHELL_TABS: { value: PluginTab; labelKey: string; icon: ExtensionIcon }[] = [
+/* The four library views share the row with the installation place menu. */
+const SHELL_TABS: { value: Exclude<PluginTab, "place">; labelKey: string; icon: ExtensionIcon }[] = [
   { value: "all", labelKey: "plugins.tab.all", icon: LayoutGridIcon },
   { value: "library", labelKey: "plugins.tab.library", icon: LibraryIcon },
   { value: "unstored", labelKey: "plugins.tab.unstored", icon: InboxIcon },
   { value: "updates", labelKey: "plugins.tab.updates", icon: CircleArrowUpIcon },
-  { value: "workspace", labelKey: "plugins.tab.workspace", icon: ContainerIcon },
-  { value: "global", labelKey: "plugins.tab.global", icon: GlobeIcon },
 ]
-
-/** The tabs that group the agents by where they hold a pack, which open a menu. */
-const SCOPE_TABS: PluginTab[] = ["workspace", "global"]
 
 /** The mark for where a pack came from. */
 const SOURCE_ICONS: Record<PluginSource, LucideIcon> = {
@@ -201,10 +200,11 @@ interface RowActions {
   /** True while a call is in flight, which disables the actions. */
   busy: boolean
   onUpdate: (plugin: PluginRow) => void
-  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
-  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
   /** Switch an agent's own use of a pack on or off, where it already sits. */
-  onSetEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, on: boolean) => void
+  onSetEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, on: boolean, placeId?: string) => void
+  onClearEnabled: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
   /** Take a pack an agent holds into the library. */
   onAdopt: (plugin: PluginRow) => void
 }
@@ -217,9 +217,10 @@ function InstallButton({ plugin, actions }: { plugin: PluginRow; actions: RowAct
       clients={actions.clients}
       busy={actions.busy}
       onUpdate={() => actions.onUpdate(plugin)}
-      onInstall={(client, scope) => actions.onInstall(plugin, client, scope)}
-      onUninstall={(client, scope) => actions.onUninstall(plugin, client, scope)}
-      onSetEnabled={(client, scope, on) => actions.onSetEnabled(plugin, client, scope, on)}
+      onInstall={(client, scope, placeId) => actions.onInstall(plugin, client, scope, placeId)}
+      onUninstall={(client, scope, placeId) => actions.onUninstall(plugin, client, scope, placeId)}
+      onSetEnabled={(client, scope, on, placeId) => actions.onSetEnabled(plugin, client, scope, on, placeId)}
+      onClearEnabled={(client, scope, placeId) => actions.onClearEnabled(plugin, client, scope, placeId)}
     />
   )
 }
@@ -387,7 +388,7 @@ function PluginCard({
         event.preventDefault()
         onOpen()
       }}
-      className="mb-5 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow break-inside-avoid outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
+      className="w-full min-w-0 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div
         className="relative w-full overflow-hidden bg-surface-raised"
@@ -498,25 +499,17 @@ function PluginGrid({
   actions: RowActions
   onOpen: (plugin: PluginRow) => void
 }) {
-  /*
-   * Masonry with a responsive column count, capped at five so a wide window
-   * does not keep adding columns. A column needs a 266px card plus the 24px
-   * gutter, so each step is 290n - 24; container queries, so the sidebar width
-   * does not shift them.
-   */
   return (
-    <div className="@container">
-      <div className="columns-1 gap-x-6 @min-[556px]:columns-2 @min-[846px]:columns-3 @min-[1136px]:columns-4 @min-[1426px]:columns-5">
-        {plugins.map((plugin) => (
-          <PluginCard
-            key={plugin.id}
-            plugin={plugin}
-            actions={actions}
-            onOpen={() => onOpen(plugin)}
-          />
-        ))}
-      </div>
-    </div>
+    <ResourceMasonry>
+      {plugins.map((plugin) => (
+        <PluginCard
+          key={plugin.id}
+          plugin={plugin}
+          actions={actions}
+          onOpen={() => onOpen(plugin)}
+        />
+      ))}
+    </ResourceMasonry>
   )
 }
 
@@ -637,7 +630,7 @@ function PluginTable({
               {t("plugins.action.installTo")}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" sideOffset={6} className="w-[272px] p-1">
-              {actions.clients.map((client) => (
+              {actions.clients.filter((client) => installablePlaces(client.places).length > 0).map((client) => (
                 <div key={client.id}>
                   <DropdownMenuGroup>
                     <DropdownMenuLabel className="flex items-center gap-1.5 px-1.5 py-1 text-[11.5px] font-semibold text-muted-soft">
@@ -645,15 +638,15 @@ function PluginTable({
                       {client.label}
                     </DropdownMenuLabel>
                   </DropdownMenuGroup>
-                  {client.places.map((place) => (
+                  {installablePlaces(client.places).map((place) => (
                     <DropdownMenuItem
-                      key={`${client.id}:${place.scopeWord}`}
+                      key={`${client.id}:${place.id}`}
                       closeOnClick={false}
                       disabled={actions.busy || !client.available}
                       onClick={() => {
                         for (const plugin of plugins) {
                           if (checked.includes(plugin.id)) {
-                            actions.onInstall(plugin, client.id, place.scopeWord)
+                            actions.onInstall(plugin, client.id, place.scopeWord, place.id)
                           }
                         }
                         onCheck([])
@@ -722,9 +715,8 @@ function ViewButton({
 export function PluginsPage() {
   const { t } = useI18n()
   const [tab, setTab] = React.useState<PluginTab>("all")
-  /* One agent inside the scope tab on screen, once a person picked one from its
-     menu; `null` leaves the scope whole. */
-  const [narrowed, setNarrowed] = React.useState<string | null>(null)
+  /* A location is one agent in one scope. */
+  const [narrowed, setNarrowed] = React.useState<PluginFilterPlace | null>(null)
   const settings = useSettings()
   const search = useSearchPage()
   const [view, setView] = React.useState<"grid" | "list">(settings.layout)
@@ -822,10 +814,7 @@ export function PluginsPage() {
     [offered, tag]
   )
 
-  /* A number belongs to the tabs that hold packs; a scope tab shows which agents
-     it spans instead, so its size is not printed twice. Every count is read
-     before any narrowing: a tab says how big its set is, not how big the slice of
-     it a person happens to be looking at is. */
+  /* Tab counts follow the other filters, while place counts use the full catalog. */
   const counts = React.useMemo(
     () => ({
       all: rowsForTab(filtered, "all").length,
@@ -836,58 +825,45 @@ export function PluginsPage() {
     [filtered]
   )
 
-  /* The agents each scope tab spans, as the tab's own stack and menu draw them.
-     Which of them is a place of which tab is the same reading the rows go
-     through, so a client no tab can show is not offered by one either. Only the
-     clients the sidebar chose are read, so a scope with none left has no tab. */
-  const scopePlaces = React.useMemo(() => {
-    const byScope: Record<AssetScope, PlaceOption[]> = { workspace: [], global: [] }
-    for (const scope of SCOPE_TABS as AssetScope[]) {
-      byScope[scope] = library.clients
-        .filter((client) => client.places.some((one) => one.scope === scope))
+  const scopePlaces = React.useMemo(
+    () => SCOPES.map((scope) => ({
+      scope,
+      options: library.clients
+        .filter((client) => client.places.some((place) => place.scope === scope))
         .map((client) => ({
-          id: client.id,
+          id: pluginPlaceKey({ scope, client: client.id }),
+          client: client.id,
           icon: client.icon,
           label: client.label,
-          count: catalog.filter((row) =>
-            row.held.some(
-              (hold) =>
-                hold.client === client.id && hold.places.some((one) => one.group === scope)
-            )
-          ).length,
-        }))
-    }
-    return byScope
-  }, [library.clients, catalog])
-
-  /* A scope with no agents left has nothing to open: with nothing chosen, its
-     client files are not read at all. */
-  const scopeHasPlaces = React.useCallback(
-    (value: PluginTab) =>
-      value === "workspace" || value === "global"
-        ? scopePlaces[value as AssetScope].length > 0
-        : true,
-    [scopePlaces]
+          count: pluginPlaceCount(catalog, client, scope),
+        })),
+    })),
+    [library.clients, catalog]
   )
 
-  /* A tab whose set is empty leaves the row rather than sitting there saying
-     nothing, and the screen follows it off: a person who emptied the set by
-     acting on it lands back on the whole catalog rather than on a blank page. */
+  const chosen = selectedPluginPlace(library.clients, narrowed)
+  const selectableKey = JSON.stringify(
+    scopePlaces.flatMap((group) => group.options.map((place) => place.id))
+  )
+  const [previousSelectableKey, setPreviousSelectableKey] = React.useState(selectableKey)
+  if (previousSelectableKey !== selectableKey) {
+    setPreviousSelectableKey(selectableKey)
+    /* Re-enabling an agent must not revive a stale location filter. */
+    if (tab === "place" && chosen === null) {
+      setTab("all")
+      setNarrowed(null)
+      setPage(0)
+      setChecked([])
+    }
+  }
+
+  /* A vanished or empty action tab falls back to the complete catalog. */
   const screenTab: PluginTab =
     (tab === "unstored" && counts.unstored === 0) ||
     (tab === "updates" && counts.updates === 0) ||
-    !scopeHasPlaces(tab)
+    (tab === "place" && chosen === null)
       ? "all"
       : tab
-
-  /* A choice from a scope tab's menu only means something while it is a place of
-     the scope on screen; anywhere else the scope is whole. */
-  const chosen =
-    narrowed !== null &&
-    SCOPE_TABS.includes(screenTab) &&
-    scopePlaces[screenTab as AssetScope].some((place) => place.id === narrowed)
-      ? narrowed
-      : null
 
   const matching = React.useMemo(
     () => rowsForTab(filtered, screenTab, chosen),
@@ -903,6 +879,10 @@ export function PluginsPage() {
     () => matching.slice(shownPage * pageSize, (shownPage + 1) * pageSize),
     [matching, shownPage, pageSize]
   )
+
+  const showInstallReport = (report: PluginInstallReport) => {
+    if (report?.warning !== undefined) toast.add({ type: "warning", title: t("plugins.transaction.committed"), description: report.warning })
+  }
 
   /* Every row's own write: a pack is delivered to one client at one scope, or
      taken back out of that same place. Each place is its own, so the row's menu
@@ -931,18 +911,23 @@ export function PluginsPage() {
           })
         })
     },
-    onInstall: (plugin, client, scope) => {
-      void library.install(plugin.name, client, scope).catch((error: unknown) => {
+    onInstall: (plugin, client, scope, placeId) => {
+      void library.install(plugin.name, client, scope, placeId).then(showInstallReport).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
-    onUninstall: (plugin, client, scope) => {
-      void library.uninstall(plugin.name, client, scope).catch((error: unknown) => {
+    onUninstall: (plugin, client, scope, placeId) => {
+      void library.uninstall(plugin.name, client, scope, placeId).then(showInstallReport).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
-    onSetEnabled: (plugin, client, scope, on) => {
-      void library.setEnabled(plugin.name, client, scope, on).catch((error: unknown) => {
+    onClearEnabled: (plugin, client, scope, placeId) => {
+      void library.clearEnabled(plugin.name, client, scope, placeId).then(showInstallReport).catch((error: unknown) => {
+        toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
+      })
+    },
+    onSetEnabled: (plugin, client, scope, on, placeId) => {
+      void library.setEnabled(plugin.name, client, scope, on, placeId).then(showInstallReport).catch((error: unknown) => {
         toast.add({ type: "error", title: error instanceof Error ? error.message : String(error) })
       })
     },
@@ -1094,10 +1079,10 @@ export function PluginsPage() {
       </div>
     )
 
-  /* Taking a tab is one thing whichever element carried it — a tab primitive, an
-     action's pill, or a scope's — so the reset that goes with it lives here. */
+  /* Taking a library tab clears the location and its row selection. */
   const pickTab = (value: PluginTab) => {
     setTab(value)
+    setNarrowed(null)
     setPage(0)
     setChecked([])
   }
@@ -1119,8 +1104,7 @@ export function PluginsPage() {
             {SHELL_TABS.filter(
               (item) =>
                 (item.value !== "unstored" || counts.unstored > 0) &&
-                (item.value !== "updates" || counts.updates > 0) &&
-                scopeHasPlaces(item.value)
+                (item.value !== "updates" || counts.updates > 0)
             ).map((item) => {
               const active = screenTab === item.value
               /* A set of what is missing opens through the one action it is for:
@@ -1146,27 +1130,6 @@ export function PluginsPage() {
                   />
                 )
               }
-              /* A scope opens through the agents it spans, so a person never lands
-                 on it without having said which agent they meant. */
-              if (item.value === "workspace" || item.value === "global") {
-                return (
-                  <PlaceScopePicker
-                    key={item.value}
-                    scopeIcon={item.icon}
-                    scopeLabel={t(item.labelKey)}
-                    places={scopePlaces[item.value]}
-                    chosen={active ? chosen : null}
-                    active={active}
-                    allLabel={t("plugins.place.all")}
-                    title={t("plugins.place.which")}
-                    words={placeWords(t)}
-                    onChoose={(id) => {
-                      pickTab(item.value)
-                      setNarrowed(id)
-                    }}
-                  />
-                )
-              }
               const count = counts[item.value]
               return (
                 <TabsTrigger
@@ -1182,6 +1145,48 @@ export function PluginsPage() {
                 </TabsTrigger>
               )
             })}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                disabled={scopePlaces.every((group) => group.options.length === 0)}
+                render={
+                  <button
+                    type="button"
+                    disabled={scopePlaces.every((group) => group.options.length === 0)}
+                    aria-label={chosen !== null && screenTab === "place"
+                      ? `${t("plugins.tab.places")}: ${library.clients.find((client) => client.id === chosen.client)?.label} · ${t(`plugins.detail.group.${chosen.scope}`)}`
+                      : `${t("plugins.tab.places")}: ${t("plugins.tab.all")}`}
+                    aria-current={screenTab === "place" ? "true" : undefined}
+                    className={`flex h-9 flex-none items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${screenTab === "place" ? "bg-foreground text-background dark:bg-accent dark:text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                  >
+                    <ContainerIcon className="size-3.5 shrink-0" aria-hidden />
+                    {t("plugins.tab.places")}
+                    <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
+                  </button>
+                }
+              />
+              <PlaceMenu
+                words={placeWords(t)}
+                currentSelection
+                groups={scopePlaces.map((group) => ({
+                  label: t(`plugins.detail.group.${group.scope}`),
+                  options: group.options.map((option) => ({
+                    ...option,
+                    selected: screenTab === "place" && chosen !== null && option.id === pluginPlaceKey(chosen),
+                  })),
+                }))}
+                onPick={(id) => {
+                  for (const group of scopePlaces) {
+                    const option = group.options.find((item) => item.id === id)
+                    if (option === undefined) continue
+                    setNarrowed({ scope: group.scope, client: option.client })
+                    setTab("place")
+                    setPage(0)
+                    setChecked([])
+                    return
+                  }
+                }}
+              />
+            </DropdownMenu>
           </TabsList>
           <div className="flex shrink-0 items-center gap-2">
             <div className={viewToggleSurface}>
@@ -1258,7 +1263,7 @@ export function PluginsPage() {
             all: t("plugins.allTags"),
           }}
         />
-        <TabsContent value={screenTab} className="flex flex-col">
+        <TabsContent value={screenTab} aria-label={screenTab === "place" ? t("plugins.tab.places") : undefined} className="flex flex-col">
           <PageBody footer={footer}>
             {plugins.length === 0 ? (
               needle !== "" ? (
@@ -1324,8 +1329,8 @@ export function PluginsPage() {
         busy={library.busy}
         tagSuggestions={tagsOf(catalog)}
         onUpdate={(plugin) => actions.onUpdate(plugin)}
-        onInstall={(plugin, client, scope) => actions.onInstall(plugin, client, scope)}
-        onUninstall={(plugin, client, scope) => actions.onUninstall(plugin, client, scope)}
+        onInstall={(plugin, client, scope, placeId) => actions.onInstall(plugin, client, scope, placeId)}
+        onUninstall={(plugin, client, scope, placeId) => actions.onUninstall(plugin, client, scope, placeId)}
         onAdopt={(plugin) => actions.onAdopt(plugin)}
         onCheckUpdate={(plugin) => library.checkUpdate(plugin.name).then(() => undefined)}
         onDelete={(plugin) => library.remove(plugin.name)}

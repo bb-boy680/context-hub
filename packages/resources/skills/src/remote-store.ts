@@ -213,15 +213,10 @@ export function createRemoteSkillStore(base = ""): SkillStore {
       return body.mode
     },
 
-    async adoptFrom(
-      name: string,
-      ref: SkillPlaceRef,
-      mode: InstallMode = "auto"
-    ): Promise<SkillInstall> {
+    async adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall> {
       const body = await write<{ mode: SkillInstall }>(base, "adopt-place", {
         name,
         ...placeBody(ref),
-        mode,
       })
       return body.mode
     },

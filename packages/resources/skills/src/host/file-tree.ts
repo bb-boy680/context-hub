@@ -12,17 +12,24 @@ import type { SkillFileEntry } from "../store.ts"
  * List everything under a skill directory.
  *
  * @param dir — the skill's own directory.
- * @returns one entry per directory and file, depth first, in name order.
+ * @returns one entry per directory and file, depth first, folders before files
+ *   and each run in name order.
  */
 export function walkSkillDir(dir: string): Promise<SkillFileEntry[]> {
   return walk(dir, dir, 0)
 }
 
 async function walk(dir: string, base: string, depth: number): Promise<SkillFileEntry[]> {
-  const entries = await fs.readdir(dir, { withFileTypes: true }).catch(() => [])
+  const entries = (await fs.readdir(dir, { withFileTypes: true }).catch(() => []))
+    .filter((entry) => !entry.name.startsWith("."))
+    .sort((left, right) => {
+      /* Folders first at each level, then files; a folder precedes what it
+         holds because it is pushed before the walk descends into it. */
+      if (left.isDirectory() !== right.isDirectory()) return left.isDirectory() ? -1 : 1
+      return left.name.localeCompare(right.name)
+    })
   const rows: SkillFileEntry[] = []
-  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-    if (entry.name.startsWith(".")) continue
+  for (const entry of entries) {
     const absolute = path.join(dir, entry.name)
     const relative = path.relative(base, absolute).split(path.sep).join("/")
     if (entry.isDirectory()) {

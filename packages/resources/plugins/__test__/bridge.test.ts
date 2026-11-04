@@ -153,7 +153,7 @@ const CALLS: readonly Call[] = [
   {
     label: "writing the marketplace indexes",
     path: "",
-    init: post({ action: "sync-marketplace" }),
+    init: post({ action: "sync-marketplace", indexes: [{ path: ".agents/plugins/marketplace.json", document: { name: "context-hub" } }] }),
     keys: ["root"],
   },
 ]
@@ -244,6 +244,24 @@ describe("every call the page makes", () => {
   })
 })
 
+describe("extension manifest over the bridge", () => {
+  it("carries the declaration through collection, description, contents and missing checks", async () => {
+    const manifests = [".fixture-plugin/plugin.json"]
+    const files = [{ path: manifests[0], base64: Buffer.from(JSON.stringify({ name: "native-bridge", version: "2", description: "native", mcpServers: { test: { command: "fixture" } } })).toString("base64") }]
+    const added = await ask(post({ action: "add-folder", name: "native-bridge", files, manifests }))
+    expect(added.status, added.raw).toBe(200)
+    const query = encodeURIComponent(JSON.stringify(manifests))
+    const listing = await ask(undefined, `?action=list&manifests=${query}`)
+    expect((listing.body as { missing: string[] }).missing).not.toContain("native-bridge")
+    const contents = await ask(undefined, `?action=contents&name=native-bridge&manifests=${query}`)
+    expect(JSON.parse((contents.body as { mcp: string }).mcp)).toEqual({ mcpServers: { test: { command: "fixture" } } })
+    const described = await createRemotePluginTools(base, () => manifests).describe(path.join(home, "plugins", "native-bridge"), "native-bridge")
+    expect(described).toMatchObject({ name: "native-bridge", version: "2", description: "native" })
+    const invalid = await ask(post({ action: "describe", path: folder, name: PACK, manifests: ["../outside"] }))
+    expect(invalid.status).toBe(400)
+  })
+})
+
 describe("the tools an installer is handed", () => {
   const tools = () => createRemotePluginTools(base)
 
@@ -263,6 +281,47 @@ describe("the tools an installer is handed", () => {
     expect(Object.keys(described)).toEqual(
       expect.arrayContaining(["name", "version", "description"])
     )
+  })
+
+  it("carries file snapshots and commits through the real socket", async () => {
+    const disk = tools().disk!
+    const declaration = {
+      home: ".claude", homeEnv: "CLAUDE_CONFIG_DIR", state: "plugins", stateEnv: "CLAUDE_CODE_PLUGIN_CACHE_DIR",
+      config: { write: ["settings.json"], read: [] }, stateFiles: { write: ["cache/*/*/*"], read: [] },
+      workspace: { write: [], read: [] }, library: { write: [], read: ["*"] }, external: [],
+    }
+    const oldConfig = process.env.CLAUDE_CONFIG_DIR
+    const oldPlugins = process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
+    process.env.CLAUDE_CONFIG_DIR = path.join(home, "agent-config")
+    process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR = path.join(home, "agent-plugins")
+    try {
+      await disk.run(declaration, async (roots) => {
+        const ref = { root: "config" as const, path: "settings.json" }
+        const before = await disk.read(roots, ref)
+        expect(before).toBeNull()
+        const directory = { root: "plugins" as const, path: `cache/context-hub/${PACK}/0.0.1` }
+        expect(await disk.snapshotDirectory(roots, directory)).toBeNull()
+        const sourceSnapshot = await disk.snapshotDirectory(roots, { root: "library", path: PACK })
+        expect(sourceSnapshot).toMatch(/^[0-9a-f]{64}$/)
+        await disk.commit(roots, [{ ref, before, after: '{"enabled":true}\n' }], {
+          name: PACK,
+          destination: directory.path,
+          before: null,
+          sourceSnapshot: sourceSnapshot!,
+        })
+        expect(await disk.read(roots, ref)).toContain('"enabled":true')
+        expect(await fs.readFile(path.join(roots.plugins, "cache", "context-hub", PACK, "0.0.1", "README.md"), "utf8")).toBe(README)
+        const snapshot = await disk.snapshotDirectory(roots, directory)
+        await disk.commit(roots, [{ ref, before: '{"enabled":true}\n', after: null }], undefined, { ref: directory, before: snapshot })
+        expect(await disk.snapshotDirectory(roots, directory)).toBeNull()
+        expect(await disk.read(roots, ref)).toBeNull()
+      })
+    } finally {
+      if (oldConfig === undefined) delete process.env.CLAUDE_CONFIG_DIR
+      else process.env.CLAUDE_CONFIG_DIR = oldConfig
+      if (oldPlugins === undefined) delete process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR
+      else process.env.CLAUDE_CODE_PLUGIN_CACHE_DIR = oldPlugins
+    }
   })
 
   it("runs a program and hands back what it printed", async () => {

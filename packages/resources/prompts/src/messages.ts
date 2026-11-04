@@ -14,8 +14,7 @@ export const promptsMessages: Record<string, string> = {
     "The prompts this hub keeps, and the agents each one has been delivered to.",
 
   "prompts.tab.all": "All",
-  "prompts.tab.workspace": "Workspace",
-  "prompts.tab.global": "Global",
+  "prompts.tab.places": "Install locations",
 
   "prompts.view.grid": "Card view",
   "prompts.view.list": "List view",
@@ -65,8 +64,6 @@ export const promptsMessages: Record<string, string> = {
   "prompts.place.searchClear": "Clear the search",
   "prompts.place.searchEmpty": "No agent matches",
   "prompts.place.none": "No agent takes prompts yet",
-  "prompts.place.all": "All places",
-  "prompts.place.which": "Places",
   "prompts.location.workspace": "Workspace",
   "prompts.location.library": "Prompt library",
   "prompts.place.body": "This hub",

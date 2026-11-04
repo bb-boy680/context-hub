@@ -62,18 +62,20 @@ function recordsPort(answer: { document: unknown; file: string } | Error): McpRe
  */
 function formWorkspaces(agents: string[]) {
   let chosen = [...agents]
+  let current: string | null = null
   const listeners = new Set<() => void>()
   const tell = () => {
     for (const listener of [...listeners]) listener()
   }
   return {
-    current: () => ({ folders: [], current: null, agents: chosen }),
+    current: () => ({ folders: [], current, agents: chosen }),
     subscribe: (listener: () => void) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
     },
     refresh: async () => undefined,
     announce: tell,
+    changeWorkspace(id: string) { current = id; tell() },
     choose(id: string, on: boolean) {
       chosen = on ? [...chosen, id] : chosen.filter((one) => one !== id)
       tell()
@@ -92,6 +94,57 @@ describe("the library a form starts", () => {
     /* Constructing it is not enough to make it findable; this is the seam a
        form's startup and every page look through. */
     expect(kernel.ctx.get(MCP_LIBRARY_SERVICE)).toBeInstanceOf(McpLibrary)
+  })
+
+  it("keeps dynamically resolved places with the scan that produced them", async () => {
+    vi.stubGlobal("fetch", async (url: string) => new Response(JSON.stringify(
+      String(url).includes("action=records") ? { value: [], file: "" } : {}
+    ), { status: 200 }))
+    let current = "first"
+    let fail = false
+    let readFailure = false
+    const dynamic: McpProvider = {
+      ...PROVIDER,
+      places: [],
+      read: async (io, place) => {
+        if (readFailure) throw new Error("file unavailable")
+        return PROVIDER.read(io, place)
+      },
+      placesFor: async () => {
+        if (fail) throw new Error("directory unavailable")
+        return [{ id: current, label: current, scope: "global", file: `${current}.json`, switchable: true }]
+      },
+    }
+    const workspace = formWorkspaces([PROVIDER.id])
+    const kernel = await createHubKernel({
+      host: { ...bareHost(), files: noFiles() },
+      services: { "hub.workspaces": workspace },
+      extensions: [mcpModuleWith(() => null)],
+    })
+    await kernel.start()
+    const service = kernel.ctx.get("mcp")!
+    const library = kernel.ctx.get(MCP_LIBRARY_SERVICE)!
+    service.register(dynamic)
+    await library.reload()
+    expect(library.state().value?.scan?.places?.map((entry) => entry.place.id)).toEqual(["first"])
+    expect(library.rows()?.servers[0]?.detail.installs[0]?.place).toBe("first")
+    current = "second"
+    expect(library.rows()?.servers[0]?.detail.installs[0]?.place).toBe("first")
+    await library.reload()
+    expect(library.rows()?.servers[0]?.detail.installs[0]?.place).toBe("second")
+    readFailure = true
+    await library.reload()
+    expect(library.rows()?.servers[0]?.detail.installs[0]).toMatchObject({ place: "second", enabled: null, readOnly: true })
+    expect(library.state().value?.scan?.answer.problems).toHaveLength(1)
+    readFailure = false
+    await library.reload()
+    fail = true
+    await library.reload()
+    expect(library.rows()?.servers[0]?.detail.installs[0]?.place).toBe("second")
+    expect(library.state().failure).not.toBeNull()
+    workspace.changeWorkspace("other-workspace")
+    expect(library.rows()).toBeNull()
+    vi.unstubAllGlobals()
   })
 
   it("answers an empty read rather than a failure when this form reaches no client file", async () => {

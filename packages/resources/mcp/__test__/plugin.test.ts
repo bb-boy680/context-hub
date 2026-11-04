@@ -171,6 +171,8 @@ describe("what it can reach without importing", () => {
     expect(typeof service?.tools?.editJson, "the toolkit travels with the service").toBe("function")
     expect(typeof service?.tools?.setTomlEntry, "so does the TOML editor").toBe("function")
     expect(typeof service?.tools?.parseToml, "and the TOML reader").toBe("function")
+    expect(service?.tools.parseYamlDocument("[]\n")?.kind).toBe("seq")
+    expect(typeof service?.tools.spliceYamlDocument).toBe("function")
     expect(typeof service?.tools?.McpError, "and the failure the plugin throws with").toBe("function")
   })
 })

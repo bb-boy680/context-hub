@@ -25,13 +25,32 @@ import path from "node:path"
 import type { AssetStore } from "@context-hub/core"
 
 import {
-  PLUGIN_MANIFESTS,
+  matchesPluginManifestRule,
+  pluginManifestPaths,
+  pluginManifestRules,
   PLUGIN_MARKETPLACE_MANIFEST,
   hasStandardComponents,
   marketplaceManifest,
   type PackDescription,
+  type PluginManifestRule,
 } from "../contract.ts"
 import { findLogo, storePicture } from "./logo.ts"
+import { assertPackRelative } from "./names.ts"
+
+/** Resolve a pack path without following links at any segment. */
+export async function safePackPath(dir: string, relative: string): Promise<string> {
+  let current = path.resolve(dir)
+  if ((await fs.lstat(current).catch(() => null))?.isSymbolicLink()) throw new Error(`symbolic link in plugin root: ${dir}`)
+  for (const part of assertPackRelative(relative.startsWith("./") ? relative.slice(2) : relative).split("/")) {
+    current = path.join(current, part)
+    const stat = await fs.lstat(current).catch((error: unknown) => {
+      if (["ENOENT", "ENOTDIR"].includes((error as NodeJS.ErrnoException).code ?? "")) return null
+      throw error
+    })
+    if (stat?.isSymbolicLink()) throw new Error(`symbolic link in plugin path: ${relative}`)
+  }
+  return current
+}
 
 /** One pack's manifest, read as the fields a record and a row both need. */
 export interface ManifestFields {
@@ -45,6 +64,8 @@ export interface ManifestFields {
   name?: string
   version: string
   description: string
+  icon?: string
+  document?: Record<string, unknown>
 }
 
 /** No manifest, or one this build cannot use: every field empty. */
@@ -71,16 +92,17 @@ const NOTHING: ManifestFields = {
  * @param dir — the pack's directory.
  * @returns what the manifest says, with `carried` saying whether one was found at all.
  */
-export async function readManifestFields(dir: string): Promise<ManifestFields> {
+export async function readManifestFields(dir: string, paths: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<ManifestFields> {
   let carried = false
-  for (const relative of PLUGIN_MANIFESTS) {
-    const manifest = await readManifestFile(path.join(dir, relative))
+  for (const relative of pluginManifestPaths(paths)) {
+    const manifest = await readManifestFile(await safePackPath(dir, relative))
     if (manifest === null) continue
     carried = true
     const name =
       typeof manifest.name === "string" && manifest.name !== "" ? manifest.name : undefined
     const version = typeof manifest.version === "string" ? manifest.version : ""
     if (name === undefined && version === "") continue
+    if (typeof manifest.icon === "string") await safePackPath(dir, manifest.icon)
     return {
       carried: true,
       marketplace: false,
@@ -88,10 +110,36 @@ export async function readManifestFields(dir: string): Promise<ManifestFields> {
       ...(name === undefined ? {} : { name }),
       version,
       description: typeof manifest.description === "string" ? manifest.description : "",
+      ...(typeof manifest.icon === "string" ? { icon: manifest.icon } : {}),
+      document: manifest,
     }
   }
 
-  const market = await readManifestFile(path.join(dir, PLUGIN_MARKETPLACE_MANIFEST))
+  /* An extension's structured rule claims a manifest only when its declared
+     literal fields are present; a package.json without them stays a plain
+     package. This runs before the marketplace and component fallbacks so an
+     explicit declaration wins over a layout guess. */
+  for (const rule of pluginManifestRules(rules)) {
+    const manifest = await readManifestFile(await safePackPath(dir, rule.file))
+    if (manifest === null || !matchesPluginManifestRule(manifest, rule)) continue
+    carried = true
+    const name = typeof manifest.name === "string" && manifest.name !== "" ? manifest.name : undefined
+    const version = typeof manifest.version === "string" ? manifest.version : ""
+    if (name === undefined && version === "") continue
+    if (typeof manifest.icon === "string") await safePackPath(dir, manifest.icon)
+    return {
+      carried: true,
+      marketplace: false,
+      components: false,
+      ...(name === undefined ? {} : { name }),
+      version,
+      description: typeof manifest.description === "string" ? manifest.description : "",
+      ...(typeof manifest.icon === "string" ? { icon: manifest.icon } : {}),
+      document: manifest,
+    }
+  }
+
+  const market = await readManifestFile(await safePackPath(dir, PLUGIN_MARKETPLACE_MANIFEST))
   if (market !== null) {
     const root = marketplaceManifest(market)
     if (root !== null && (root.name !== undefined || root.version !== "")) {
@@ -182,10 +230,12 @@ async function hasComponents(dir: string): Promise<boolean> {
 export async function describePack(
   dir: string,
   name: string,
-  assets: AssetStore
+  assets: AssetStore,
+  paths: readonly string[] = [],
+  rules: readonly PluginManifestRule[] = []
 ): Promise<PackDescription> {
-  const fields = await readManifestFields(dir)
-  const logo = await findLogo(dir)
+  const fields = await readManifestFields(dir, paths, rules)
+  const logo = fields.icon === undefined ? await findLogo(dir) : (await safePackPath(dir, fields.icon), fields.icon)
   const icon = logo === undefined ? undefined : await storePicture(assets, dir, name, logo)
   return {
     name: fields.name ?? "",

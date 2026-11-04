@@ -22,9 +22,10 @@ export type SkillOrigin = "local" | "builtin" | "registry"
 /**
  * The upstream a skill was installed from, as the skills CLI records it in
  * `skills-lock.json`. It is the only thing that makes an update askable: the
- * `hash` is what the CLI computed over the skill's files at install time, so a
- * later run over the same source tells whether the upstream moved, and a run
- * over the local copy tells whether the files here were changed by hand.
+ * `revision` is the commit the source held when the files landed, so one
+ * `git ls-remote` tells whether the source moved; the `hash` is what the CLI
+ * computed over those files, so a run over the local copy tells whether they
+ * were changed by hand.
  */
 export interface SkillUpstream {
   /** The package the CLI was given: `owner/repo`, or a git URL. */
@@ -33,8 +34,14 @@ export interface SkillUpstream {
   sourceType: string
   /** The manifest's path inside that package, forward slashes. */
   skillPath: string
-  /** Directory hash of the installed revision; what updates are measured against. */
+  /** Directory hash of the installed revision; what edits are measured against. */
   hash: string
+  /**
+   * The commit the source held when these files landed. Absent on rows written
+   * before checks compared commits, and on sources this build cannot ask about;
+   * such a row is updated once to establish it, rather than guessed current.
+   */
+  revision?: string
 }
 /**
  * One check's answer, kept on the row: what the source held when it was asked,
@@ -44,7 +51,11 @@ export interface SkillUpstream {
 export interface SkillCheck {
   /** When the source was asked. */
   at: string
-  /** The source's revision hash as of then. */
+  /**
+   * The source's revision as of then. Older rows hold a directory hash here;
+   * it is only compared once `SkillUpstream.revision` exists, so that value is
+   * never read as a commit.
+   */
   latest: string
   /** The directory hash of the local files as of then. */
   currentHash: string
@@ -88,14 +99,24 @@ export interface SkillSummary {
 }
 
 /**
- * Whether the last check found the skill's source ahead of the files here. Only
- * a check that recorded an answer says so: a row with no recorded source, or one
- * nobody has asked about, is not ahead of anything.
+ * Whether the source holds a commit this copy does not have.
+ *
+ * A row written before checks compared commits has no `revision`: it is ahead
+ * of nothing yet, and the only way to start tracking it is one update, so it
+ * reads as update-worthy rather than current. A row nobody has asked about, or
+ * one with no source, is not ahead of anything.
  */
+export function ahead(
+  upstream: Pick<SkillUpstream, "revision"> | undefined,
+  latest: string | undefined
+): boolean {
+  if (upstream === undefined || latest === undefined) return false
+  return upstream.revision === undefined || upstream.revision !== latest
+}
+
+/** Whether the last check found the skill's source ahead of the files here. */
 export function outdated(skill: Pick<SkillSummary, "upstream" | "checked">): boolean {
-  const latest = skill.checked?.latest
-  if (latest === undefined || skill.upstream === undefined) return false
-  return latest !== skill.upstream.hash
+  return ahead(skill.upstream, skill.checked?.latest)
 }
 
 /**
@@ -202,15 +223,15 @@ export interface SkillImport {
 
 /** One skill measured against its upstream. */
 export interface SkillUpdateCheck {
-  /** The directory hash recorded when the skill was installed or last updated. */
-  recordedHash: string
+  /** The commit recorded when the skill was installed or last updated. */
+  recordedRevision: string | null
+  /** The commit the source holds now. */
+  latestRevision: string
   /** The directory hash of the files on disk now. */
   currentHash: string
-  /** The upstream revision's directory hash. */
-  latestHash: string
-  /** The upstream holds a revision this copy does not have. */
+  /** The upstream holds a commit this copy does not have. */
   outdated: boolean
-  /** The files on disk differ from the recorded revision. */
+  /** The files on disk differ from the commit they were installed at. */
   modified: boolean
 }
 
@@ -398,14 +419,14 @@ export interface SkillStore {
    */
   installInto(name: string, ref: SkillPlaceRef, mode?: InstallMode): Promise<SkillInstall>
   /**
-   * Link one skill of one place into the library; the place keeps its own
+   * Copy one skill of one place into the library; the place keeps its own
    * directory.
    *
    * @param name — the skill's directory name under that place.
    * @param ref — the place to read.
-   * @returns how it landed: a link, or a copy where the filesystem cannot hold one.
+   * @returns how it landed: always a copy.
    */
-  adoptFrom(name: string, ref: SkillPlaceRef, mode?: InstallMode): Promise<SkillInstall>
+  adoptFrom(name: string, ref: SkillPlaceRef): Promise<SkillInstall>
   /**
    * Delete one skill from one place, its directory included. This is the
    * destructive one; `removeFrom` only takes back a link.

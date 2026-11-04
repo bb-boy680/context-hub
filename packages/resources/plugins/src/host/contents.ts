@@ -5,7 +5,7 @@
  * Nothing about this is recorded and nothing of it is derivable from the pack's
  * manifest, so the pack's own directory is asked — and only the three names a
  * pack follows are asked about: one directory per skill under `skills/`, one
- * markdown file per command under `commands/`, and a single `.mcp.json` at the
+ * markdown file per command under `commands/`, and the MCP declaration at the
  * root. A pack carrying none of them answers with empty lists, which is what
  * tells a screen that the tab is not one to offer.
  *
@@ -19,7 +19,8 @@
 import { promises as fs, type Dirent } from "node:fs"
 import path from "node:path"
 
-import type { PackContentItem, PackContents } from "../contract.ts"
+import type { PackContentItem, PackContents, PluginManifestRule } from "../contract.ts"
+import { readManifestFields, safePackPath } from "./describe.ts"
 
 /** The directory a pack keeps its skills in, one directory per skill. */
 const SKILLS_DIR = "skills"
@@ -112,11 +113,13 @@ function readDir(dir: string): Promise<Dirent[]> {
  * so it is passed over rather than listed under a name nothing answers to.
  */
 async function scanSkills(dir: string): Promise<PackContentItem[]> {
-  const entries = await readDir(path.join(dir, SKILLS_DIR))
+  const entries = await readDir(dir)
   const found: PackContentItem[] = []
   for (const entry of entries) {
     if (!entry.isDirectory()) continue
-    const text = await readText(path.join(dir, SKILLS_DIR, entry.name, SKILL_FILE))
+    const file = path.join(dir, entry.name, SKILL_FILE)
+    if ((await fs.lstat(file).catch(() => null))?.isSymbolicLink()) throw new Error("symbolic link in plugin skill")
+    const text = await readText(file)
     if (text === null) continue
     const words = ownWords(text)
     found.push({ title: words.name ?? entry.name, description: words.description ?? "" })
@@ -149,8 +152,8 @@ async function markdownFiles(root: string, at = root): Promise<string[]> {
 /** What one pack ships as commands: every markdown file under `commands/`. */
 async function scanCommands(dir: string): Promise<PackContentItem[]> {
   const found: PackContentItem[] = []
-  for (const relative of await markdownFiles(path.join(dir, COMMANDS_DIR))) {
-    const text = await readText(path.join(dir, COMMANDS_DIR, relative))
+  for (const relative of await markdownFiles(dir)) {
+    const text = await readText(path.join(dir, relative))
     const words = text === null ? {} : ownWords(text)
     const base = relative.split("/").at(-1) ?? relative
     found.push({
@@ -174,13 +177,54 @@ function byTitle(left: PackContentItem, right: PackContentItem): number {
  * which directory they are in.
  *
  * @param dir — the pack's directory.
- * @returns its skills and commands in title order, and its `.mcp.json` as written.
+ * @returns its skills and commands in title order, and its MCP declaration as written.
  */
-export async function readPackContents(dir: string): Promise<PackContents> {
-  const [skills, commands, mcp] = await Promise.all([
-    scanSkills(dir),
-    scanCommands(dir),
-    readText(path.join(dir, MCP_FILE)),
-  ])
-  return { skills: skills.sort(byTitle), commands: commands.sort(byTitle), mcp }
+export async function readPackContents(dir: string, manifests: readonly string[] = [], rules: readonly PluginManifestRule[] = []): Promise<PackContents> {
+  const fields = await readManifestFields(dir, manifests, rules)
+  const doc = fields.document ?? {}
+  const paths = (value: unknown, fallback: string): string[] => {
+    if (value === undefined) return [fallback]
+    const values = Array.isArray(value) ? value : [value]
+    if (values.some((item) => typeof item !== "string")) throw new Error("invalid plugin component path")
+    return values as string[]
+  }
+  const skills: PackContentItem[] = []
+  for (const relative of paths(doc.skills, SKILLS_DIR)) {
+    const target = await safePackPath(dir, relative)
+    const own = await readText(await safePackPath(dir, `${relative.replace(/\/$/, "")}/${SKILL_FILE}`))
+    if (own !== null) {
+      const words = ownWords(own)
+      skills.push({ title: words.name ?? path.basename(target), description: words.description ?? "" })
+    } else skills.push(...await scanSkills(target))
+  }
+  const commands: PackContentItem[] = []
+  for (const relative of paths(doc.commands, COMMANDS_DIR)) {
+    const target = await safePackPath(dir, relative)
+    const stat = await fs.lstat(target).catch(() => null)
+    if (stat?.isFile()) {
+      const words = ownWords(await readText(target) ?? "")
+      commands.push({ title: words.name ?? path.basename(target, path.extname(target)), description: words.description ?? "" })
+    } else commands.push(...await scanCommands(target))
+  }
+  const mcpDeclarations = doc.mcpServers === undefined ? [] : Array.isArray(doc.mcpServers) ? doc.mcpServers : [doc.mcpServers]
+  const agentPlugin = typeof doc.$schema === "string" && /^https:\/\/agent-plugins\.org\/schemas\/1\.\d+\.\d+\/plugin\.schema\.json$/.test(doc.$schema)
+  const implicitAgentMcp = doc.mcpServers === undefined && agentPlugin
+  const mcpParts: string[] = []
+  const mcpFiles: string[] = []
+  const sources = doc.mcpServers === undefined ? (implicitAgentMcp ? ["mcp.json", MCP_FILE] : [MCP_FILE]) : mcpDeclarations
+  for (const value of sources) {
+    if (typeof value === "string") {
+      const text = await readText(await safePackPath(dir, value))
+      if (text !== null) {
+        mcpParts.push(text)
+        mcpFiles.push(value)
+        if (implicitAgentMcp) break
+      }
+    } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      mcpParts.push(JSON.stringify({ mcpServers: value }, null, 2))
+    } else throw new Error("invalid plugin MCP declaration")
+  }
+  const mcp = mcpParts.length === 0 ? null : mcpParts.join("\n\n")
+  const mcpPath = mcpParts.length === 1 && mcpFiles.length === 1 && mcpFiles[0] !== MCP_FILE ? mcpFiles[0] : undefined
+  return { skills: skills.sort(byTitle), commands: commands.sort(byTitle), mcp, ...(mcpPath === undefined ? {} : { mcpPath }) }
 }

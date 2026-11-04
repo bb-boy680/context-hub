@@ -8,8 +8,8 @@
  * this component's state.
  */
 import {
+  ChevronDownIcon,
   ContainerIcon,
-  GlobeIcon,
   InboxIcon,
   LayoutGridIcon,
   LibraryIcon,
@@ -26,6 +26,7 @@ import { cn } from "cn"
 
 import { AddServerDialog } from "./add-server-dialog.tsx"
 import { ServerCardView } from "./card-view.tsx"
+import { MCP_SCOPES, placeServerCount, selectedMcpPlace, serverHeldAt } from "./installs.ts"
 import { useMcpLibrary } from "./library.ts"
 import { ServerListView } from "./list-view.tsx"
 import { placeWords } from "./place-words.ts"
@@ -38,7 +39,7 @@ import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/rea
 import {
   FilterBar,
   PageBody,
-  PlaceScopePicker,
+  PlaceMenu,
   TablePagination,
   type PlaceOption,
 } from "@context-hub/extensions/components"
@@ -52,42 +53,25 @@ import {
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 
 /** Which axis the tab row is filtering on. */
-type TabId = "all" | "library" | "unstored" | "failed" | "workspace" | "global"
-
-/** The tabs that are screens already, rather than a scope holding places. */
 type ShellTab = "all" | "library" | "unstored" | "failed"
+type TabId = ShellTab | "place"
 
 /** How the catalog is laid out. */
 type ViewId = "list" | "grid"
 
-const TAB_MARKS: Record<TabId, LucideIcon> = {
+const TAB_MARKS: Record<ShellTab, LucideIcon> = {
   all: LayoutGridIcon,
   library: LibraryIcon,
   unstored: InboxIcon,
   failed: TriangleAlertIcon,
-  workspace: ContainerIcon,
-  global: GlobeIcon,
 }
 
-const TAB_ORDER: TabId[] = ["all", "library", "unstored", "failed", "workspace", "global"]
+const TAB_ORDER: ShellTab[] = ["all", "library", "unstored", "failed"]
 
-/**
- * The tabs a screen shows right now. A screen that holds nothing is left out
- * rather than drawn empty: nothing is failing, or every server is already in
- * the library, is good news the tab row does not need to repeat. The same goes
- * for a scope with no places left — with no agent chosen, its places are not
- * read at all, so there is nothing behind the tab to open.
- *
- * @param counts — how many rows each screen holds.
- * @param hasPlaces — whether a scope still spans any place this hub reads.
- */
-function tabsToShow(
-  counts: Record<ShellTab, number>,
-  hasPlaces: (id: TabId) => boolean
-): TabId[] {
+/** The tabs a screen shows right now; empty action tabs have nothing to show. */
+function tabsToShow(counts: Record<ShellTab, number>): ShellTab[] {
   return TAB_ORDER.filter((id) => id !== "failed" || counts.failed > 0)
     .filter((id) => id !== "unstored" || counts.unstored > 0)
-    .filter((id) => (id !== "workspace" && id !== "global") || hasPlaces(id))
 }
 
 /** How long ago something happened, in the three steps a card or a footer prints. */
@@ -165,66 +149,32 @@ function ToolbarActions({
   )
 }
 
-/** The filter tabs: the screens that have something to show, and two scopes. */
+/** The filter tabs and one menu for the places in both scopes. */
 function FilterTabs({
   tab,
   onTab,
   counts,
-  hasPlaces,
   scopePlaces,
   chosen,
   onChoose,
   onAdopt,
 }: {
   tab: TabId
-  onTab: (tab: TabId) => void
+  onTab: (tab: ShellTab) => void
   counts: Record<ShellTab, number>
-  /** Whether a scope still spans any place, which is what draws its tab. */
-  hasPlaces: (id: TabId) => boolean
-  /** The places each scope holds, which its own pill draws as a stack. */
   scopePlaces: Record<McpPlaceKind, readonly PlaceOption[]>
-  /** The place the scope on screen is narrowed to; `null` when it is whole. */
-  chosen: string | null
-  onChoose: (scope: McpPlaceKind, place: string | null) => void
-  /** Take every server the library does not hold yet into it. */
+  chosen: McpAgentPlace | null
+  onChoose: (place: string) => void
   onAdopt: () => void
 }) {
   const { t } = useI18n()
+  const hasPlaces = MCP_SCOPES.some((scope) => scopePlaces[scope].length > 0)
 
   return (
-    /* `w-fit` rather than a block box: the trough keeps its own width, so a line
-       too narrow for the tabs scrolls inside the wrapper instead of squashing
-       them into unreadable slivers. */
     <div className="flex h-11 w-fit items-center gap-1 rounded-full bg-secondary p-1">
-      {tabsToShow(counts, hasPlaces).map((id) => {
+      {tabsToShow(counts).map((id) => {
         const Icon = TAB_MARKS[id]
-
-        /* A scope says which places it spans instead of how many servers it
-           holds, so the count would be said twice; it opens through its place
-           list. */
-        if (id === "workspace" || id === "global") {
-          const active = tab === id
-          return (
-            <PlaceScopePicker
-              key={id}
-              scopeIcon={Icon}
-              scopeLabel={t(`mcp.tab.${id}`)}
-              places={scopePlaces[id]}
-              chosen={active ? chosen : null}
-              active={active}
-              allLabel={t("mcp.place.all")}
-              title={t("mcp.place.which")}
-              words={placeWords(t)}
-              onChoose={(place) => onChoose(id, place)}
-            />
-          )
-        }
-
         const active = tab === id
-
-        /* The tab of what the library does not hold carries the one action that
-           set is for, and the action opens from the tab itself rather than from
-           a mark inside it. */
         if (id === "unstored") {
           return (
             <UnstoredTab
@@ -253,6 +203,35 @@ function FilterTabs({
           </button>
         )
       })}
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          disabled={!hasPlaces}
+          render={
+            <button
+              type="button"
+              disabled={!hasPlaces}
+              aria-label={tab === "place" && chosen !== null
+                ? `${t("mcp.tab.places")}: ${chosen.label} · ${t(`mcp.detail.group.${chosen.scope}`)} · ${chosen.path}`
+                : `${t("mcp.tab.places")}: ${t("mcp.tab.all")}`}
+              aria-current={tab === "place" ? "true" : undefined}
+              className={`flex h-9 flex-none items-center gap-1.5 rounded-full px-4 text-[length:var(--text-body)] outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${tab === "place" ? "bg-foreground text-background dark:bg-accent dark:text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+            >
+              <ContainerIcon className="size-3.5 shrink-0" aria-hidden />
+              {t("mcp.tab.places")}
+              <ChevronDownIcon className="size-3.5 shrink-0" aria-hidden />
+            </button>
+          }
+        />
+        <PlaceMenu
+          words={placeWords(t)}
+          currentSelection
+          groups={MCP_SCOPES.map((scope) => ({
+            label: t(`mcp.detail.group.${scope}`),
+            options: scopePlaces[scope],
+          }))}
+          onPick={onChoose}
+        />
+      </DropdownMenu>
     </div>
   )
 }
@@ -434,8 +413,7 @@ export function McpServersPage() {
   /* The query lives in the address so the global search can seed it. */
   const query = search.query
   const setQuery = search.setQuery
-  /* One place inside the current scope, once a person picked one from the
-     scope's menu; `null` leaves the scope whole. */
+  /* One exact client file selected from the installation locations menu. */
   const [narrowed, setNarrowed] = React.useState<string | null>(null)
   const [selected, setSelected] = React.useState<ReadonlySet<string>>(new Set())
   const [openId, setOpenId] = React.useState<string | null>(null)
@@ -453,9 +431,27 @@ export function McpServersPage() {
     } satisfies Record<ShellTab, number>
   }, [servers])
 
-  /* Each scope pill names the places it holds by their marks, and its menu
-     counts what each place declares, so a person can tell two client files
-     apart before opening one. */
+  const chosen = selectedMcpPlace(places, narrowed)
+  const selectableKey = JSON.stringify(places.map((place) => place.id))
+  const [previousSelectableKey, setPreviousSelectableKey] = React.useState(selectableKey)
+  if (previousSelectableKey !== selectableKey) {
+    setPreviousSelectableKey(selectableKey)
+    if (tab === "place" && chosen === null) {
+      setTab("all")
+      setNarrowed(null)
+      setPage(0)
+      setSelected(new Set())
+    }
+  }
+
+  const activeTab: TabId =
+    (tab === "failed" && counts.failed === 0) ||
+    (tab === "unstored" && counts.unstored === 0) ||
+    (tab === "place" && chosen === null)
+      ? "all"
+      : tab
+
+  /* Counts use the unfiltered catalog and distinguish a failed scan from zero. */
   const scopePlaces = React.useMemo(() => {
     const byScope: Record<McpPlaceKind, PlaceOption[]> = { workspace: [], global: [] }
     for (const place of places) {
@@ -464,41 +460,15 @@ export function McpServersPage() {
         icon: place.icon,
         label: place.label,
         where: place.path,
-        count: servers.filter((server) =>
-          server.detail.installs.some((install) => install.place === place.id && install.installed)
-        ).length,
+        count: placeServerCount(servers, place.id, library.readPlaces),
+        selected: activeTab === "place" && chosen?.id === place.id,
       })
     }
     return byScope
-  }, [places, servers])
-
-  /* A scope with no places left has no tab to open: with no agent chosen, none
-     of its client files is read at all. */
-  const scopeHasPlaces = React.useCallback(
-    (id: TabId) => (id === "workspace" || id === "global" ? scopePlaces[id].length > 0 : true),
-    [scopePlaces]
-  )
-
-  /* A screen whose tab has just gone — the last failure cleared, the last
-     unstored server taken in, or the last place of a scope un-chosen — leaves
-     the person on the whole list instead of an empty one. */
-  const activeTab: TabId =
-    (tab === "failed" && counts.failed === 0) ||
-    (tab === "unstored" && counts.unstored === 0) ||
-    !scopeHasPlaces(tab)
-      ? "all"
-      : tab
-
-  /* A choice from a scope's menu only means something while that scope is the
-     one on screen; anywhere else the scope is whole. */
-  const chosen =
-    narrowed !== null && places.some((place) => place.scope === activeTab && place.id === narrowed)
-      ? narrowed
-      : null
+  }, [places, servers, library.readPlaces, activeTab, chosen])
 
   const visible = React.useMemo(() => {
     const needle = query.trim().toLowerCase()
-    const scopeOf = new Map(places.map((place) => [place.id, place.scope]))
     return servers.filter((server) => {
       /* The hub's own library: the servers it holds a record for. A server a
          client file declares and no record knows is still a row in the other
@@ -506,15 +476,7 @@ export function McpServersPage() {
       if (activeTab === "library" && !server.stored) return false
       if (activeTab === "unstored" && server.stored) return false
       if (activeTab === "failed" && server.status !== "failed") return false
-      /* A scope holds the servers its own places declare, narrowed to the one
-         place its menu last picked. */
-      if (activeTab === "workspace" || activeTab === "global") {
-        const held = server.detail.installs.filter((install) => install.installed)
-        const hit = held.some((install) =>
-          chosen === null ? scopeOf.get(install.place) === activeTab : install.place === chosen
-        )
-        if (!hit) return false
-      }
+      if (activeTab === "place" && (chosen === null || !serverHeldAt(server, chosen.id))) return false
       /* A server matches the picked type when any of its types is it, not just
          the first one, which is only the card's own label. */
       if (tag !== "" && !server.detail.tags.includes(tag)) return false
@@ -525,7 +487,7 @@ export function McpServersPage() {
         server.description.toLowerCase().includes(needle)
       )
     })
-  }, [servers, query, activeTab, tag, chosen, places])
+  }, [servers, query, activeTab, tag, chosen])
 
   /* A filter, an agent switch, or a shorter list can leave the page past the
      end; the page shown is clamped rather than an empty stretch of rows. */
@@ -641,14 +603,16 @@ export function McpServersPage() {
                 tab={activeTab}
                 onTab={(next) => {
                   setTab(next)
+                  setNarrowed(null)
+                  setSelected(new Set())
                   setPage(0)
                 }}
                 counts={counts}
-                hasPlaces={scopeHasPlaces}
                 scopePlaces={scopePlaces}
                 chosen={chosen}
-                onChoose={(scope, place) => {
-                  setTab(scope)
+                onChoose={(place) => {
+                  if (selectedMcpPlace(places, place) === null) return
+                  setTab("place")
                   setNarrowed(place)
                   setSelected(new Set())
                   setPage(0)

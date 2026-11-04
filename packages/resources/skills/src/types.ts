@@ -58,10 +58,12 @@ export type Skill = {
    */
   linkAt?: "library" | SkillPlaceId
   /**
-   * The places holding a skill of their own under this name, so the name is
-   * taken there: installing the library's copy into one of them is not possible.
+   * The places holding a skill of their own under this name. The library row
+   * still stands for it there — its marks and its places list count the place —
+   * and taking it out of that place deletes its entry. Installing the library's
+   * copy there is not possible while the name is taken.
    */
-  takenAt?: SkillPlaceId[]
+  takenAt?: SkillHold[]
   /** A link the hub made whose library skill is gone; only cleanup can follow. */
   stale?: boolean
   /**
@@ -71,11 +73,6 @@ export type Skill = {
   upstream?: SkillUpstream
   /** The last check of that source: what it held, and the files here then. */
   checked?: SkillCheck
-  /**
-   * A skill the workspace holds that the library also holds under this name;
-   * the library's copy is the one to manage, so this row offers nothing to do.
-   */
-  inLibrary?: boolean
   /** Token estimate, present once the body has been read. */
   tokens?: string
   /** Display-ready age, e.g. "2 hours ago"; empty for a row with no record. */

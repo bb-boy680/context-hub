@@ -21,6 +21,7 @@ import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -84,7 +85,9 @@ export function GenerateItems({
   const { t } = useI18n()
 
   return (
-    <>
+    /* Base UI's menu labels read their group's context: a label outside one
+       throws as the popup mounts, taking the whole page down with it. */
+    <DropdownMenuGroup>
       {promptMenu(place, held).map((group, at) => (
         <Fragment key={group.id}>
           {group.labelKey === undefined ? null : (
@@ -108,7 +111,7 @@ export function GenerateItems({
           })}
         </Fragment>
       ))}
-    </>
+    </DropdownMenuGroup>
   )
 }
 

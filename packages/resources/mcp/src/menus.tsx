@@ -99,13 +99,15 @@ export function InstallToMenu({
         groups={MCP_SCOPES.map((scope) => ({
           label: t(`mcp.detail.group.${scope}`),
           options: places
-            .filter((place) => place.scope === scope)
+            .filter((place) => place.scope === scope && place.installable !== false)
             .map((place) => ({
               id: place.id,
               icon: place.icon,
               label: place.label,
               where: place.path,
               selected: state.get(place.id)?.installed === true,
+              ...((state.get(place.id)?.readOnly === true || state.get(place.id)?.enabled === null)
+                ? { blocked: t("mcp.detail.place.selfManaged") } : {}),
             })),
         })).filter((group) => group.options.length > 0)}
       />
@@ -134,7 +136,8 @@ function enabledNote(
   place: McpAgentPlace,
   held: McpInstall | undefined
 ): string {
-  if (!place.switchable) return t("mcp.detail.place.selfManaged")
+  if (held?.enabled === null) return t("mcp.place.unknown")
+  if (!place.switchable || held?.readOnly === true) return t("mcp.detail.place.selfManaged")
   return t("mcp.menu.enabled.note")
     .replace("{scope}", t(scopeWord(place.scope)))
     .replace("{state}", t(held?.enabled === true ? "mcp.place.on" : "mcp.place.off"))
@@ -168,7 +171,7 @@ export function EnabledMenu({
      in the place that has one. */
   const held = (place: McpAgentPlace): McpInstall | undefined =>
     state.get(place.id) ??
-    server.detail.installs.find((install) => byId.get(install.place)?.client === place.client)
+    (place.root === undefined ? server.detail.installs.find((install) => byId.get(install.place)?.client === place.client) : undefined)
   const installed = new Set(
     server.detail.installs
       .filter((install) => install.installed)
@@ -210,10 +213,10 @@ export function EnabledMenu({
           /* A place its extension declares unswitchable is the hub's business
              to install for and nobody's to toggle: its row says so instead of
              showing a control that would not mean anything. */
-          if (place === undefined || !place.switchable) {
+          if (place === undefined || !place.switchable || held(place)?.readOnly === true || held(place)?.enabled === null) {
             return (
               <span className="flex h-5 shrink-0 items-center rounded-full bg-secondary px-2 text-[11.5px] leading-[1.3] text-muted-foreground">
-                {t("mcp.detail.place.self")}
+                {t(place !== undefined && held(place)?.enabled === null ? "mcp.place.unknown" : "mcp.detail.place.self")}
               </span>
             )
           }
@@ -229,7 +232,7 @@ export function EnabledMenu({
         groups={MCP_SCOPES.map((scope) => ({
           label: t(`mcp.detail.group.${scope}`),
           options: places
-            .filter((place) => place.scope === scope && installed.has(place.client))
+            .filter((place) => place.scope === scope && installed.has(place.client) && (place.root === undefined || state.has(place.id)))
             .map((place) => ({
               id: place.id,
               icon: place.icon,

@@ -228,6 +228,7 @@ function createWindow(url: string): void {
   const created = new BrowserWindow({
     width: 1280,
     height: 820,
+    icon: path.join(app.getAppPath(), "assets", "icon.png"),
     show: false,
     autoHideMenuBar: true,
     ...(process.platform === "win32"

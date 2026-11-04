@@ -222,10 +222,12 @@ export function createAboutHandler(options: {
  * workspace switches the files, and a product form mounts the same reader
  * itself.
  */
-export function createPlaceFileHandler(options: { home?: string; folder?: string } = {}): HubMiddleware {
+export function createPlaceFileHandler(options: { home?: string; folder?: string; userHome?: string; env?: NodeJS.ProcessEnv } = {}): HubMiddleware {
   const files = createFsPlaceFiles({
     ...(options.home === undefined ? {} : { home: options.home }),
     ...(options.folder === undefined ? {} : { folder: options.folder }),
+    ...(options.userHome === undefined ? {} : { userHome: options.userHome }),
+    ...(options.env === undefined ? {} : { env: options.env }),
   })
 
   return async (request, response, next) => {
@@ -246,6 +248,29 @@ export function createPlaceFileHandler(options: { home?: string; folder?: string
         return
       }
       if (call.ref === undefined) throw new Error("a call needs a place")
+      if (call.action === "list") {
+        if (files.list === undefined) throw new Error("client directory listing is not supported")
+        sendJson(response, 200, { entries: await files.list(call.ref) })
+        return
+      }
+      if (call.action === "display") {
+        if (files.display === undefined) throw new Error("client path display is not supported")
+        sendJson(response, 200, { path: await files.display(call.ref) })
+        return
+      }
+      if (call.action === "snapshot") {
+        if (files.snapshot === undefined) throw new Error("guarded file writes are not supported")
+        sendJson(response, 200, { snapshot: await files.snapshot(call.ref) })
+        return
+      }
+      if (call.action === "commit") {
+        if (files.commit === undefined || call.before === undefined || call.text === undefined) {
+          throw new Error("guarded file writes are not supported")
+        }
+        await files.commit(call.ref, call.before, call.text)
+        sendJson(response, 200, { ok: true })
+        return
+      }
       if (call.action === "read") {
         sendJson(response, 200, { text: await files.read(call.ref) })
         return
@@ -259,7 +284,8 @@ export function createPlaceFileHandler(options: { home?: string; folder?: string
       sendJson(response, 200, { ok: true })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      sendJson(response, 400, { error: message })
+      const code = (error as { code?: unknown } | null)?.code
+      sendJson(response, 400, { error: message, ...(typeof code === "string" ? { code } : {}) })
     }
   }
 }

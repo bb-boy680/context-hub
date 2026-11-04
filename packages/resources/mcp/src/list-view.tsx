@@ -156,7 +156,7 @@ export function ServerListView({
               server a client holds and none connects keeps the check's own
               verdict beside it. A server no file holds has no state to report:
               the place column already says it is installed nowhere. */}
-          {isInstalled(server) && !isEnabled(server) ? <OffChip /> : null}
+          {isInstalled(server) && isEnabled(server) === false ? <OffChip /> : null}
         </div>
       ),
     },

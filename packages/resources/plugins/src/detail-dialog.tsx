@@ -56,7 +56,8 @@ import {
   usePackReadme,
   type PluginClient,
 } from "./library.ts"
-import { placeReached, SCOPES, scopeWords } from "./rows.ts"
+import { installablePlaces, placeSourceNote, SCOPE_LABELS, SCOPES } from "./rows.ts"
+import { PLUGIN_SERVICE, type PluginPlace } from "./provider.ts"
 import { NO_CONTENTS } from "./contract.ts"
 import type { PackContentItem, PackContents } from "./contract.ts"
 import type { PluginInstallScope } from "./contract.ts"
@@ -74,7 +75,7 @@ import {
   type MediaItem,
   type PlaceOption,
 } from "@context-hub/extensions/components"
-import { useI18n } from "@context-hub/extensions/react"
+import { useHub, useI18n } from "@context-hub/extensions/react"
 import { Button } from "@context-hub/shadcn-ui/components/button"
 import {
   Dialog,
@@ -101,7 +102,6 @@ import { Spinner } from "@context-hub/shadcn-ui/components/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@context-hub/shadcn-ui/components/tabs"
 import { toast } from "@context-hub/shadcn-ui/components/toast"
 import { assetRef } from "@context-hub/core"
-import type { AssetScope } from "@context-hub/extensions"
 
 /** The two scope groups a panel lists places under, in the order it reads them. */
 /** The stage with no picture to show: what the pack is, in one block. */
@@ -564,6 +564,7 @@ function PackPane({
   onRemoveAsset: (ref: string) => Promise<void>
 }) {
   const { t } = useI18n()
+  const ctx = useHub()
   const [tab, setTab] = React.useState<PackTab>("media")
   const [contents, setContents] = React.useState<PackContents>(NO_CONTENTS)
 
@@ -575,7 +576,9 @@ function PackPane({
     let alive = true
     queueMicrotask(() => {
       if (!alive) return
-      void (dir === null ? packContents(plugin.id) : packContentsIn(dir))
+      const manifests = ctx.get(PLUGIN_SERVICE)?.manifestPaths() ?? []
+      const rules = ctx.get(PLUGIN_SERVICE)?.manifestRules() ?? []
+      void (dir === null ? packContents(plugin.id, manifests, rules) : packContentsIn(dir, manifests, rules))
         .then((found) => {
           if (alive) setContents(found)
         })
@@ -588,7 +591,7 @@ function PackPane({
     return () => {
       alive = false
     }
-  }, [dir, plugin.id])
+  }, [ctx, dir, plugin.id])
 
   const offered: { id: PackTab; key: string; count?: number }[] = [
     { id: "media", key: "plugins.detail.tab.media" },
@@ -672,7 +675,7 @@ function PackPane({
       {contents.mcp === null ? null : (
         <TabsContent value="mcp" className="min-h-0 flex-1 px-6 py-[22px]">
           <CodeCard
-            path=".mcp.json"
+            path={contents.mcpPath ?? ".mcp.json"}
             text={contents.mcp}
             words={{
               copy: t("plugins.detail.files.copy"),
@@ -830,13 +833,7 @@ function SourceSection({
 
 /**
  * Where this pack can be, and the way into and out of each place: the hub's own
- * library first, then one row per agent under the scope that names it.
- *
- * A place is one agent, not one of that agent's scopes. An agent that keeps
- * packs in two places inside a repository reads as one row saying both, and the
- * row's action is about the row: installing puts the pack in each of them, and
- * removing takes it back out of the ones that hold it. The finer choice — one
- * scope at a time — is what the list page's own row menu is for.
+ * library first, then one row per agent and installation scope.
  */
 function PlacesSection({
   plugin,
@@ -853,21 +850,14 @@ function PlacesSection({
   root: string
   busy: boolean
   onAdopt: () => void
-  onInstall: (client: string, scope: PluginInstallScope) => void
-  onUninstall: (client: string, scope: PluginInstallScope) => void
+  onInstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
 }) {
   const { t } = useI18n()
   /* The library is one of the places a pack can be, so it is one of the count.
      It counts where the pack really is, whether or not this hub put it there. */
   const installed = plugin.held.length + (plugin.stored ? 1 : 0)
 
-  /* What this agent holds in this group, in its own words — not what this hub
-     delivered to it. A pack the agent got from some other marketplace is just as
-     installed, and its row has to say so and offer the way out. */
-  const heldIn = (client: PluginClient, scope: AssetScope): string[] =>
-    (plugin.held.find((one) => one.client === client.id)?.places ?? [])
-      .filter((one) => one.group === scope)
-      .map((one) => one.scope)
   /* Why this row cannot be taken at all: an agent that is not on this machine,
      or one whose own list could not be read — the second holds an unknown set of
      packs, which is not the same as holding none. */
@@ -878,41 +868,28 @@ function PlacesSection({
         ? null
         : t("plugins.client.absent")
 
-  /* The rows, and what each one's action must reach. A row stands for the one
-     place its action lands in, so what it says and what a click writes agree; an
-     agent that keeps nothing in this group has no row here. A row's id carries
-     the group as well as the agent, because one agent appears in two groups. */
+  const byRow = new Map<string, { client: PluginClient; place: PluginPlace }>()
   const rows = SCOPES.map((scope) => ({
     label: t(`plugins.detail.group.${scope}`),
-    options: clients.flatMap((client): PlaceOption[] => {
-      const reached = placeReached(client.places, scope)
-      if (reached === undefined) return []
-      return [
-        {
-          id: `${scope}:${client.id}`,
+    options: clients.flatMap((client): PlaceOption[] =>
+      installablePlaces(client.places, (plugin.held.find((one) => one.client === client.id)?.places.length ?? 0) > 0)
+        .filter((place) => place.scope === scope).map((place) => {
+        const id = JSON.stringify([client.id, place.id])
+        byRow.set(id, { client, place })
+        return {
+          id,
           icon: client.icon,
           label: client.label,
-          /* The agent's own word for that one place: this hub has no path to
-             show, because an installer never names one. */
-          note: scopeWords([reached.scopeWord], t),
-        },
-      ]
-    }),
-  }))
-  const byRow = new Map(
-    rows.flatMap((group) =>
-      group.options.map((option) => {
-        const [scope, ...rest] = option.id.split(":")
-        return [option.id, { client: rest.join(":"), scope: scope as AssetScope }] as const
+          note: placeSourceNote(plugin.held.find((one) => one.client === client.id)?.places ?? [], scope, place, t),
+        }
       })
-    )
-  )
+    ),
+  }))
 
   const rowAction = (option: PlaceOption) => {
     const at = byRow.get(option.id)
     if (at === undefined) return null
-    const client = clients.find((one) => one.id === at.client)
-    if (client === undefined) return null
+    const { client, place } = at
 
     const blocked = blockedFor(client)
     if (blocked !== null) {
@@ -931,17 +908,22 @@ function PlacesSection({
       )
     }
 
-    const held = heldIn(client, at.scope)
+    const heldPlaces = (plugin.held.find((one) => one.client === client.id)?.places ?? [])
+      .filter((one) => one.placeId !== undefined ? one.placeId === place.id : one.scope === place.scopeWord)
+    const held = heldPlaces.filter((one) => !one.readOnly)
+    const readOnly = heldPlaces.some((one) => one.readOnly)
+    const ambiguous = new Set(held.map((one) => one.id)).size > 1
+    if ((held.length === 0 && readOnly) || ambiguous) {
+      return <span className="text-xs text-muted-foreground">{t("plugins.place.selfManaged")}</span>
+    }
     if (held.length > 0) {
       return (
         <Button
           type="button"
           variant="outline"
           disabled={busy}
-          aria-label={`${t("plugins.action.uninstall")} ${client.label}`}
-          onClick={() => {
-            for (const one of held) onUninstall(client.id, one as PluginInstallScope)
-          }}
+          aria-label={`${t("plugins.action.uninstall")} ${client.label} ${t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord)}`}
+          onClick={() => onUninstall(client.id, place.scopeWord, place.id)}
           className={`${placePill} border-border bg-transparent text-copy hover:bg-muted hover:text-foreground dark:border-input dark:bg-transparent`}
         >
           <MinusIcon className="size-[13px]" />
@@ -954,11 +936,8 @@ function PlacesSection({
         type="button"
         variant="ghost"
         disabled={busy}
-        aria-label={`${t("plugins.action.install")} ${client.label}`}
-        onClick={() => {
-          const reached = placeReached(client.places, at.scope)
-          if (reached !== undefined) onInstall(client.id, reached.scopeWord)
-        }}
+        aria-label={`${t("plugins.action.install")} ${client.label} ${t(SCOPE_LABELS[place.scopeWord] ?? place.scopeWord)}`}
+        onClick={() => onInstall(client.id, place.scopeWord, place.id)}
         className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
       >
         <PlusIcon className="size-[13px]" />
@@ -966,6 +945,10 @@ function PlacesSection({
       </Button>
     )
   }
+
+  const unavailable = plugin.held.flatMap((hold) => hold.places
+    .filter((place) => place.sourceAvailable === false)
+    .map((place) => ({ client: hold.client, label: hold.label, scope: place.scope, id: place.id, path: place.source?.path })))
 
   return (
     <section className="flex flex-col gap-2.5">
@@ -1004,7 +987,7 @@ function PlacesSection({
             <Button
               type="button"
               variant="ghost"
-              disabled={busy}
+              disabled={busy || plugin.directory === undefined}
               aria-label={`${t("plugins.action.adopt")} ${plugin.name}`}
               onClick={onAdopt}
               className={`${placePill} bg-secondary text-foreground hover:bg-accent`}
@@ -1022,6 +1005,12 @@ function PlacesSection({
           }}
           action={rowAction}
         />
+        {unavailable.map((place) => (
+          <li key={`${place.client}:${place.scope}:${place.id ?? ""}`} className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            <span>{place.label} · {t(SCOPE_LABELS[place.scope] ?? place.scope)} · {t("plugins.place.sourceUnavailable")}</span>
+            {place.path === undefined ? null : <span className="break-all font-mono">{place.path}</span>}
+          </li>
+        ))}
       </ul>
     </section>
   )
@@ -1049,8 +1038,8 @@ function InfoPanel({
   busy: boolean
   /** Take this pack to the revision its source holds. */
   onUpdate: () => void
-  onInstall: (client: string, scope: PluginInstallScope) => void
-  onUninstall: (client: string, scope: PluginInstallScope) => void
+  onInstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (client: string, scope: PluginInstallScope, placeId?: string) => void
   /** Take a pack only an agent holds into the library. */
   onAdopt: () => void
   /** Ask this pack's source whether it moved. */
@@ -1197,7 +1186,7 @@ function InfoPanel({
             return (async () => {
               for (const hold of plugin.held) {
                 for (const place of hold.places) {
-                  await onUninstall(hold.client, place.scope as PluginInstallScope)
+                  if (!place.readOnly) await onUninstall(hold.client, place.scope as PluginInstallScope, place.placeId)
                 }
               }
             })()
@@ -1205,6 +1194,7 @@ function InfoPanel({
         >
           <Button
             variant="outline"
+            disabled={!plugin.stored && plugin.held.some((hold) => hold.places.some((place) => place.readOnly) || new Set(hold.places.map((place) => place.id)).size > 1)}
             className="h-10 shrink-0 gap-[7px] rounded-full border-destructive/35 bg-transparent px-4 text-[13.5px] font-semibold text-destructive hover:bg-destructive/5 hover:text-destructive aria-expanded:bg-transparent aria-expanded:text-destructive dark:border-destructive/35 dark:bg-transparent"
           >
             <Trash2Icon className="size-[15px]" />
@@ -1474,8 +1464,8 @@ function PackLightbox({
   busy: boolean
   tagSuggestions: string[]
   onUpdate: (plugin: PluginRow) => void
-  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
-  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
   onAdopt: (plugin: PluginRow) => void
   onCheckUpdate: (plugin: PluginRow) => Promise<void>
   onDelete: (plugin: PluginRow) => Promise<void>
@@ -1510,8 +1500,8 @@ function PackLightbox({
           root={root}
           busy={busy}
           onUpdate={() => onUpdate(plugin)}
-          onInstall={(client, scope) => onInstall(plugin, client, scope)}
-          onUninstall={(client, scope) => onUninstall(plugin, client, scope)}
+          onInstall={(client, scope, placeId) => onInstall(plugin, client, scope, placeId)}
+          onUninstall={(client, scope, placeId) => onUninstall(plugin, client, scope, placeId)}
           onAdopt={() => onAdopt(plugin)}
           onCheckUpdate={() => onCheckUpdate(plugin)}
           onDelete={() => onDelete(plugin)}
@@ -1567,8 +1557,8 @@ export function PluginDetailDialog({
   /** Every category in use across the catalog, for the editor's quick picks. */
   tagSuggestions: string[]
   onUpdate: (plugin: PluginRow) => void
-  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
-  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope) => void
+  onInstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
+  onUninstall: (plugin: PluginRow, client: string, scope: PluginInstallScope, placeId?: string) => void
   onAdopt: (plugin: PluginRow) => void
   /** Ask this pack's source whether it moved. */
   onCheckUpdate: (plugin: PluginRow) => Promise<void>

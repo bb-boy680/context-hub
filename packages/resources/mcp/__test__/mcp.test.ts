@@ -13,7 +13,8 @@ import { beforeAll, describe, expect, it } from "vitest"
 import type { PlaceFiles } from "@context-hub/core/place-files"
 import type { ExtensionIcon } from "@context-hub/extensions"
 
-import { buildCatalog, placesOf, scanPlaces } from "../src/catalog.ts"
+import { availablePlaces, buildCatalog, placesOf, resolvePlaces, scanPlaces } from "../src/catalog.ts"
+import { isEnabled, placeServerCount, selectedMcpPlace, serverHeldAt } from "../src/installs.ts"
 import type { McpScan, ScannedPlace } from "../src/catalog.ts"
 import { McpError } from "../src/contract.ts"
 import type {
@@ -160,6 +161,67 @@ beforeAll(async () => {
     files,
     () => undefined
   )
+})
+
+describe("dynamic places and unknown status", () => {
+  it("resolves the same place snapshot used by the scan and keeps unknown state distinct", async () => {
+    const dynamic: McpPlace = { id: "dynamic", label: "Profile", scope: "global", file: "patch.yml", root: { home: ".fixture" }, switchable: true, installable: false }
+    const client = provider({ id: "dynamic-client", places: [], entries: {
+      dynamic: [{ name: "unknown", declaration: null, enabled: null, readOnly: true }],
+    } })
+    client.placesFor = async () => [dynamic]
+    const read = client.read.bind(client)
+    let seen: McpPlace | undefined
+    client.read = async (io, place) => { seen = io.place; return read(io, place) }
+    const port = { ...files, display: async () => "/fixture/patch.yml" }
+    const resolved = await resolvePlaces([client], () => MARK, port, () => undefined)
+    expect(resolved[0]?.place.path).toBe("/fixture/patch.yml")
+    const scan = await scanPlaces(resolved, port, () => undefined)
+    expect(seen?.id).toBe("dynamic")
+    const server = buildCatalog([], scan, resolved, [], Date.now()).servers[0]!
+    expect(server.detail.installs[0]).toMatchObject({ place: "dynamic", enabled: null, readOnly: true })
+    expect(isEnabled(server)).toBeNull()
+  })
+
+  it("disables writes to unreadable files while keeping other places available", () => {
+    const scan: McpScan = { entries: new Map(), problems: [{ place: "a-global", failure: { key: "mcp.error.read" } }] }
+    const available = availablePlaces(places, scan)
+    expect(available.find((entry) => entry.place.id === "a-global")?.place).toMatchObject({ installable: false, switchable: false })
+    expect(available.find((entry) => entry.place.id === "a-project")?.place.switchable).toBe(true)
+  })
+
+  it("fails when dynamic positions cannot be resolved", async () => {
+    const client = provider({ id: "dynamic-client", places: [PLACES[0]!], entries: {} })
+    client.placesFor = async () => { throw new Error("directory unavailable") }
+    await expect(resolvePlaces([client], () => MARK, files, () => undefined)).rejects.toThrow("directory unavailable")
+  })
+})
+
+describe("the installation location filter", () => {
+  it("counts and filters each client file independently, including disabled and unreadable entries", () => {
+    const catalog = buildCatalog(records, read, places, [], Date.now())
+    const github = catalog.servers.find((server) => server.name === "github")
+    const odd = catalog.servers.find((server) => server.name === "odd")
+    expect(github).toBeDefined()
+    expect(odd).toBeDefined()
+    expect(serverHeldAt(github as McpServer, "a-project")).toBe(true)
+    expect(serverHeldAt(github as McpServer, "a-global")).toBe(true)
+    expect(serverHeldAt(odd as McpServer, "a-project")).toBe(true)
+    expect(serverHeldAt(odd as McpServer, "a-global")).toBe(false)
+    const readable = new Set(read.entries.keys())
+    expect(placeServerCount(catalog.servers, "a-project", readable)).toBe(2)
+    expect(placeServerCount(catalog.servers, "a-global", readable)).toBe(1)
+    expect(placeServerCount(catalog.servers, "unread", readable)).toBeNull()
+    expect(placeServerCount(catalog.servers, "empty", new Set(["empty"]))).toBe(0)
+  })
+
+  it("drops a selected place when its agent no longer offers it", () => {
+    const available = places.map((item) => item.place)
+    expect(selectedMcpPlace(available, "a-project")?.id).toBe("a-project")
+    expect(selectedMcpPlace(available, "a-global")?.id).toBe("a-global")
+    expect(selectedMcpPlace(available.filter((place) => place.id !== "a-project"), "a-project")).toBeNull()
+    expect(selectedMcpPlace(available, null)).toBeNull()
+  })
 })
 
 describe("the service", () => {

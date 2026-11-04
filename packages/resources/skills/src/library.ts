@@ -14,7 +14,7 @@ import { createCatalog, type Catalog } from "@context-hub/extensions"
 import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
 import { readablePlaces, type SkillPlace, type SkillProvider } from "./provider.ts"
-import { modified, outdated } from "./store.ts"
+import { ahead, modified, outdated } from "./store.ts"
 import {
   DEFAULT_SKILL_UPDATE_SETTINGS,
   readSkillUpdateSettings,
@@ -126,6 +126,23 @@ export function useReadablePlaces(): SkillPlace[] {
   return readablePlaces(providers, chosen)
 }
 
+/** Places offered as targets, without hiding the module's shared read. */
+export function selectablePlaces(
+  providers: readonly SkillProvider[],
+  chosen: readonly string[]
+): SkillPlace[] {
+  return readablePlaces(
+    providers.filter((provider) => provider.id !== SKILLS_ID || provider.shared !== true),
+    chosen
+  )
+}
+
+export function useSelectablePlaces(): SkillPlace[] {
+  const providers = useSkillProviders()
+  const chosen = useChosenAgents()
+  return selectablePlaces(providers, chosen)
+}
+
 /**
  * The agents this hub reads skills from: one id per registered provider. A
  * `target` reads as an agent row while its own id is one of these, because a
@@ -164,12 +181,71 @@ export function inLibrary(skill: Skill): boolean {
 }
 
 /**
- * A skill a place holds and the library does not, which is what 收录 is for. A
- * place's own row is out when the library already holds that name: taking it in
- * would collide with the copy already there rather than add anything.
+ * A skill a place holds and the library does not, which is what 收录 is for.
  */
 export function unstored(skill: Skill): boolean {
-  return skill.inLibrary !== true && !inLibrary(skill) && holdsOf(skill).length > 0
+  return !inLibrary(skill) && holdsOf(skill).length > 0
+}
+
+/**
+ * Whether a place's own skill still gets a row of its own. A name the library
+ * already holds is represented by the library row; showing the place's copy as
+ * well would be the same skill twice, and the library copy is the one to manage.
+ *
+ * @param skill — the skill as the place reads it.
+ * @param items — the library rows in view.
+ */
+export function showsOwnRow(
+  skill: Pick<PlaceSkill, "name" | "origin">,
+  items: readonly SkillSummary[]
+): boolean {
+  return skill.origin !== "hub" && !items.some((item) => item.name === skill.name)
+}
+
+/**
+ * Every place a row belongs on screen under: the ones holding its files, and
+ * any holding a same-named skill of their own, which the library row stands for.
+ *
+ * @param skill — the row.
+ * @returns the places its tab and count include it in.
+ */
+export function placedIn(skill: Skill): SkillHold[] {
+  return [...holdsOf(skill), ...(skill.takenAt ?? [])]
+}
+
+/** A selected place remains valid only while that exact target is available. */
+export function selectedSkillPlace(
+  places: readonly SkillPlace[],
+  selected: Pick<SkillPlace, "id" | "scope" | "dir"> | null
+): SkillPlace | null {
+  return selected === null ? null : places.find((place) =>
+    place.id === selected.id && place.scope === selected.scope && place.dir === selected.dir
+  ) ?? null
+}
+
+export function skillPlaceKey(place: Pick<SkillPlace, "id" | "scope" | "dir">): string {
+  return JSON.stringify([place.scope, place.id, place.dir])
+}
+
+export function skillHeldAt(skill: Skill, place: Pick<SkillPlace, "id" | "scope" | "dir">): boolean {
+  return placedIn(skill).some((hold) =>
+    hold.id === place.id && hold.scope === place.scope && hold.dir === place.dir
+  )
+}
+
+/**
+ * Whether the place a ref names keeps its own skill under this row's name, so
+ * taking it back deletes that entry rather than a link the hub made.
+ *
+ * @param skill — the row.
+ * @param ref — the place an action names.
+ */
+export function nameTakenAt(skill: Skill, ref: SkillPlaceRef): boolean {
+  return (
+    skill.takenAt?.some(
+      (hold) => hold.scope === ref.scope && hold.dir === ref.dir
+    ) === true
+  )
 }
 
 /**
@@ -177,7 +253,7 @@ export function unstored(skill: Skill): boolean {
  * a check that recorded an answer says so: a row with no recorded source, or one
  * nobody has asked about, is not ahead of anything.
  */
-export { modified, outdated }
+export { ahead, modified, outdated }
 
 /**
  * How one place's directory reads to a person. A place is a directory inside a
@@ -517,7 +593,7 @@ export function useSkillLibrary(
        */
       const holding: SkillHold[] = []
       let linkAt: "library" | SkillPlaceId | undefined
-      const takenAt: SkillPlaceId[] = []
+      const takenAt: SkillHold[] = []
       for (const place of roots) {
         const own = place.byId.get(item.name)
         const adopted = reachedFrom(item, place.root)
@@ -527,8 +603,9 @@ export function useSkillLibrary(
           if (adopted) linkAt = "library"
           else if (linkAt === undefined) linkAt = place.id
         } else if (own !== undefined) {
-          /* A same-named skill the project wrote is not this one, and it holds the name. */
-          takenAt.push(place.id)
+          /* A same-named skill the project wrote holds the name there; the
+             library row above stands for it. */
+          takenAt.push({ id: place.id, scope: place.scope, dir: place.dir })
         }
       }
       return {
@@ -541,18 +618,14 @@ export function useSkillLibrary(
       }
     })
     /*
-     * A link the hub made, or a skill the library already reached through one,
-     * is on screen already; anything else a place holds is that place's own.
+     * A skill the library already holds is on screen as its library row; but a
+     * place's own skill under a name the library does not hold is that place's.
      */
     const own: Skill[] = []
     for (const place of roots) {
       for (const skill of held[place.id]?.skills ?? []) {
-        if (skill.origin === "hub") continue
-        if (items.some((item) => item.name === skill.name && reachedFrom(item, place.root))) continue
-        own.push({
-          ...placeRow(skill, place),
-          inLibrary: items.some((item) => item.name === skill.name),
-        })
+        if (!showsOwnRow(skill, items)) continue
+        own.push(placeRow(skill, place))
       }
     }
     return [...library, ...own]
@@ -571,12 +644,12 @@ export function useSkillLibrary(
   const adopt = React.useCallback(
     async (id: string, ref: SkillPlaceRef) => {
       if (store === null) throw new Error("this form has no skill library")
-      /* The place keeps its files; the library reaches them through a link. */
-      const landed = await store.adoptFrom(id, ref, installMode)
+      /* The place keeps its files; the library takes its own copy. */
+      const landed = await store.adoptFrom(id, ref)
       await reload()
       return landed
     },
-    [store, reload, installMode]
+    [store, reload]
   )
 
   const deleteInPlace = React.useCallback(
@@ -609,8 +682,7 @@ export function useSkillLibrary(
         await reload()
         return {
           ...result,
-          recordedHash: result.latestHash,
-          currentHash: result.latestHash,
+          recordedRevision: result.latestRevision,
           outdated: false,
         }
       }
@@ -685,7 +757,7 @@ export function useSkillLibrary(
     updates: rows.filter(outdated).length,
   }
   for (const [id] of targets) {
-    counts[id] = rows.filter((row) => holdsOf(row).some((hold) => hold.id === id)).length
+    counts[id] = rows.filter((row) => placedIn(row).some((hold) => hold.id === id)).length
   }
   return {
     store,

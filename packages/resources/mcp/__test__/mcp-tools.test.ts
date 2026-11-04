@@ -22,6 +22,9 @@ import {
   isBareKey,
   jsonValueLines,
   mcpFailure,
+  mcpTools,
+  parseYamlDocument,
+  spliceYamlDocument,
   parseJsonc,
   readDeclaration,
   readJsonObject,
@@ -35,6 +38,16 @@ import {
   writeTomlString,
 } from "../src/contract.ts"
 import type { McpRemoteDeclaration, McpStdioDeclaration } from "../src/contract.ts"
+
+describe("YAML toolkit", () => {
+  it("exposes the same range parser and editor through the service toolkit", () => {
+    expect(mcpTools.parseYamlDocument).toBe(parseYamlDocument)
+    expect(mcpTools.spliceYamlDocument).toBe(spliceYamlDocument)
+    const text = "- example: true # keep\n"
+    const value = mcpTools.parseYamlDocument(text)!.items![0]!.pairs![0]!.value!
+    expect(mcpTools.spliceYamlDocument(text, value.range[0], value.range[1], "false")).toBe("- example: false # keep\n")
+  })
+})
 
 describe("declaration", () => {
   /* Written with the declaration's own type rather than `as const`: a readonly

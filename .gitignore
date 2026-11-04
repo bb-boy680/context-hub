@@ -7,6 +7,7 @@ yarn-error.log*
 .pnpm-debug.log*
 lerna-debug.log*
 
+.codex
 node_modules
 dist
 dist-ssr
@@ -16,6 +17,7 @@ dist-ssr
 /apps/web/release/
 /apps/desktop/release/
 /apps/desktop/release-*/
+/out/
 
 # machine-local agent skill links
 /.claude/skills/

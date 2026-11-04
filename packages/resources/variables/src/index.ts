@@ -50,6 +50,7 @@ export const variablesExtension: ExtensionModule = {
       "Keep environment variable names, groups and values in one place, and insert a reference anywhere a ${name} is read.",
     icon: VariableIcon,
     defaultEnabled: true,
+    locked: true,
     permissions: ["assets.read", "filesystem"],
     provides: [VARIABLES_SERVICE, VARIABLE_LIBRARY_SERVICE],
   },
