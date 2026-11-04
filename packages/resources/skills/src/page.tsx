@@ -24,12 +24,12 @@ import {
 import * as React from "react"
 
 import { AddSkillDialog, type AddSkillTab } from "./add-skill-dialog.tsx"
-import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, tokenLabel, unstored, useReadablePlaces, useSelectablePlaces, useSkillDocument, useSkillLibrary } from "./library.ts"
+import { holdsOf, inLibrary, modified, nameTakenAt, outdated, placePath, placedIn, selectedSkillPlace, skillHeldAt, skillKey, skillPlaceKey, unstored, useReadablePlaces, useSelectablePlaces, useSkillLibrary } from "./library.ts"
 import { ProvenanceLine } from "./provenance-line.tsx"
 import { SkillDetailDialog } from "./skill-detail-dialog.tsx"
 import type { SkillPlace } from "./provider.ts"
 import { tagTone } from "./tags.ts"
-import type { SkillPlaceRef, SkillStore } from "./store.ts"
+import type { SkillPlaceRef } from "./store.ts"
 import type { Skill } from "./types.ts"
 
 import { useI18n, useSearchPage, useSettings } from "@context-hub/extensions/react"
@@ -46,6 +46,7 @@ import {
   PageBody,
   PlaceMenu,
   ResourceMasonry,
+  TagEditor,
   TablePagination,
   type LedgerColumn,
   type PlaceWords,
@@ -121,15 +122,6 @@ function TagChip({
       {tag}
     </span>
   )
-}
-
-/* A quiet chip over a cover: a hairline pill on the canvas colour, so a label
-   never competes with the picture underneath it. */
-const pillSurface =
-  "inline-flex h-5 shrink-0 items-center rounded-full bg-card/95 px-[9px] text-[12px] leading-none font-semibold text-foreground ring-1 ring-border"
-
-function TagPill({ tag }: { tag: string }) {
-  return <span className={pillSurface}>{tag}</span>
 }
 
 /**
@@ -306,73 +298,12 @@ function PhotoCover({
   )
 }
 
-/** The opening of a skill's file tree, as many rows as the cover has room for. */
-const COVER_TREE_ROWS = 4
-
-/**
- * A card with no media shows what the skill ships: `SKILL.md`, the folders
- * beside it, and how much there is. The card body already carries the name and
- * the description, so this is the one thing left that the card cannot say.
- */
-function FileTreeCover({ skill, store }: { skill: Skill; store: SkillStore | null }) {
-  const { t } = useI18n()
-  const { body, files } = useSkillDocument(skill, store)
-  const rows = files.slice(0, COVER_TREE_ROWS)
-  const count = t("skills.cover.files").replace("{count}", String(files.length))
-  const tokens =
-    body === null ? "" : t("skills.cover.tokens").replace("{tokens}", tokenLabel(body))
-
-  return (
-    <div
-      className={`flex size-full flex-col bg-surface-raised px-[18px] pb-2.5 ${
-        /* Room for the tag pills, which sit over this corner; nothing to clear without them. */
-        skill.tags.length > 0 ? "pt-10" : "pt-3.5"
-      }`}
-    >
-      {files.length === 0 ? (
-        /* Nothing read yet, or nothing to read: the icon says which element is
-           empty and the count how much of it there is. A heading and the
-           description would only repeat the card body. */
-        <span className="flex min-h-0 flex-1 flex-col items-center justify-center gap-1.5 text-muted-foreground">
-          <FileTextIcon className="size-[22px]" aria-hidden />
-          {body === null ? null : (
-            <span className="font-mono text-[12px] leading-[18px]">
-              {t("skills.cover.tokens").replace("{tokens}", tokenLabel(body))}
-            </span>
-          )}
-        </span>
-      ) : (
-        <span className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden font-mono text-[12px] leading-[18px]">
-          {rows.map((file) => (
-            <span
-              key={file.path}
-              className={
-                file.directory
-                  ? "truncate text-secondary-foreground"
-                  : "truncate text-muted-foreground"
-              }
-              style={{ paddingLeft: `${file.depth * 2}ch` }}
-            >
-              {`${file.path.slice(file.path.lastIndexOf("/") + 1)}${file.directory ? "/" : ""}`}
-            </span>
-          ))}
-        </span>
-      )}
-      {files.length === 0 ? null : (
-        <span className="shrink-0 border-t border-border pt-1.5 font-mono text-[12px] leading-[18px] text-muted-foreground">
-          {tokens === "" ? count : `${count} · ${tokens}`}
-        </span>
-      )}
-    </div>
-  )
-}
-
 /** Ratio a card falls back to before its asset reports one. */
 const FALLBACK_RATIO = 16 / 9
 
 /**
  * The asset a card shows: the first picture when it is a video, else the cover,
- * else the first picture. `undefined` means the card falls back to its document.
+ * else the first picture. `undefined` means the card has no media.
  *
  * A video is not drawn still — a card hands it to a preview that plays it — so
  * which kind it is decides which of the two the card uses.
@@ -406,25 +337,26 @@ function CheckBadge({ skill }: { skill: Skill }) {
 
 function SkillCard({
   skill,
-  store,
   blocked,
+  tagSuggestions,
+  onTagsChange,
   onInstall,
   onAdopt,
   onRemove,
   onOpen,
 }: {
   skill: Skill
-  /** The library behind the catalog, for a cover that reads the document. */
-  store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
+  tagSuggestions: string[]
+  onTagsChange: (tags: string[]) => Promise<void>
   onInstall: (ref: SkillPlaceRef) => void
   onAdopt: (ref: SkillPlaceRef) => void
   onRemove: (ref: SkillPlaceRef) => void
   onOpen: () => void
 }) {
-  const shownTags = skill.tags.slice(0, 2)
-  const extraTags = skill.tags.length - shownTags.length
+  const { t } = useI18n()
+  const [savingTags, setSavingTags] = React.useState(false)
   /* Stable identity keeps the ratio callback from re-running every render. */
   const media = React.useMemo(() => cardMedia(skill), [skill])
   /* The media box takes the asset's own ratio, so covers are never cropped. */
@@ -457,30 +389,22 @@ function SkillCard({
       }}
       className="w-full min-w-0 cursor-pointer overflow-hidden rounded-xl bg-card ring-1 ring-border transition-shadow outline-none hover:shadow-soft focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div
-        className="relative w-full overflow-hidden bg-surface-raised"
-        style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
-      >
-        {media === undefined ? (
-          <FileTreeCover skill={skill} store={store} />
-        ) : media.kind === "video" ? (
-          <AutoplayVideo
-            src={media.src}
-            onAspect={measure}
-            className="size-full object-cover"
-          />
-        ) : (
-          <PhotoCover src={media.src} onRatio={measure} />
-        )}
-        <div className="absolute top-3 left-3 flex items-center gap-1.5">
-          {shownTags.map((tag) => (
-            <TagPill key={tag} tag={tag} />
-          ))}
-          {extraTags > 0 && (
-            <span className={`${pillSurface} text-muted-foreground`}>+{extraTags}</span>
+      {media === undefined ? null : (
+        <div
+          className="relative w-full overflow-hidden bg-surface-raised"
+          style={{ aspectRatio: ratio ?? FALLBACK_RATIO }}
+        >
+          {media.kind === "video" ? (
+            <AutoplayVideo
+              src={media.src}
+              onAspect={measure}
+              className="size-full object-cover"
+            />
+          ) : (
+            <PhotoCover src={media.src} onRatio={measure} />
           )}
         </div>
-      </div>
+      )}
       <div className="flex flex-col gap-2.5 px-[18px] pt-4 pb-[18px]">
         <div className="flex h-[19px] items-center justify-between gap-2">
           <span className="flex min-w-0 items-center gap-1.5">
@@ -499,6 +423,24 @@ function SkillCard({
         <p className="line-clamp-2 text-[13px] leading-[18px] text-copy">
           {skill.description}
         </p>
+        {inLibrary(skill) ? (
+          <div onClick={(event) => event.stopPropagation()}>
+            <TagEditor
+              disabled={savingTags}
+              tags={skill.tags}
+              suggestions={tagSuggestions}
+              words={{
+                add: t("skills.detail.category.add"),
+                placeholder: t("skills.detail.category.placeholder"),
+                remove: t("skills.detail.category.remove"),
+              }}
+              onChange={(tags) => {
+                setSavingTags(true)
+                void onTagsChange(tags).finally(() => setSavingTags(false))
+              }}
+            />
+          </div>
+        ) : null}
         <div className="flex items-center justify-between gap-2">
           <ProvenanceLine skill={skill} />
           <SkillActionButton
@@ -567,20 +509,21 @@ function EmptyState({
  * jumps from nothing to full height the moment the answer lands.
  */
 function GridSkeleton() {
-  const covers = [292, 342, 276, 342, 292, 276, 292, 342]
+  const cards = Array.from({ length: 8 }, (_, index) => index)
 
   return (
     <ResourceMasonry>
-      {covers.map((height, index) => (
+      {cards.map((index) => (
         <div
           key={index}
           className="w-full min-w-0 overflow-hidden rounded-xl bg-card ring-1 ring-border"
         >
-          <div className="w-full animate-pulse bg-muted" style={{ height }} />
-          <div className="flex flex-col gap-2 px-[18px] py-3.5">
+          <div className="flex flex-col gap-2 px-[18px] py-4">
             <span className="h-4 w-1/2 animate-pulse rounded-full bg-muted" />
             <span className="h-3 w-5/6 animate-pulse rounded-full bg-muted" />
             <span className="h-3 w-2/3 animate-pulse rounded-full bg-muted" />
+            <span className="h-6 w-1/3 animate-pulse rounded-full bg-muted" />
+            <span className="h-8 w-full animate-pulse rounded-full bg-muted" />
           </div>
         </div>
       ))}
@@ -590,18 +533,19 @@ function GridSkeleton() {
 
 function SkillGrid({
   skills,
-  store,
   blocked,
+  tagSuggestions,
+  onTagsChange,
   onInstall,
   onAdopt,
   onRemove,
   onOpen,
 }: {
   skills: Skill[]
-  /** The library behind the catalog, for covers that read the document. */
-  store: SkillStore | null
   /** Why no folder can be installed into, ready to show; `null` when one can. */
   blocked: string | null
+  tagSuggestions: string[]
+  onTagsChange: (skill: Skill, tags: string[]) => Promise<void>
   onInstall: (skill: Skill, ref: SkillPlaceRef) => void
   onAdopt: (skill: Skill, ref: SkillPlaceRef) => void
   onRemove: (skill: Skill, ref: SkillPlaceRef) => void
@@ -619,8 +563,9 @@ function SkillGrid({
         <SkillCard
           key={skillKey(skill)}
           skill={skill}
-          store={store}
           blocked={blocked}
+          tagSuggestions={tagSuggestions}
+          onTagsChange={(tags) => onTagsChange(skill, tags)}
           onInstall={(ref) => onInstall(skill, ref)}
           onAdopt={(ref) => onAdopt(skill, ref)}
           onRemove={(ref) => onRemove(skill, ref)}
@@ -1128,8 +1073,15 @@ export function SkillsPage() {
     }
   }
 
-  const setTags = (skill: Skill, tags: string[]) =>
-    void applyTo(() => library.store?.update(skill.name, { tags }) ?? Promise.resolve())
+  const setTags = async (skill: Skill, tags: string[]) => {
+    try {
+      const store = library.store
+      if (store === null) throw new Error("this form has no skill library")
+      await applyTo(() => store.update(skill.name, { tags }))
+    } catch (failure) {
+      refuse(failure)
+    }
+  }
 
   /** Delete the skill, then close the lightbox it was open in. */
   const removeSkill = async (skill: Skill) => {
@@ -1446,8 +1398,9 @@ export function SkillsPage() {
             ) : view === "grid" ? (
               <SkillGrid
                 skills={skills}
-                store={library.store}
                 blocked={blocked}
+                tagSuggestions={library.tags}
+                onTagsChange={setTags}
                 onInstall={install}
                 onAdopt={adopt}
                 onRemove={uninstall}
@@ -1480,6 +1433,7 @@ export function SkillsPage() {
         }}
       />
       <SkillDetailDialog
+        key={detailKey ?? "closed"}
         skill={detail}
         store={library.store}
         root={library.root}

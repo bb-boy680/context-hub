@@ -9,7 +9,6 @@ import * as React from "react"
 import { useCatalog, useChosenAgents, useExtensionSnapshot, useHub, useI18n, usePluginSettings, useSettings } from "@context-hub/extensions/react"
 import type { AssetScope } from "@context-hub/extensions"
 
-import { parseSkillFile } from "./frontmatter.ts"
 import { createCatalog, type Catalog } from "@context-hub/extensions"
 import { SKILLS_ID } from "./extension.ts"
 import { NOTHING_READ, type SkillLibraryValue } from "./library-store.ts"
@@ -23,7 +22,6 @@ import {
 import type {
   PlaceSkill,
   PlaceSkillsView,
-  SkillFileEntry,
   SkillInstall,
   SkillPage,
   SkillPlaceRef,
@@ -322,74 +320,6 @@ export function sourceLabel(
  */
 export function skillKey(skill: Skill): string {
   return inLibrary(skill) ? `library:${skill.name}` : `${skill.location}:${skill.name}`
-}
-
-/** Token count as a compact label, the way the cards show it. */
-export function tokenLabel(body: string): string {
-  const count = Math.round(body.length / 4)
-  return count >= 1000 ? `${(count / 1000).toFixed(1)}k` : String(count)
-}
-
-/** One skill's document as a cover reads it. */
-export interface SkillDocument {
-  /** The SKILL.md body, or `null` until it is read. */
-  body: string | null
-  /** Every file the skill ships, which the same read already answered. */
-  files: readonly SkillFileEntry[]
-}
-
-const NO_FILES: readonly SkillFileEntry[] = []
-
-/** Documents already read, so a re-mounted cover does not refetch. */
-const documents = new Map<string, SkillDocument>()
-
-/**
- * The skill's own document — the SKILL.md body and its file list, read from
- * wherever the skill lives. Only a cover that shows the document calls this, so
- * a card with a picture never pays for the read.
- *
- * @param skill — the row whose document is shown.
- * @param store — the form's library, or `null` when this form has none.
- * @returns the body and files, both empty until the read answers.
- */
-export function useSkillDocument(
-  skill: Skill,
-  store: SkillStore | null
-): SkillDocument {
-  const key = `${skillKey(skill)}@${skill.stamp ?? ""}`
-  const [document, setDocument] = React.useState<SkillDocument>(
-    () => documents.get(key) ?? { body: null, files: NO_FILES }
-  )
-
-  React.useEffect(() => {
-    if (store === null || documents.has(key)) return
-    let live = true
-    void (async () => {
-      try {
-        /* A skill no library record holds is read where the place keeps it. */
-        const hold = holdsOf(skill)[0]
-        const record =
-          hold === undefined
-            ? await store.get(skill.name)
-            : await store.placeSkill(skill.name, { scope: hold.scope, dir: hold.dir })
-        if (record === undefined || record === null) return
-        const text = "body" in record ? record.body : record.text
-        const read: SkillDocument = {
-          body: hold === undefined ? text : parseSkillFile(text).body,
-          files: record.files,
-        }
-        documents.set(key, read)
-        if (live) setDocument(read)
-      } catch {
-        /* An unreadable skill leaves the cover on its file-less placeholder. */
-      }
-    })()
-    return () => {
-      live = false
-    }
-  }, [key, store, skill])
-
-  return document
 }
 
 /** A past timestamp as an age the list can print, localized to the active locale. */
