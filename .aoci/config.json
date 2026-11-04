@@ -20,7 +20,10 @@
     ".github",
     ".opencode",
     "designs",
-    "docs"
+    "docs",
+    "assets",
+    "public",
+    "static"
   ],
   "exclude_root_dirs": [
     "backup",

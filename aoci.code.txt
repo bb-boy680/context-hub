@@ -47,7 +47,7 @@ extension-detail-dialog.tsx[DU6L]: F:扩展详情弹窗：清单、来源、engi
 sidebar-rows.tsx[CU7S]: F:侧栏行与分组原语 | R:- | A:SidebarGroup,SidebarRow | S:行内自带控件必须用 div+role=button，嵌套 button 不合法也不可达；trailing 的 null 与 undefined 都要判空；行内控件点击要 stopPropagation；disabled 行渲染成 aria-disabled 的 div，hint 只做 title
 theme-provider.tsx[CU5M]: F:主题状态与持久化 | R:- | A:ThemeProvider,useTheme | S:localStorage 键默认 theme；按 d 键切换主题但输入框与可编辑区不触发；system 模式下跟随 matchMedia 变化
 theme-toggle.tsx[CU3T]: F:明暗主题切换按钮 | R:code:apps/web/src/components/theme-provider.tsx | A:ThemeToggle | S:aria-label 是硬编码中文，未走 i18n
-workspace-group.tsx[DU8M]: F:侧栏工作区列表与增删改，默认工作区固定显示且不可删除 | R:code:apps/web/src/lib/workspaces.ts,code:apps/web/src/lib/folder-picker.ts,code:apps/web/src/components/sidebar-rows.tsx | A:WorkspaceGroup,RenameDialog | S:移除只忘掉记录不动磁盘目录，所以删除不弹确认；当前工作区只显示勾而不显示 ⋯ 菜单；桌面 carrier 给绝对路径时按路径添加，浏览器只拿得到目录名由 host 自行定位；默认行显示 nameKey 的 i18n 文案且不显示路径 hint，菜单不渲染删除项；默认行清空或输入当前语言默认文案时提交空串，由 store 恢复系统别名
+workspace-group.tsx[DU8M]: F:侧栏工作区列表与增删改，默认工作区固定显示且不可删除 | R:code:apps/web/src/lib/workspaces.ts,code:apps/web/src/lib/folder-picker.ts,code:apps/web/src/components/sidebar-rows.tsx | A:WorkspaceGroup | S:移除只忘掉记录不动磁盘目录，所以删除不弹确认；当前工作区只显示勾而不显示 ⋯ 菜单；桌面 carrier 给绝对路径时按路径添加，浏览器只拿得到目录名由 host 自行定位；默认行显示 nameKey 的 i18n 文案且不显示路径 hint，菜单不渲染删除项；默认行清空或输入当前语言默认文案时提交空串，由 store 恢复系统别名
 desktop-menu-actions.tsx[AU7T]: F:页面侧监听桌面菜单动作并执行 | R:code:apps/web/src/lib/app-menu.ts,code:apps/web/src/lib/desktop.ts,code:apps/web/src/lib/extension-market.ts | A:DesktopMenuActions | S:不渲染 UI；desktopBridge 存在时订阅 onMenuAction；html.lang 跟随语言并经 setLanguage 通知主进程；about 导航 /settings#about；reload-resources 重读 skills/plugins；refresh-plugins 刷市场；结果弹 toast。
 extension-update-settings.tsx[AE6T]: F:设置页的扩展更新控件：检查时机、每天时间与自动更新 | R:code:apps/web/src/lib/extension-updates.ts,code:packages/extensions/src/components/settings-row.tsx | A:ExtensionUpdateSettings | S:命名空间 hub.extensions；值经 readExtensionUpdateSettings 归一化；dailyAt 只在选每天时出现；保存即生效
 
@@ -75,7 +75,7 @@ settings.tsx[AU8L]: F:设置页：外观、安装方式、图片下载、扩展�
 eslint.config.js[FQ3T]: F:core 包 lint 规则 | R:- | A:- | S:globals 必须同时含 browser 与 node，本包含两端代码
 package.json[FV8T]: F:core 包对外导出表与依赖 | R:- | A:- | S:exports 子路径是各模块唯一入口；semver 是运行时依赖、@types/semver 是 dev 依赖，供 engines 区间校验；./handlers 指向包根
 tsconfig.json[FV5T]: F:core 包编译选项 | R:- | A:- | S:include 必须含 src、handlers.ts 与 __test__，漏掉 handlers.ts 包根处理器就不进类型检查
-handlers.ts[CN9L]: F:hub 自有桥接的 node:http 处理器集合 | R:code:packages/core/src/host/http.ts,code:packages/core/src/host/server.ts,code:packages/core/src/host/extension-market.ts,code:packages/core/src/assets.ts,code:packages/core/src/net.ts,code:packages/core/src/place-files.ts,code:packages/core/src/plugins.ts,code:packages/core/src/about.ts | A:createAssetHandler,createStateHandler,createPlaceFileHandler,createExtensionHandler,createExtensionMarketHandler,createNetHandler | S:市场 list 成功后原子写 extensions/marketplace.json；install 把 hubVersion 传给安装器；市场路由只接受 POST；net 只允许 https 公网；about 返回版本与 home；workspace 路由与启动 ensure 共用 openWorkspaceStore（folder 缺省取 hostFolder）；ensureDefaultWorkspace 传 userHome() 作 defaultFolder，路由不传以保留该默认行；rename 接受空串，默认行恢复系统别名、其他行清别名
+handlers.ts[CN9L]: F:hub 自有桥接的 node:http 处理器集合 | R:code:packages/core/src/host/http.ts,code:packages/core/src/host/server.ts,code:packages/core/src/host/extension-market.ts,code:packages/core/src/assets.ts,code:packages/core/src/net.ts,code:packages/core/src/place-files.ts,code:packages/core/src/plugins.ts,code:packages/core/src/about.ts | A:createAssetHandler,createStateHandler,createPlaceFileHandler,createExtensionHandler,createExtensionMarketHandler,createWorkspaceHandler | S:市场 list 成功后原子写 extensions/marketplace.json；install 把 hubVersion 传给安装器；市场路由只接受 POST；net 只允许 https 公网；about 返回版本与 home；workspace 路由与启动 ensure 共用 openWorkspaceStore（folder 缺省取 hostFolder）；ensureDefaultWorkspace 传 userHome() 作 defaultFolder，路由不传以保留该默认行；rename 接受空串，默认行恢复系统别名、其他行清别名
 vitest.config.ts[FQ3T]: F:core 包的 vitest 项目 | R:code:packages/core/tsconfig.json | A:- | S:include 写死 __test__/**/*.test.ts，测试放在别处不会收集
 
 ===D:/work-space/dsh-context-hub/packages/core/src/===
@@ -88,6 +88,7 @@ workspace.ts[CD8S]: F:工作区契约、持久化默认标记与文档解码 | R
 about.ts[AC6T]: F:About 路由与形状：版本号与 hub home | R:code:packages/core/handlers.ts,code:packages/core/src/host/home.ts | A:ABOUT_ROUTE,AboutInfo | S:home 由 resolveHubHome 与 displayPath 得出，浏览器不读磁盘；版本由宿主启动时读 manifest 后传入，不在这里猜
 extension-manifest.ts[CG9M]: F:plugin.yaml 与 package.json 的纯校验契约，含 npm semver engines 区间 | R:code:packages/core/src/plugins.ts | A:Engines,parseEngines,parsePluginManifest,parsePluginManifestYaml,parsePluginPackage,isCompatible | S:plugin.yaml 禁 version/entry；engines.contextHub 必填且 validRange 必须通过；isCompatible(undefined)=true 只给编译模块；比较应用版本且 includePrerelease；非法 hubVersion fail closed；旧 apiVersion 被忽略
 extension-market.ts[CG8L]: F:市场索引格式、URL/本地源校验、兼容版本选择与更新计算 | R:code:packages/core/src/extension-manifest.ts,code:packages/core/src/plugins.ts | A:readMarketIndex,isMarketIndexUrl,isMarketSource,compatibleVersion,updateFor,recommendedVersion | S:只校验 engines 语法，不因单个版本不适配拒绝整份索引；compatibleVersion 取第一个满足项；updateFor 区分有兼容目标/仅不兼容；versions[0] 仅供展示；icon 只收 data/https；GitHub URL 归一化
+yaml-document.ts[CC6T]: F:YAML 文档解析与按原文范围替换 | R:code:packages/resources/mcp/src/contract.ts,code:packages/resources/mcp/src/toolkit.ts | A:YamlNode,parseYamlDocument,spliceYamlDocument | S:只接受恰好一个文档且无 error/warning；节点必须保留 range 才能原位替换；splice 前后各解析一次，替换后非法即抛错；自定义 js 标签只保留文本不执行
 
 ===D:/work-space/dsh-context-hub/packages/core/src/host/===
 assets-fs.ts[PD9S]: F:磁盘资产库 | R:code:packages/core/src/assets.ts,code:packages/core/src/host/atomic.ts | A:createFsAssetLibrary,resolveStoredFile | S:文件名是提示词清洗后加 8 位字节摘要，目标已存在就不再重写；resolveStoredFile 拒绝解析到 hub home 之外的路径，是各 store 的越界防线
@@ -144,6 +145,8 @@ code-editor.tsx[CU6S]: F:可就地编辑的代码视图 | R:code:packages/shadcn
 media-pane.tsx[CU7M]: F:媒体上传与拖放面板 | R:code:packages/extensions/src/components/media-gallery.tsx | A:MediaPane,MediaSource,MediaPaneWords | S:粘贴监听挂在 document 上，只有 onScreen=false 才关，因为面板在切走的标签页里仍挂载；dragleave 会因子元素触发，要用 relatedTarget 判断；words 全部由调用方传，三种资产文案表不同
 highlight.tsx[CU5T]: F:查询字符的首次高亮 | R:- | A:Highlighted | S:大小写不敏感，只标第一个命中；样式是 bg-transparent font-semibold text-primary；列表与弹窗共用这一份
 settings-row.tsx[CU6T]: F:设置页与插件设置区块共用的行原语 | R:code:packages/extensions/src/components/highlight.tsx,code:packages/shadcn-ui/src/components/switch.tsx,code:apps/web/src/pages/settings.tsx,code:packages/resources/skills/src/settings-section.tsx | A:SettingText,SettingRow,Segmented,SettingSwitch | S:SettingText/SettingRow 的 needle 只标第一处命中；Segmented 按引用值比较，泛型 T 须与 value 同型；SettingSwitch 的 className 是设置开关唯一的尺寸与配色来源，改这里会同时改所有开关。
+masonry.tsx[CU5T]: F:按容器宽度切换列数的响应式瀑布流 | R:code:packages/resources/skills/src/page.tsx,code:packages/resources/prompts/src/page.tsx | A:ResourceMasonry | S:ResizeObserver 以 556/846/1136/1426 分 1–5 列；列宽用 calc 扣掉 24px gutter，列少也铺满；无 ResizeObserver 时保持单列
+sidebar-icons.ts[CU6S]: F:侧栏与功能页的自绘图标集 | R:code:packages/extensions/src/types.ts | A:SidebarSkillsIcon,SidebarMcpIcon,SidebarPluginsMarketIcon,SidebarWorkspaceIcon,SidebarExtensionsIcon,Sidebar*Icon（共 12 个） | S:全部用 createElement 不用 JSX，让模块声明与搜索 provider 仍可在纯 Node 加载；frame 统一 24×24、currentColor 描边；plane 为半透明填充
 
 ===D:/work-space/dsh-context-hub/packages/extensions/src/===
 cordis.ts[CR9T]: F:内核框架唯一导入点 | R:- | A:Context,Service | S:TypeScript 只有在包根被当作值导入时才会把 augment 的 Context 成员并入符号，所以所有模块必须经本文件导入框架，不得直接 import @deepseek-ai/cordis
@@ -257,6 +260,7 @@ search.ts[DE7T]: F:插件搜索行 | R:code:packages/resources/plugins/src/libra
 settings-section.tsx[AE7T]: F:插件更新设置的设置页区块 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/update-settings.ts,code:packages/extensions/src/components/settings-row.tsx,code:packages/shadcn-ui/src/components/input.tsx | A:PluginsSettingsSection | S:lastCheckAt 是内部字段，写入先展开当前设置再覆盖一项；dailyAt 只在选每天时出现；控件值经 readPluginUpdateSettings 归一化，未知值回落 manual/14:00。
 update-settings.ts[DW7M]: F:插件更新检查的时机、自动下载与插件级调度 | R:code:packages/resources/plugins/src/revision.ts,code:packages/resources/plugins/src/index.ts,code:packages/resources/plugins/src/library.ts | A:PluginCheckTiming,PluginUpdateSettings/readPluginUpdateSettings,msUntilDue,updatableNames/updateOutdated/runScheduledCheck,PluginUpdateSource,startUpdateSchedule | S:默认 manual、不自动下载；startup 只跑一次；daily 按本地 dailyAt 运行、错过补跑；自动更新只碰 outdated && !modified；msUntilDue 从 extensions re-export，不再本地定义；定时器挂 ctx.effect
 market-install.ts[CE7T]: F:市场条目可收集地址的校验契约 | R:code:packages/resources/plugins/src/host/names.ts | A:MarketInstallSource,assertMarketInstall | S:只接受 url 与 git-subdir；必须 https、无凭证/查询/片段；ref 单词、sha 40 位；path 走 assertPackRelative；页面与 host 用同一套规则
+manifest-rules.ts[DE6T]: F:扩展清单规则校验与字面 JSON 条件匹配 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/describe.ts,code:packages/resources/plugins/src/provider.ts | A:PluginManifestRule,pluginManifestRules,matchesPluginManifestRule | S:跨进程边界重新校验；规则上限 128、条件上限 16，路径禁止空段与 __proto__/constructor/prototype；file 必须是相对路径且不含盘符或反斜杠；只读字面 JSON 值，不执行清单里的代码
 
 ===D:/work-space/dsh-context-hub/packages/resources/plugins/src/host/===
 collect.ts[PE8M]: F:把一个包收进库 | R:code:packages/resources/plugins/src/contract.ts,code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/resources/plugins/src/inspect.ts | A:createPluginCollector,PluginCollector,PackUpload | S:先暂存并用请求的清单声明验证再移入写行；市场 sha 与记录 revision 不同则重收；同名异源抛 PluginNameTakenError；本地目录来源无法 restore。
@@ -272,6 +276,7 @@ program.ts[RE7T]: F:运行控制台程序 | R:- | A:runProgram,hasProgram,Progra
 update.ts[PE7S]: F:把包更新到源当前状态 | R:code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/host/library.ts | A:createPluginUpdater,PluginUpdater,PluginUpdateOutcome | S:先比较暂存哈希，相同则不替换；更新记录时传入当前扩展清单路径；确实变化才替换目录。
 preview.ts[IN7T]: F:收取前读取一个市场条目的内容 | R:code:packages/resources/plugins/src/host/contents.ts,code:packages/resources/plugins/src/host/fetch.ts,code:packages/resources/plugins/src/contract.ts | A:MarketPreview,previewMarket | S:暂存获取后读 README 和组件，finally 删除暂存目录；不写库；缓存键包含清单声明，10 分钟内同键并发共享。
 installer-files.ts[PS9L]: F:安装器声明作用域的文件通道、目录投递与补偿写入 | R:code:packages/resources/plugins/src/provider.ts,code:packages/resources/plugins/src/host/library.ts,code:packages/core/src/host/atomic.ts | A:createInstallerFiles,InstallerFiles | S:作用域不是安全沙箱；state 多段逐级拒绝链接；directories 模板恰好一个 :name 且须匹配 write 白名单；复制绑定 sourceSnapshot 与目标 before，失败只恢复仍为本次写入的文件，清理失败会报 operation committed 并保留备份；不能锁住其他进程。
+proper-lockfile.d.ts[LR3T]: F:proper-lockfile 的最小类型声明 | R:- | A:- | S:只声明用到的 lock 与 LockOptions；lock 返回释放函数；options 全必填
 
 ===D:/work-space/dsh-context-hub/packages/resources/prompts/===
 eslint.config.js[FQ3T]: F:提示词模块 lint 规则 | R:- | A:- | S:含 react-hooks 但不含 react-refresh；globals 只有 browser
@@ -555,8 +560,8 @@ marketplace.ts[IN6S]: F:把 Claude 市场索引读成页面条目 | R:code:packa
 types.ts[IN6T]: F:Claude 市场索引的宽松形状 | R:- | A:RawClaudePlugin,RawClaudeMarketplace | S:全部字段 optional/unknown；plugins 不是数组时整份索引被拒，单条坏行只跳过
 
 ===D:/work-space/dsh-context-hub/packages/market/claude-plugins-official/src/===
-index.ts[EE7T]: F:把 Claude 官方市场注册为内置市场源 | R:code:packages/market/claude-plugins-official/src/source.ts | A:MARKET_CLAUDE_PLUGINS_OFFICIAL_ID,marketClaudePluginsOfficialExtension | S:defaultEnabled 但未 locked；inject 只有 marketSources；apply 把 ctx.host.net 与 log 传给 source；图标 GlobeIcon
-source.ts[AE7T]: F:Claude 市场源的清单读取与富化 | R:code:packages/market/claude-plugins-official/src/apis/client.ts,code:packages/market/claude-plugins-official/src/apis/marketplace.ts,code:packages/market/plugins/src/cache.ts | A:createClaudePluginsSource | S:createMarketCache 让并发 list 共享一个请求；enrich 只补 GitHub owner 头像，anthropics 自己的条目不补，让行回落分类图标
+index.ts[EE7T]: F:把 Claude 官方市场注册为内置市场源 | R:code:packages/market/claude-plugins-official/src/source.ts | A:MARKET_CLAUDE_PLUGINS_OFFICIAL_ID,marketClaudePluginsOfficialExtension | S:locked 且 defaultEnabled；清单 name 与 icon 复用 source 的 SOURCE_NAME/SOURCE_MARK（随包头像），与来源栏一致；description 为 en/zh-cn 双语；inject 只有 marketSources；apply 把 ctx.host.net 与 log 传给 source
+source.ts[AE7T]: F:Claude 市场源的清单读取与富化 | R:code:packages/market/claude-plugins-official/src/apis/client.ts,code:packages/market/claude-plugins-official/src/apis/marketplace.ts,code:packages/market/plugins/src/cache.ts | A:createClaudePluginsSource,SOURCE_NAME,SOURCE_MARK | S:SOURCE_NAME/SOURCE_MARK 同时供 manifest 与来源栏，头像为包内 assets/anthropics.png；createMarketCache 让并发 list 共享请求；enrich 只补 GitHub owner 头像，anthropics 自己的条目不补，行回落分类图标
 
 ===D:/work-space/dsh-context-hub/packages/market/codex-plugins/===
 eslint.config.js[FQ3T]: F:Codex 市场包 lint 规则 | R:- | A:- | S:globalIgnores 排除 dist；react-hooks 规则对无 JSX 文件也无害
@@ -571,8 +576,8 @@ marketplace.ts[IN6S]: F:把 Codex 市场索引读成页面条目 | R:code:packag
 types.ts[IN6T]: F:Codex 市场索引的宽松形状 | R:- | A:RawCodexPlugin,RawCodexMarketplace | S:字段可缺省；plugins 必须是数组，否则整份索引被拒
 
 ===D:/work-space/dsh-context-hub/packages/market/codex-plugins/src/===
-index.ts[EE7T]: F:把 Codex 官方市场注册为内置市场源 | R:code:packages/market/codex-plugins/src/source.ts | A:MARKET_CODEX_PLUGINS_ID,marketCodexPluginsExtension | S:defaultEnabled 但未 locked；inject 只有 marketSources；apply 把 ctx.host.net 与 log 传给 source；图标 BoxesIcon
-source.ts[AE7T]: F:Codex 市场源：索引、缓存与按需富化 | R:code:packages/market/codex-plugins/src/apis/client.ts,code:packages/market/codex-plugins/src/apis/marketplace.ts,code:packages/market/codex-plugins/src/apis/manifest.ts,code:packages/market/plugins/src/cache.ts | A:createCodexPluginsSource | S:索引不带宽高与描述；enrich 读每个可见行自己的 .codex-plugin/plugin.json，失败返回空而不报错；logo 相对路径按市场仓库解析
+index.ts[EE7T]: F:把 Codex 官方市场注册为内置市场源 | R:code:packages/market/codex-plugins/src/source.ts | A:MARKET_CODEX_PLUGINS_ID,marketCodexPluginsExtension | S:locked 且 defaultEnabled；清单 name 与 icon 复用 source 的 SOURCE_NAME/SOURCE_MARK（随包头像），与来源栏一致；description 为 en/zh-cn 双语；inject 只有 marketSources；apply 把 ctx.host.net 与 log 传给 source
+source.ts[AE7T]: F:Codex 市场源：索引、缓存与按需富化 | R:code:packages/market/codex-plugins/src/apis/client.ts,code:packages/market/codex-plugins/src/apis/marketplace.ts,code:packages/market/codex-plugins/src/apis/manifest.ts,code:packages/market/plugins/src/cache.ts | A:createCodexPluginsSource,SOURCE_NAME,SOURCE_MARK | S:SOURCE_NAME/SOURCE_MARK 同时供 manifest 与来源栏，头像为包内 assets/openai.png；索引不带宽高与描述；enrich 读每个可见行的 .codex-plugin/plugin.json，失败返回空不报错；logo 相对路径按仓库解析
 
 ===D:/work-space/dsh-context-hub/packages/market/plugins/===
 eslint.config.js[FQ3T]: F:插件市场包 lint 规则 | R:- | A:- | S:globalIgnores 排除 dist；react-hooks 规则覆盖 tsx
