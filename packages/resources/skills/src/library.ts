@@ -111,9 +111,11 @@ export function holdsOf(skill: Skill): SkillHold[] {
  * them back when it is disabled.
  */
 function useSkillProviders(): readonly SkillProvider[] {
+  "use no memo"
   const ctx = useHub()
   useExtensionSnapshot()
-  return ctx.get("skills")?.providers() ?? []
+  // 服务原位更新数组，复制后下游编译缓存才能识别注册变化。
+  return [...(ctx.get("skills")?.providers() ?? [])]
 }
 
 /**

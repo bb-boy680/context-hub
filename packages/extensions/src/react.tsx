@@ -51,6 +51,8 @@ export function useExtensionSnapshot(): ExtensionSnapshot {
 export function useContributions<P extends ExtensionPointId>(
   point: P
 ): ContributionMap[P][] {
+  "use no memo"
+  // 注册信息在服务内部变化，必须随扩展通知重新读取。
   const ctx = useHub()
   useExtensionSnapshot()
   return ctx.extensions.contributions(point)
@@ -61,6 +63,7 @@ export function useExtensionContributions<P extends ExtensionPointId>(
   id: string,
   point: P
 ): ContributionMap[P][] {
+  "use no memo"
   const ctx = useHub()
   useExtensionSnapshot()
   return ctx.extensions.contributionsFrom(id, point)
@@ -96,6 +99,8 @@ export interface I18n {
 
 /** Translation and locale control, re-rendering on every locale change. */
 export function useI18n(): I18n {
+  "use no memo"
+  // 翻译依赖服务内部状态，保留按语言快照更新函数的显式 memo。
   const ctx = useHub()
   const state = React.useSyncExternalStore(
     (onChange) => ctx.on("i18n/change", onChange),
