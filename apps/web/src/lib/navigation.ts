@@ -1,4 +1,4 @@
-import { BlocksIcon, SettingsIcon } from "lucide-react"
+import { SidebarExtensionsIcon, SidebarSettingsIcon } from "@context-hub/extensions/icons"
 import * as React from "react"
 
 import type { ExtensionIcon, NavGroupId } from "@context-hub/extensions"
@@ -8,7 +8,7 @@ export type NavItem = {
   /** Message key resolved through `ctx.i18n` where the item renders. */
   labelKey: string
   path: string
-  /** The shell's own entries use lucide icons; a contribution may use any. */
+  /** 壳层与扩展贡献各自提供图标组件。 */
   icon: ExtensionIcon
   /**
    * Sort rank inside the group. Built-in entries keep gaps between them (20,
@@ -45,8 +45,8 @@ export const navGroups: NavGroup[] = [
     id: "operate",
     labelKey: "nav.group.operate",
     items: [
-      { labelKey: "nav.settings", path: "/settings", icon: SettingsIcon, order: 20 },
-      { labelKey: "nav.extensions", path: "/extensions", icon: BlocksIcon, order: 30 },
+      { labelKey: "nav.settings", path: "/settings", icon: SidebarSettingsIcon, order: 20 },
+      { labelKey: "nav.extensions", path: "/extensions", icon: SidebarExtensionsIcon, order: 30 },
     ],
   },
 ]

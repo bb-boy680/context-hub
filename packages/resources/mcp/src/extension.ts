@@ -5,7 +5,7 @@
  * Node, which cannot parse JSX.
  */
 import type { ComponentType } from "react"
-import { ServerIcon } from "lucide-react"
+import { SidebarMcpIcon } from "@context-hub/extensions/icons"
 
 import type { WorkspaceService } from "@context-hub/core/workspace"
 import type { ExtensionModule } from "@context-hub/extensions"
@@ -40,7 +40,7 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
       kind: "code",
       category: "asset",
       description: "Declare the MCP servers agents may use, and where each is installed.",
-      icon: ServerIcon,
+      icon: SidebarMcpIcon,
       defaultEnabled: true,
       locked: true,
       permissions: ["storage.self", "filesystem"],
@@ -64,7 +64,7 @@ export function mcpModuleWith(page: ComponentType): ExtensionModule {
       ctx.nav.register({
         path: "/mcp-servers",
         labelKey: "nav.mcpServers",
-        icon: ServerIcon,
+        icon: SidebarMcpIcon,
         group: "assets",
         order: 20,
       })

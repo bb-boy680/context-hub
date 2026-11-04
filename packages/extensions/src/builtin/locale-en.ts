@@ -2,7 +2,7 @@
  * The locked English base pack. The kernel ships it because every lookup
  * falls back to it; other languages arrive as their own extension packages.
  */
-import { LanguagesIcon } from "lucide-react"
+import { SidebarLanguageIcon } from "../components/sidebar-icons.ts"
 
 import type { ExtensionModule } from "../types.ts"
 
@@ -188,7 +188,7 @@ export const englishLocale: ExtensionModule = {
     kind: "builtin",
     category: "language",
     description: "Base interface language every other pack falls back to.",
-    icon: LanguagesIcon,
+    icon: SidebarLanguageIcon,
     defaultEnabled: true,
     locked: true,
     permissions: [],

@@ -7,7 +7,9 @@
  * register their places into, and the navigation and language entries.
  */
 import type { ComponentType } from "react"
-import { FolderIcon, SparklesIcon } from "lucide-react"
+import { FolderIcon } from "lucide-react"
+
+import { SidebarSkillsIcon } from "@context-hub/extensions/icons"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
@@ -50,7 +52,7 @@ export function skillsModuleWith(
       kind: "code",
       category: "asset",
       description: "Browse, import and install skills, and keep them in this workspace.",
-      icon: SparklesIcon,
+      icon: SidebarSkillsIcon,
       defaultEnabled: true,
       locked: true,
       permissions: ["assets.read", "assets.write"],
@@ -93,7 +95,7 @@ export function skillsModuleWith(
       ctx.nav.register({
         path: "/skills",
         labelKey: "nav.skills",
-        icon: SparklesIcon,
+        icon: SidebarSkillsIcon,
         group: "assets",
         order: 15,
       })

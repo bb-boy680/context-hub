@@ -6,7 +6,7 @@
  * library has not taken in are searched too — the page shows them, so the
  * palette must find them.
  */
-import { SparklesIcon } from "lucide-react"
+import { SidebarSkillsIcon } from "@context-hub/extensions/icons"
 
 import { matchesQuery, searchPath } from "@context-hub/extensions"
 import type { SearchContribution, SearchResult } from "@context-hub/extensions"
@@ -25,7 +25,7 @@ const PAGE = "/skills"
 export function skillSearch(library: SkillLibrary): SearchContribution {
   return {
     labelKey: "search.group.skills",
-    icon: SparklesIcon,
+    icon: SidebarSkillsIcon,
     search(query) {
       const value = library.state().value
       if (value === null) return []

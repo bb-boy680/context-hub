@@ -9,7 +9,7 @@
  * an agent plugin registers how it installs a plugin into. Nothing here names an
  * agent — adding one is a plugin, not a case in this module.
  */
-import { PlugIcon } from "lucide-react"
+import { SidebarPluginsIcon } from "@context-hub/extensions/icons"
 
 import type { WorkspaceService } from "@context-hub/core/workspace"
 import type { ExtensionModule } from "@context-hub/extensions"
@@ -54,7 +54,7 @@ export const pluginsExtension: ExtensionModule = {
     kind: "code",
     category: "asset",
     description: "Browse the packs this hub knows, and keep them in the agents that use them.",
-    icon: PlugIcon,
+    icon: SidebarPluginsIcon,
     defaultEnabled: true,
     locked: true,
     permissions: ["assets.read", "assets.write"],
@@ -94,7 +94,7 @@ export const pluginsExtension: ExtensionModule = {
     ctx.nav.register({
       path: "/plugins",
       labelKey: "nav.plugins",
-      icon: PlugIcon,
+      icon: SidebarPluginsIcon,
       group: "assets",
       order: 30,
     })

@@ -9,7 +9,9 @@
  * library and the page, and the agents own the question of where "somewhere" is
  * — each declares its own directories when it activates.
  */
-import { FileTextIcon, FolderIcon } from "lucide-react"
+import { FolderIcon } from "lucide-react"
+
+import { SidebarPromptsIcon } from "@context-hub/extensions/icons"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
@@ -48,7 +50,7 @@ export const promptsExtension: ExtensionModule = {
     category: "asset",
     description:
       "Keep prompts in one place, and deliver them to an agent as a command, a rule, or a line of its instructions.",
-    icon: FileTextIcon,
+    icon: SidebarPromptsIcon,
     defaultEnabled: true,
     locked: true,
     permissions: ["assets.read", "filesystem"],
@@ -79,7 +81,7 @@ export const promptsExtension: ExtensionModule = {
     ctx.nav.register({
       path: "/prompts",
       labelKey: "nav.prompts",
-      icon: FileTextIcon,
+      icon: SidebarPromptsIcon,
       group: "assets",
       order: 35,
     })

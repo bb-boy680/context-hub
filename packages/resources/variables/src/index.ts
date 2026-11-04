@@ -9,7 +9,7 @@
  * on every visit, because the global search and the page both draw the same
  * names.
  */
-import { VariableIcon } from "lucide-react"
+import { SidebarVariablesIcon } from "@context-hub/extensions/icons"
 
 import type { ExtensionModule } from "@context-hub/extensions"
 
@@ -48,7 +48,7 @@ export const variablesExtension: ExtensionModule = {
     category: "asset",
     description:
       "Keep environment variable names, groups and values in one place, and insert a reference anywhere a ${name} is read.",
-    icon: VariableIcon,
+    icon: SidebarVariablesIcon,
     defaultEnabled: true,
     locked: true,
     permissions: ["assets.read", "filesystem"],
@@ -72,7 +72,7 @@ export const variablesExtension: ExtensionModule = {
     ctx.nav.register({
       path: "/variables",
       labelKey: "nav.variables",
-      icon: VariableIcon,
+      icon: SidebarVariablesIcon,
       group: "operate",
       order: 15,
     })

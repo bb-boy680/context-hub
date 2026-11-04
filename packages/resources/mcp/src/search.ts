@@ -6,7 +6,7 @@
  * record for it. The note under a result is the server's own description; a
  * declaration is a command, not a sentence to read.
  */
-import { ServerIcon } from "lucide-react"
+import { SidebarMcpIcon } from "@context-hub/extensions/icons"
 
 import { matchesQuery, searchPath } from "@context-hub/extensions"
 import type { SearchContribution, SearchResult } from "@context-hub/extensions"
@@ -27,7 +27,7 @@ const PAGE = "/mcp-servers"
 export function mcpSearch(library: McpLibrary): SearchContribution {
   return {
     labelKey: "search.group.mcp",
-    icon: ServerIcon,
+    icon: SidebarMcpIcon,
     search(query) {
       const catalog = library.rows()
       return catalog === null ? [] : searchServers(catalog.servers, query)
