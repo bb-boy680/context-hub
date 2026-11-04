@@ -1,5 +1,69 @@
 # Changelog
 
+## v0.2.1 (2026-11-04)
+
+### Features
+
+- **agents:** add host contracts for six agent integrations ([e3f98ac](https://github.com/bb-boy680/context-hub/commit/e3f98aceb4666c5f4e24ee0e7018a49f76303f5f))
+- **brand:** adopt fold logo across web and desktop ([bc2dca9](https://github.com/bb-boy680/context-hub/commit/bc2dca92276b1b8f5eab30da938ccc8874e807c4))
+- **mcp:** separate install targets from scan-only places ([e0b48d5](https://github.com/bb-boy680/context-hub/commit/e0b48d5e2d6daf4f8ffc73eefc2e796ab5e052b2))
+- **plugins:** support native agent manifests and transactional installs ([cc74950](https://github.com/bb-boy680/context-hub/commit/cc749505d07d662e8b9423a718387cc92ec254fa))
+- **plugins:** let extensions declare plugin file scopes ([410160d](https://github.com/bb-boy680/context-hub/commit/410160d3a45ad31295156b1ab868827e4c4af7b7))
+- **plugins:** install Claude Code plugins through files ([02e615d](https://github.com/bb-boy680/context-hub/commit/02e615d86164fbade4fad3ec5b7f64e437f63999))
+- unify installation location filters ([f0c6d15](https://github.com/bb-boy680/context-hub/commit/f0c6d15552bd5fb650ba00e95f236e48e6737d85))
+- **skills:** refine locations and masonry layout ([9fc6c8b](https://github.com/bb-boy680/context-hub/commit/9fc6c8b72ee6efac0628ac63eea1bb023bee1b50))
+- **market:** install a pack into the agent places it belongs in ([a2fc50b](https://github.com/bb-boy680/context-hub/commit/a2fc50bb4585ec2f1cab0f75e0c5b3248d81536a))
+- **market:** rebuild the plugin detail dialog around tabs ([e00ff83](https://github.com/bb-boy680/context-hub/commit/e00ff834e61d1710a6a9576c11899251f4981f23))
+- **market:** add the plugin market with pinned installs ([06f3aac](https://github.com/bb-boy680/context-hub/commit/06f3aac2d76abdc56e7057969831b9075826c613))
+- **market:** install skills into agent places ([a04c885](https://github.com/bb-boy680/context-hub/commit/a04c885cd10539502bb097d12feb648870fd34da))
+- **market:** add the skills.sh skills market ([3526795](https://github.com/bb-boy680/context-hub/commit/3526795bb7b005978c4d0ff65e837987287fa524))
+- **extensions:** mark the shipped modules as built-in ([0c3d66e](https://github.com/bb-boy680/context-hub/commit/0c3d66ed0843fb899997ad416891bef6506cd214))
+- **skills:** detect updates by upstream commit ([3ae8f25](https://github.com/bb-boy680/context-hub/commit/3ae8f255457d2dd6f7cd30e6690c173b9a51c795))
+- **web:** enable React Compiler in the Vite build ([978a798](https://github.com/bb-boy680/context-hub/commit/978a798f3a5366fb3a328d69cd7d30b266f6d6c8))
+
+### Bug Fixes
+
+- **plugins:** accept writes without manifest rules ([10e9d30](https://github.com/bb-boy680/context-hub/commit/10e9d307983df66ef628723c0c17a58d630f4260))
+- **market:** keep plugin details open during installation ([5d655ea](https://github.com/bb-boy680/context-hub/commit/5d655eaef8e1bca8693eb48b39f16cdc58bb3f3e))
+- **market:** open the skill detail from the whole row ([f26e3a5](https://github.com/bb-boy680/context-hub/commit/f26e3a5e6961bf041a9ba4a96d2bbf6713478438))
+- **web:** wait for the hub before starting Vite ([b75cbc4](https://github.com/bb-boy680/context-hub/commit/b75cbc46b644ac99d6544ab8aca68734d9147cbf))
+- **variables:** keep the picker open on field and panel clicks ([776f017](https://github.com/bb-boy680/context-hub/commit/776f017d8880d31ea7ac5c7c28a218efae890f6a))
+- **prompts:** keep the place menu's labels inside a group ([3616680](https://github.com/bb-boy680/context-hub/commit/3616680aba52fb6951e385423560e8a7c934c336))
+- **skills:** read the ASCII package listing too ([8cc20bd](https://github.com/bb-boy680/context-hub/commit/8cc20bdac2b02ab723e9358f3679718555bcb589))
+- **skills:** keep agent marks and uninstall for deduped rows ([a438565](https://github.com/bb-boy680/context-hub/commit/a4385654dd317f7c7fcef03f7d0b178afe2f53b2))
+- **skills:** copy adopted skills and dedupe rows by name ([b5f545e](https://github.com/bb-boy680/context-hub/commit/b5f545e2a19755064da7065a766faadd281ba210))
+
+### Refactoring
+
+- unify resource masonry layouts ([5bd9a6b](https://github.com/bb-boy680/context-hub/commit/5bd9a6ba98064ea817f4f7ff6cf4bbee7e91d62a))
+
+### Documentation
+
+- **agents:** archive six integration plans and icon assets ([e9b922c](https://github.com/bb-boy680/context-hub/commit/e9b922cbed7111026374ef006e916136c17e91a6))
+- record subagent usage policy ([25ed325](https://github.com/bb-boy680/context-hub/commit/25ed3253d7801f15b076c7a0b881f7e4f83520ee))
+- **agents:** add the design guidance block ([09b6630](https://github.com/bb-boy680/context-hub/commit/09b6630c710a1a088cb4ce828070c8f40c6075f4))
+- trim the AOCI section and ignore .codex ([e5a9ec7](https://github.com/bb-boy680/context-hub/commit/e5a9ec7661cccf89d638d6ac531921995a9cf6b1))
+- refine bilingual README and add MIT license ([a1b6c4b](https://github.com/bb-boy680/context-hub/commit/a1b6c4b56c9b1b0bb0630d2b2efc3b6139e85051))
+- **readme:** introduce Context Hub with bilingual README ([b647fe8](https://github.com/bb-boy680/context-hub/commit/b647fe882e72f62b8b27a3643c25e4fc76bf1e2d))
+
+### Build
+
+- **deps:** add proper-lockfile type declarations ([98279e7](https://github.com/bb-boy680/context-hub/commit/98279e71feb348b1a7241c49ed1f3c42fdfd5c0a))
+
+### Chores
+
+- **aoci:** refresh index and exclude local client config ([0f698f2](https://github.com/bb-boy680/context-hub/commit/0f698f203df331b57053c41a87dab429d5477318))
+- **aoci:** index the market install places ([2856fb0](https://github.com/bb-boy680/context-hub/commit/2856fb0f471e0c3c81274e33b0bfb2b95a232d10))
+- **aoci:** index the market detail dialog and market sources ([245a9b7](https://github.com/bb-boy680/context-hub/commit/245a9b7d0cc9e91362dcf5e4002d59daf2a9a830))
+- **aoci:** index the market install changes ([137c4b9](https://github.com/bb-boy680/context-hub/commit/137c4b94879a588d87d84172a8dda94871a89189))
+- **aoci:** refresh the design entry baseline ([c5eca68](https://github.com/bb-boy680/context-hub/commit/c5eca6841585a74399d09f1be213e873853831f8))
+- **design:** drop the stale index and add the market canvas ([7b1d636](https://github.com/bb-boy680/context-hub/commit/7b1d636103c65b5455e888b11d7865da9d446089))
+- **aoci:** index the market plugin ([6f2b274](https://github.com/bb-boy680/context-hub/commit/6f2b274016adfcf2d91aa5875d09d425baae0dcd))
+- **deps-dev:** bump vite from 8.2.2 to 8.2.4 ([ee81e9a](https://github.com/bb-boy680/context-hub/commit/ee81e9a602321feebde0c004b536056133123e68))
+- add MIT license ([81227bd](https://github.com/bb-boy680/context-hub/commit/81227bd5ec98d1ca96e98c5b1ba101a0e60d7af2))
+
+**Full Changelog**: https://github.com/bb-boy680/context-hub/compare/v0.2.0...v0.2.1
+
 ## v0.2.0 (2026-10-20)
 
 ### Features
