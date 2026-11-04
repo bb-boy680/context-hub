@@ -157,7 +157,7 @@ const declaration = {
 ```
 
 A template contains exactly one `:name`, which must match the copied library
-pack; `*` matches one safe segment. The destination also needs a matching
+pack; it may be a direct child (`":name"`) and `*` matches one safe segment. The destination also needs a matching
 `stateFiles.write` pattern. `disk.run` and `disk.commit` still take snapshots,
 check the source tree and compensate for failed writes. The existing four-part
 cache destination remains available. A multi-segment `state` path is relative to
@@ -179,7 +179,15 @@ contracts must be set after that version is released.
 An agent installer receives optional `tools.disk` through the plugins service.
 The installer declares its configuration and state roots, the workspace and library
 paths it needs, and read and write patterns. `*` matches one path segment and
-`**` matches multiple segments. Environment overrides must be absolute paths.
+`**` matches multiple segments; an empty read pattern permits listing a root.
+Environment overrides require absolute paths by default. A declaration may opt
+into `homeEnvResolution: "workspace"` to expand `~` and resolve relative values
+against the selected workspace; a relative value is rejected when no workspace
+is selected. This resolution matches the client only when that client starts in
+the selected workspace. `canonicalWorkspace: true` captures a realpath workspace
+key, falling back to the resolved path only when it does not exist. `disk.list`
+skips links by default; `includeLinks: true` includes their names without
+traversing them for recovery checks.
 The host checks paths and refuses symbolic links, compares snapshots and uses
 `disk.run` to serialize read-modify-write operations. Marketplace index documents
 are supplied by the extension and written under the library root.
@@ -201,13 +209,34 @@ previously recorded digest when replacing. For uninstall, pass
 argument together with the state-file changes. A freshly read destination
 snapshot alone cannot establish that it has not been modified since installation.
 Snapshots include binary files, empty directories and cache markers, and reject
-links. Snapshot-protected copies cannot use `pruneVersions`.
+included links. Snapshot-protected copies cannot use `pruneVersions`.
 
-These checks and compensating writes are not a cross-process lock: a client or
-another application can still edit the same files between checks. A failed
-rollback preserves a directory backup when it detects an intervening change.
-Agent-specific document formats and dependency semantics remain in the agent
-extension.
+Ordinary `disk.commit` uses process-local compensation and does not lock a
+client. A declaration may opt into a `proper-lockfile` compatible `lease` with
+a declared writable lock ref, stale time, heartbeat and bounded retry options.
+`disk.run` holds that lease; a compromised lease refuses subsequent operations.
+
+`disk.journalCommit` requires such a lease. The extension supplies the opaque
+client-compatible journal documents and declared refs for pending journals,
+staging, backup, a single commit-point file and any before/after file changes.
+The host checks snapshots, creates the staging directory, writes the journal,
+copies the payload, swaps the artifact, writes the commit point and then attempts projection and cleanup. An
+existing pending journal is refused for client recovery rather than guessed at.
+After the commit point, failures return `committed: true` and warnings; installers
+must forward warnings as `PluginInstallReport.warning`. Recovery semantics and
+journal contents belong to the extension. Persistent directory-lock copy fallback
+and power-loss durability are not guaranteed by this interface.
+
+`copyExcludeTop` omits specified top-level names from a source snapshot and its
+copy. `copyRejectNested` refuses matching nested names before hashing or copying;
+patterns are exact names or a prefix ending in `.*`. Ordinary commit still uses
+process-local compensation. Agent-specific document formats and dependency
+semantics remain in the agent extension.
+
+A policy-only `PluginPlace` can set `installable: false` to stay out of artifact
+install and uninstall menus while retaining its switch. A `clearable` place with
+an installer `clearEnabled` method exposes restoring inheritance without removing
+the artifact.
 
 ## MCP providers
 
@@ -215,6 +244,36 @@ An MCP provider may mark a place `installable: false` to scan and show existing
 server declarations without offering that file as a new installation target.
 Existing declarations can still be removed or updated. When omitted, `installable`
 defaults to `true`.
+
+Providers with locations discovered at runtime may implement `placesFor(io)`;
+it returns the complete current place list for a scan. The catalog uses that
+same resolved list for scanning, display and actions. For each read or action,
+`io.place` carries that exact resolved place; use its captured root identity
+rather than resolving a new location by id. An entry can return
+`enabled: null` for an unknown switch state or `readOnly: true` when its
+literal declaration cannot be changed safely. The page keeps the location and
+diagnostic visible while disabling the corresponding writes.
+
+A global `PlaceRef` may declare `root: { home, homeEnv?, list? }`, where `home` is a
+relative fallback under the user's home, `homeEnv` names an absolute-path
+override, and `list` names the exact directories that may be enumerated.
+Environment names must end in `_HOME` and must not contain credential terms.
+Rooted paths reject traversal and links. `PlaceFiles.list` enumerates
+direct child directories, `display` resolves a location, and `snapshot` plus
+`commit` perform a guarded replacement when both root identity and previous
+text still match. A place may carry `rootIdentity` from a snapshot so display,
+read and mutation reject a root that changed after discovery. These methods are
+optional: providers requiring them must refuse writes on an older host. The lease
+serializes this host's guarded writes;
+it cannot prevent an external editor from racing the final filesystem replace.
+A root declaration is a trusted extension capability, not a sandbox for
+untrusted extension code.
+
+`ctx.mcp.tools.parseYamlDocument` exposes nodes, tags and source ranges without
+evaluating expressions; `spliceYamlDocument` validates a replacement by
+reparsing while preserving text outside its range. Providers must identify
+ownership and refuse unsafe aliases, anchors, ambiguous overrides and tagged
+values before requesting an edit.
 
 ## Prompt providers
 
