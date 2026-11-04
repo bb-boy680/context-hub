@@ -1,5 +1,37 @@
 # Changelog
 
+## v0.2.2 (2026-11-04)
+
+### Features
+
+- **order:** keep install and manual Agent order ([63d89a7](https://github.com/bb-boy680/context-hub/commit/63d89a7db949eb681512fd65de7c5bad4b9c2e3a))
+- **workspace:** scope asset pages to global places in the global entry ([e40119b](https://github.com/bb-boy680/context-hub/commit/e40119bb49a95c69042733f59bb5d307b47abeb8))
+- **ui:** add custom sidebar and extension icons ([5e8e362](https://github.com/bb-boy680/context-hub/commit/5e8e3629ac086b12632635aeaa78e0d4a2b91d5f))
+
+### Bug Fixes
+
+- **masonry:** balance columns by height instead of index order ([44c09c9](https://github.com/bb-boy680/context-hub/commit/44c09c9599a26d63b165f40792f02c44dad6cac0))
+- **market:** unify built-in market identity and localize descriptions ([80ee04d](https://github.com/bb-boy680/context-hub/commit/80ee04dbc864d31defc5b03fecf87ee44da05e4e))
+- **ui:** refresh labels and agent list without reload ([b4a970b](https://github.com/bb-boy680/context-hub/commit/b4a970bc0d4bd08ed435a10d1278568d25a09626))
+
+### Refactoring
+
+- **skills:** keep the stored catalog order instead of sorting reads ([d817de3](https://github.com/bb-boy680/context-hub/commit/d817de37b92d383d2bee79c418e5543e4d6f8868))
+- **skills:** simplify cards and defer details ([9f9ba4f](https://github.com/bb-boy680/context-hub/commit/9f9ba4f19f54056cd5036cc14dec69c19b9561d8))
+
+### Documentation
+
+- **memory:** record plan research and post-acceptance archive rules ([751e68c](https://github.com/bb-boy680/context-hub/commit/751e68cf57dc45d8f43a4c5bf933195a6c157890))
+- **plans:** list the drag-and-drop dependencies in the agent order plan ([a9c753f](https://github.com/bb-boy680/context-hub/commit/a9c753fa31613d51cdb682005d5156bea02606ca))
+
+### Chores
+
+- sync workspace rules, plans and research notes ([171af34](https://github.com/bb-boy680/context-hub/commit/171af341e10cd57e4e53aeb5e2352ab1b6a6df8d))
+- **aoci:** align observed scope and refresh code entries ([492ae81](https://github.com/bb-boy680/context-hub/commit/492ae81b18c598ad98a2aa885ef7aac3fff91a2a))
+- **aoci:** align managed scope and refresh code entries ([115bff5](https://github.com/bb-boy680/context-hub/commit/115bff569a16005ec3db25d0da54be06a869fadb))
+
+**Full Changelog**: https://github.com/bb-boy680/context-hub/compare/v0.2.1...v0.2.2
+
 ## v0.2.1 (2026-11-04)
 
 ### Features
