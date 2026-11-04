@@ -148,7 +148,7 @@ export function createPluginHandler(
         : sent?.manifests)
       const rules = pluginManifestRules(method === "GET"
         ? JSON.parse(url.searchParams.get("rules") ?? "[]") as unknown
-        : sent?.rules)
+        : sent?.rules ?? [])
 
       /* GET /hub/plugins?action=list — every collected pack, and which of
          them have no files: the index is what says a pack was here, so a
