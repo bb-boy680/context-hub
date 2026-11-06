@@ -7,6 +7,7 @@
     "build": "turbo build",
     "build:cli": "pnpm --filter web build && pnpm --filter web build:cli",
     "build:desktop": "pnpm --filter @context-hub/desktop build",
+    "build:site": "pnpm --filter @context-hub/site build",
     "dev": "turbo dev",
     "dev:web": "pnpm --filter web dev",
     "dev:desktop": "pnpm --filter @context-hub/desktop dev",
@@ -24,6 +25,6 @@
   },
   "packageManager": "pnpm@10.33.4",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.18.0"
   }
 }
